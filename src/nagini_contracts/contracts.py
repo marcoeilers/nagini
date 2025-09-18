@@ -31,7 +31,7 @@ CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'ResultT', 'Implies', 'Fo
                   'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding', 'Previous',
                   'RaisedException', 'PSeq', 'PSet', 'ToSeq', 'ToMS', 'MaySet', 'MayCreate',
                   'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',
-                  'PMultiset', 'LowExit', 'Refute', 'isNaN']
+                  'PMultiset', 'LowExit', 'Refute', 'isNaN', 'MarkGhost']
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -40,6 +40,8 @@ U2 = TypeVar('U2')
 U3 = TypeVar('U3')
 U4 = TypeVar('U4')
 
+def MarkGhost(t: Type[T]) -> None:
+    pass
 
 def Requires(expr: bool) -> bool:
     pass
@@ -576,5 +578,6 @@ __all__ = [
         'ToMS',
         'MaySet',
         'MayCreate',
-        'isNaN'
+        'isNaN',
+        'MarkGhost'
         ]

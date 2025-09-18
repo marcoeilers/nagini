@@ -19,6 +19,8 @@ import traceback
 
 from jpype._jexception import JException
 from nagini_translation.analyzer import Analyzer
+from nagini_translation.ghost.ghost_checker import GhostChecker
+from nagini_translation.lib.context import Context
 from nagini_translation.sif_translator import SIFTranslator
 from nagini_translation.lib import config
 from nagini_translation.lib.constants import DEFAULT_SERVER_SOCKET
@@ -104,7 +106,7 @@ def load_sil_files(jvm: JVM, bv_size: int, sif: bool = False, float_option: str 
 
 def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), base_dir: str = None,
               sif: bool = False, arp: bool = False, ignore_global: bool = False,
-              reload_resources: bool = False, verbose: bool = False,
+              reload_resources: bool = False, verbose: bool = False, skip_verification: bool = False,
               check_consistency: bool = False, float_encoding: str = None,
               counterexample: bool = False) -> Tuple[List['PythonModule'], Program]:
     """
@@ -151,8 +153,16 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
         global sil_programs
         sil_programs = load_sil_files(jvm, bv_size, sif, float_encoding)
     modules = [main_module.global_module] + list(analyzer.modules.values())
+    ghost_checker = GhostChecker(modules)
+    ghost_ctx = Context()
+    ghost_ctx.current_class = None
+    ghost_ctx.current_function = None
+    ghost_ctx.module = modules[0]
+    ghost_checker.check(ghost_ctx)
     prog = translator.translate_program(modules, sil_programs, selected,
                                         arp=arp, ignore_global=ignore_global, sif=sif, float_encoding=float_encoding)
+    if skip_verification:
+        return modules, None
     if sif:
         set_all_low_methods(jvm, viper_ast.all_low_methods)
         set_preserves_low_methods(jvm, viper_ast.preserves_low_methods)
@@ -356,6 +366,12 @@ def main() -> None:
         type=int,
         default=8
     )
+    parser.add_argument(
+        '--skip-verification',
+        help='Skip verification of the program (check types only).',
+        action='store_true',
+        default=False
+    )
     args = parser.parse_args()
 
     config.classpath = args.viper_jar_path
@@ -420,7 +436,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
         start = time.time()
         selected = set(args.select.split(',')) if args.select else set()
         modules, prog = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif, base_dir=base_dir,
-                                  ignore_global=args.ignore_global, arp=arp, verbose=args.verbose,
+                                  ignore_global=args.ignore_global, arp=arp, verbose=args.verbose, skip_verification=args.skip_verification,
                                   counterexample=args.counterexample, float_encoding=args.float_encoding)
         if args.print_viper:
             if args.verbose:
@@ -447,6 +463,9 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                 print("{}, {}, {}, {}, {}".format(
                     i, args.benchmark, start, end, end - start))
         else:
+            if args.skip_verification:
+                return True
+
             submitter = None
             if args.submit_for_evaluation:
                 submitter = jvm.viper.silver.utility.ManualProgramSubmitter(True, "", "Nagini", backend.name.capitalize(), viper_args)
