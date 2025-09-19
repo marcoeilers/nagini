@@ -133,6 +133,7 @@ class ContractTranslator(CommonTranslator):
     def translate_builtin_predicate(self, node: ast.Call, perm: Expr,
                                     args: List[Expr], ctx: Context) -> Expr:
         name = node.func.id
+        seq_int = self.viper.SeqType(self.viper.Int)
         seq_ref = self.viper.SeqType(self.viper.Ref)
         set_ref = self.viper.SetType(self.viper.Ref)
         map_ref_ref = self.viper.MapType(self.viper.Ref, self.viper.Ref)
@@ -145,6 +146,8 @@ class ContractTranslator(CommonTranslator):
             return self._get_field_perm('set_acc', set_ref, perm, args[0], pos, ctx)
         elif name == 'dict_pred':
             return self._get_field_perm('dict_acc', map_ref_ref, perm, args[0], pos, ctx)
+        elif name == 'bytearray_pred':
+            return self._get_field_perm('bytearray_acc', seq_int, perm, args[0], pos, ctx)
         elif name == 'MayStart':
             return self.translate_may_start(node, args, perm, ctx)
         elif name == 'ThreadPost':

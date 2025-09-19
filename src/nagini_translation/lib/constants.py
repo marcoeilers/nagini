@@ -30,7 +30,7 @@ BUILTINS = ['cast',
 
 THREADING = ['Thread']
 
-BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred', 'MayStart', 'ThreadPost']
+BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred', 'bytearray_pred', 'MayStart', 'ThreadPost']
 
 FUNCTION_DOMAIN_NAME = 'Function'
 

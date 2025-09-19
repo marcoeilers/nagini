@@ -518,6 +518,13 @@ def dict_pred(d: object) -> bool:
     be folded or unfolded.
     """
 
+def bytearray_pred(d: object) -> bool:
+    """
+    Special, predefined predicate that represents the permissions belonging
+    to a bytearray. To be used like normal predicates, except it does not need to
+    be folded or unfolded.
+    """
+
 def isNaN(f: float) -> bool:
     pass
 
@@ -569,6 +576,7 @@ __all__ = [
         'list_pred',
         'dict_pred',
         'set_pred',
+        'bytearray_pred',
         'PSeq',
         'PSet',
         'PMultiset',
