@@ -487,6 +487,10 @@ class ProgramTranslator(CommonTranslator):
                                        self.viper.MapType(self.viper.Ref, self.viper.Ref),
                                        self.no_position(ctx),
                                        self.no_info(ctx)))
+        fields.append(self.viper.Field('bytearray_acc',
+                                       self.viper.SeqType(self.viper.Int),
+                                       self.no_position(ctx),
+                                       self.no_info(ctx)))
         fields.append(self.viper.Field('Measure$acc',
                                        self.viper.SeqType(self.viper.Ref),
                                        self.no_position(ctx),

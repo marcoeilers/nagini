@@ -12,7 +12,8 @@ function object___bool__(self: Ref) : Bool
     // this is not the case for collections.
     ensures self != null ==> (let t == (typeof(self)) in ((!issubtype(t, list(list_arg(t, 0))) &&
                                                            !issubtype(t, set(set_arg(t, 0))) &&
-                                                           !issubtype(t, dict(dict_arg(t, 0), dict_arg(t, 1)))) ==> result))
+                                                           !issubtype(t, dict(dict_arg(t, 0), dict_arg(t, 1))) &&
+                                                           !issubtype(t, bytearray())) ==> result))
 
 function NoneType___bool__(self: Ref) : Bool
     decreases _

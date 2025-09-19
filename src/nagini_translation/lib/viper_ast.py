@@ -207,6 +207,7 @@ class ViperAST:
             self.used_names.add('list')
             self.used_names.add('dict')
             self.used_names.add('set')
+            self.used_names.add('bytearray')
         self.used_names.add(name)
 
     def DomainFuncApp(self, func_name, args, type_passed,

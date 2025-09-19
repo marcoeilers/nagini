@@ -11,6 +11,7 @@ from nagini_translation.lib.constants import (
     BYTES_TYPE,
     COMBINED_NAME_ACCESSOR,
     DICT_TYPE,
+    BYTEARRAY_TYPE,
     END_LABEL,
     IGNORED_IMPORTS,
     IGNORED_MODULE_NAMES,
@@ -453,6 +454,7 @@ class StatementTranslator(CommonTranslator):
         """
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
+        seq_int = self.viper.SeqType(self.viper.Int)
         seq_ref = self.viper.SeqType(self.viper.Ref)
         set_ref = self.viper.SetType(self.viper.Ref)
         map_ref_ref = self.viper.MapType(self.viper.Ref, self.viper.Ref)
@@ -477,6 +479,13 @@ class StatementTranslator(CommonTranslator):
             invariant.append(field_pred)
         elif iterable_type.name == DICT_TYPE:
             acc_field = self.viper.Field('dict_acc', map_ref_ref, pos, info)
+            field_acc = self.viper.FieldAccess(iterable, acc_field, pos, info)
+            field_pred = self.viper.FieldAccessPredicate(field_acc,
+                                                         frac_perm_120, pos,
+                                                         info)
+            invariant.append(field_pred)
+        elif iterable_type.name == BYTEARRAY_TYPE:
+            acc_field = self.viper.Field('bytearray_acc', seq_int, pos, info)
             field_acc = self.viper.FieldAccess(iterable, acc_field, pos, info)
             field_pred = self.viper.FieldAccessPredicate(field_acc,
                                                          frac_perm_120, pos,
@@ -712,7 +721,7 @@ class StatementTranslator(CommonTranslator):
         # Find type of the collection content we're iterating over.
         if iterable_type.name in (LIST_TYPE, DICT_TYPE, SET_TYPE):
             target_type = iterable_type.type_args[0]
-        elif iterable_type.name in (RANGE_TYPE, BYTES_TYPE):
+        elif iterable_type.name in (RANGE_TYPE, BYTES_TYPE, BYTEARRAY_TYPE):
             target_type = ctx.module.global_module.classes[INT_TYPE]
         else:
             raise UnsupportedException(node, 'unknown.iterable')
