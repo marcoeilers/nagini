@@ -1136,12 +1136,14 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
             for requirement in self.requires:
                 requires.add(requirement)
             translator.set_required_names(self.sil_name, requires)
-            if self.sil_name in BUILTIN___EQ___FUNCTIONS and self.sil_name != OBJECT_EQ:
+            if self.sil_name in BUILTIN___EQ___FUNCTIONS:
                 self.merge_func_name = OBJ___EQ__MERGED
-                self.extended_name = self.get_fresh_name(sil_name + '_extended')
-            if self.sil_name in BUILTIN___HASH___FUNCTIONS and self.sil_name != OBJECT_HASH:
+                if self.sil_name != OBJECT_EQ:
+                    self.extended_name = self.get_fresh_name(sil_name + '_extended')
+            if self.sil_name in BUILTIN___HASH___FUNCTIONS:
                 self.merge_func_name = OBJ___HASH__MERGED
-                self.extended_name = self.get_fresh_name(sil_name + '_extended')
+                if self.sil_name != OBJECT_HASH:
+                    self.extended_name = self.get_fresh_name(sil_name + '_extended')
             return
         func_type = self.module.types.get_func_type(self.scope_prefix)
         if self.type is not None:
