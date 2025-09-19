@@ -83,6 +83,7 @@ NO_TRANS_SYMM = [
 ]
 
 DOMAIN_EQ_FUNC = 'eq'
+DOMAIN_HASH_FUNC = '_hash'
 OBJECT_EQ = 'object___eq__'
 OBJECT_HASH = 'object___hash__'
 EQUALITY_STATE_PRED = 'state'
@@ -151,6 +152,8 @@ DEPENDENCIES = [
     "type___unbox__",
     "object___cast__",
     OBJECT_HASH,
+    "SameHash",
+    DOMAIN_HASH_FUNC,
 ]
 STATE_PREDS = [
     'list_state',

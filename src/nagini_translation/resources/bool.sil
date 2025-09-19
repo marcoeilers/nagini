@@ -431,6 +431,16 @@ function type___eq__(self: Ref, other: Ref): Bool
     requires issubtype(typeof(other), type())
     ensures result == (type___unbox__(self) == type___unbox__(other))
 
+
+domain SameHash {
+    function _hash(self: Ref): Int
+
+    axiom same_hash {
+        forall o1: Ref, o2: Ref :: { _hash(o1), _hash(o2) } 
+            _hash(o1) == _hash(o2)
+    }
+}
+
 domain __Transitivity_Eq {
     function eq(self: Ref, other: Ref): Bool
 

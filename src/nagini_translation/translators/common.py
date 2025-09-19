@@ -35,6 +35,7 @@ from nagini_translation.lib.constants import (
     OBJ___HASH__MERGED,
     EQUALITY_STATE_PRED,
     DOMAIN_EQ_FUNC,
+    DOMAIN_HASH_FUNC,
     SYMM_TRANS_RES_VAR,
 )
 from nagini_translation.lib.context import Context
@@ -801,19 +802,37 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 if isinstance(receiver, GenericType):
                     receiver = receiver.cls
                 pos = self.to_position(receiver.node, ctx)
-                arg1 = self.to_ref(args[0], ctx)
-                if ctx.merge:
-                    return self.viper.FuncApp(OBJ___HASH__MERGED , [arg1], pos,
-                                                self.no_info(ctx), self.viper.Int)
+
+                # Redirect call to __eq__ function to domain function eq.
+                # Wrapped in box since custom __eq__ functions return Ref instead of Bool.
+                # type comparisons are not replaced with the domain function eq.
+                
+                # do not replace res == ...
+                res_in_args = list(filter(
+                    lambda a: (isinstance(a, self.viper.ast.LocalVar) 
+                               and a.name() == SYMM_TRANS_RES_VAR),
+                    args
+                ))
+                if not res_in_args and ctx.use_domain_func_eq:
+                    domain_name = 'SameHash'
+                    return self.viper.DomainFuncApp(
+                        DOMAIN_HASH_FUNC, [args[0]], self.viper.Int, pos,
+                        self.no_info(ctx), domain_name
+                    )
                 else:
-                    to_call = receiver.functions.get('__hash__')
-                    rt = self.translate_type(to_call.type, ctx)
-                    if to_call.extended_name:
-                        return self.viper.FuncApp(to_call.extended_name, [arg1], pos,
-                                                    self.no_info(ctx), rt)
+                    arg1 = self.to_ref(args[0], ctx)
+                    if ctx.merge:
+                        return self.viper.FuncApp(OBJ___HASH__MERGED , [arg1], pos,
+                                                    self.no_info(ctx), self.viper.Int)
                     else:
-                        return self.viper.FuncApp(to_call.sil_name, [arg1], pos,
+                        to_call = receiver.functions.get('__hash__')
+                        rt = self.translate_type(to_call.type, ctx)
+                        if to_call.extended_name:
+                            return self.viper.FuncApp(to_call.extended_name, [arg1], pos,
                                                         self.no_info(ctx), rt)
+                        else:
+                            return self.viper.FuncApp(to_call.sil_name, [arg1], pos,
+                                                            self.no_info(ctx), rt)
 
             if receiver.python_class.name == FLOAT_TYPE:
                 if ctx.float_encoding is None:

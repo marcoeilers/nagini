@@ -632,6 +632,223 @@ class MethodTranslator(CommonTranslator):
         ctx.use_domain_func_eq = False
         return stmts
 
+    def encode_same_hash_check(self, func: PythonMethod, ctx: Context, pos, info, sil_progs) -> Method:
+        self_var, other_var, self_decl, other_decl = self.get_self_other_as_var_and_decls(func)
+        body = []
+        locals = []
+
+        self_pyvar = func.args[list(func.args.keys())[0]]
+        other_pyvar = func.args[list(func.args.keys())[1]]
+
+        initial_type_check = self.get_typeof_check_for_custom_class(self_var, func.cls.sil_name, pos, info)
+        body.append(self.viper.Inhale(initial_type_check, pos, info))
+
+        result_in_posts = self.viper.LocalVar('res', self.viper.Ref, pos, info)
+        result_decl_in_posts = self.viper.LocalVarDecl('res', self.viper.Ref, pos, info)
+        left_hash_call = self.viper.LocalVar('left_hash_call', self.viper.Ref, pos, info)
+        left_hash_call_decl = self.viper.LocalVarDecl('left_hash_call', self.viper.Ref, pos, info)
+
+        locals.extend([result_decl_in_posts, left_hash_call_decl])
+
+        # assume typeof(res) <: bool
+        result_in_posts_subtype_check = self.get_subtype_check_for_custom_class(result_in_posts, 'bool', pos, info)
+        body.append(self.viper.Inhale(result_in_posts_subtype_check, pos, info))
+
+        # for at least one C in M we have: type(other) <: C
+        assume_other = self.viper.FalseLit(pos, info)
+        for c in func.mentioned_classes:
+            subtype_check_other = self.get_subtype_check_for_custom_class(other_var, c.sil_name, pos, info)
+            assume_other = self.viper.Or(assume_other, subtype_check_other, pos, info)
+
+        # type(self) == type(other)
+        type_self = self.viper.DomainFuncApp('typeof', [self_var], self.pytype, pos, info, self.pytype_domain)
+        type_other = self.viper.DomainFuncApp('typeof', [other_var], self.pytype, pos, info, self.pytype_domain)
+        type_self_eq_type_other = self.viper.EqCmp(type_self, type_other, pos, info)
+
+        assume_other = self.viper.Or(assume_other, type_self_eq_type_other, pos, info)
+        assume_other = self.viper.Inhale(assume_other, pos, info)
+        body.append(assume_other)
+
+        # inhale state predicate access for self and other
+        for var in [self_var, other_var]:
+            state_pred = self.viper.PredicateAccess([var], EQUALITY_STATE_PRED, pos, info)
+            acc_state_pred = self.viper.PredicateAccessPredicate(state_pred, self.viper.FullPerm(pos, info), pos, info)
+            body.append(self.viper.Inhale(acc_state_pred, pos, info))
+
+        ctx.use_domain_func_eq = True
+
+        old_func = ctx.current_function
+        ctx.current_function = func
+
+        # Inline body of func.___hash___ and assume the body.
+        # Calls to the merge function are redirected to the eq domain function
+        hash_func = func.cls.functions.get('__hash__')
+        if not hash_func:
+            hash_func = self.get_inherited_function(func.cls, "__hash__")
+        statements = hash_func.node.body
+        start, end = get_body_indices(statements)
+        actual_body = statements[start:end]
+        if (hash_func.contract_only or
+                (len(actual_body) == 1 and isinstance(actual_body[0], ast.Expr) and
+                 isinstance(actual_body[0].value, ast.Ellipsis))):
+            inlined_body = None
+        else:
+            inlined_body = self.translate_exprs(actual_body, hash_func, ctx)
+
+        ctx.current_function = old_func
+
+        if inlined_body:
+            body.append(self.viper.LocalVarAssign(left_hash_call, inlined_body, pos, info))
+        ctx.use_domain_func_eq = False
+
+        guarded_blocks = []
+        for c in toposort_classes(set(func.mentioned_classes)):
+            stmts = []
+            cond_exact_type = self.get_typeof_check_for_custom_class(other_var, c.sil_name, pos, info)
+            cond_subtype = self.get_subtype_check_for_custom_class(other_var, c.sil_name, pos, info)
+            other_hash_func = c.functions.get('__hash__')
+
+            # Use the domain function hash instead of the __hash__ merge function
+            # for the transitivity assumption.
+            ctx.use_domain_func_eq = True
+
+            if not other_hash_func:
+                other_hash_func = self.get_inherited_function(c, '__hash__')
+
+            else:
+                old_func = ctx.current_function
+                ctx.current_function = other_hash_func
+                old_class = ctx.current_class
+                ctx.current_class = other_hash_func.cls
+
+                iterator = iter(other_hash_func.args)
+                cur_self_pyvar = other_hash_func.args[next(iterator)]
+                aliases = {}
+                aliases[cur_self_pyvar.name] = other_pyvar
+
+                # cast other to type c
+                node_factory = ProgramNodeFactory()
+                t = other_pyvar.type
+                t_self = self_pyvar.type
+                old_type: PythonClass = node_factory.create_python_class(
+                    t.name, t.superscope, node_factory, t.node, t.superclass, t.interface
+                )
+                for k, v in t.__dict__.items():
+                    old_type.__setattr__(k, v)
+                other_pyvar.type = c
+                
+                # translate preconditions
+                and_pres = self.viper.TrueLit(pos, info)
+                for pre, _ in other_hash_func.precondition:
+                    with ctx.additional_aliases(aliases):
+                        stmt, expr = self.translate_expr(pre, ctx, self.viper.Bool, impure=True)
+                    if stmt:
+                        raise InvalidProgramException(pre, 'purity.violated')
+                    and_pres = self.viper.And(and_pres, expr, pos, info)
+                stmts.append(self.viper.Assert(and_pres, pos, info))
+
+                # translate postconditions
+                # we substitute result in the postconditions with res
+                ctx.transitivity_result_var = result_in_posts
+
+                and_posts = self.viper.TrueLit(pos, info)
+                for post, _ in other_hash_func.postcondition:
+                    with ctx.additional_aliases(aliases):
+                        stmt, expr = self.translate_expr(post, ctx, self.viper.Bool)
+                    if stmt:
+                        raise InvalidProgramException(post, 'purity.violated')
+                    and_posts = self.viper.And(and_posts, expr, pos, info)
+
+                stmts.append(self.viper.Inhale(and_posts, pos, info))
+                
+                # check if transitivity holds by asserting left_hash_call == res using
+                # int___eq___extended(hash(self), hash(other))
+                hash_eq = self.viper.FuncApp(
+                    'int___eq___extended',
+                    [left_hash_call, result_in_posts],
+                    pos, info, self.viper.Bool 
+                )
+                stmts.append(self.viper.Assert(hash_eq, pos, info))
+
+                # reset type to be object again
+                other_pyvar.type = old_type
+
+                ctx.current_function = old_func
+                ctx.current_class = old_class
+                ctx.transitivity_result_var = None
+
+            guarded_blocks.append(
+                (cond_subtype, self.translate_block(stmts, pos, info))
+            )
+
+            ctx.use_domain_func_eq = False
+ 
+        # encode elseif (type(self) == type(other))
+        # inline body in with self and other flipped
+        ctx.use_domain_func_eq = True
+
+        old_func = ctx.current_function
+        ctx.current_function = func
+
+        # Inline body of func.___hash___ and assume the body.
+        # Calls to the merge function are redirected to the eq domain function
+        cond_exact_type = self.get_typeof_check_for_custom_class(other_var, func.cls.sil_name, pos, info)
+        hash_func = func.cls.functions.get('__hash__')
+        if not hash_func:
+            hash_func = self.get_inherited_function(func.cls, "__hash__")
+        statements = hash_func.node.body
+        start, end = get_body_indices(statements)
+        actual_body = statements[start:end]
+        if (hash_func.contract_only or
+                (len(actual_body) == 1 and isinstance(actual_body[0], ast.Expr) and
+                 isinstance(actual_body[0].value, ast.Ellipsis))):
+            inlined_body = None
+        else:
+            iterator = iter(func.args)
+            self_pyvar = func.args[next(iterator)]
+            other_pyvar = func.args[next(iterator)]
+            aliases = {}
+
+            # cast other to the same type as self
+            node_factory = ProgramNodeFactory()
+            t = other_pyvar.type
+            t_self = self_pyvar.type
+            old_type: PythonClass = node_factory.create_python_class(
+                t.name, t.superscope, node_factory, t.node, t.superclass, t.interface
+            )
+            for k, v in t.__dict__.items():
+                old_type.__setattr__(k, v)
+            other_pyvar.type = t_self
+            aliases[self_pyvar.name] = other_pyvar
+
+            inlined_body = self.translate_exprs(actual_body, hash_func, ctx, aliases=aliases)
+
+            # reset to old type, i.e., object
+            other_pyvar.type = old_type
+
+        ctx.current_function = old_func
+
+        hash_eq_same_type = self.viper.FuncApp(
+            'int___eq___extended',
+            [left_hash_call, inlined_body],
+            pos, info, self.viper.Bool 
+        )
+
+        if inlined_body:
+            guarded_blocks.insert(0, (cond_exact_type, self.viper.Assert(hash_eq_same_type, pos, info)))
+        ctx.use_domain_func_eq = False
+
+        if guarded_blocks:
+            if_stmt = chain_if_stmts(guarded_blocks, self.viper, pos, info, ctx)
+            body.append(if_stmt)
+            block = self.translate_block(body, pos, info)
+
+        return self.viper.Method(
+            f"{func.sil_name}_check_same_hash",
+            [self_decl, other_decl], [],
+            [], [], locals, block, pos, info
+        )
+
     def encode_symmetry_check(self, func: PythonMethod, ctx: Context, pos, info, sil_progs) -> Method:
         self_var, other_var, self_decl, other_decl = self.get_self_other_as_var_and_decls(func)
         body = []

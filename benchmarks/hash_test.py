@@ -66,6 +66,7 @@ class E:
     @Pure
     def __hash__(self) -> int:
         Requires(Acc(self.state()))
+        Ensures(Result() == Unfolding(self.state(), hash(self.i)))
         return Unfolding(self.state(), hash(self.i))
 
     @Predicate
@@ -133,6 +134,7 @@ class F:
     @Pure
     def __hash__(self) -> int:
         Requires(Acc(self.state()))
+        Ensures(Result() == Unfolding(self.state(), hash(self.i)))
         return Unfolding(self.state(), hash(self.i))
 
     @Predicate

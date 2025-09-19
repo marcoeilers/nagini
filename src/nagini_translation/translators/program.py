@@ -1956,14 +1956,19 @@ class ProgramTranslator(CommonTranslator):
                         trans_check = self.config.method_translator.encode_transitivity_check(
                             func, ctx, pos, info
                         )
+                        hash_check = self.config.method_translator.encode_same_hash_check(
+                            func, ctx, pos, info, sil_progs
+                        )
                         # do not add methods if tests are run, whose names 
                         # do not include the substrings transitive or symmetric
                         pattern = r'^test_(?!.*(transitive|symmetric)).*\.py$'
                         if not re.match(pattern, module.file):
                             methods.append(symm_check)
                             methods.append(trans_check)
+                            methods.append(hash_check)
                             self.add_dependency([symm_check.name()], func.sil_name)
                             self.add_dependency([trans_check.name()], func.sil_name)
+                            self.add_dependency([hash_check.name()], func.sil_name)
 
                     func_constants.append(self.translate_function_constant(func, ctx))
                     if ((func_name != '__init__' or
