@@ -766,8 +766,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 pos = self.to_position(receiver.node, ctx)
 
                 # Redirect call to __eq__ function to domain function eq.
-                # Wrapped in box since custom __eq__ functions return Ref instead of Bool.
-                # type comparisons are not replaced with the domain function eq.
+                # Type comparisons are not replaced with the domain function eq.
                 
                 # do not replace res == ...
                 res_in_args = list(filter(
@@ -803,10 +802,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                     receiver = receiver.cls
                 pos = self.to_position(receiver.node, ctx)
 
-                # Redirect call to __eq__ function to domain function eq.
-                # Wrapped in box since custom __eq__ functions return Ref instead of Bool.
-                # type comparisons are not replaced with the domain function eq.
-                
+                # Redirect call to __hash__ function to domain function _hash.
                 # do not replace res == ...
                 res_in_args = list(filter(
                     lambda a: (isinstance(a, self.viper.ast.LocalVar) 
