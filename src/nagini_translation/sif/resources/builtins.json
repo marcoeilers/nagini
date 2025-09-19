@@ -645,12 +645,13 @@
             "args": ["bytearray", "int", "int"],
             "type": null,
             "MustTerminate": true,
-            "requires": ["__len__", "__getitem__", "int___unbox__"]
+            "requires": ["__len__", "__getitem__", "bytearray___bounds_helper__", "int___unbox__"]
         },
         "__iter__": {
             "args": ["bytearray"],
             "type": "Iterator",
-            "MustTerminate": true
+            "MustTerminate": true,
+            "requires": ["__sil_seq__"]
         },
         "__getitem_slice__": {
             "args": ["bytearray", "slice"],
@@ -663,17 +664,30 @@
     "functions": {
         "__len__": {
             "args": ["bytearray"],
-            "type": "__prim__int",
-            "requires": ["__val__"]
+            "type": "__prim__int"
         },
         "__getitem__": {
             "args": ["bytearray", "int"],
             "type": "__prim__int",
-            "requires": ["__len__", "int___unbox__"]
+            "requires": ["__len__", "bytearray___bounds_helper__", "int___unbox__"]
+        },
+        "__contains__": {
+            "args": ["bytearray", "int"],
+            "type": "__prim__bool",
+            "requires": ["int___unbox__"]
+        },
+        "__bool__": {
+            "args": ["bytearray"],
+            "type": "__prim__bool"
+        },
+        "__bounds_helper__": {
+            "args": ["__prim__int"],
+            "type": "__prim__bool"
         },
         "__sil_seq__": {
             "args": ["bytearray"],
-            "type": "__prim__Seq"
+            "type": "__prim__Seq",
+            "requires": ["bytearray___bounds_helper__", "__len__", "__prim__int___box__", "int___unbox__"]
         }
     },
     "extends": "object"
