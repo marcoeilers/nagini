@@ -318,7 +318,7 @@
         "__ror__": {
             "args": ["int", "int"],
             "type": "int",
-            "requires": ["__and__"]
+            "requires": ["__or__"]
         },
         "__xor__": {
             "args": ["int", "int"],
@@ -328,7 +328,17 @@
         "__rxor__": {
             "args": ["int", "int"],
             "type": "int",
-            "requires": ["__and__"]
+            "requires": ["__xor__"]
+        },
+        "__lshift__": {
+            "args": ["int", "int"],
+            "type": "int",
+            "requires": ["__prim__int___box__", "int___unbox__", "__prim__bool___box__", "bool___unbox__"]
+        },
+        "__rlshift__": {
+            "args": ["int", "int"],
+            "type": "int",
+            "requires": ["__lshift__"]
         }
     },
     "extends": "float"
