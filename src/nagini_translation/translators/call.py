@@ -517,6 +517,9 @@ class CallTranslator(CommonTranslator):
 
             if arg_type.name == LIST_TYPE:
                 method_name = '__initFromList__'
+                
+            if arg_type.name == INT_TYPE:
+                method_name = '__initFromInt__'
 
             #     sil_ref_seq = self.viper.SeqType(self.viper.Int)
             #     ref_seq = SilverType(sil_ref_seq, ctx.module)

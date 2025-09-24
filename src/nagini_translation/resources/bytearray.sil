@@ -7,6 +7,7 @@
 
 field bytearray_acc : Seq[Int]
 
+// Bytearray only accepts values in the range [0, 255]
 function bytearray___bounds_helper__(value: Int): Bool
     decreases _
 {
@@ -18,9 +19,14 @@ method bytearray___init__() returns (res: Ref)
     ensures res.bytearray_acc == Seq[Int]()
     ensures typeof(res) == bytearray()
     ensures Low(res)
-{
-    assume false
-}
+
+method bytearray___initFromInt__(length: Ref) returns (res: Ref)
+    requires issubtype(typeof(length), int())
+    ensures typeof(res) == bytearray()
+    ensures acc(res.bytearray_acc)
+    ensures |res.bytearray_acc| == int___unbox__(length)
+    ensures (forall i: Int :: { res.bytearray_acc[i] } 0 <= i < int___unbox__(length) ==> res.bytearray_acc[i] == 0)
+    ensures Low(res)
 
 method bytearray___initFromBytearray__(other: Ref) returns (res: Ref)
     requires issubtype(typeof(other), bytearray())
@@ -30,19 +36,17 @@ method bytearray___initFromBytearray__(other: Ref) returns (res: Ref)
     ensures res.bytearray_acc == other.bytearray_acc
     ensures typeof(res) == bytearray()
     ensures Low(res)
-{
-    assume false
-}
 
-method bytearray___initFromList__(values: Seq[Int]) returns (res: Ref)
+method bytearray___initFromList__(values: Ref) returns (res: Ref)
+    requires issubtype(typeof(values), list(int()))
+    requires acc(values.list_acc, 1/1000)
+    requires forall i: Int :: {values.list_acc[i]} ((0 <= i < list___len__(values)) ==> bytearray___bounds_helper__(int___unbox__(list___getitem__(values, __prim__int___box__(i)))))
+    ensures acc(values.list_acc, 1/1000)
     ensures acc(res.bytearray_acc)
-    ensures res.bytearray_acc == values
     ensures typeof(res) == bytearray()
+    ensures res.bytearray_acc == __seq_ref_to_seq_int(values.list_acc)
     ensures Low(res)
-{
-    assume false
-}
-
+    
 function bytearray___len__(self: Ref) : Int
     decreases _
     requires issubtype(typeof(self), bytearray())
@@ -90,9 +94,6 @@ method bytearray___getitem_slice__(self: Ref, key: Ref) returns (_res: Ref)
     ensures acc(_res.bytearray_acc)
     ensures typeof(_res) == bytearray()
     ensures _res.bytearray_acc == self.bytearray_acc[slice___start__(key, bytearray___len__(self))..slice___stop__(key, bytearray___len__(self))]
-{
-    assume false
-}
 
 method bytearray___setitem__(self: Ref, key: Ref, value: Ref) returns ()
     requires issubtype(typeof(self), bytearray())
@@ -105,9 +106,6 @@ method bytearray___setitem__(self: Ref, key: Ref, value: Ref) returns ()
     ensures acc(self.bytearray_acc)
     ensures self.bytearray_acc == old(self.bytearray_acc)[int___unbox__(key) := int___unbox__(value)]
     ensures (Low(key) && Low(value)) ==> (forall i: Ref :: {bytearray___getitem__(self, i)} ((issubtype(typeof(i), int()) && int___unbox__(i) >= 0 && int___unbox__(i) < bytearray___len__(self) && Low(old(bytearray___getitem__(self, i)))) ==> Low(bytearray___getitem__(self, i))))
-{
-    assume false
-}
 
 method bytearray_append(self: Ref, item: Ref) returns ()
     requires issubtype(typeof(self), bytearray())
@@ -116,9 +114,6 @@ method bytearray_append(self: Ref, item: Ref) returns ()
     requires @error("Provided item may be out of bounds.")bytearray___bounds_helper__(int___unbox__(item))
     ensures acc(self.bytearray_acc)
     ensures self.bytearray_acc == old(self.bytearray_acc) ++ Seq(int___unbox__(item))
-{
-    assume false
-}
 
 // Actual type of other is Iterable[SupportsIndex]
 method bytearray_extend(self: Ref, other: Ref) returns ()
@@ -137,8 +132,6 @@ method bytearray_reverse(self: Ref) returns ()
     ensures old(bytearray___len__(self)) == bytearray___len__(self)
     ensures forall i: Int :: {self.bytearray_acc[i]} ((i >= 0 && i < bytearray___len__(self)) ==> (self.bytearray_acc[i] == old(self.bytearray_acc[bytearray___len__(self) - 1 - i])))
 
-
-// TODO implement related functionality for Iterator on bytearray
 method bytearray___iter__(self: Ref) returns (_res: Ref)
     requires issubtype(typeof(self), bytearray())
     requires acc(self.bytearray_acc, 1/ 20)
@@ -150,15 +143,12 @@ method bytearray___iter__(self: Ref) returns (_res: Ref)
     ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
     ensures acc(_res.__previous, write) && _res.__previous == Seq[Ref]()
     ensures issubtype(typeof(_res), Iterator(int()))
-{
-  inhale false
-}
 
 function bytearray___sil_seq__(self: Ref): Seq[Ref]
   decreases _
   requires issubtype(typeof(self), bytearray()) 
   requires acc(self.bytearray_acc, wildcard)
   ensures |result| == bytearray___len__(self)
-  ensures (forall i: Int :: { result[i] } i >= 0 && i < bytearray___len__(self) ==> result[i] == __prim__int___box__(self.bytearray_acc[i]))
+  ensures (forall i: Int :: { result[i] } 0 <= i < bytearray___len__(self) ==> result[i] == __prim__int___box__(self.bytearray_acc[i]))
   ensures (forall i: Ref :: { (i in result) } (i in result) == (typeof(i) == int() && (int___unbox__(i) in self.bytearray_acc)))
   ensures (forall i: Ref :: { (i in result) } (i in result) ==> bytearray___bounds_helper__(int___unbox__(i)))

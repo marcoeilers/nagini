@@ -614,10 +614,17 @@
             "type": null,
             "MustTerminate": true
         },
-        "__initFromList__": {
-            "args": ["__prim__Seq"],
+        "__initFromInt__": {
+            "args": ["int"],
             "type": null,
-            "MustTerminate": true
+            "MustTerminate": true,
+            "requires": ["int___unbox__"]
+        },
+        "__initFromList__": {
+            "args": ["list"],
+            "type": null,
+            "MustTerminate": true,
+            "requires": ["list", "list___getitem__", "list___len__", "bytearray___bounds_helper__", "int___unbox__", "__seq_ref_to_seq_int"]
         },
         "__initFromBytearray__": {
             "args": ["bytearray"],
@@ -645,7 +652,7 @@
             "args": ["bytearray", "int", "int"],
             "type": null,
             "MustTerminate": true,
-            "requires": ["__len__", "__getitem__", "bytearray___bounds_helper__", "int___unbox__"]
+            "requires": ["__len__", "__getitem__", "bytearray___bounds_helper__", "int___unbox__", "__prim__int___box__"]
         },
         "__iter__": {
             "args": ["bytearray"],
@@ -687,7 +694,7 @@
         "__sil_seq__": {
             "args": ["bytearray"],
             "type": "__prim__Seq",
-            "requires": ["bytearray___bounds_helper__", "__len__", "__prim__int___box__", "int___unbox__"]
+            "requires": ["bytearray___bounds_helper__", "__len__", "__prim__int___box__", "int___unbox__", "__prim__int___box__"]
         }
     },
     "extends": "object"
