@@ -500,11 +500,10 @@ class CallTranslator(CommonTranslator):
         bytearray_class = ctx.module.global_module.classes[BYTEARRAY_TYPE]
         res_var = ctx.current_function.create_variable('bytearray', bytearray_class, self.translator)
         targets = [res_var.ref()]
+        result_var = res_var.ref(node, ctx)        
 
-        position = self.to_position(node, ctx)
-        info = self.no_info(ctx)
-        result_var = res_var.ref(node, ctx)
-
+        # This could potentially be merged using the "display_name" field
+        # by extending the general code for selecting a specific __init__ call
         if len(node.args) == 0:
             call = self.get_method_call(bytearray_class, '__init__', [], [], targets, node, ctx)
             return call, result_var
@@ -520,22 +519,8 @@ class CallTranslator(CommonTranslator):
                 
             if arg_type.name == INT_TYPE:
                 method_name = '__initFromInt__'
-
-            #     sil_ref_seq = self.viper.SeqType(self.viper.Int)
-            #     ref_seq = SilverType(sil_ref_seq, ctx.module)
-            #     havoc_var = ctx.current_function.create_variable('havoc_seq', ref_seq,
-            #                                                     self.translator)
-            #     seq_field = self.viper.Field('bytearray_acc', sil_ref_seq, position, info)
-            #     content_field = self.viper.FieldAccess(result_var, seq_field, position, info)
-            #     stmts.append(self.viper.FieldAssign(content_field, havoc_var.ref(), position,
-            #                                         info))
-            #     arg_seq = self.get_sequence(arg_type, arg_val, None, node, ctx, position)
-            #     res_seq = self.get_sequence(None, result_var, None, node, ctx, position)
-            #     seq_equal = self.viper.EqCmp(arg_seq, res_seq, position, info)
-            #     stmts.append(self.viper.Inhale(seq_equal, position, info))
             
         if method_name:
-            print("Calling method " + method_name)
             target_method = bytearray_class.get_method(method_name)
             arg_stmts, arg_vals, arg_types = self.translate_args(target_method, node.args, node.keywords, node, ctx)
             constr_call = self.get_method_call(bytearray_class, method_name, arg_vals, arg_types, targets, node, ctx)
