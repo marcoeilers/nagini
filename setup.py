@@ -28,8 +28,8 @@ setup(
             'toposort==1.5',
             'jpype1==1.2.1',
             'astunparse==1.6.2',
-            'pytest==4.3.0',
-            'pytest-xdist==1.27.0',
+            'pytest',
+            'pytest-xdist',
             'z3-solver==4.8.7.0'
             ],
         entry_points={

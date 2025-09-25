@@ -279,6 +279,8 @@ class Converter:
                     receiver_type = global_module.classes['list']
                 elif field == 'set_acc':
                     receiver_type = global_module.classes['set']
+                elif field == 'bytearray_acc':
+                    receiver_type = global_module.classes['bytearray']
                 elif field == '_val':
                     # This is a global variable.
                     var_sil_name = str(recv.applicable().id())
