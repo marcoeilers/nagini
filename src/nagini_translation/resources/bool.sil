@@ -124,12 +124,12 @@ function int___lshift__(self: Ref, other: Ref): Ref
     requires issubtype(typeof(other), int())
     requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(self), bool()) ==> int___unbox__(self) >= _INT_MIN)
     requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(self), bool()) ==> int___unbox__(self) <= _INT_MAX)
-    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) >= _INT_MIN)
+    requires @error("Negative shift count.")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) >= 0)
     requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) <= _INT_MAX)
-    ensures result ==
-    ((issubtype(typeof(self), bool()) && issubtype(typeof(other), bool())) ?
-        __prim__bool___box__(bool___unbox__(self) != bool___unbox__(other)) :
-        __prim__int___box__(fromBVInt(shlBVInt(toBVInt(int___unbox__(self)), toBVInt(int___unbox__(other))))))
+    ensures result == (let val == (int___unbox__(self)) in val >= 0 ?
+        __prim__int___box__(fromBVInt(shlBVInt(toBVInt(val), toBVInt(int___unbox__(other))))) :
+        __prim__int___box__(-fromBVInt(shlBVInt(toBVInt(-val), toBVInt(int___unbox__(other)))))
+    )
 
 function int___rlshift__(self: Ref, other: Ref): Ref
     decreases _
@@ -137,7 +137,7 @@ function int___rlshift__(self: Ref, other: Ref): Ref
     requires issubtype(typeof(other), int())
     requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(self), bool()) ==> int___unbox__(self) >= _INT_MIN)
     requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(self), bool()) ==> int___unbox__(self) <= _INT_MAX)
-    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) >= _INT_MIN)
+    requires @error("Negative shift count.")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) >= 0)
     requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) <= _INT_MAX)
 {
     int___lshift__(self, other)

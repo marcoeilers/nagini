@@ -172,3 +172,45 @@ def xor_4(a: int, b: bool, c: int) -> None:
     Requires(c >= -128 and c < 129)
     #:: ExpectedOutput(application.precondition:assertion.false)
     intint = a ^ c
+    
+def lshift_1(b: int) -> None:
+    Requires(b >=0 and b <= 127)
+    
+    a = 1
+    shift = a << b
+    
+    if b == 0:
+        assert shift == a * 1
+    if b == 1:
+        assert shift == a * 2
+    if b == 2:
+        assert shift == a * 4
+    if b == 3:
+        assert shift == a * 8
+    if b == 4:
+        assert shift == a * 16
+    if b == 5:
+        assert shift == a * 32
+    if b == 6:
+        assert shift == a * 64
+    if b == 7:
+        assert shift == a * 128
+        
+def lshift_general(a: int, b: int) -> None:
+    Requires(a > -100 and a < 100)
+    Requires(b >=0 and b <= 127)
+    
+    shift = a << b
+    
+    # Unfortunately we cannot prove the equivalence shift == a * (2**b)
+    if b == 0:
+        assert shift == a
+    if b == 1:
+        assert shift == a * 2
+
+def lshift_neg(a: int, b: int) -> None:
+    Requires(a > -100 and a < 100)
+    Requires(b >= -128 and b <= 127)
+    
+    #:: ExpectedOutput(application.precondition:assertion.false)
+    shift = a << b
