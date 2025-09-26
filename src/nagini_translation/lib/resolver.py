@@ -284,7 +284,7 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         elif node.value is None:
             return module.global_module.classes['NoneType']
         else:
-            raise UnsupportedException(node.value, f"Unsupported contant value type {type(node.value)}")
+            raise UnsupportedException(node.value, f"Unsupported constant value type {type(node.value)}")
     if isinstance(node, ast.Num):
         if isinstance(node.n, int):
             return module.global_module.classes[INT_TYPE]
