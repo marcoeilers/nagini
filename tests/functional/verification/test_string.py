@@ -30,3 +30,19 @@ def main() -> None:
     Assert(my_string2 == "a")
     #:: ExpectedOutput(assert.failed:assertion.false)
     Assert(my_string2 == "b")
+    
+    
+def test_str_format_wrong1() -> None:
+    a = "".format()
+     #:: ExpectedOutput(assert.failed:assertion.false)
+    Assert(a == " ")
+    
+def test_str_format_wrong2() -> None:
+    a = "{0}".format(2)
+     #:: ExpectedOutput(assert.failed:assertion.false)
+    Assert(a == "3")
+    
+def test_fstr_wrong() -> None:
+    a = f"{8}"
+     #:: ExpectedOutput(assert.failed:assertion.false)
+    Assert(a == "3")

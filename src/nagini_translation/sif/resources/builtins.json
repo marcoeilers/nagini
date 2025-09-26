@@ -536,6 +536,15 @@
         "__mod__": {
             "args": ["str", "tuple"],
             "type": "str"
+        },
+        "format": {
+            "args": ["str", "object", "object"],
+            "type": "str",
+            "MustTerminate": true
+        },
+        "__format__": {
+            "args": ["str", "str"],
+            "type": "str"
         }
     },
     "methods": {

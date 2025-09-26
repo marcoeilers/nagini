@@ -403,6 +403,33 @@ class ExpressionTranslator(CommonTranslator):
                                       node, ctx)
         return call
 
+    def translate_JoinedStr(self, node: ast.JoinedStr, ctx: Context) -> StmtsAndExpr:
+        """
+        Dummy implementation for ast.JoinedStr, only translates contained expressions.
+        Provides no guarantees about resulting value.
+        """
+        stmts = []
+        exps = []
+        for val in node.values:
+            val_stmt, val_exp = self.translate_expr(val, ctx)
+            stmts += val_stmt
+            exps.append(val_exp)
+        
+        str_class = ctx.module.global_module.classes[STRING_TYPE]
+        res_var = ctx.current_function.create_variable('joined_str', str_class, self.translator)
+        result_var = res_var.ref(node, ctx)
+        position = self.to_position(node, ctx)
+        stmts.append(self.viper.Inhale(self.type_check(result_var, str_class, position, ctx),
+                                       position, self.no_info(ctx)))
+        return stmts, result_var
+        
+    def translate_FormattedValue(self, node: ast.FormattedValue, ctx: Context) -> StmtsAndExpr:
+        """
+        Dummy implementation for ast.FormattedValue, only translates contained expression.
+        Does not apply given formatting rules
+        """
+        stmt, exp = self.translate_expr(node.value, ctx)
+        return stmt, exp
 
     def translate_Bytes(self, node: ast.Bytes, ctx: Context) -> StmtsAndExpr:
         elems = []
