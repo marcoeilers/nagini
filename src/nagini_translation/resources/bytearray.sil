@@ -26,7 +26,7 @@ method bytearray___initFromInt__(length: Ref) returns (res: Ref)
     ensures acc(res.bytearray_acc)
     ensures |res.bytearray_acc| == int___unbox__(length)
     ensures (forall i: Int :: { res.bytearray_acc[i] } 0 <= i < int___unbox__(length) ==> res.bytearray_acc[i] == 0)
-    ensures Low(res)
+    ensures Low(length) ==> Low(res)
 
 method bytearray___initFromBytearray__(other: Ref) returns (res: Ref)
     requires issubtype(typeof(other), bytearray())
@@ -35,7 +35,7 @@ method bytearray___initFromBytearray__(other: Ref) returns (res: Ref)
     ensures acc(res.bytearray_acc)
     ensures res.bytearray_acc == other.bytearray_acc
     ensures typeof(res) == bytearray()
-    ensures Low(res)
+    ensures Low(other) ==> Low(res)
 
 method bytearray___initFromList__(values: Ref) returns (res: Ref)
     requires issubtype(typeof(values), list(int()))
@@ -45,7 +45,7 @@ method bytearray___initFromList__(values: Ref) returns (res: Ref)
     ensures acc(res.bytearray_acc)
     ensures typeof(res) == bytearray()
     ensures res.bytearray_acc == __seq_ref_to_seq_int(values.list_acc)
-    ensures Low(res)
+    ensures Low(values) ==> Low(res)
     
 function bytearray___len__(self: Ref) : Int
     decreases _
