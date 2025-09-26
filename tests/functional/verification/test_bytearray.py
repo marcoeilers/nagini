@@ -28,7 +28,15 @@ def test_bytearray_constr_list() -> None:
     
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert 5 in a
+
+def test_bytearray_constr_list_bounds_low() -> None:
+    #:: ExpectedOutput(call.precondition:assertion.false)
+    a = bytearray([-1,3,4])
     
+def test_bytearray_constr_list_bounds_high() -> None:
+    #:: ExpectedOutput(call.precondition:assertion.false)
+    a = bytearray([0,3,256])
+
 def test_bytearray_constr_bytearray() -> None:
     a = bytearray([2,3,4])
     b = bytearray(a)
@@ -40,7 +48,18 @@ def test_bytearray_constr_bytearray() -> None:
     
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert 5 in b
+
+def test_bytearray_bool() -> None:
+    a = bytearray([0])
+    b = bytearray(3)
+    c = bytearray()
     
+    assert a
+    assert b
+    
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert c
+
 def test_byterray_append() -> None:
     a = bytearray([2,3,4])
     a.append(5)
@@ -53,7 +72,39 @@ def test_byterray_append() -> None:
     
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert a[2] == 8
+
+def test_bytearray_append_bounds_low() -> None:
+    a = bytearray()
+    #:: ExpectedOutput(call.precondition:assertion.false)
+    a.append(-10)
+
+def test_bytearray_append_bounds_high() -> None:
+    a = bytearray()
+    #:: ExpectedOutput(call.precondition:assertion.false)
+    a.append(256)
+
+def test_bytearray_setitem() -> None:
+    a = bytearray([2,3,4])
     
+    a[0] = 10
+    a[1] = 0
+    a[2] = 255
+    assert a[0] == 10
+    assert a[1] == 0
+    
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert a[2] == 254
+
+def test_bytearray_setitem_bounds_low() -> None:
+    a = bytearray([0,128,255])
+    #:: ExpectedOutput(call.precondition:assertion.false)
+    a[0] = -1
+
+def test_bytearray_setitem_bounds_high() -> None:
+    a = bytearray([0,128,255])  
+    #:: ExpectedOutput(call.precondition:assertion.false)
+    a[0] = 256
+
 def test_byterray_extend() -> None:
     a = bytearray([2,3,4])
     b = bytearray([5,6,7])
@@ -76,3 +127,43 @@ def test_bytearray_reverse() -> None:
     
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert a[2] == 4
+    
+def test_bytearray_getitem_slice() -> None:
+    a = bytearray([2,3,4])
+    b = a[1:]
+    
+    assert len(b) == 2
+    assert b[0] == 3
+    assert b[1] == 4
+    
+    c = a[:-1]
+    assert len(c) == 2
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert c[0] == 3
+    
+
+def test_bytearray_perm(b: bytearray) -> None:
+    #:: ExpectedOutput(call.precondition:insufficient.permission)
+    b.append(6)
+
+def test_bytearray_bounds_low(b: bytearray) -> None:
+    Requires(bytearray_pred(b))
+    Requires(len(b) > 1)
+    
+    assert b[0] >= 0
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert b[1] < 0
+    
+def test_bytearray_bounds_high(b: bytearray) -> None:
+    Requires(bytearray_pred(b))
+    Requires(len(b) > 1)
+    
+    assert b[0] <= 255
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert b[1] > 255
+    
+def test_bytearray_iter_bounds(b: bytearray) -> None:
+    Requires(bytearray_pred(b))
+    
+    for byte in b:
+        assert 0 <= byte and byte < 256
