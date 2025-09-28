@@ -9,9 +9,14 @@ class Map:
     def __init__(self, keys: List[object], values: List[object]) -> None:
         Requires(Acc(self.keys))
         Requires(Acc(self.values))
+        Requires(list_pred(keys) and list_pred(values))
+        Requires(len(keys) == len(values))
         Ensures(Acc(self.keys))
         Ensures(Acc(self.values))
         Ensures(self.keys is keys and self.values is values)
+        Ensures(list_pred(keys) and list_pred(values))
+        Ensures(len(keys) == len(values))
+        Ensures(len(self.keys) == len(self.values))
         Ensures(self.state())
         
         self.keys: List[object] = keys
@@ -33,31 +38,24 @@ class Map:
     def lookup(self, key: object) -> Optional[object]:
         Requires(Acc(self.state()))
         Requires(Implies(not Stateless(key), Acc(state_pred(key))))
+        Requires(Unfolding(self.state(), Unfolding(state_pred(self.keys), Unfolding(state_pred(self.values), 
+            len(self.keys) == len(self.values)
+        ))))
+
         Ensures(Acc(self.state()))
         Ensures(Implies(not Stateless(key), Acc(state_pred(key))))
-        
         Ensures(Unfolding(self.state(), Unfolding(state_pred(self.keys), Unfolding(state_pred(self.values),
-                Implies(
-                    not (Result() is None),
-                    Exists(int, lambda j: 0 <= j and j < len(self.keys) and j < len(self.values) and self.keys[j] == key and Result() is self.values[j])
-                )
+            Implies(
+                not (Result() is None),
+                Exists(int, lambda j: 0 <= j and j < len(self.keys) and j < len(self.values) and self.keys[j] == key and Result() is self.values[j])
+            )
         ))))
 
         res: Optional[object] = None
         i: int = 0
         found_idx: int = -1
-
         Unfold(self.state())
-
-        Unfold(state_pred(self.keys))
-        Unfold(state_pred(self.values))
-        len_keys: int = len(self.keys)
-        len_values: int = len(self.values)
-        Assume(len_keys == len_values)
-        Fold(state_pred(self.values))
-        Fold(state_pred(self.keys))
-
-        while (i < len_keys and found_idx == -1):
+        while (i < Unfolding(state_pred(self.keys), len(self.keys)) and found_idx == -1):
             Invariant(Acc(self.keys, 1/2) and Acc(self.values, 1/2))
             Invariant(Implies(not Stateless(key), Acc(state_pred(key))))
             Invariant(Acc(state_pred(self.keys)))
@@ -65,6 +63,11 @@ class Map:
             Invariant(
               (res is None and found_idx == -1) or
               (res is not None and found_idx != -1)
+            )
+            Invariant(
+                Unfolding(state_pred(self.keys), Unfolding(state_pred(self.values), 
+                    len(self.keys) == len(self.values) and 0 <= i and i <= len(self.keys) and (found_idx == -1 or 0 <= found_idx and found_idx < i)
+                ))
             )
             Invariant(
                 Implies(
@@ -78,9 +81,6 @@ class Map:
 
             Unfold(state_pred(self.keys))
             Unfold(state_pred(self.values))
-            Assume(0 <= i and i < len(self.keys))
-            Assume(0 <= i and i < len(self.values))
-
             if key == self.keys[i]:
                 if res:
                     res = self.values[i]
@@ -88,74 +88,11 @@ class Map:
                     i += 1
                     break
             i += 1
-
             Fold(state_pred(self.values))
             Fold(state_pred(self.keys))
-        
         Fold(self.state())
         return res
 
     @Predicate
     def state(self) -> bool:
-        return Acc(self.keys) and Acc(self.values) and Acc(state_pred(self.keys)) and Acc(state_pred(self.values))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# class Node:
-#     def __init__(self, k: int, v: object) -> None:
-#         Requires(Acc(state_pred(v)))
-#         Ensures(Acc(self.state()))
-#         Unfold(state_pred(v))
-#         self.data: Tuple[int, object] = (k, v)
-#         self.next: Node = None
-#         Fold(Acc(state_pred(self.data)))
-#         Fold(Acc(self.state()))
-# 
-#     @Predicate
-#     def state(self) -> bool:
-#         return Acc(self.data) and Acc(state_pred(self.data))
-# 
-# @Predicate
-# def lseg(start: Node, end: Node) -> bool:
-#     return Implies(not (start is end), Acc(start.state()) and Acc(start.next) and Acc(lseg(start.next, end)))
-# 
-# class Map:
-#     # list of key/value pairs
-#     def __init__(self) -> None:
-#         Ensures(self.state())
-#         self.head: Node = None
-#         Fold(lseg(self.head, None))
-#         Fold(self.state())
-# 
-#     @Predicate
-#     def state(self) -> bool:
-#         return Acc(self.head) and Acc(lseg(self.head, None))
-# 
-#     @Pure
-#     def lookup(self, key: int) -> Optional[object]:
-#         Requires(Acc(self.state()))
-#         # Ensures(Implies(key in self.m, Result() == self.m[key]))
-#         # Ensures(Implies(not (key in self.m), Result() == None))
-#         return None
-# 
-#         # Unfold(self.state())
-#         # res: object = None
-#         # for (k, v) in self.m:
-#         #     if k == key:
-#         #         res = v
-#         #         break
-#         # Fold(self.state())
-#         # return res
+        return Acc(self.keys) and Acc(self.values) and Acc(state_pred(self.keys)) and Acc(state_pred(self.values)) 
