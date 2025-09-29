@@ -55,41 +55,42 @@ class Map:
         i: int = 0
         found_idx: int = -1
         Unfold(self.state())
-        while (i < Unfolding(state_pred(self.keys), len(self.keys)) and found_idx == -1):
+        Unfold(state_pred(self.keys))
+        Unfold(state_pred(self.values))
+
+        while (i < len(self.keys) and found_idx == -1):
+            # Permissions
             Invariant(Acc(self.keys, 1/2) and Acc(self.values, 1/2))
+            Invariant(list_pred(self.keys))
+            Invariant(list_pred(self.values))
             Invariant(Implies(not Stateless(key), Acc(state_pred(key))))
-            Invariant(Acc(state_pred(self.keys)))
-            Invariant(Acc(state_pred(self.values)))
+            Invariant(Forall(self.keys, lambda i: Implies(not Stateless(i), Acc(state_pred(i)))))
+            Invariant(Forall(self.values, lambda i: Implies(not Stateless(i), Acc(state_pred(i)))))
+
             Invariant(
-              (res is None and found_idx == -1) or
-              (res is not None and found_idx != -1)
+              (res is None and found_idx == -1) or (res is not None and found_idx != -1)
             )
             Invariant(
-                Unfolding(state_pred(self.keys), Unfolding(state_pred(self.values), 
-                    len(self.keys) == len(self.values) and 0 <= i and i <= len(self.keys) and (found_idx == -1 or 0 <= found_idx and found_idx < i)
-                ))
+                len(self.keys) == len(self.values) and 0 <= i and i <= len(self.keys) and (found_idx == -1 or 0 <= found_idx and found_idx < i)
             )
             Invariant(
                 Implies(
                     (res is not None) and (found_idx != -1),
-                    Unfolding(state_pred(self.keys), Unfolding(state_pred(self.values), 
-                        0 <= found_idx and found_idx < len(self.keys) and found_idx < len(self.values) and 
-                        self.keys[found_idx] == key and res is self.values[found_idx]
-                    ))
+                    0 <= found_idx and found_idx < len(self.keys) and found_idx < len(self.values) and 
+                    self.keys[found_idx] == key and res is self.values[found_idx]
                 )
             )
 
-            Unfold(state_pred(self.keys))
-            Unfold(state_pred(self.values))
             if key == self.keys[i]:
-                if res:
-                    res = self.values[i]
+                res = self.values[i]
+                if not (res is None):
                     found_idx = i
                     i += 1
                     break
             i += 1
-            Fold(state_pred(self.values))
-            Fold(state_pred(self.keys))
+
+        Fold(state_pred(self.values))
+        Fold(state_pred(self.keys))
         Fold(self.state())
         return res
 
