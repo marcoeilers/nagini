@@ -17,4 +17,5 @@ domain ___intbv interpretation (SMTLIB: "(_ BitVec NBITS)", Boogie: "bvNBITS") {
   function orBVInt(___intbv, ___intbv): ___intbv interpretation "bvor"
   function xorBVInt(___intbv, ___intbv): ___intbv interpretation "bvxor"
   function shlBVInt(___intbv, ___intbv): ___intbv interpretation "bvshl"
+  function shrBVInt(___intbv, ___intbv): ___intbv interpretation "bvlshr"
 }

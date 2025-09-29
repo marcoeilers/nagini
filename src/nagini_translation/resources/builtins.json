@@ -339,6 +339,16 @@
             "args": ["int", "int"],
             "type": "int",
             "requires": ["__lshift__"]
+        },
+        "__rshift__": {
+            "args": ["int", "int"],
+            "type": "int",
+            "requires": ["__prim__int___box__", "int___unbox__", "__prim__bool___box__", "bool___unbox__"]
+        },
+        "__rrshift__": {
+            "args": ["int", "int"],
+            "type": "int",
+            "requires": ["__rshift__"]
         }
     },
     "extends": "float"
