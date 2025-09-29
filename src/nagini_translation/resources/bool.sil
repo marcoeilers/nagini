@@ -152,10 +152,11 @@ function int___rshift__(self: Ref, other: Ref): Ref
     requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(self), bool()) ==> int___unbox__(self) <= _INT_MAX)
     requires @error("Negative shift count.")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) >= 0)
     requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) <= _INT_MAX)
-    ensures result == (let val == (int___unbox__(self)) in val >= 0 ?
-        __prim__int___box__(fromBVInt(shrBVInt(toBVInt(val), toBVInt(int___unbox__(other))))) :
-        __prim__int___box__(-fromBVInt(shrBVInt(toBVInt(-val), toBVInt(int___unbox__(other))))) // TODO This case is wrong
-    )
+    // ensures result == (let val == (int___unbox__(self)) in val >= 0 ?
+    //     __prim__int___box__(fromBVInt(shrBVInt(toBVInt(val), toBVInt(int___unbox__(other))))) :
+    //     __prim__int___box__(-fromBVInt(shrBVInt(toBVInt(-val), toBVInt(int___unbox__(other))))) // TODO This case is wrong
+    // )
+    ensures result == (let val == (int___unbox__(self)) in __prim__int___box__(fromBVInt(shrBVInt(toBVInt(val), toBVInt(int___unbox__(other))))))
 
 function int___rrshift__(self: Ref, other: Ref): Ref
     decreases _
