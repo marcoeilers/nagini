@@ -67,16 +67,15 @@ class Map:
             Invariant(Forall(self.keys, lambda i: Implies(not Stateless(i), Acc(state_pred(i)))))
             Invariant(Forall(self.values, lambda i: Implies(not Stateless(i), Acc(state_pred(i)))))
 
+            # Witness
             Invariant(
               (res is None and found_idx == -1) or (res is not None and found_idx != -1)
             )
-            Invariant(
-                len(self.keys) == len(self.values) and 0 <= i and i <= len(self.keys) and (found_idx == -1 or 0 <= found_idx and found_idx < i)
-            )
+            Invariant(found_idx == -1 or 0 <= found_idx and found_idx < i)
+            Invariant(len(self.keys) == len(self.values) and 0 <= i and i <= len(self.keys))
             Invariant(
                 Implies(
-                    (res is not None) and (found_idx != -1),
-                    0 <= found_idx and found_idx < len(self.keys) and found_idx < len(self.values) and 
+                    not (res is None),
                     self.keys[found_idx] == key and res is self.values[found_idx]
                 )
             )
