@@ -51,6 +51,20 @@ class ReturnWrapper:
         self.names = {}
 
 
+class UnfoldWrapper:
+    """
+    Represents an unfolding of predicate pred, to be executed under conditions conds.
+    """
+
+    def __init__(self, conds: List, pred: ast.AST, node: ast.AST):
+        self.cond = conds
+        self.pred = pred
+        self.node = node
+        self.names = {}
+        self.var = None
+
+
+
 class NotWrapper:
     """
     Represents a negation of the condition cond.
@@ -68,7 +82,7 @@ class BinOpWrapper:
         self.op = op
         self.rhs = rhs
 
-Wrapper = Union[AssignWrapper, ReturnWrapper]
+Wrapper = Union[AssignWrapper, ReturnWrapper, UnfoldWrapper]
 
 
 class PureTranslator(CommonTranslator):
@@ -90,6 +104,9 @@ class PureTranslator(CommonTranslator):
             return []
         if isinstance(node.value, ast.Call) and get_func_name(node.value) in CONTRACT_WRAPPER_FUNCS:
             raise InvalidProgramException(node, 'invalid.contract.position')
+        if isinstance(node.value, ast.Call) and get_func_name(node.value) == 'Unfold':
+            wrapper = UnfoldWrapper(conds, node.value, node)
+            return [wrapper]
         raise UnsupportedException(node)
 
     def translate_pure_If(self, conds: List, node: ast.If,
@@ -213,6 +230,46 @@ class PureTranslator(CommonTranslator):
             return self.viper.Let(wrapper.var.decl, val,
                                   previous, position, info)
 
+    def _translate_unfold_wrapper(self, wrapper: Wrapper, previous: Expr,
+                                  function: PythonMethod,
+                                  ctx: Context) -> Expr:
+        info = self.no_info(ctx)
+        position = self.to_position(wrapper.node, ctx)
+        if not previous:
+            raise InvalidProgramException(function.node,
+                                          'function.return.missing')
+
+        if len(wrapper.pred.args) != 1:
+            raise InvalidProgramException(wrapper.pred, 'invalid.contract.call')
+        if not isinstance(wrapper.pred.args[0], ast.Call):
+            raise InvalidProgramException(wrapper.pred, 'invalid.contract.call')
+        if get_func_name(wrapper.pred.args[0]) in ('Acc', 'Rd'):
+            pred_call = wrapper.pred.args[0].args[0]
+        else:
+            pred_call = wrapper.pred.args[0]
+        target_pred = self.get_target(pred_call, ctx)
+        if (target_pred and
+                (not isinstance(target_pred, PythonMethod) or not target_pred.predicate)):
+            raise InvalidProgramException(wrapper.pred, 'invalid.contract.call')
+        if target_pred and target_pred.contract_only:
+            raise InvalidProgramException(wrapper.pred, 'abstract.predicate.fold')
+        pred_stmt, pred = self.translate_expr(wrapper.pred.args[0], ctx,
+                                              self.viper.Bool, True)
+        if pred_stmt:
+            raise InvalidProgramException(wrapper.node, 'purity.violated')
+
+        unfolding = self.viper.Unfolding(pred, previous, position, info)
+
+        if wrapper.cond:
+            cond = self._translate_condition(wrapper.cond,
+                                             wrapper.names, ctx)
+
+            new_val = self.viper.CondExp(cond, unfolding, previous, position,
+                                         info)
+            return new_val
+        else:
+            return unfolding
+
     def _translate_wrapper_expr(self, wrapper: Wrapper,
                                 ctx: Context) -> Expr:
         info = self.no_info(ctx)
@@ -245,6 +302,9 @@ class PureTranslator(CommonTranslator):
                                                   function, ctx)
         elif isinstance(wrapper, AssignWrapper):
             return self._translate_assign_wrapper(wrapper, previous,
+                                                  function, ctx)
+        elif isinstance(wrapper, UnfoldWrapper):
+            return self._translate_unfold_wrapper(wrapper, previous,
                                                   function, ctx)
         else:
             raise UnsupportedException(wrapper)
