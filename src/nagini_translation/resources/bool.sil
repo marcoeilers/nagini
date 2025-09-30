@@ -437,7 +437,7 @@ domain SameHash {
 
     axiom same_hash {
         forall o1: Ref, o2: Ref :: { _hash(o1), _hash(o2) } 
-            _hash(o1) == _hash(o2)
+            eq(o1, o2) ==> _hash(o1) == _hash(o2)
     }
 }
 

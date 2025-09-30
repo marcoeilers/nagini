@@ -680,6 +680,30 @@ class MethodTranslator(CommonTranslator):
         old_func = ctx.current_function
         ctx.current_function = func
 
+        # Inline body of func.___eq___ and assume the body.
+        # Calls to the merge function are redirected to the eq domain function
+        statements = func.node.body
+        start, end = get_body_indices(statements)
+        actual_body = statements[start:end]
+        if (func.contract_only or
+                (len(actual_body) == 1 and isinstance(actual_body[0], ast.Expr) and
+                 isinstance(actual_body[0].value, ast.Ellipsis))):
+            inlined_body_eq = None
+        else:
+            inlined_body_eq = self.viper.FuncApp(
+                'bool___unbox__',
+                [self.translate_exprs(actual_body, func, ctx)],
+                pos, info, self.viper.Bool 
+            )
+
+        ctx.current_function = old_func
+
+        if inlined_body_eq:
+            body.append(self.viper.Inhale(inlined_body_eq, pos, info))
+
+        old_func = ctx.current_function
+        ctx.current_function = func
+
         # Inline body of func.___hash___ and assume the body.
         # Calls to the merge function are redirected to the eq domain function
         hash_func = func.cls.functions.get('__hash__')
