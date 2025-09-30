@@ -89,12 +89,15 @@ class ProgramTranslator(CommonTranslator):
         fields = []
         functions = []
         methods = []
+        # Translate actual fields first, since they have no dependencies
         for field in cls.fields.values():
             if isinstance(field, PythonField) and field.inherited is None:
                 sil_field = self.translate_field(field, ctx)
                 field.sil_field = sil_field
                 fields.append(sil_field)
-            elif isinstance(field, PythonMethod):
+        # Translate properties
+        for field in cls.fields.values():
+            if isinstance(field, PythonMethod):
                 # This is a property
                 if cls.module is not cls.module.global_module:
                     all_names.append(field.sil_name)
