@@ -65,8 +65,8 @@ def parse_sil_file(sil_path: str, bv_path: str, bv_size: int, jvm, float_option:
     with open(sil_path, 'r') as file:
         text = file.read()
     with open(bv_path, 'r') as file:
-        int_min = -(2 ** (bv_size - 1))
-        int_max = 2 ** (bv_size - 1) - 1
+        int_min = -(2 ** (bv_size))
+        int_max = 2 ** (bv_size) - 1
         text += "\n" + file.read().replace("NBITS", str(bv_size)).replace("INT_MIN_VAL", str(int_min)).replace("INT_MAX_VAL", str(int_max))
     if float_option == "real":
         text = text.replace("float.sil", "float_real.sil")
@@ -482,6 +482,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
             line = str(e.node.lineno)
             col = str(e.node.col_offset)
             print(issue + ' (' + python_file + '@' + line + '.' + col + ')')
+            traceback.print_exc()
         if isinstance(e, TypeException):
             for msg in e.messages:
                 parts = TYPE_ERROR_MATCHER.match(msg)
@@ -493,6 +494,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                     msg = parts['msg']
                     line = parts['line']
                     print('Type error: ' + msg + ' (' + file + '@' + line + '.0)')
+                    traceback.print_exc()
                 else:
                     print(msg)
         return False
