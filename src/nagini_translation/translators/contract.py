@@ -24,6 +24,7 @@ from nagini_translation.lib.constants import (
     PSEQ_TYPE,
     PSET_TYPE,
     RANGE_TYPE,
+    BYTEARRAY_TYPE,
     THREAD_DOMAIN,
     THREAD_POST_PRED,
     THREAD_START_PRED,
@@ -685,7 +686,7 @@ class ContractTranslator(CommonTranslator):
         # iterable (which gives no information about order for unordered types).
         seq_call = self.get_sequence(coll_type, arg, None, node, ctx)
         seq_class = ctx.module.global_module.classes[PSEQ_TYPE]
-        if coll_type.name == RANGE_TYPE:
+        if coll_type.name == RANGE_TYPE or coll_type.name == BYTEARRAY_TYPE:
             type_arg = ctx.module.global_module.classes[INT_TYPE]
         else:
             type_arg = coll_type.type_args[0]

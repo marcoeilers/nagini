@@ -60,6 +60,38 @@ def test_bytearray_bool() -> None:
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert c
 
+def test_bytearray_eq1() -> None:
+    a = bytearray([1,2,3])
+    b = bytearray([1,2,3])
+    
+    assert a == b
+    
+def test_bytearray_eq2() -> None:
+    a = bytearray([1,2,3])
+    b = bytearray([2,2,3])
+    
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert a == b
+    
+def test_bytearray_eq_client1(b1: bytearray, b2: bytearray) -> None:
+    Requires(bytearray_pred(b1))
+    Requires(bytearray_pred(b2))
+    Requires(b1 == b2)
+    Requires(len(b1) > 0)
+    
+    assert b1[0] == b2[0]
+    
+def test_bytearray_eq_client2(b1: bytearray, b2: bytearray) -> None:
+    Requires(bytearray_pred(b1))
+    Requires(bytearray_pred(b2))
+    Requires(b1 == b2)
+    Requires(len(b1) > 0)
+    
+    b1[0] = 42
+    
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert b1[0] == b2[0]
+
 def test_byterray_append() -> None:
     a = bytearray([2,3,4])
     a.append(5)

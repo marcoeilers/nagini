@@ -46,7 +46,7 @@ method bytearray___initFromList__(values: Ref) returns (res: Ref)
     ensures typeof(res) == bytearray()
     ensures res.bytearray_acc == __seq_ref_to_seq_int(values.list_acc)
     ensures Low(values) ==> Low(res)
-    
+
 function bytearray___len__(self: Ref) : Int
     decreases _
     requires issubtype(typeof(self), bytearray())
@@ -69,6 +69,20 @@ function bytearray___bool__(self: Ref) : Bool
     requires self != null ==> acc(self.bytearray_acc, wildcard)
     ensures self == null ==> !result
     ensures self != null ==> result == (|self.bytearray_acc| != 0)
+
+// Currently only supports comparing to another bytearray
+function bytearray___eq__(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), bytearray())
+    requires acc(self.bytearray_acc, wildcard)
+    requires issubtype(typeof(other), bytearray())
+    requires acc(other.bytearray_acc, wildcard)
+    ensures result <==>
+        (bytearray___len__(self) == bytearray___len__(other) &&
+         (forall i: Int :: { self.bytearray_acc[i] }
+                           { other.bytearray_acc[i] }
+                            0 <= i && i < bytearray___len__(self)
+                            ==> self.bytearray_acc[i] == other.bytearray_acc[i] ))
 
 // function bytearray___hex__(self: Ref): Str
 //     decreases _

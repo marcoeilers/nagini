@@ -721,6 +721,11 @@
             "args": ["bytearray"],
             "type": "__prim__bool"
         },
+        "__eq__": {
+            "args": ["bytearray", "object"],
+            "type": "__prim__bool",
+            "requires": ["__len__"]
+        },
         "__bounds_helper__": {
             "args": ["__prim__int"],
             "type": "__prim__bool"
