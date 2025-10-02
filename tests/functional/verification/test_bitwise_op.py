@@ -97,7 +97,7 @@ def and_3a(a: int, b: bool, c: int) -> None:
 
 def and_4(a: int, b: bool, c: int) -> None:
     Requires(a > -100 and a < 100)
-    Requires(c > -130 and c < 127)
+    Requires(c > -260 and c < 127)
     #:: ExpectedOutput(application.precondition:assertion.false)
     intint = a & c
 
@@ -133,7 +133,7 @@ def or_3a(a: int, b: bool, c: int) -> None:
 
 def or_4(a: int, b: bool, c: int) -> None:
     Requires(a > -100 and a < 100)
-    Requires(c > -130 and c < 127)
+    Requires(c > -260 and c < 127)
     #:: ExpectedOutput(application.precondition:assertion.false)
     intint = a | c
 
@@ -169,7 +169,7 @@ def xor_3a(a: int, b: bool, c: int) -> None:
 
 def xor_4(a: int, b: bool, c: int) -> None:
     Requires(a > -100 and a < 100)
-    Requires(c >= -128 and c < 129)
+    Requires(c >= -128 and c < 257)
     #:: ExpectedOutput(application.precondition:assertion.false)
     intint = a ^ c
     
