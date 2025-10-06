@@ -1056,10 +1056,16 @@ class ContractTranslator(CommonTranslator):
                         raise InvalidProgramException(node, 'invalid.acc')
                     return self.translate_acc_global(node, perm, ctx)
         elif func_name in BUILTIN_PREDICATES:
+            if not impure:
+                raise InvalidProgramException(node, 'invalid.contract.position')
             return [], self.translate_unwrapped_builtin_predicate(node, ctx)
         elif func_name == 'MaySet':
+            if not impure:
+                raise InvalidProgramException(node, 'invalid.contract.position')
             return self.translate_may_set(node, ctx)
         elif func_name == 'MayCreate':
+            if not impure:
+                raise InvalidProgramException(node, 'invalid.contract.position')
             return self.translate_may_create(node, ctx)
         elif func_name in ('Assert', 'Assume', 'Fold', 'Unfold', 'Refute'):
             if not statement:
