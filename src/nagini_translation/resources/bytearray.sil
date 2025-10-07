@@ -77,12 +77,7 @@ function bytearray___eq__(self: Ref, other: Ref): Bool
     requires acc(self.bytearray_acc, wildcard)
     requires issubtype(typeof(other), bytearray())
     requires acc(other.bytearray_acc, wildcard)
-    ensures result <==>
-        (bytearray___len__(self) == bytearray___len__(other) &&
-         (forall i: Int :: { self.bytearray_acc[i] }
-                           { other.bytearray_acc[i] }
-                            0 <= i && i < bytearray___len__(self)
-                            ==> self.bytearray_acc[i] == other.bytearray_acc[i] ))
+    ensures result <==> self.bytearray_acc == other.bytearray_acc
 
 // function bytearray___hex__(self: Ref): Str
 //     decreases _
