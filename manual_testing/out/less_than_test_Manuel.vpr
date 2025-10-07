@@ -1049,13 +1049,17 @@ domain LessThan {
 // prove asymmetry
 method E___lt___check_asymmetry(self: Ref, other: Ref) {
   var res : Ref
+  var body_self_other: Bool
+  var body_other_self: Bool
+  var posts_other_self_E: Bool
+  var posts_other_self_F: Bool
   assume issubtype(typeof(res), bool())
   assume typeof(self) == E()
   assume issubtype(typeof(other), F()) || typeof(other) == E()
   inhale acc(state(self))
   inhale acc(state(other))
-  // assume self <_E other
-  inhale (bool___unbox__(let cond_2 ==
+
+  body_self_other := (bool___unbox__(let cond_2 ==
       (__prim__bool___box__(self == other)) in
       (true && bool___unbox__(cond_2) ?
         __prim__bool___box__(false) :
@@ -1079,37 +1083,41 @@ method E___lt___check_asymmetry(self: Ref, other: Ref) {
                     lt(self.E_i, object___cast__(F(), other).F_i)))) :
                 __prim__bool___box__(false)))))))
   )
+
+  // assume self <_E other
+  inhale body_self_other
+
   if (typeof(other) == E()) {
     // prove !(other <_E self)
-    assert !(bool___unbox__(
-      let cond_2 ==
-            (__prim__bool___box__(other == self)) in
-            (true && bool___unbox__(cond_2) ?
-              __prim__bool___box__(false) :
-              (let cond_0_0 ==
-                ((true && !bool___unbox__(cond_2) ?
-                  __prim__bool___box__(issubtype(typeof(self), E())) :
-                  null)) in
-                (true && !bool___unbox__(cond_2) && bool___unbox__(cond_0_0) ?
-                  __prim__bool___box__((unfolding acc(state(other), write) in
-                    (unfolding acc(state(self), write) in
-                      lt(other.E_i, object___cast__(E(), self).E_i)))) :
-                  (let cond_1_0 ==
-                    ((true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) ?
-                      __prim__bool___box__(issubtype(typeof(self),
-                      F())) :
-                      null)) in
-                    (true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) &&
-                    bool___unbox__(cond_1_0) ?
-                      __prim__bool___box__((unfolding acc(state(other), write) in
-                        (unfolding acc(state(self), write) in
-                          lt(other.E_i, object___cast__(F(), self).F_i)))) :
-                      __prim__bool___box__(false))))))
+    body_other_self := (bool___unbox__(
+        let cond_2 ==
+              (__prim__bool___box__(other == self)) in
+              (true && bool___unbox__(cond_2) ?
+                __prim__bool___box__(false) :
+                (let cond_0_0 ==
+                  ((true && !bool___unbox__(cond_2) ?
+                    __prim__bool___box__(issubtype(typeof(self), E())) :
+                    null)) in
+                  (true && !bool___unbox__(cond_2) && bool___unbox__(cond_0_0) ?
+                    __prim__bool___box__((unfolding acc(state(other), write) in
+                      (unfolding acc(state(self), write) in
+                        lt(other.E_i, object___cast__(E(), self).E_i)))) :
+                    (let cond_1_0 ==
+                      ((true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) ?
+                        __prim__bool___box__(issubtype(typeof(self),
+                        F())) :
+                        null)) in
+                      (true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) &&
+                      bool___unbox__(cond_1_0) ?
+                        __prim__bool___box__((unfolding acc(state(other), write) in
+                          (unfolding acc(state(self), write) in
+                            lt(other.E_i, object___cast__(F(), self).F_i)))) :
+                        __prim__bool___box__(false))))))
     ))
+    assert !body_other_self
   } elseif (issubtype(typeof(other), E())) {
-    // prove !(other <_E self) (only using postconditions)
-    inhale (
-      issubtype(typeof(res), bool()) &&
+    // prove !(other <_E self) (only using postconditions of E___lt__)
+    posts_other_self_E := (issubtype(typeof(res), bool()) &&
       (other == self ==> !bool___unbox__(res)) &&
       (issubtype(typeof(self), E()) ==>
         (unfolding acc(state(other), write) in
@@ -1124,11 +1132,11 @@ method E___lt___check_asymmetry(self: Ref, other: Ref) {
             res == __prim__bool___box__(lt(other.E_i,
             object___cast__(F(), self).F_i)))))
     )
+    inhale posts_other_self_E
     assert !bool___unbox__(res)
   } elseif (issubtype(typeof(other), F())) {
     // prove !(other <_F self) (only using postconditions)
-    inhale(
-      issubtype(typeof(res), bool()) &&
+    posts_other_self_F := (issubtype(typeof(res), bool()) &&
       (other == self ==> !bool___unbox__(res)) &&
       (issubtype(typeof(self), F()) ==>
         (unfolding acc(state(other), write) in
@@ -1143,18 +1151,23 @@ method E___lt___check_asymmetry(self: Ref, other: Ref) {
             res == __prim__bool___box__(lt(other.F_i,
             object___cast__(E(), self).E_i)))))
     )
+    inhale posts_other_self_F
     assert !bool___unbox__(res)
   }
 }
 
 method F___lt___check_asymmetry(self: Ref, other: Ref) {
   var res : Ref
+  var body_self_other: Bool
+  var body_other_self: Bool
+  var posts_other_self_E: Bool
+  var posts_other_self_F: Bool
   assume issubtype(typeof(res), bool())
   assume typeof(self) == F()
   assume issubtype(typeof(other), E()) || typeof(other) == F()
   inhale acc(state(self))
   inhale acc(state(other))
-  inhale (bool___unbox__((let cond_3_0 ==
+  body_self_other := (bool___unbox__((let cond_3_0 ==
       (__prim__bool___box__(self == other)) in
       (true && bool___unbox__(cond_3_0) ?
         __prim__bool___box__(false) :
@@ -1179,8 +1192,11 @@ method F___lt___check_asymmetry(self: Ref, other: Ref) {
                     lt(self.F_i, object___cast__(E(), other).E_i)))) :
                 __prim__bool___box__(false)))))))
   ))
+
+  inhale body_self_other
+
   if (typeof(other) == F()) {
-    assert !bool___unbox__((
+    body_other_self := bool___unbox__((
     (let cond_3_0 ==
       (__prim__bool___box__(other == self)) in
       (true && bool___unbox__(cond_3_0) ?
@@ -1206,8 +1222,9 @@ method F___lt___check_asymmetry(self: Ref, other: Ref) {
                     lt(other.F_i, object___cast__(E(), self).E_i)))) :
                 __prim__bool___box__(false)))))))
     ))
+    assert !body_other_self
   } elseif (issubtype(typeof(other), F())) {
-    inhale (
+    posts_other_self_F := (
       issubtype(typeof(res), bool()) &&
       (other == self ==> !bool___unbox__(res)) &&
       (issubtype(typeof(self), F()) ==>
@@ -1223,9 +1240,10 @@ method F___lt___check_asymmetry(self: Ref, other: Ref) {
             res == __prim__bool___box__(lt(other.F_i,
             object___cast__(E(), self).E_i)))))
     )
+    inhale posts_other_self_F
     assert !bool___unbox__(res)
   } elseif (issubtype(typeof(other), E())) {
-    inhale (
+    posts_other_self_E := (
       issubtype(typeof(res), bool()) &&
       (other == self ==> !bool___unbox__(res)) &&
       (issubtype(typeof(self), E()) ==>
@@ -1241,6 +1259,7 @@ method F___lt___check_asymmetry(self: Ref, other: Ref) {
             res == __prim__bool___box__(lt(other.E_i,
             object___cast__(F(), self).F_i)))))
     )
+    inhale posts_other_self_E
     assert !bool___unbox__(res)
   }
 }
@@ -1248,6 +1267,11 @@ method F___lt___check_asymmetry(self: Ref, other: Ref) {
 // prove transitivity
 method E___lt___check_transitivity(self: Ref, other1: Ref, other2: Ref) {
   var res : Ref
+  var body_self_other1: Bool
+  var body_other1_other2: Bool
+  var body_self_other2: Bool
+  var posts_other1_other2_E: Bool
+  var posts_other1_other2_F: Bool
   assume issubtype(typeof(res), bool())
   assume typeof(self) == E()
   assume issubtype(typeof(other1), E()) || issubtype(typeof(other1), F()) || typeof(other1) == E()
@@ -1256,7 +1280,7 @@ method E___lt___check_transitivity(self: Ref, other1: Ref, other2: Ref) {
   inhale acc(state(other1))
   inhale acc(state(other2))
   // self < other1
-  inhale (bool___unbox__(let cond_2 ==
+  body_self_other1 := (bool___unbox__(let cond_2 ==
       (__prim__bool___box__(self == other1)) in
       (true && bool___unbox__(cond_2) ?
         __prim__bool___box__(false) :
@@ -1280,9 +1304,35 @@ method E___lt___check_transitivity(self: Ref, other1: Ref, other2: Ref) {
                     lt(self.E_i, object___cast__(F(), other1).F_i)))) :
                 __prim__bool___box__(false))))))
   ))
+  body_self_other2 := (bool___unbox__(let cond_2 ==
+        (__prim__bool___box__(self == other2)) in
+        (true && bool___unbox__(cond_2) ?
+          __prim__bool___box__(false) :
+          (let cond_0_0 ==
+            ((true && !bool___unbox__(cond_2) ?
+              __prim__bool___box__(issubtype(typeof(other2), E())) :
+              null)) in
+            (true && !bool___unbox__(cond_2) && bool___unbox__(cond_0_0) ?
+              __prim__bool___box__((unfolding acc(state(self), write) in
+                (unfolding acc(state(other2), write) in
+                  lt(self.E_i, object___cast__(E(), other2).E_i)))) :
+              (let cond_1_0 ==
+                ((true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) ?
+                  __prim__bool___box__(issubtype(typeof(other2),
+                  F())) :
+                  null)) in
+                (true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) &&
+                bool___unbox__(cond_1_0) ?
+                  __prim__bool___box__((unfolding acc(state(self), write) in
+                    (unfolding acc(state(other2), write) in
+                      lt(self.E_i, object___cast__(F(), other2).F_i)))) :
+                  __prim__bool___box__(false))))))
+    ))
+
+  inhale body_self_other1
   if (typeof(other1) == E()) {
     // other1 <_E other2
-    inhale (bool___unbox__(let cond_2 ==
+    body_other1_other2 := (bool___unbox__(let cond_2 ==
         (__prim__bool___box__(other1 == other2)) in
         (true && bool___unbox__(cond_2) ?
           __prim__bool___box__(false) :
@@ -1306,34 +1356,12 @@ method E___lt___check_transitivity(self: Ref, other1: Ref, other2: Ref) {
                       lt(other1.E_i, object___cast__(F(), other2).F_i)))) :
                   __prim__bool___box__(false))))))
     ))
+    inhale body_other1_other2
     // prove self <_E other2
-    assert (bool___unbox__(let cond_2 ==
-        (__prim__bool___box__(self == other2)) in
-        (true && bool___unbox__(cond_2) ?
-          __prim__bool___box__(false) :
-          (let cond_0_0 ==
-            ((true && !bool___unbox__(cond_2) ?
-              __prim__bool___box__(issubtype(typeof(other2), E())) :
-              null)) in
-            (true && !bool___unbox__(cond_2) && bool___unbox__(cond_0_0) ?
-              __prim__bool___box__((unfolding acc(state(self), write) in
-                (unfolding acc(state(other2), write) in
-                  lt(self.E_i, object___cast__(E(), other2).E_i)))) :
-              (let cond_1_0 ==
-                ((true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) ?
-                  __prim__bool___box__(issubtype(typeof(other2),
-                  F())) :
-                  null)) in
-                (true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) &&
-                bool___unbox__(cond_1_0) ?
-                  __prim__bool___box__((unfolding acc(state(self), write) in
-                    (unfolding acc(state(other2), write) in
-                      lt(self.E_i, object___cast__(F(), other2).F_i)))) :
-                  __prim__bool___box__(false))))))
-    ))
+    assert body_self_other2
   } elseif (issubtype(typeof(other1), E())) {
     // assume other1 <_E other2 (only use postcondition of E___lt__)
-    inhale (
+    posts_other1_other2_E := (
       issubtype(typeof(res), bool()) &&
       (other1 == other2 ==> !bool___unbox__(res)) &&
       (issubtype(typeof(other2), E()) ==>
@@ -1349,37 +1377,14 @@ method E___lt___check_transitivity(self: Ref, other1: Ref, other2: Ref) {
             res == __prim__bool___box__(lt(other1.E_i,
             object___cast__(F(), other2).F_i)))))
     )
+    inhale posts_other1_other2_E
     inhale bool___unbox__(res)
 
     // prove self <_E other2
-    assert (bool___unbox__(let cond_2 ==
-        (__prim__bool___box__(self == other2)) in
-        (true && bool___unbox__(cond_2) ?
-          __prim__bool___box__(false) :
-          (let cond_0_0 ==
-            ((true && !bool___unbox__(cond_2) ?
-              __prim__bool___box__(issubtype(typeof(other2), E())) :
-              null)) in
-            (true && !bool___unbox__(cond_2) && bool___unbox__(cond_0_0) ?
-              __prim__bool___box__((unfolding acc(state(self), write) in
-                (unfolding acc(state(other2), write) in
-                  lt(self.E_i, object___cast__(E(), other2).E_i)))) :
-              (let cond_1_0 ==
-                ((true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) ?
-                  __prim__bool___box__(issubtype(typeof(other2),
-                  F())) :
-                  null)) in
-                (true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) &&
-                bool___unbox__(cond_1_0) ?
-                  __prim__bool___box__((unfolding acc(state(self), write) in
-                    (unfolding acc(state(other2), write) in
-                      lt(self.E_i, object___cast__(F(), other2).F_i)))) :
-                  __prim__bool___box__(false))))))
-    ))
-
+    assert body_self_other2
   } elseif (issubtype(typeof(other1), F())) {
     // assume other1 <_F other2 (only use postcondition of F___lt__)
-    inhale (
+    posts_other1_other2_F := (
       (issubtype(typeof(res), bool())) &&
       (other1 == other2 ==> !bool___unbox__(res)) &&
       (issubtype(typeof(other2), F()) ==>
@@ -1395,38 +1400,21 @@ method E___lt___check_transitivity(self: Ref, other1: Ref, other2: Ref) {
             res == __prim__bool___box__(lt(other1.F_i,
             object___cast__(E(), other2).E_i)))))
     )
+    inhale posts_other1_other2_F
     inhale bool___unbox__(res)
 
     // prove self <_E other2
-    assert (bool___unbox__(let cond_2 ==
-        (__prim__bool___box__(self == other2)) in
-        (true && bool___unbox__(cond_2) ?
-          __prim__bool___box__(false) :
-          (let cond_0_0 ==
-            ((true && !bool___unbox__(cond_2) ?
-              __prim__bool___box__(issubtype(typeof(other2), E())) :
-              null)) in
-            (true && !bool___unbox__(cond_2) && bool___unbox__(cond_0_0) ?
-              __prim__bool___box__((unfolding acc(state(self), write) in
-                (unfolding acc(state(other2), write) in
-                  lt(self.E_i, object___cast__(E(), other2).E_i)))) :
-              (let cond_1_0 ==
-                ((true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) ?
-                  __prim__bool___box__(issubtype(typeof(other2),
-                  F())) :
-                  null)) in
-                (true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) &&
-                bool___unbox__(cond_1_0) ?
-                  __prim__bool___box__((unfolding acc(state(self), write) in
-                    (unfolding acc(state(other2), write) in
-                      lt(self.E_i, object___cast__(F(), other2).F_i)))) :
-                  __prim__bool___box__(false))))))
-    ))
+    assert body_self_other2
   }
 }
 
 method F___lt___check_transitivity(self: Ref, other1: Ref, other2: Ref) {
   var res : Ref
+  var body_self_other1: Bool
+  var body_other1_other2: Bool
+  var body_self_other2: Bool
+  var posts_other1_other2_E: Bool
+  var posts_other1_other2_F: Bool
   assume issubtype(typeof(res), bool())
   assume typeof(self) == F()
   assume issubtype(typeof(other1), E()) || issubtype(typeof(other1), F()) || typeof(other1) == F()
@@ -1436,7 +1424,7 @@ method F___lt___check_transitivity(self: Ref, other1: Ref, other2: Ref) {
   inhale acc(state(other2))
 
   // assume self < other1
-  inhale (bool___unbox__((let cond_3_0 ==
+  body_self_other1 := (bool___unbox__((let cond_3_0 ==
       (__prim__bool___box__(self == other1)) in
       (true && bool___unbox__(cond_3_0) ?
         __prim__bool___box__(false) :
@@ -1461,9 +1449,37 @@ method F___lt___check_transitivity(self: Ref, other1: Ref, other2: Ref) {
                     lt(self.F_i, object___cast__(E(), other1).E_i)))) :
                 __prim__bool___box__(false)))))))
   ))
+  inhale body_self_other1
+
+  body_self_other2 := (bool___unbox__((let cond_3_0 ==
+          (__prim__bool___box__(self == other2)) in
+          (true && bool___unbox__(cond_3_0) ?
+            __prim__bool___box__(false) :
+            (let cond_4_0 ==
+              ((true && !bool___unbox__(cond_3_0) ?
+                __prim__bool___box__(issubtype(typeof(other2), F())) :
+                null)) in
+              (true && !bool___unbox__(cond_3_0) && bool___unbox__(cond_4_0) ?
+                __prim__bool___box__((unfolding acc(state(self), write) in
+                  (unfolding acc(state(other2), write) in
+                    lt(self.F_i, object___cast__(F(), other2).F_i)))) :
+                (let cond_5_0 ==
+                  ((true && !bool___unbox__(cond_3_0) &&
+                  !bool___unbox__(cond_4_0) ?
+                    __prim__bool___box__(issubtype(typeof(other2),
+                    E())) :
+                    null)) in
+                  (true && !bool___unbox__(cond_3_0) && !bool___unbox__(cond_4_0) &&
+                  bool___unbox__(cond_5_0) ?
+                    __prim__bool___box__((unfolding acc(state(self), write) in
+                      (unfolding acc(state(other2), write) in
+                        lt(self.F_i, object___cast__(E(), other2).E_i)))) :
+                    __prim__bool___box__(false)))))))
+  ))
+
   if (typeof(other1) == F()) {
     // assume other1 <_E other2
-    inhale (bool___unbox__((let cond_3_0 ==
+    body_other1_other2 := (bool___unbox__((let cond_3_0 ==
         (__prim__bool___box__(other1 == other2)) in
         (true && bool___unbox__(cond_3_0) ?
           __prim__bool___box__(false) :
@@ -1488,35 +1504,12 @@ method F___lt___check_transitivity(self: Ref, other1: Ref, other2: Ref) {
                       lt(other1.F_i, object___cast__(E(), other2).E_i)))) :
                   __prim__bool___box__(false)))))))
     ))
+    inhale body_other1_other2
     // prove self <_E other2
-    assert (bool___unbox__((let cond_3_0 ==
-        (__prim__bool___box__(self == other2)) in
-        (true && bool___unbox__(cond_3_0) ?
-          __prim__bool___box__(false) :
-          (let cond_4_0 ==
-            ((true && !bool___unbox__(cond_3_0) ?
-              __prim__bool___box__(issubtype(typeof(other2), F())) :
-              null)) in
-            (true && !bool___unbox__(cond_3_0) && bool___unbox__(cond_4_0) ?
-              __prim__bool___box__((unfolding acc(state(self), write) in
-                (unfolding acc(state(other2), write) in
-                  lt(self.F_i, object___cast__(F(), other2).F_i)))) :
-              (let cond_5_0 ==
-                ((true && !bool___unbox__(cond_3_0) &&
-                !bool___unbox__(cond_4_0) ?
-                  __prim__bool___box__(issubtype(typeof(other2),
-                  E())) :
-                  null)) in
-                (true && !bool___unbox__(cond_3_0) && !bool___unbox__(cond_4_0) &&
-                bool___unbox__(cond_5_0) ?
-                  __prim__bool___box__((unfolding acc(state(self), write) in
-                    (unfolding acc(state(other2), write) in
-                      lt(self.F_i, object___cast__(E(), other2).E_i)))) :
-                  __prim__bool___box__(false)))))))
-    ))
+    assert body_self_other2
   } elseif (issubtype(typeof(other1), E())) {
     // assume other1 <_E other2 (only use postcondition of E___lt__)
-    inhale (
+    posts_other1_other2_E := (
       issubtype(typeof(res), bool()) &&
       (other1 == other2 ==> !bool___unbox__(res)) &&
       (issubtype(typeof(other2), E()) ==>
@@ -1532,38 +1525,15 @@ method F___lt___check_transitivity(self: Ref, other1: Ref, other2: Ref) {
             res == __prim__bool___box__(lt(other1.E_i,
             object___cast__(F(), other2).F_i)))))
     )
+    inhale posts_other1_other2_E
     inhale bool___unbox__(res)
 
     // prove self <_E other2
-    assert (bool___unbox__((let cond_3_0 ==
-        (__prim__bool___box__(self == other2)) in
-        (true && bool___unbox__(cond_3_0) ?
-          __prim__bool___box__(false) :
-          (let cond_4_0 ==
-            ((true && !bool___unbox__(cond_3_0) ?
-              __prim__bool___box__(issubtype(typeof(other2), F())) :
-              null)) in
-            (true && !bool___unbox__(cond_3_0) && bool___unbox__(cond_4_0) ?
-              __prim__bool___box__((unfolding acc(state(self), write) in
-                (unfolding acc(state(other2), write) in
-                  lt(self.F_i, object___cast__(F(), other2).F_i)))) :
-              (let cond_5_0 ==
-                ((true && !bool___unbox__(cond_3_0) &&
-                !bool___unbox__(cond_4_0) ?
-                  __prim__bool___box__(issubtype(typeof(other2),
-                  E())) :
-                  null)) in
-                (true && !bool___unbox__(cond_3_0) && !bool___unbox__(cond_4_0) &&
-                bool___unbox__(cond_5_0) ?
-                  __prim__bool___box__((unfolding acc(state(self), write) in
-                    (unfolding acc(state(other2), write) in
-                      lt(self.F_i, object___cast__(E(), other2).E_i)))) :
-                  __prim__bool___box__(false)))))))
-    ))
+    assert body_self_other2
 
   } elseif (issubtype(typeof(other1), F())) {
     // assume other1 <_F other2 (only use postcondition of F___lt__)
-    inhale (
+    posts_other1_other2_F := (
       (issubtype(typeof(res), bool())) &&
       (other1 == other2 ==> !bool___unbox__(res)) &&
       (issubtype(typeof(other2), F()) ==>
@@ -1579,34 +1549,11 @@ method F___lt___check_transitivity(self: Ref, other1: Ref, other2: Ref) {
             res == __prim__bool___box__(lt(other1.F_i,
             object___cast__(E(), other2).E_i)))))
     )
+    inhale posts_other1_other2_F
     inhale bool___unbox__(res)
 
     // prove self <_E other2
-    assert (bool___unbox__((let cond_3_0 ==
-        (__prim__bool___box__(self == other2)) in
-        (true && bool___unbox__(cond_3_0) ?
-          __prim__bool___box__(false) :
-          (let cond_4_0 ==
-            ((true && !bool___unbox__(cond_3_0) ?
-              __prim__bool___box__(issubtype(typeof(other2), F())) :
-              null)) in
-            (true && !bool___unbox__(cond_3_0) && bool___unbox__(cond_4_0) ?
-              __prim__bool___box__((unfolding acc(state(self), write) in
-                (unfolding acc(state(other2), write) in
-                  lt(self.F_i, object___cast__(F(), other2).F_i)))) :
-              (let cond_5_0 ==
-                ((true && !bool___unbox__(cond_3_0) &&
-                !bool___unbox__(cond_4_0) ?
-                  __prim__bool___box__(issubtype(typeof(other2),
-                  E())) :
-                  null)) in
-                (true && !bool___unbox__(cond_3_0) && !bool___unbox__(cond_4_0) &&
-                bool___unbox__(cond_5_0) ?
-                  __prim__bool___box__((unfolding acc(state(self), write) in
-                    (unfolding acc(state(other2), write) in
-                      lt(self.F_i, object___cast__(E(), other2).E_i)))) :
-                  __prim__bool___box__(false)))))))
-    ))
+    assert body_self_other2
   }
 }
 
