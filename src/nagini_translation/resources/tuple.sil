@@ -156,12 +156,27 @@ function tuple___eq__(self: Ref, other: Ref): Bool
       ))
 
 domain HashTuple {
-    function abstract_hash_tuple(self: Ref): Int
+    function tup_hash_one(o1: Int): Int
+    function tup_hash_two(o1: Int, o2: Int): Int
+
+    axiom one_elem {
+      forall t: Ref, el: Ref :: issubtype(typeof(t), tuple(tuple_args(typeof(t)))) && tuple___len__(t) == 1 && tuple___val__(t) == Seq(el) ==> 
+      _hash(t) == tup_hash_one(_hash(el))
+    }
+
+    axiom two_elems {
+      forall t: Ref, o1: Ref, o2: Ref :: issubtype(typeof(t), tuple(tuple_args(typeof(t)))) && tuple___len__(t) == 2 && tuple___val__(t) == Seq(o1, o2) ==> 
+      _hash(t) == tup_hash_two(_hash(o1), _hash(o2))
+    }
+
+    
 }
 
 function tuple___hash__(self: Ref): Int
     decreases _
-    ensures issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ==> result == abstract_hash_tuple(self)
+    ensures issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ==> 
+      (tuple___len__(self) == 1 ==> result == tup_hash_one(int___unbox__(tuple___getitem__(self, 0)))) &&
+      (tuple___len__(self) == 2 ==> result == tup_hash_two(int___unbox__(tuple___getitem__(self, 0)), int___unbox__(tuple___getitem__(self, 1))))
 
 domain tuple_types {
     function tuple_var(arg0: PyType): PyType
