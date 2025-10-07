@@ -539,8 +539,6 @@ class MethodTranslator(CommonTranslator):
         Translates an impure Python function (may or not belong to a class) to
         a Viper method
         """
-        if method.opaque:
-            raise UnsupportedException(method.node, 'Opaque methods are currently not supported')
         old_function = ctx.current_function
         ctx.current_function = method
         args = self._translate_params(method, ctx)

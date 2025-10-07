@@ -1524,6 +1524,7 @@ class Analyzer(ast.NodeVisitor):
 
     def _incompatible_decorators(self, decorators) -> bool:
         return ((('Predicate' in decorators) and ('Pure' in decorators)) or
+                (('Opaque' in decorators) and ('Pure' not in decorators)) or
                 (('Predicate' in decorators) and ('Inline' in decorators)) or
                 (('Inline' in decorators) and ('Pure' in decorators)) or
                 (('IOOperation' in decorators) and (len(decorators) != 1)) or
