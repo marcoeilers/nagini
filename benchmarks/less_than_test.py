@@ -4,7 +4,6 @@
 from nagini_contracts.contracts import *
 from typing import cast
 
-# This works:))) (with merge function)
 class E:
     def __init__(self, i: int) -> None:
         Ensures(self.state())
@@ -32,7 +31,7 @@ class E:
         )
         Ensures(
             Implies(
-                type(other) == F, Unfolding(
+                isinstance(other, F), Unfolding(
                     self.state(),
                     Implies(
                         not Stateless(other), Unfolding(
@@ -53,7 +52,7 @@ class E:
                     self.i < cast(E, other).i
                 )
             )
-        elif type(other) == F:
+        elif isinstance(other, F):
             return Unfolding(
                 self.state(),
                 Unfolding(
@@ -94,7 +93,7 @@ class F:
         )
         Ensures(
             Implies(
-                type(other) == E, Unfolding(
+                isinstance(other, E), Unfolding(
                     self.state(),
                     Implies(
                         not Stateless(other), Unfolding(
@@ -115,7 +114,7 @@ class F:
                     self.i < cast(F, other).i
                 )
             )
-        elif type(other) == E:
+        elif isinstance(other, E):
             return Unfolding(
                 self.state(),
                 Unfolding(
