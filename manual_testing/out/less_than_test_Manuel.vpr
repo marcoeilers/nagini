@@ -988,7 +988,7 @@ function E___lt___extended(self: Ref, other: Ref): Ref
   requires !stateless(other) ==> acc(state(other), write)
   ensures issubtype(typeof(result), bool())
   ensures self == other ==> !bool___unbox__(result)
-  ensures type___eq__(PyType___box__(typeof(self)), PyType___box__(typeof(other))) ==>
+  ensures issubtype(typeof(other), E()) ==>
     (unfolding acc(state(self), write) in
       !stateless(other) ==>
       (unfolding acc(state(other), write) in
@@ -1010,7 +1010,7 @@ function F___lt___extended(self: Ref, other: Ref): Ref
   requires !stateless(other) ==> acc(state(other), write)
   ensures issubtype(typeof(result), bool())
   ensures self == other ==> !bool___unbox__(result)
-  ensures type___eq__(PyType___box__(typeof(self)), PyType___box__(typeof(other))) ==>
+  ensures issubtype(typeof(other), F()) ==>
     (unfolding acc(state(self), write) in
       !stateless(other) ==>
       (unfolding acc(state(other), write) in
@@ -1054,67 +1054,88 @@ method E___lt___check_asymmetry(self: Ref, other: Ref) {
   assume issubtype(typeof(other), F()) || typeof(other) == E()
   inhale acc(state(self))
   inhale acc(state(other))
-  inhale (
-    bool___unbox__(let cond_2 ==
-        (__prim__bool___box__(self == other)) in
-        (true && bool___unbox__(cond_2) ?
-          __prim__bool___box__(false) :
-          (let cond_0_0 ==
-            ((true && !bool___unbox__(cond_2) ?
-              __prim__bool___box__(type___eq__(PyType___box__(typeof(self)),
-              PyType___box__(typeof(other)))) :
-              null)) in
-            (true && !bool___unbox__(cond_2) && bool___unbox__(cond_0_0) ?
-              __prim__bool___box__((unfolding acc(state(self), write) in
-                (unfolding acc(state(other), write) in
-                  lt(self.E_i, object___cast__(E(), other).E_i)))) :
-              (let cond_1_0 ==
-                ((true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) ?
-                  __prim__bool___box__(issubtype(typeof(other),
-                  F())) :
-                  null)) in
-                (true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) &&
-                bool___unbox__(cond_1_0) ?
-                  __prim__bool___box__((unfolding acc(state(self), write) in
-                    (unfolding acc(state(other), write) in
-                      lt(self.E_i, object___cast__(F(), other).F_i)))) :
-                  __prim__bool___box__(false)))))))
+  // assume self <_E other
+  inhale (bool___unbox__(let cond_2 ==
+      (__prim__bool___box__(self == other)) in
+      (true && bool___unbox__(cond_2) ?
+        __prim__bool___box__(false) :
+        (let cond_0_0 ==
+          ((true && !bool___unbox__(cond_2) ?
+            __prim__bool___box__(issubtype(typeof(other), E())) :
+            null)) in
+          (true && !bool___unbox__(cond_2) && bool___unbox__(cond_0_0) ?
+            __prim__bool___box__((unfolding acc(state(self), write) in
+              (unfolding acc(state(other), write) in
+                lt(self.E_i, object___cast__(E(), other).E_i)))) :
+            (let cond_1_0 ==
+              ((true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) ?
+                __prim__bool___box__(issubtype(typeof(other),
+                F())) :
+                null)) in
+              (true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) &&
+              bool___unbox__(cond_1_0) ?
+                __prim__bool___box__((unfolding acc(state(self), write) in
+                  (unfolding acc(state(other), write) in
+                    lt(self.E_i, object___cast__(F(), other).F_i)))) :
+                __prim__bool___box__(false)))))))
   )
   if (typeof(other) == E()) {
-    assert !(bool___unbox__(let cond_2 ==
-        (__prim__bool___box__(other == self)) in
-        (true && bool___unbox__(cond_2) ?
-          __prim__bool___box__(false) :
-          (let cond_0_0 ==
-            ((true && !bool___unbox__(cond_2) ?
-              __prim__bool___box__(type___eq__(PyType___box__(typeof(other)),
-              PyType___box__(typeof(self)))) :
-              null)) in
-            (true && !bool___unbox__(cond_2) && bool___unbox__(cond_0_0) ?
-              __prim__bool___box__((unfolding acc(state(other), write) in
-                (unfolding acc(state(self), write) in
-                  lt(other.E_i, object___cast__(E(), self).E_i)))) :
-              (let cond_1_0 ==
-                ((true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) ?
-                  __prim__bool___box__(issubtype(typeof(self),
-                  F())) :
+    // prove !(other <_E self)
+    assert !(bool___unbox__(
+      let cond_2 ==
+            (__prim__bool___box__(other == self)) in
+            (true && bool___unbox__(cond_2) ?
+              __prim__bool___box__(false) :
+              (let cond_0_0 ==
+                ((true && !bool___unbox__(cond_2) ?
+                  __prim__bool___box__(issubtype(typeof(self), E())) :
                   null)) in
-                (true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) &&
-                bool___unbox__(cond_1_0) ?
+                (true && !bool___unbox__(cond_2) && bool___unbox__(cond_0_0) ?
                   __prim__bool___box__((unfolding acc(state(other), write) in
                     (unfolding acc(state(self), write) in
-                      lt(other.E_i, object___cast__(F(), self).F_i)))) :
-                  __prim__bool___box__(false)))))))
-    )
-  } elseif (issubtype(typeof(other), F())) {
-    inhale (issubtype(typeof(res), bool()) &&
+                      lt(other.E_i, object___cast__(E(), self).E_i)))) :
+                  (let cond_1_0 ==
+                    ((true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) ?
+                      __prim__bool___box__(issubtype(typeof(self),
+                      F())) :
+                      null)) in
+                    (true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) &&
+                    bool___unbox__(cond_1_0) ?
+                      __prim__bool___box__((unfolding acc(state(other), write) in
+                        (unfolding acc(state(self), write) in
+                          lt(other.E_i, object___cast__(F(), self).F_i)))) :
+                      __prim__bool___box__(false))))))
+    ))
+  } elseif (issubtype(typeof(other), E())) {
+    // prove !(other <_E self) (only using postconditions)
+    inhale (
+      issubtype(typeof(res), bool()) &&
       (other == self ==> !bool___unbox__(res)) &&
-      (type___eq__(PyType___box__(typeof(other)), PyType___box__(typeof(self))) ==>
+      (issubtype(typeof(self), E()) ==>
         (unfolding acc(state(other), write) in
           !stateless(self) ==>
           (unfolding acc(state(self), write) in
-            eq(res, __prim__bool___box__(lt(other.F_i,
-            object___cast__(F(), self).F_i)))))) &&
+            res == __prim__bool___box__(lt(other.E_i,
+            object___cast__(E(), self).E_i))))) &&
+      (issubtype(typeof(self), F()) ==>
+        (unfolding acc(state(other), write) in
+          !stateless(self) ==>
+          (unfolding acc(state(self), write) in
+            res == __prim__bool___box__(lt(other.E_i,
+            object___cast__(F(), self).F_i)))))
+    )
+    assert !bool___unbox__(res)
+  } elseif (issubtype(typeof(other), F())) {
+    // prove !(other <_F self) (only using postconditions)
+    inhale(
+      issubtype(typeof(res), bool()) &&
+      (other == self ==> !bool___unbox__(res)) &&
+      (issubtype(typeof(self), F()) ==>
+        (unfolding acc(state(other), write) in
+          !stateless(self) ==>
+          (unfolding acc(state(self), write) in
+            res == __prim__bool___box__(lt(other.F_i,
+            object___cast__(F(), self).F_i))))) &&
       (issubtype(typeof(self), E()) ==>
         (unfolding acc(state(other), write) in
           !stateless(self) ==>
@@ -1133,15 +1154,13 @@ method F___lt___check_asymmetry(self: Ref, other: Ref) {
   assume issubtype(typeof(other), E()) || typeof(other) == F()
   inhale acc(state(self))
   inhale acc(state(other))
-  inhale (
-    bool___unbox__(let cond_3_0 ==
+  inhale (bool___unbox__((let cond_3_0 ==
       (__prim__bool___box__(self == other)) in
       (true && bool___unbox__(cond_3_0) ?
         __prim__bool___box__(false) :
         (let cond_4_0 ==
           ((true && !bool___unbox__(cond_3_0) ?
-            __prim__bool___box__(type___eq__(PyType___box__(typeof(self)),
-            PyType___box__(typeof(other)))) :
+            __prim__bool___box__(issubtype(typeof(other), F())) :
             null)) in
           (true && !bool___unbox__(cond_3_0) && bool___unbox__(cond_4_0) ?
             __prim__bool___box__((unfolding acc(state(self), write) in
@@ -1159,50 +1178,68 @@ method F___lt___check_asymmetry(self: Ref, other: Ref) {
                   (unfolding acc(state(other), write) in
                     lt(self.F_i, object___cast__(E(), other).E_i)))) :
                 __prim__bool___box__(false)))))))
-  )
+  ))
   if (typeof(other) == F()) {
-    assert !(bool___unbox__((let cond_3_0 ==
-        (__prim__bool___box__(other == self)) in
-        (true && bool___unbox__(cond_3_0) ?
-          __prim__bool___box__(false) :
-          (let cond_4_0 ==
-            ((true && !bool___unbox__(cond_3_0) ?
-              __prim__bool___box__(type___eq__(PyType___box__(typeof(other)),
-              PyType___box__(typeof(self)))) :
-              null)) in
-            (true && !bool___unbox__(cond_3_0) && bool___unbox__(cond_4_0) ?
-              __prim__bool___box__((unfolding acc(state(other), write) in
-                (unfolding acc(state(self), write) in
-                  lt(other.F_i, object___cast__(F(), self).F_i)))) :
-              (let cond_5_0 ==
-                ((true && !bool___unbox__(cond_3_0) &&
-                !bool___unbox__(cond_4_0) ?
-                  __prim__bool___box__(issubtype(typeof(self),
-                  E())) :
-                  null)) in
-                (true && !bool___unbox__(cond_3_0) && !bool___unbox__(cond_4_0) &&
-                bool___unbox__(cond_5_0) ?
-                  __prim__bool___box__((unfolding acc(state(other), write) in
-                    (unfolding acc(state(self), write) in
-                      lt(other.F_i, object___cast__(E(), self).E_i)))) :
-                  __prim__bool___box__(false)))))))
+    assert !bool___unbox__((
+    (let cond_3_0 ==
+      (__prim__bool___box__(other == self)) in
+      (true && bool___unbox__(cond_3_0) ?
+        __prim__bool___box__(false) :
+        (let cond_4_0 ==
+          ((true && !bool___unbox__(cond_3_0) ?
+            __prim__bool___box__(issubtype(typeof(self), F())) :
+            null)) in
+          (true && !bool___unbox__(cond_3_0) && bool___unbox__(cond_4_0) ?
+            __prim__bool___box__((unfolding acc(state(other), write) in
+              (unfolding acc(state(self), write) in
+                lt(other.F_i, object___cast__(F(), self).F_i)))) :
+            (let cond_5_0 ==
+              ((true && !bool___unbox__(cond_3_0) &&
+              !bool___unbox__(cond_4_0) ?
+                __prim__bool___box__(issubtype(typeof(self),
+                E())) :
+                null)) in
+              (true && !bool___unbox__(cond_3_0) && !bool___unbox__(cond_4_0) &&
+              bool___unbox__(cond_5_0) ?
+                __prim__bool___box__((unfolding acc(state(other), write) in
+                  (unfolding acc(state(self), write) in
+                    lt(other.F_i, object___cast__(E(), self).E_i)))) :
+                __prim__bool___box__(false)))))))
     ))
-  } elseif (issubtype(typeof(other), E())) {
+  } elseif (issubtype(typeof(other), F())) {
     inhale (
       issubtype(typeof(res), bool()) &&
       (other == self ==> !bool___unbox__(res)) &&
-      (type___eq__(PyType___box__(typeof(other)), PyType___box__(typeof(self))) ==>
-        (unfolding acc(state(other), write) in
-          !stateless(self) ==>
-          (unfolding acc(state(self), write) in
-            bool___eq___extended(res, __prim__bool___box__(lt(other.E_i,
-            object___cast__(E(), self).E_i)))))) &&
       (issubtype(typeof(self), F()) ==>
         (unfolding acc(state(other), write) in
           !stateless(self) ==>
           (unfolding acc(state(self), write) in
-            bool___eq___extended(res, __prim__bool___box__(lt(other.E_i,
-            object___cast__(F(), self).F_i))))))
+            res == __prim__bool___box__(lt(other.F_i,
+            object___cast__(F(), self).F_i))))) &&
+      (issubtype(typeof(self), E()) ==>
+        (unfolding acc(state(other), write) in
+          !stateless(self) ==>
+          (unfolding acc(state(self), write) in
+            res == __prim__bool___box__(lt(other.F_i,
+            object___cast__(E(), self).E_i)))))
+    )
+    assert !bool___unbox__(res)
+  } elseif (issubtype(typeof(other), E())) {
+    inhale (
+      issubtype(typeof(res), bool()) &&
+      (other == self ==> !bool___unbox__(res)) &&
+      (issubtype(typeof(self), E()) ==>
+        (unfolding acc(state(other), write) in
+          !stateless(self) ==>
+          (unfolding acc(state(self), write) in
+            res == __prim__bool___box__(lt(other.E_i,
+            object___cast__(E(), self).E_i))))) &&
+      (issubtype(typeof(self), F()) ==>
+        (unfolding acc(state(other), write) in
+          !stateless(self) ==>
+          (unfolding acc(state(self), write) in
+            res == __prim__bool___box__(lt(other.E_i,
+            object___cast__(F(), self).F_i)))))
     )
     assert !bool___unbox__(res)
   }
@@ -1213,12 +1250,364 @@ method E___lt___check_transitivity(self: Ref, other1: Ref, other2: Ref) {
   var res : Ref
   assume issubtype(typeof(res), bool())
   assume typeof(self) == E()
-  assume issubtype(typeof(other1), F()) || typeof(other1) == E()
-  assume issubtype(typeof(other2), F()) || typeof(other2) == E()
+  assume issubtype(typeof(other1), E()) || issubtype(typeof(other1), F()) || typeof(other1) == E()
+  assume issubtype(typeof(other2), E()) || issubtype(typeof(other2), F()) || typeof(other2) == E()
   inhale acc(state(self))
   inhale acc(state(other1))
   inhale acc(state(other2))
-  // TODO: solve this
+  // self < other1
+  inhale (bool___unbox__(let cond_2 ==
+      (__prim__bool___box__(self == other1)) in
+      (true && bool___unbox__(cond_2) ?
+        __prim__bool___box__(false) :
+        (let cond_0_0 ==
+          ((true && !bool___unbox__(cond_2) ?
+            __prim__bool___box__(issubtype(typeof(other1), E())) :
+            null)) in
+          (true && !bool___unbox__(cond_2) && bool___unbox__(cond_0_0) ?
+            __prim__bool___box__((unfolding acc(state(self), write) in
+              (unfolding acc(state(other1), write) in
+                lt(self.E_i, object___cast__(E(), other1).E_i)))) :
+            (let cond_1_0 ==
+              ((true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) ?
+                __prim__bool___box__(issubtype(typeof(other1),
+                F())) :
+                null)) in
+              (true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) &&
+              bool___unbox__(cond_1_0) ?
+                __prim__bool___box__((unfolding acc(state(self), write) in
+                  (unfolding acc(state(other1), write) in
+                    lt(self.E_i, object___cast__(F(), other1).F_i)))) :
+                __prim__bool___box__(false))))))
+  ))
+  if (typeof(other1) == E()) {
+    // other1 <_E other2
+    inhale (bool___unbox__(let cond_2 ==
+        (__prim__bool___box__(other1 == other2)) in
+        (true && bool___unbox__(cond_2) ?
+          __prim__bool___box__(false) :
+          (let cond_0_0 ==
+            ((true && !bool___unbox__(cond_2) ?
+              __prim__bool___box__(issubtype(typeof(other2), E())) :
+              null)) in
+            (true && !bool___unbox__(cond_2) && bool___unbox__(cond_0_0) ?
+              __prim__bool___box__((unfolding acc(state(other1), write) in
+                (unfolding acc(state(other2), write) in
+                  lt(other1.E_i, object___cast__(E(), other2).E_i)))) :
+              (let cond_1_0 ==
+                ((true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) ?
+                  __prim__bool___box__(issubtype(typeof(other2),
+                  F())) :
+                  null)) in
+                (true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) &&
+                bool___unbox__(cond_1_0) ?
+                  __prim__bool___box__((unfolding acc(state(other1), write) in
+                    (unfolding acc(state(other2), write) in
+                      lt(other1.E_i, object___cast__(F(), other2).F_i)))) :
+                  __prim__bool___box__(false))))))
+    ))
+    // prove self <_E other2
+    assert (bool___unbox__(let cond_2 ==
+        (__prim__bool___box__(self == other2)) in
+        (true && bool___unbox__(cond_2) ?
+          __prim__bool___box__(false) :
+          (let cond_0_0 ==
+            ((true && !bool___unbox__(cond_2) ?
+              __prim__bool___box__(issubtype(typeof(other2), E())) :
+              null)) in
+            (true && !bool___unbox__(cond_2) && bool___unbox__(cond_0_0) ?
+              __prim__bool___box__((unfolding acc(state(self), write) in
+                (unfolding acc(state(other2), write) in
+                  lt(self.E_i, object___cast__(E(), other2).E_i)))) :
+              (let cond_1_0 ==
+                ((true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) ?
+                  __prim__bool___box__(issubtype(typeof(other2),
+                  F())) :
+                  null)) in
+                (true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) &&
+                bool___unbox__(cond_1_0) ?
+                  __prim__bool___box__((unfolding acc(state(self), write) in
+                    (unfolding acc(state(other2), write) in
+                      lt(self.E_i, object___cast__(F(), other2).F_i)))) :
+                  __prim__bool___box__(false))))))
+    ))
+  } elseif (issubtype(typeof(other1), E())) {
+    // assume other1 <_E other2 (only use postcondition of E___lt__)
+    inhale (
+      issubtype(typeof(res), bool()) &&
+      (other1 == other2 ==> !bool___unbox__(res)) &&
+      (issubtype(typeof(other2), E()) ==>
+        (unfolding acc(state(other1), write) in
+          !stateless(other2) ==>
+          (unfolding acc(state(other2), write) in
+            res == __prim__bool___box__(lt(other1.E_i,
+            object___cast__(E(), other2).E_i))))) &&
+      (issubtype(typeof(other2), F()) ==>
+        (unfolding acc(state(other1), write) in
+          !stateless(other2) ==>
+          (unfolding acc(state(other2), write) in
+            res == __prim__bool___box__(lt(other1.E_i,
+            object___cast__(F(), other2).F_i)))))
+    )
+    inhale bool___unbox__(res)
+
+    // prove self <_E other2
+    assert (bool___unbox__(let cond_2 ==
+        (__prim__bool___box__(self == other2)) in
+        (true && bool___unbox__(cond_2) ?
+          __prim__bool___box__(false) :
+          (let cond_0_0 ==
+            ((true && !bool___unbox__(cond_2) ?
+              __prim__bool___box__(issubtype(typeof(other2), E())) :
+              null)) in
+            (true && !bool___unbox__(cond_2) && bool___unbox__(cond_0_0) ?
+              __prim__bool___box__((unfolding acc(state(self), write) in
+                (unfolding acc(state(other2), write) in
+                  lt(self.E_i, object___cast__(E(), other2).E_i)))) :
+              (let cond_1_0 ==
+                ((true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) ?
+                  __prim__bool___box__(issubtype(typeof(other2),
+                  F())) :
+                  null)) in
+                (true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) &&
+                bool___unbox__(cond_1_0) ?
+                  __prim__bool___box__((unfolding acc(state(self), write) in
+                    (unfolding acc(state(other2), write) in
+                      lt(self.E_i, object___cast__(F(), other2).F_i)))) :
+                  __prim__bool___box__(false))))))
+    ))
+
+  } elseif (issubtype(typeof(other1), F())) {
+    // assume other1 <_F other2 (only use postcondition of F___lt__)
+    inhale (
+      (issubtype(typeof(res), bool())) &&
+      (other1 == other2 ==> !bool___unbox__(res)) &&
+      (issubtype(typeof(other2), F()) ==>
+        (unfolding acc(state(other1), write) in
+          !stateless(other2) ==>
+          (unfolding acc(state(other2), write) in
+            res == __prim__bool___box__(lt(other1.F_i,
+            object___cast__(F(), other2).F_i))))) &&
+      (issubtype(typeof(other2), E()) ==>
+        (unfolding acc(state(other1), write) in
+          !stateless(other2) ==>
+          (unfolding acc(state(other2), write) in
+            res == __prim__bool___box__(lt(other1.F_i,
+            object___cast__(E(), other2).E_i)))))
+    )
+    inhale bool___unbox__(res)
+
+    // prove self <_E other2
+    assert (bool___unbox__(let cond_2 ==
+        (__prim__bool___box__(self == other2)) in
+        (true && bool___unbox__(cond_2) ?
+          __prim__bool___box__(false) :
+          (let cond_0_0 ==
+            ((true && !bool___unbox__(cond_2) ?
+              __prim__bool___box__(issubtype(typeof(other2), E())) :
+              null)) in
+            (true && !bool___unbox__(cond_2) && bool___unbox__(cond_0_0) ?
+              __prim__bool___box__((unfolding acc(state(self), write) in
+                (unfolding acc(state(other2), write) in
+                  lt(self.E_i, object___cast__(E(), other2).E_i)))) :
+              (let cond_1_0 ==
+                ((true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) ?
+                  __prim__bool___box__(issubtype(typeof(other2),
+                  F())) :
+                  null)) in
+                (true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) &&
+                bool___unbox__(cond_1_0) ?
+                  __prim__bool___box__((unfolding acc(state(self), write) in
+                    (unfolding acc(state(other2), write) in
+                      lt(self.E_i, object___cast__(F(), other2).F_i)))) :
+                  __prim__bool___box__(false))))))
+    ))
+  }
+}
+
+method F___lt___check_transitivity(self: Ref, other1: Ref, other2: Ref) {
+  var res : Ref
+  assume issubtype(typeof(res), bool())
+  assume typeof(self) == F()
+  assume issubtype(typeof(other1), E()) || issubtype(typeof(other1), F()) || typeof(other1) == F()
+  assume issubtype(typeof(other2), E()) || issubtype(typeof(other2), F()) || typeof(other2) == F()
+  inhale acc(state(self))
+  inhale acc(state(other1))
+  inhale acc(state(other2))
+
+  // assume self < other1
+  inhale (bool___unbox__((let cond_3_0 ==
+      (__prim__bool___box__(self == other1)) in
+      (true && bool___unbox__(cond_3_0) ?
+        __prim__bool___box__(false) :
+        (let cond_4_0 ==
+          ((true && !bool___unbox__(cond_3_0) ?
+            __prim__bool___box__(issubtype(typeof(other1), F())) :
+            null)) in
+          (true && !bool___unbox__(cond_3_0) && bool___unbox__(cond_4_0) ?
+            __prim__bool___box__((unfolding acc(state(self), write) in
+              (unfolding acc(state(other1), write) in
+                lt(self.F_i, object___cast__(F(), other1).F_i)))) :
+            (let cond_5_0 ==
+              ((true && !bool___unbox__(cond_3_0) &&
+              !bool___unbox__(cond_4_0) ?
+                __prim__bool___box__(issubtype(typeof(other1),
+                E())) :
+                null)) in
+              (true && !bool___unbox__(cond_3_0) && !bool___unbox__(cond_4_0) &&
+              bool___unbox__(cond_5_0) ?
+                __prim__bool___box__((unfolding acc(state(self), write) in
+                  (unfolding acc(state(other1), write) in
+                    lt(self.F_i, object___cast__(E(), other1).E_i)))) :
+                __prim__bool___box__(false)))))))
+  ))
+  if (typeof(other1) == F()) {
+    // assume other1 <_E other2
+    inhale (bool___unbox__((let cond_3_0 ==
+        (__prim__bool___box__(other1 == other2)) in
+        (true && bool___unbox__(cond_3_0) ?
+          __prim__bool___box__(false) :
+          (let cond_4_0 ==
+            ((true && !bool___unbox__(cond_3_0) ?
+              __prim__bool___box__(issubtype(typeof(other2), F())) :
+              null)) in
+            (true && !bool___unbox__(cond_3_0) && bool___unbox__(cond_4_0) ?
+              __prim__bool___box__((unfolding acc(state(other1), write) in
+                (unfolding acc(state(other2), write) in
+                  lt(other1.F_i, object___cast__(F(), other2).F_i)))) :
+              (let cond_5_0 ==
+                ((true && !bool___unbox__(cond_3_0) &&
+                !bool___unbox__(cond_4_0) ?
+                  __prim__bool___box__(issubtype(typeof(other2),
+                  E())) :
+                  null)) in
+                (true && !bool___unbox__(cond_3_0) && !bool___unbox__(cond_4_0) &&
+                bool___unbox__(cond_5_0) ?
+                  __prim__bool___box__((unfolding acc(state(other1), write) in
+                    (unfolding acc(state(other2), write) in
+                      lt(other1.F_i, object___cast__(E(), other2).E_i)))) :
+                  __prim__bool___box__(false)))))))
+    ))
+    // prove self <_E other2
+    assert (bool___unbox__((let cond_3_0 ==
+        (__prim__bool___box__(self == other2)) in
+        (true && bool___unbox__(cond_3_0) ?
+          __prim__bool___box__(false) :
+          (let cond_4_0 ==
+            ((true && !bool___unbox__(cond_3_0) ?
+              __prim__bool___box__(issubtype(typeof(other2), F())) :
+              null)) in
+            (true && !bool___unbox__(cond_3_0) && bool___unbox__(cond_4_0) ?
+              __prim__bool___box__((unfolding acc(state(self), write) in
+                (unfolding acc(state(other2), write) in
+                  lt(self.F_i, object___cast__(F(), other2).F_i)))) :
+              (let cond_5_0 ==
+                ((true && !bool___unbox__(cond_3_0) &&
+                !bool___unbox__(cond_4_0) ?
+                  __prim__bool___box__(issubtype(typeof(other2),
+                  E())) :
+                  null)) in
+                (true && !bool___unbox__(cond_3_0) && !bool___unbox__(cond_4_0) &&
+                bool___unbox__(cond_5_0) ?
+                  __prim__bool___box__((unfolding acc(state(self), write) in
+                    (unfolding acc(state(other2), write) in
+                      lt(self.F_i, object___cast__(E(), other2).E_i)))) :
+                  __prim__bool___box__(false)))))))
+    ))
+  } elseif (issubtype(typeof(other1), E())) {
+    // assume other1 <_E other2 (only use postcondition of E___lt__)
+    inhale (
+      issubtype(typeof(res), bool()) &&
+      (other1 == other2 ==> !bool___unbox__(res)) &&
+      (issubtype(typeof(other2), E()) ==>
+        (unfolding acc(state(other1), write) in
+          !stateless(other2) ==>
+          (unfolding acc(state(other2), write) in
+            res == __prim__bool___box__(lt(other1.E_i,
+            object___cast__(E(), other2).E_i))))) &&
+      (issubtype(typeof(other2), F()) ==>
+        (unfolding acc(state(other1), write) in
+          !stateless(other2) ==>
+          (unfolding acc(state(other2), write) in
+            res == __prim__bool___box__(lt(other1.E_i,
+            object___cast__(F(), other2).F_i)))))
+    )
+    inhale bool___unbox__(res)
+
+    // prove self <_E other2
+    assert (bool___unbox__((let cond_3_0 ==
+        (__prim__bool___box__(self == other2)) in
+        (true && bool___unbox__(cond_3_0) ?
+          __prim__bool___box__(false) :
+          (let cond_4_0 ==
+            ((true && !bool___unbox__(cond_3_0) ?
+              __prim__bool___box__(issubtype(typeof(other2), F())) :
+              null)) in
+            (true && !bool___unbox__(cond_3_0) && bool___unbox__(cond_4_0) ?
+              __prim__bool___box__((unfolding acc(state(self), write) in
+                (unfolding acc(state(other2), write) in
+                  lt(self.F_i, object___cast__(F(), other2).F_i)))) :
+              (let cond_5_0 ==
+                ((true && !bool___unbox__(cond_3_0) &&
+                !bool___unbox__(cond_4_0) ?
+                  __prim__bool___box__(issubtype(typeof(other2),
+                  E())) :
+                  null)) in
+                (true && !bool___unbox__(cond_3_0) && !bool___unbox__(cond_4_0) &&
+                bool___unbox__(cond_5_0) ?
+                  __prim__bool___box__((unfolding acc(state(self), write) in
+                    (unfolding acc(state(other2), write) in
+                      lt(self.F_i, object___cast__(E(), other2).E_i)))) :
+                  __prim__bool___box__(false)))))))
+    ))
+
+  } elseif (issubtype(typeof(other1), F())) {
+    // assume other1 <_F other2 (only use postcondition of F___lt__)
+    inhale (
+      (issubtype(typeof(res), bool())) &&
+      (other1 == other2 ==> !bool___unbox__(res)) &&
+      (issubtype(typeof(other2), F()) ==>
+        (unfolding acc(state(other1), write) in
+          !stateless(other2) ==>
+          (unfolding acc(state(other2), write) in
+            res == __prim__bool___box__(lt(other1.F_i,
+            object___cast__(F(), other2).F_i))))) &&
+      (issubtype(typeof(other2), E()) ==>
+        (unfolding acc(state(other1), write) in
+          !stateless(other2) ==>
+          (unfolding acc(state(other2), write) in
+            res == __prim__bool___box__(lt(other1.F_i,
+            object___cast__(E(), other2).E_i)))))
+    )
+    inhale bool___unbox__(res)
+
+    // prove self <_E other2
+    assert (bool___unbox__((let cond_3_0 ==
+        (__prim__bool___box__(self == other2)) in
+        (true && bool___unbox__(cond_3_0) ?
+          __prim__bool___box__(false) :
+          (let cond_4_0 ==
+            ((true && !bool___unbox__(cond_3_0) ?
+              __prim__bool___box__(issubtype(typeof(other2), F())) :
+              null)) in
+            (true && !bool___unbox__(cond_3_0) && bool___unbox__(cond_4_0) ?
+              __prim__bool___box__((unfolding acc(state(self), write) in
+                (unfolding acc(state(other2), write) in
+                  lt(self.F_i, object___cast__(F(), other2).F_i)))) :
+              (let cond_5_0 ==
+                ((true && !bool___unbox__(cond_3_0) &&
+                !bool___unbox__(cond_4_0) ?
+                  __prim__bool___box__(issubtype(typeof(other2),
+                  E())) :
+                  null)) in
+                (true && !bool___unbox__(cond_3_0) && !bool___unbox__(cond_4_0) &&
+                bool___unbox__(cond_5_0) ?
+                  __prim__bool___box__((unfolding acc(state(self), write) in
+                    (unfolding acc(state(other2), write) in
+                      lt(self.F_i, object___cast__(E(), other2).E_i)))) :
+                  __prim__bool___box__(false)))))))
+    ))
+  }
 }
 
 @opaque()
@@ -1230,7 +1619,7 @@ function E___lt__(self_14: Ref, other_8: Ref): Ref
   requires !stateless(other_8) ==> acc(state(other_8), write)
   ensures issubtype(typeof(result), bool())
   ensures self_14 == other_8 ==> !bool___unbox__(result)
-  ensures type___eq__(PyType___box__(typeof(self_14)), PyType___box__(typeof(other_8))) ==>
+  ensures issubtype(typeof(other_8), E()) ==>
     (unfolding acc(state(self_14), write) in
       !stateless(other_8) ==>
       (unfolding acc(state(other_8), write) in
@@ -1249,8 +1638,7 @@ function E___lt__(self_14: Ref, other_8: Ref): Ref
       __prim__bool___box__(false) :
       (let cond_0_0 ==
         ((true && !bool___unbox__(cond_2) ?
-          __prim__bool___box__(type___eq__(PyType___box__(typeof(self_14)),
-          PyType___box__(typeof(other_8)))) :
+          __prim__bool___box__(issubtype(typeof(other_8), E())) :
           null)) in
         (true && !bool___unbox__(cond_2) && bool___unbox__(cond_0_0) ?
           __prim__bool___box__((unfolding acc(state(self_14), write) in
@@ -1278,7 +1666,7 @@ function F___lt__(self_17: Ref, other_9: Ref): Ref
   requires !stateless(other_9) ==> acc(state(other_9), write)
   ensures issubtype(typeof(result), bool())
   ensures self_17 == other_9 ==> !bool___unbox__(result)
-  ensures type___eq__(PyType___box__(typeof(self_17)), PyType___box__(typeof(other_9))) ==>
+  ensures issubtype(typeof(other_9), F()) ==>
     (unfolding acc(state(self_17), write) in
       !stateless(other_9) ==>
       (unfolding acc(state(other_9), write) in
@@ -1297,8 +1685,7 @@ function F___lt__(self_17: Ref, other_9: Ref): Ref
       __prim__bool___box__(false) :
       (let cond_4_0 ==
         ((true && !bool___unbox__(cond_3_0) ?
-          __prim__bool___box__(type___eq__(PyType___box__(typeof(self_17)),
-          PyType___box__(typeof(other_9)))) :
+          __prim__bool___box__(issubtype(typeof(other_9), F())) :
           null)) in
         (true && !bool___unbox__(cond_3_0) && bool___unbox__(cond_4_0) ?
           __prim__bool___box__((unfolding acc(state(self_17), write) in
