@@ -985,7 +985,8 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                  node_factory: 'ProgramNodeFactory',
                  interface: bool = False,
                  interface_dict: Dict[str, Any] = None,
-                 method_type: MethodType = MethodType.normal):
+                 method_type: MethodType = MethodType.normal,
+                 opaque: bool = False):
         """
         :param cls: Class this method belongs to, if any.
         :param superscope: The scope (class or module) this method belongs to
@@ -994,6 +995,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         implementation, just its contract
         :param interface: True iff the method implementation is provided in
         native Silver.
+        :param opaque: True iff ir's opaque
         """
         PythonNode.__init__(self, name, node)
         PythonScope.__init__(self, None, superscope)
@@ -1017,6 +1019,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.error_var = None  # infer
         self.declared_exceptions = OrderedDict()  # direct
         self.pure = pure
+        self.opaque = opaque
         self.predicate = False
         self.inline = False
         self.all_low = False
@@ -1852,10 +1855,11 @@ class ProgramNodeFactory:
             container_factory: 'ProgramNodeFactory',
             interface: bool = False,
             interface_dict: Dict[str, Any] = None,
-            method_type: MethodType = MethodType.normal) -> PythonMethod:
+            method_type: MethodType = MethodType.normal,
+            opaque: bool = False) -> PythonMethod:
         return PythonMethod(name, node, cls, superscope, pure, contract_only,
                             container_factory, interface, interface_dict,
-                            method_type)
+                            method_type, opaque)
 
     def create_python_io_operation(self, name: str, node: ast.AST,
                                    superscope: PythonScope,
