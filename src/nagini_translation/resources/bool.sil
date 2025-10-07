@@ -391,3 +391,19 @@ domain __SumHelper[T$] {
         forall __ss1: Seq[Int], __ss2: Seq[Int] :: { __sum(__ss1), __sum(__ss2) } __toMS(__ss1) == __toMS(__ss2) ==> __sum(__ss1) == __sum(__ss2)
     }
 }
+
+function PyType___box__(prim: PyType): Ref
+    decreases _
+    ensures typeof(result) == type()
+    ensures type___unbox__(result) == prim
+
+function type___unbox__(box: Ref): PyType
+    decreases _
+    requires issubtype(typeof(box), type())
+    ensures PyType___box__(result) == box
+
+function type___eq__(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), type())
+    requires issubtype(typeof(other), type())
+    ensures result == (type___unbox__(self) == type___unbox__(other))

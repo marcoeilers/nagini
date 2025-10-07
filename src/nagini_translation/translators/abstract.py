@@ -358,6 +358,9 @@ class AbstractTranslator(metaclass=ABCMeta):
         return self.config.type_translator.type_check(
             lhs, type, position, ctx, inhale_exhale=inhale_exhale)
 
+    def subtype_check(self, obj: Expr, type_expr: Expr, position: 'silver.ast.Position', ctx: Context) -> Expr:
+        return self.config.type_translator.subtype_check(obj, type_expr, position, ctx)
+
     def bind_type_vars(self, method: PythonMethod, ctx: Context) -> None:
         return self.config.method_translator.bind_type_vars(method, ctx)
 
