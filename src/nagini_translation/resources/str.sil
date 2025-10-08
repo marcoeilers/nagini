@@ -48,16 +48,14 @@ function str___mod__(self: Ref, other: Ref): Ref
     requires issubtype(typeof(self), str())
     ensures issubtype(typeof(result), str())
 
-function str_format(self: Ref, args: Ref, kwargs: Ref): Ref
-    decreases _
+method str_format(self: Ref, args: Ref, kwargs: Ref) returns (_res: Ref)
     requires issubtype(typeof(self), str())
-    ensures issubtype(typeof(result), str())
+    ensures issubtype(typeof(_res), str())
 
-function str___format__(self: Ref, other: Ref): Ref
-    decreases _
+method str___format__(self: Ref, other: Ref) returns (_res: Ref)
     requires issubtype(typeof(self), str())
     requires issubtype(typeof(other), str())
-    ensures issubtype(typeof(result), str())
+    ensures issubtype(typeof(_res), str())
     
 method str_split(self: Ref) returns (res: Ref)
     decreases _

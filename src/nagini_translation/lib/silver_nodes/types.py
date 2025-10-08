@@ -164,3 +164,20 @@ class PSeq:
             elements = [element.translate(translator, ctx, position, info)
                         for element in self._elements]
             return translator.viper.ExplicitSeq(elements, position, info)
+        
+class PIntSeq:
+    """A helper class for generating Silver sequences."""
+    
+    def __init__(self, elements: List['Expression']) -> None:
+        self._elements = elements
+        
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        """Translate to Silver sequence."""
+        if not self._elements:
+            typ = self._type.translate(translator)
+            return translator.viper.EmptySeq(typ, position, info)
+        else:
+            elements = [element.translate(translator, ctx, position, info)
+                        for element in self._elements]
+            return translator.viper.ExplicitSeq(elements, position, info)

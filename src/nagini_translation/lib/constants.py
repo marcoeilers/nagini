@@ -289,6 +289,8 @@ RANGE_TYPE = 'range'
 
 PSEQ_TYPE = 'PSeq'
 
+PINTSEQ_TYPE = 'PIntSeq'
+
 PSET_TYPE = 'PSet'
 
 PMSET_TYPE = 'PMultiset'
