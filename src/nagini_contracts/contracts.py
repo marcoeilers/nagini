@@ -31,7 +31,7 @@ CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'ResultT', 'Implies', 'Fo
                   'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding', 'Previous',
                   'RaisedException', 'PSeq', 'PSet', 'ToSeq', 'ToMS', 'MaySet', 'MayCreate',
                   'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',
-                  'PMultiset', 'LowExit', 'Refute', 'isNaN']
+                  'PMultiset', 'LowExit', 'Refute', 'isNaN', 'Reveal']
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -413,11 +413,21 @@ def Wildcard(field) -> bool:
 
 
 def Fold(predicate: bool) -> None:
-    pass
+    """
+    Folds the given predicate (exchanges the predicate body for an instance of the predicate).
+    """
 
 
 def Unfold(predicate: bool) -> None:
-    pass
+    """
+    Unfolds the given predicate (exchanges the predicate instance for the predicate body).
+    """
+
+
+def Reveal(funcApp: T) -> T:
+    """
+    Reveals the implementation of the given application of a pure function
+    """
 
 
 def Unfolding(predicate: bool, expr: T) -> T:
@@ -430,6 +440,15 @@ def Unfolding(predicate: bool, expr: T) -> T:
 def Pure(func: T) -> T:
     """
     Decorator to mark pure functions. It's a no-op.
+    """
+    return func
+
+
+def Opaque(func: T) -> T:
+    """
+    Decorator to mark pure functions as opaque, meaning that they are treated
+    modularly in terms of their specifications, and callers do not get to use
+    their implementation unless it is revealed (using Reveal()). It's a no-op.
     """
     return func
 
@@ -567,7 +586,9 @@ __all__ = [
         'Fold',
         'Unfold',
         'Unfolding',
+        'Reveal',
         'Pure',
+        'Opaque',
         'Predicate',
         'Inline',
         'Ghost',

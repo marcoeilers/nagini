@@ -386,6 +386,10 @@ class ViperAST:
         return self.ast.FuncApp(name, self.to_seq(args), position, info, type,
                                 self.NoTrafos)
 
+    def FuncAppWithInfo(self, funcApp, info):
+        return self.ast.FuncApp(funcApp.funcname(), funcApp.args(), funcApp.pos(), info, funcApp.typ(),
+                                funcApp.errT())
+
     def ExplicitSeq(self, elems, position, info):
         return self.ast.ExplicitSeq(self.to_seq(elems), position, info, self.NoTrafos)
 
@@ -524,6 +528,9 @@ class ViperAST:
 
     def ConsInfo(self, head, tail):
         return self.ast.ConsInfo(head, tail)
+
+    def AnnotationInfo(self, annotation, arguments):
+        return self.ast.AnnotationInfo(self.to_map({annotation: self.to_seq(arguments)}))
 
     def to_position(self, expr, vias, error_string: str=None,
                     rules: Rules=None, file: str = None, py_node=None):

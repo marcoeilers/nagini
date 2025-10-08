@@ -41,7 +41,8 @@ from nagini_translation.lib.util import (
     get_body_indices,
     get_parent_of_type,
     get_surrounding_try_blocks,
-    InvalidProgramException
+    InvalidProgramException,
+    UnsupportedException
 )
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
@@ -279,6 +280,7 @@ class MethodTranslator(CommonTranslator):
         Translates a pure Python function (may or not belong to a class) to a
         Viper function
         """
+
         old_function = ctx.current_function
         ctx.current_function = func
         self.bind_type_vars(func, ctx)
@@ -324,8 +326,14 @@ class MethodTranslator(CommonTranslator):
             body = self.translate_exprs(actual_body, func, ctx)
         ctx.current_function = old_function
         name = func.sil_name
+
+        # Create Function node and add opaque property if it exists
+        if func.opaque:
+            annotation = self.viper.AnnotationInfo("opaque", [])
+        else:
+            annotation = self.no_info(ctx)
         return self.viper.Function(name, args, type, pres, posts, body,
-                                   pos, self.no_info(ctx))
+                                   pos, annotation)
 
     def extract_contract(self, method: PythonMethod, errorvarname: str,
                          is_constructor: bool,
