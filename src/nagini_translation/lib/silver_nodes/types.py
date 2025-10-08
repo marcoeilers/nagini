@@ -175,8 +175,7 @@ class PIntSeq:
                   position: Position, info: Info) -> Expr:
         """Translate to Silver sequence."""
         if not self._elements:
-            typ = self._type.translate(translator)
-            return translator.viper.EmptySeq(typ, position, info)
+            return translator.viper.EmptySeq(self.viper.Int, position, info)
         else:
             elements = [element.translate(translator, ctx, position, info)
                         for element in self._elements]

@@ -26,6 +26,7 @@ from nagini_translation.lib.constants import (
     PRIMITIVE_SET_TYPE,
     PRIMITIVES,
     PSEQ_TYPE,
+    PINTSEQ_TYPE,
     PSET_TYPE,
     RESULT_NAME,
     STRING_TYPE,
@@ -720,6 +721,8 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
                 boxed_name = PMSET_TYPE
             if boxed_name == 'Seq':
                 boxed_name = PSEQ_TYPE
+            if boxed_name == 'PIntSeq':
+                boxed_name = PINTSEQ_TYPE
             return self.module.classes[boxed_name]
         return self
 

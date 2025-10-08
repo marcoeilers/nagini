@@ -22,6 +22,7 @@ from nagini_translation.lib.constants import (
     PMSET_TYPE,
     PRIMITIVES,
     PSEQ_TYPE,
+    PINTSEQ_TYPE,
     PSET_TYPE,
     RANGE_TYPE,
     BYTEARRAY_TYPE,
@@ -721,6 +722,18 @@ class ContractTranslator(CommonTranslator):
                                         [seq_call, type_lit], [None, None],
                                         node, ctx)
         return stmt, result
+    
+    def translate_to_int_sequence(self, node: ast.Call,
+                              ctx: Context) -> StmtsAndExpr:
+        coll_type = self.get_type(node.args[0], ctx)
+        stmt, arg = self.translate_expr(node.args[0], ctx)
+        
+        seq_call = self.get_int_sequence(coll_type, arg, node, ctx)
+        seq_class = ctx.module.global_module.classes[PINTSEQ_TYPE]
+        result = self.get_function_call(seq_class, '__create__',
+                                        [seq_call], [None],
+                                        node, ctx)
+        return stmt, result
 
     def translate_sequence(self, node: ast.Call,
                            ctx: Context) -> StmtsAndExpr:
@@ -747,6 +760,31 @@ class ContractTranslator(CommonTranslator):
                                                             ctx)
         result = self.get_function_call(seq_type.cls, '__create__',
                                         [result, type_lit], [None, None], node,
+                                        ctx)
+        return val_stmts, result
+    
+    def translate_int_sequence(self, node: ast.Call,
+                           ctx: Context) -> StmtsAndExpr:
+        intseq_class = ctx.module.global_module.classes[PINTSEQ_TYPE]
+        viper_type = self.viper.Int
+        val_stmts = []
+        if node.args:
+            vals = []
+            for arg in node.args:
+                arg_stmt, arg_val = self.translate_expr(arg, ctx,
+                    target_type=viper_type)
+                val_stmts += arg_stmt
+                vals.append(arg_val)
+            result = self.viper.ExplicitSeq(vals, self.to_position(node,
+                                                                   ctx),
+                                            self.no_info(ctx))
+        else:
+            result = self.viper.EmptySeq(viper_type,
+                                         self.to_position(node, ctx),
+                                         self.no_info(ctx))
+
+        result = self.get_function_call(intseq_class, '__create__',
+                                        [result], [None], node,
                                         ctx)
         return val_stmts, result
 
@@ -1138,12 +1176,16 @@ class ContractTranslator(CommonTranslator):
             return self.translate_let(node, ctx, impure)
         elif func_name == PSEQ_TYPE:
             return self.translate_sequence(node, ctx)
+        elif func_name == PINTSEQ_TYPE:
+            return self.translate_int_sequence(node, ctx)
         elif func_name == PSET_TYPE:
             return self.translate_pset(node, ctx)
         elif func_name == PMSET_TYPE:
             return self.translate_mset(node, ctx)
         elif func_name == 'ToSeq':
             return self.translate_to_sequence(node, ctx)
+        elif func_name == 'ToIntSeq':
+            return self.translate_to_int_sequence(node, ctx)
         elif func_name == 'ToMS':
             return self.translate_to_multiset(node, ctx)
         elif func_name == 'Joinable':
@@ -1159,4 +1201,4 @@ class ContractTranslator(CommonTranslator):
         elif func_name == 'arg':
             raise InvalidProgramException(node, 'invalid.arg.use')
         else:
-            raise UnsupportedException(node)
+            raise UnsupportedException(node, func_name)

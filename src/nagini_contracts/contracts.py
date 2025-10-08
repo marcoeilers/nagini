@@ -29,7 +29,7 @@ CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant', 'Decrea
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'ResultT', 'Implies', 'Forall', 'IOForall', 'Forall2', 'Forall3', 'Forall6',
                   'Exists', 'Low', 'LowVal', 'LowEvent', 'Declassify', 'TerminatesSif',
                   'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding', 'Previous',
-                  'RaisedException', 'PSeq', 'PIntSeq', 'PSet', 'ToSeq', 'ToMS', 'MaySet', 'MayCreate',
+                  'RaisedException', 'PSeq', 'PIntSeq', 'PSet', 'ToSeq', 'ToIntSeq', 'ToMS', 'MaySet', 'MayCreate',
                   'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',
                   'PMultiset', 'LowExit', 'Refute', 'isNaN', 'Reveal']
 
@@ -412,7 +412,7 @@ def ToSeq(l: Iterable[T]) -> PSeq[T]:
     a pure PSeq.
     """
     
-def ToPIntSeq(l: Iterable[int]) -> PIntSeq:
+def ToIntSeq(l: Iterable[int]) -> PIntSeq:
     """
     Converts the given iterable of a compatible built-in type (bytearray) to
     a pure PIntSeq.
@@ -665,9 +665,11 @@ __all__ = [
         'set_pred',
         'bytearray_pred',
         'PSeq',
+        'PIntSeq',
         'PSet',
         'PMultiset',
         'ToSeq',
+        'ToIntSeq',
         'ToMS',
         'MaySet',
         'MayCreate',

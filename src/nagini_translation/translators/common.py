@@ -17,6 +17,7 @@ from nagini_translation.lib.constants import (
     INT_TYPE,
     IS_DEFINED_FUNC,
     LIST_TYPE,
+    BYTEARRAY_TYPE,
     MAIN_METHOD_NAME,
     MAY_SET_PRED,
     NAME_DOMAIN,
@@ -25,6 +26,7 @@ from nagini_translation.lib.constants import (
     PRIMITIVE_INT_TYPE,
     RANGE_TYPE,
     PSEQ_TYPE,
+    PINTSEQ_TYPE,
     PSET_TYPE,
     SET_TYPE,
     SINGLE_NAME,
@@ -634,6 +636,40 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         return self.get_function_call(receiver, '__sil_seq__', [arg], [arg_type],
                                       node, ctx, position)
 
+    def get_int_sequence(self, receiver: PythonType, arg: Expr,
+                     node: ast.AST, ctx: Context,
+                     position: Position = None) -> Expr:
+        """
+        Returns a sequence (Viper type Seq[Int]) representing the contents of arg.
+        Defaults to type___sil_seq__, but used simpler expressions for known types
+        to improve performance/triggering.
+        """
+        position = position if position else self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        int_type = INT_TYPE
+        if not isinstance(receiver, UnionType) or isinstance(receiver, OptionalType):
+            if receiver.name == BYTEARRAY_TYPE:
+                seq_int = self.viper.SeqType(self.viper.Int)
+                field = self.viper.Field('bytearray_acc', seq_int, position, info)
+                res = self.viper.FieldAccess(arg, field, position, info)
+                return res
+            if receiver.name == PINTSEQ_TYPE:
+                if (isinstance(arg, self.viper.ast.FuncApp) and
+                            arg.funcname() == 'PIntSeq___create__'):
+                    args = self.viper.to_list(arg.args())
+                    return args[0]
+            int_seq_op = getattr(receiver.cls, '__sil_int_seq__', None)
+            if callable(int_seq_op):
+                self.get_function_call(receiver, '__sil_int_seq__', [arg], [None], 
+                                       node, ctx, position)
+                
+        # Fallback to getting a Seq[Ref] and then converting to Seq[Int]
+        pintseq_class = ctx.module.global_module.classes[PINTSEQ_TYPE]
+        seq_ref_exp = self.get_function_call(receiver, '__sil_seq__', [arg], [None],
+                                      node, ctx, position)
+        return self.get_function_call(pintseq_class, '__seq_ref_to_seq_int__', [seq_ref_exp], [None],
+                                      node, ctx, position)
+    
     def _get_function_call(self, receiver: PythonType,
                           func_name: str, args: List[Expr],
                           arg_types: List[PythonType], node: ast.AST,
