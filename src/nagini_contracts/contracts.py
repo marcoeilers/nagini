@@ -247,6 +247,13 @@ class PSeq(Generic[T], Sized, Iterable[T]):
         ``PSeq(2,3,5,6).drop(2)`` is equal to ``PSeq(5,6)``.
         """
 
+    def range(self, start: int, end: int) -> 'PSeq[T]':
+        """
+        Returns a new PSeq of the same type containg all elements 
+        in the range [start, end[\n
+        (i.e. ``PSeq(2,3,5,6).range(1,3)`` is equal to ``PSeq(3,5)`` )
+        """
+
     def update(self, index: int, new_val: T) -> 'PSeq[T]':
         """
         Returns a new sequence of the same type, containing the same elements
@@ -305,6 +312,12 @@ class PIntSeq(Sized, Iterable[int]):
         Returns a new PIntSeq containing all elements starting
         from the given index (i.e., drops all elements until that index).
         ``PIntSeq(2,3,5,6).drop(2)`` is equal to ``PIntSeq(5,6)``.
+        """
+    
+    def range(self, start: int, end: int) -> 'PIntSeq':
+        """
+        Returns a new PIntSeq containg all elements in the range [start, end[\n
+        (i.e. ``PIntSeq(2,3,5,6).range(1,3)`` is equal to ``PIntSeq(3,5)`` )
         """
 
     def update(self, index: int, new_val: int) -> 'PIntSeq':

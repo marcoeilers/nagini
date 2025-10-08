@@ -44,6 +44,11 @@ function PSeq_drop(self: Ref, no: Int): Ref
     requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
     ensures result == PSeq___create__(PSeq___sil_seq__(self)[no..], PSeq_arg(typeof(self), 0))
 
+function PSeq_range(self: Ref, start: Int, end: Int): Ref
+    decreases _
+    requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
+    ensures result == PSeq___create__(PSeq___sil_seq__(self)[start..end], PSeq_arg(typeof(self), 0))
+
 function PSeq_update(self: Ref, index: Int, val: Ref): Ref
     decreases _
     requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))

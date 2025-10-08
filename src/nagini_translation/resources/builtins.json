@@ -892,6 +892,12 @@
             "generic_type": -2,
             "requires": ["__sil_seq__", "__create__"]
         },
+        "range": {
+            "args": ["PSeq", "__prim__int", "__prim__int"],
+            "type": "PSeq",
+            "generic_type": -2,
+            "requires": ["__sil_seq__", "__create__"]
+        },
         "update": {
             "args": ["PSeq", "__prim__int", "object"],
             "type": "PSeq",
@@ -959,6 +965,11 @@
         },
         "drop": {
             "args": ["PIntSeq", "__prim__int"],
+            "type": "PIntSeq",
+            "requires": ["__val__", "__create__"]
+        },
+        "range": {
+            "args": ["PIntSeq", "__prim__int", "__prim__int"],
             "type": "PIntSeq",
             "requires": ["__val__", "__create__"]
         },

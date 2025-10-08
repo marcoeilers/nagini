@@ -862,6 +862,12 @@
             "generic_type": -2,
             "requires": ["__sil_seq__", "__create__"]
         },
+        "range": {
+            "args": ["PSeq", "__prim__int", "__prim__int"],
+            "type": "PSeq",
+            "generic_type": -2,
+            "requires": ["__sil_seq__", "__create__"]
+        },
         "update": {
             "args": ["PSeq", "__prim__int", "object"],
             "type": "PSeq",
@@ -879,6 +885,80 @@
         }
     },
     "type_vars": 1,
+    "extends": "object"
+},
+"PIntSeq": {
+    "functions": {
+        "__create__": {
+            "args": ["__prim__Seq"],
+            "type": "PIntSeq",
+            "requires": ["__val__"]
+        },
+        "__unbox__": {
+            "args": ["PIntSeq"],
+            "type": "__prim__Seq",
+            "requires": []
+        },
+        "__contains__": {
+            "args": ["PIntSeq", "__prim__int"],
+            "type": "__prim__bool",
+            "requires": ["__val__"]
+        },
+        "__getitem__": {
+            "args": ["PIntSeq", "int"],
+            "type": "__prim__int",
+            "requires": ["__val__", "__len__", "int___unbox__"]
+        },
+        "__sil_seq__": {
+            "args": ["PIntSeq"],
+            "type": "__prim__Seq",
+            "requires": ["__val__", "__seq_ref_to_seq_int"]
+        },
+        "__seq_ref_to_seq_int__": {
+            "args": ["__prim__Seq"],
+            "type": "__prim__Seq",
+            "requires": ["__seq_ref_to_seq_int"]
+        },
+        "__val__": {
+            "args": ["PIntSeq"],
+            "type": "__prim__Seq"
+        },
+        "__len__": {
+            "args": ["PIntSeq"],
+            "type": "__prim__int",
+            "requires": ["__val__"]
+        },
+        "take": {
+            "args": ["PIntSeq", "__prim__int"],
+            "type": "PIntSeq",
+            "requires": ["__val__", "__create__"]
+        },
+        "drop": {
+            "args": ["PIntSeq", "__prim__int"],
+            "type": "PIntSeq",
+            "requires": ["__val__", "__create__"]
+        },
+        "range": {
+            "args": ["PIntSeq", "__prim__int", "__prim__int"],
+            "type": "PIntSeq",
+            "requires": ["__val__", "__create__"]
+        },
+        "update": {
+            "args": ["PIntSeq", "__prim__int", "__prim__int"],
+            "type": "PIntSeq",
+            "requires": ["__val__", "__create__"]
+        },
+        "__add__": {
+            "args": ["PIntSeq", "PIntSeq"],
+            "type": "PIntSeq",
+            "requires": ["__val__", "__create__"]
+        },
+        "__eq__": {
+            "args": ["PIntSeq", "PIntSeq"],
+            "type": "__prim__bool",
+            "requires": ["__val__"]
+        }
+    },
     "extends": "object"
 },
 "PSet": {

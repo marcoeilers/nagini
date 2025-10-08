@@ -35,6 +35,19 @@ def test_seq() -> None:
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert False
 
+def test_range() -> None:
+    ints = PSeq(1,3,5,6,8)
+    r = ints.range(1, 3)
+
+    assert len(ints) == 5
+    assert len(r) == 2
+    assert 5 in r
+    assert r[0] == 3
+    assert 1 not in r
+    assert 8 not in r
+
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert r[1] == 6
 
 def test_list_ToSeq() -> None:
     a = [1,2,3]
