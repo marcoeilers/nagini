@@ -54,3 +54,13 @@ def test_bytearray_ToIntSeq() -> None:
     assert ToIntSeq(a) == PIntSeq(1,2,3)
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert False
+    
+def test_bytearray_bounds(b_array: bytearray) -> None:
+    Requires(bytearray_pred(b_array))
+    Requires(len(b_array) > 2)    
+    seq = ToIntSeq(b_array)
+    
+    assert 0 <= seq[0] and seq[0] <= 0xFF
+    
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert seq[1] >= 256

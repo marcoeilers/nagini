@@ -5,14 +5,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-field bytearray_acc : Seq[Int]
-
 // Bytearray only accepts values in the range [0, 255]
-function bytearray___bounds_helper__(value: Int): Bool
-    decreases _
-{
-    0 <= value < 256
-}
+field bytearray_acc : Seq[Int]
 
 method bytearray___init__() returns (res: Ref)
     ensures acc(res.bytearray_acc)
@@ -40,7 +34,7 @@ method bytearray___initFromBytearray__(other: Ref) returns (res: Ref)
 method bytearray___initFromList__(values: Ref) returns (res: Ref)
     requires issubtype(typeof(values), list(int()))
     requires acc(values.list_acc, 1/1000)
-    requires forall i: Int :: {values.list_acc[i]} ((0 <= i < list___len__(values)) ==> bytearray___bounds_helper__(int___unbox__(list___getitem__(values, __prim__int___box__(i)))))
+    requires forall i: Int :: {values.list_acc[i]} ((0 <= i < list___len__(values)) ==> int___byte__bounds__(int___unbox__(list___getitem__(values, __prim__int___box__(i)))))
     ensures acc(values.list_acc, 1/1000)
     ensures acc(res.bytearray_acc)
     ensures typeof(res) == bytearray()
@@ -93,7 +87,7 @@ function bytearray___getitem__(self: Ref, key: Ref): Int
     requires @error("Bytearray index may be out of bounds.")(let ln == (bytearray___len__(self)) in (int___unbox__(key) < 0 ==> int___unbox__(key) >= -ln))
     requires @error("Bytearray index may be out of bounds.")(let ln == (bytearray___len__(self)) in (int___unbox__(key) >= 0 ==> int___unbox__(key) < ln))
     ensures result == (int___unbox__(key) >= 0 ? self.bytearray_acc[int___unbox__(key)] : self.bytearray_acc[bytearray___len__(self) + int___unbox__(key)])
-    ensures bytearray___bounds_helper__(result)
+    ensures int___byte__bounds__(result)
 
 method bytearray___getitem_slice__(self: Ref, key: Ref) returns (_res: Ref)
     requires issubtype(typeof(self), bytearray())
@@ -111,7 +105,7 @@ method bytearray___setitem__(self: Ref, key: Ref, value: Ref) returns ()
     requires @error("Bytearray index may be negative.")(int___unbox__(key) >= 0)
     requires @error("Bytearray index may be out of bounds.")(int___unbox__(key) < bytearray___len__(self))
     requires issubtype(typeof(value), int())
-    requires @error("Provided value may be out of bounds.")bytearray___bounds_helper__(int___unbox__(value))
+    requires @error("Provided value may be out of bounds.")int___byte__bounds__(int___unbox__(value))
     ensures acc(self.bytearray_acc)
     ensures self.bytearray_acc == old(self.bytearray_acc)[int___unbox__(key) := int___unbox__(value)]
     ensures (Low(key) && Low(value)) ==> (forall i: Ref :: {bytearray___getitem__(self, i)} ((issubtype(typeof(i), int()) && int___unbox__(i) >= 0 && int___unbox__(i) < bytearray___len__(self) && Low(old(bytearray___getitem__(self, i)))) ==> Low(bytearray___getitem__(self, i))))
@@ -120,7 +114,7 @@ method bytearray_append(self: Ref, item: Ref) returns ()
     requires issubtype(typeof(self), bytearray())
     requires acc(self.bytearray_acc)
     requires issubtype(typeof(item), int())
-    requires @error("Provided item may be out of bounds.")bytearray___bounds_helper__(int___unbox__(item))
+    requires @error("Provided item may be out of bounds.")int___byte__bounds__(int___unbox__(item))
     ensures acc(self.bytearray_acc)
     ensures self.bytearray_acc == old(self.bytearray_acc) ++ Seq(int___unbox__(item))
 
@@ -160,4 +154,4 @@ function bytearray___sil_seq__(self: Ref): Seq[Ref]
   ensures |result| == bytearray___len__(self)
   ensures (forall i: Int :: { result[i] } 0 <= i < bytearray___len__(self) ==> result[i] == __prim__int___box__(self.bytearray_acc[i]))
   ensures (forall i: Ref :: { (i in result) } (i in result) == (typeof(i) == int() && (int___unbox__(i) in self.bytearray_acc)))
-  ensures (forall i: Ref :: { (i in result) } (i in result) ==> bytearray___bounds_helper__(int___unbox__(i)))
+  ensures (forall i: Ref :: { (i in result) } (i in result) ==> int___byte__bounds__(int___unbox__(i)))

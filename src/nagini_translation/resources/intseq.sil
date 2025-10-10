@@ -20,6 +20,12 @@ function PIntSeq___create__(values: Seq[Int]): Ref
     ensures typeof(result) == PIntSeq()
     ensures PIntSeq___val__(result) == values
 
+function PIntSeq___create__bytes__(values: Seq[Int]): Ref
+    decreases _
+    ensures typeof(result) == PIntSeq()
+    ensures PIntSeq___val__(result) == values
+    ensures forall i:Int :: i in values ==> int___byte__bounds__(i)
+
 function PIntSeq___contains__(self: Ref, item: Int): Bool
     decreases _
     requires issubtype(typeof(self), PIntSeq())

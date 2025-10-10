@@ -26,6 +26,7 @@ from nagini_translation.lib.constants import (
     PSET_TYPE,
     RANGE_TYPE,
     BYTEARRAY_TYPE,
+    BYTES_TYPE,
     THREAD_DOMAIN,
     THREAD_POST_PRED,
     THREAD_START_PRED,
@@ -730,7 +731,11 @@ class ContractTranslator(CommonTranslator):
         
         seq_call = self.get_int_sequence(coll_type, arg, node, ctx)
         seq_class = ctx.module.global_module.classes[PINTSEQ_TYPE]
-        result = self.get_function_call(seq_class, '__create__',
+        if coll_type.name == BYTEARRAY_TYPE or coll_type.name == BYTES_TYPE:
+            call_name = '__create__bytes__'
+        else:
+            call_name = '__create__'
+        result = self.get_function_call(seq_class, call_name,
                                         [seq_call], [None],
                                         node, ctx)
         return stmt, result

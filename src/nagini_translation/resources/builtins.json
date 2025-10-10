@@ -349,6 +349,10 @@
             "args": ["int", "int"],
             "type": "int",
             "requires": ["__rshift__"]
+        },
+        "__byte__bounds__": {
+            "args": ["__prim__int"],
+            "type": "__prim__bool"
         }
     },
     "extends": "float"
@@ -658,7 +662,7 @@
             "args": ["list"],
             "type": null,
             "MustTerminate": true,
-            "requires": ["list", "list___getitem__", "list___len__", "bytearray___bounds_helper__", "int___unbox__", "__seq_ref_to_seq_int"]
+            "requires": ["list", "list___getitem__", "list___len__", "int___byte__bounds__", "int___unbox__", "__seq_ref_to_seq_int"]
         },
         "__initFromBytearray__": {
             "args": ["bytearray"],
@@ -686,7 +690,7 @@
             "args": ["bytearray", "int", "int"],
             "type": null,
             "MustTerminate": true,
-            "requires": ["__len__", "__getitem__", "bytearray___bounds_helper__", "int___unbox__", "__prim__int___box__"]
+            "requires": ["__len__", "__getitem__", "int___byte__bounds__", "int___unbox__", "__prim__int___box__"]
         },
         "__iter__": {
             "args": ["bytearray"],
@@ -710,7 +714,7 @@
         "__getitem__": {
             "args": ["bytearray", "int"],
             "type": "__prim__int",
-            "requires": ["__len__", "bytearray___bounds_helper__", "int___unbox__"]
+            "requires": ["__len__", "int___byte__bounds__", "int___unbox__"]
         },
         "__contains__": {
             "args": ["bytearray", "int"],
@@ -726,14 +730,10 @@
             "type": "__prim__bool",
             "requires": ["__len__"]
         },
-        "__bounds_helper__": {
-            "args": ["__prim__int"],
-            "type": "__prim__bool"
-        },
         "__sil_seq__": {
             "args": ["bytearray"],
             "type": "__prim__Seq",
-            "requires": ["bytearray___bounds_helper__", "__len__", "__prim__int___box__", "int___unbox__", "__prim__int___box__"]
+            "requires": ["int___byte__bounds__", "__len__", "__prim__int___box__", "int___unbox__", "__prim__int___box__"]
         }
     },
     "extends": "object"
@@ -922,7 +922,12 @@
         "__create__": {
             "args": ["__prim__Seq"],
             "type": "PIntSeq",
-            "requires": ["__val__"]
+            "requires": ["__val__", "int___byte__bounds__"]
+        },
+        "__create__bytes__": {
+            "args": ["__prim__Seq"],
+            "type": "PIntSeq",
+            "requires": ["__val__", "int___byte__bounds__"]
         },
         "__unbox__": {
             "args": ["PIntSeq"],
