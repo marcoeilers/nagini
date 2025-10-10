@@ -1055,7 +1055,7 @@ method E___lt___check_asymmetry(self: Ref, other: Ref) {
   var posts_other_self_F: Bool
   assume issubtype(typeof(res), bool())
   assume typeof(self) == E()
-  assume issubtype(typeof(other), F()) || typeof(other) == E()
+  assume issubtype(typeof(other), F()) || typeof(other) == E() || issubtype(typeof(other), E())
   inhale acc(state(self))
   inhale acc(state(other))
 
@@ -1164,7 +1164,7 @@ method F___lt___check_asymmetry(self: Ref, other: Ref) {
   var posts_other_self_F: Bool
   assume issubtype(typeof(res), bool())
   assume typeof(self) == F()
-  assume issubtype(typeof(other), E()) || typeof(other) == F()
+  assume issubtype(typeof(other), F()) || typeof(other) == E() || issubtype(typeof(other), E())
   inhale acc(state(self))
   inhale acc(state(other))
   body_self_other := (bool___unbox__((let cond_3_0 ==
@@ -1578,6 +1578,7 @@ function E___lt__(self_14: Ref, other_8: Ref): Ref
       (unfolding acc(state(other_8), write) in
         bool___eq___extended(result, __prim__bool___box__(int___lt__(self_14.E_i,
         object___cast__(F(), other_8).F_i)))))
+  ensures bool___unbox__(result) ==> issubtype(typeof(other_8), F()) || issubtype(typeof(other_8), E()) || typeof(other_8) == E()
 {
   (let cond_2 ==
     (__prim__bool___box__(self_14 == other_8)) in
@@ -1625,6 +1626,7 @@ function F___lt__(self_17: Ref, other_9: Ref): Ref
       (unfolding acc(state(other_9), write) in
         bool___eq___extended(result, __prim__bool___box__(int___lt__(self_17.F_i,
         object___cast__(E(), other_9).E_i)))))
+  ensures bool___unbox__(result) ==> issubtype(typeof(other_9), F()) || issubtype(typeof(other_9), E()) || typeof(other_9) == F()
 {
   (let cond_3_0 ==
     (__prim__bool___box__(self_17 == other_9)) in
