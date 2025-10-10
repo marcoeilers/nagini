@@ -165,7 +165,7 @@ class PSeq:
                         for element in self._elements]
             return translator.viper.ExplicitSeq(elements, position, info)
         
-class PIntSeq:
+class PByteSeq:
     """A helper class for generating Silver sequences."""
     
     def __init__(self, elements: List['Expression']) -> None:

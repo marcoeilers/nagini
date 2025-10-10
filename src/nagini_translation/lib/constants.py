@@ -289,7 +289,7 @@ RANGE_TYPE = 'range'
 
 PSEQ_TYPE = 'PSeq'
 
-PINTSEQ_TYPE = 'PIntSeq'
+PBYTESEQ_TYPE = 'PByteSeq'
 
 PSET_TYPE = 'PSet'
 

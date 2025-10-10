@@ -22,7 +22,7 @@ from nagini_translation.lib.constants import (
     RIGHT_OPERATOR_FUNCTIONS,
     PMSET_TYPE,
     PSEQ_TYPE,
-    PINTSEQ_TYPE,
+    PBYTESEQ_TYPE,
     PSET_TYPE,
     RANGE_TYPE,
     SET_TYPE,
@@ -488,8 +488,8 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 seq_class = module.global_module.classes[PSEQ_TYPE]
                 content_type = _get_iteration_type(arg_type, module, node)
                 return GenericType(seq_class, [content_type])
-            elif node.func.id == 'ToIntSeq':
-                return module.global_module.classes[PINTSEQ_TYPE]
+            elif node.func.id == 'ToByteSeq':
+                return module.global_module.classes[PBYTESEQ_TYPE]
             elif node.func.id == 'ToMS':
                 arg_type = get_type(node.args[0], containers, container)
                 ms_class = module.global_module.classes[PMSET_TYPE]
@@ -597,7 +597,7 @@ def _get_subscript_type(value_type: PythonType, module: PythonModule,
         # FIXME: This is very unfortunate, but right now we cannot handle this
         # generically, so we have to hard code these two cases for the moment.
         return value_type.type_args[1]
-    elif value_type.name in (RANGE_TYPE, BYTES_TYPE, BYTEARRAY_TYPE, PINTSEQ_TYPE):
+    elif value_type.name in (RANGE_TYPE, BYTES_TYPE, BYTEARRAY_TYPE, PBYTESEQ_TYPE):
         return module.global_module.classes[INT_TYPE]
     elif value_type.name == PSEQ_TYPE:
         return value_type.type_args[0]

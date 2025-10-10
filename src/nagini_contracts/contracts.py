@@ -29,7 +29,7 @@ CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant', 'Decrea
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'ResultT', 'Implies', 'Forall', 'IOForall', 'Forall2', 'Forall3', 'Forall6',
                   'Exists', 'Low', 'LowVal', 'LowEvent', 'Declassify', 'TerminatesSif',
                   'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding', 'Previous',
-                  'RaisedException', 'PSeq', 'PIntSeq', 'PSet', 'ToSeq', 'ToIntSeq', 'ToMS', 'MaySet', 'MayCreate',
+                  'RaisedException', 'PSeq', 'PByteSeq', 'PSet', 'ToSeq', 'ToByteSeq', 'ToMS', 'MaySet', 'MayCreate',
                   'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',
                   'PMultiset', 'LowExit', 'Refute', 'isNaN', 'Reveal']
 
@@ -267,21 +267,21 @@ class PSeq(Generic[T], Sized, Iterable[T]):
         can be used as arguments for Forall.
         """
 
-class PIntSeq(Sized, Iterable[int]):
+class PByteSeq(Sized, Iterable[int]):
     """
-    A PIntSeq represents a pure sequence of instances of int, and
+    A PByteSeq represents a pure sequence of instances of int, and
     is translated to native Viper sequences.
     """
 
     def __init__(self, *args: int) -> None:
         """
-        ``PIntSeq(a, b, c)`` creates a PIntSeq instance containing the objects
+        ``PByteSeq(a, b, c)`` creates a PByteSeq instance containing the objects
         a, b and c in that order.
         """
 
     def __contains__(self, item: object) -> bool:
         """
-        True iff this PIntSeq contains the given object (not taking ``__eq__``
+        True iff this PByteSeq contains the given object (not taking ``__eq__``
         into account).
         """
 
@@ -292,44 +292,44 @@ class PIntSeq(Sized, Iterable[int]):
 
     def __len__(self) -> int:
         """
-        Returns the length of this PIntSeq.
+        Returns the length of this PByteSeq.
         """
 
-    def __add__(self, other: 'PIntSeq') -> 'PIntSeq':
+    def __add__(self, other: 'PByteSeq') -> 'PByteSeq':
         """
-        Concatenates two PIntSeqs to get a new PIntSeq.
-        """
-
-    def take(self, until: int) -> 'PIntSeq':
-        """
-        Returns a new PIntSeq containing all elements starting
-        from the beginning until the given index. ``PIntSeq(3,2,5,6).take(3)``
-        is equal to ``PIntSeq(3,2,5)``.
+        Concatenates two PByteSeqs to get a new PByteSeq.
         """
 
-    def drop(self, until: int) -> 'PIntSeq':
+    def take(self, until: int) -> 'PByteSeq':
         """
-        Returns a new PIntSeq containing all elements starting
+        Returns a new PByteSeq containing all elements starting
+        from the beginning until the given index. ``PByteSeq(3,2,5,6).take(3)``
+        is equal to ``PByteSeq(3,2,5)``.
+        """
+
+    def drop(self, until: int) -> 'PByteSeq':
+        """
+        Returns a new PByteSeq containing all elements starting
         from the given index (i.e., drops all elements until that index).
-        ``PIntSeq(2,3,5,6).drop(2)`` is equal to ``PIntSeq(5,6)``.
+        ``PByteSeq(2,3,5,6).drop(2)`` is equal to ``PByteSeq(5,6)``.
         """
     
-    def range(self, start: int, end: int) -> 'PIntSeq':
+    def range(self, start: int, end: int) -> 'PByteSeq':
         """
-        Returns a new PIntSeq containg all elements in the range [start, end[\n
-        (i.e. ``PIntSeq(2,3,5,6).range(1,3)`` is equal to ``PIntSeq(3,5)`` )
+        Returns a new PByteSeq containg all elements in the range [start, end[\n
+        (i.e. ``PByteSeq(2,3,5,6).range(1,3)`` is equal to ``PByteSeq(3,5)`` )
         """
 
-    def update(self, index: int, new_val: int) -> 'PIntSeq':
+    def update(self, index: int, new_val: int) -> 'PByteSeq':
         """
-        Returns a new PIntSeq, containing the same elements
+        Returns a new PByteSeq, containing the same elements
         except for the element at index ``index``, which is replaced by
         ``new_val``.
         """
 
     def __iter__(self) -> Iterator[int]:
         """
-        PIntSeqs can be quantified over; this is only here so thatPIntSeqs
+        PByteSeqs can be quantified over; this is only here so thatPByteSeqs
         can be used as arguments for Forall.
         """
 
@@ -425,10 +425,10 @@ def ToSeq(l: Iterable[T]) -> PSeq[T]:
     a pure PSeq.
     """
     
-def ToIntSeq(l: Iterable[int]) -> PIntSeq:
+def ToByteSeq(l: Iterable[int]) -> PByteSeq:
     """
     Converts the given iterable of a compatible built-in type (bytearray) to
-    a pure PIntSeq.
+    a pure PByteSeq.
     """
 
 
@@ -678,11 +678,11 @@ __all__ = [
         'set_pred',
         'bytearray_pred',
         'PSeq',
-        'PIntSeq',
+        'PByteSeq',
         'PSet',
         'PMultiset',
         'ToSeq',
-        'ToIntSeq',
+        'ToByteSeq',
         'ToMS',
         'MaySet',
         'MayCreate',

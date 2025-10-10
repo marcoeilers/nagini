@@ -1,0 +1,92 @@
+/*
+ * Copyright (c) 2019 ETH Zurich
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+
+function PByteSeq___val__(self: Ref): Seq[Int]
+    decreases _
+    requires issubtype(typeof(self), PByteSeq())
+    ensures forall i: Int :: {i in result} (i in result) ==> int___byte_bounds__(i)
+
+function PByteSeq___len__(self: Ref): Int
+    decreases _
+    requires issubtype(typeof(self), PByteSeq())
+    ensures result == |PByteSeq___val__(self)|
+
+function PByteSeq___create__(values: Seq[Int]): Ref
+    decreases _
+    requires forall i: Int :: {i in values} (i in values) ==> int___byte_bounds__(i)
+    ensures typeof(result) == PByteSeq()
+    ensures PByteSeq___val__(result) == values
+
+function PByteSeq___from_bytes__(values: Seq[Int]): Ref
+    decreases _
+    ensures typeof(result) == PByteSeq()
+    ensures PByteSeq___val__(result) == values
+
+function PByteSeq___contains__(self: Ref, item: Int): Bool
+    decreases _
+    requires issubtype(typeof(self), PByteSeq())
+    ensures result == (item in PByteSeq___val__(self))
+
+function PByteSeq___getitem__(self: Ref, index: Ref): Int
+    decreases _
+    requires issubtype(typeof(self), PByteSeq())
+    requires issubtype(typeof(index), int())
+    requires @error("Index may be out of bounds.")(let ln == (PByteSeq___len__(self)) in
+                @error("Index may be out of bounds.")((int___unbox__(index) < 0 ==> int___unbox__(index) >= -ln) && (int___unbox__(index) >= 0 ==> int___unbox__(index) < ln)))
+    ensures result == (int___unbox__(index) >= 0 ? PByteSeq___val__(self)[int___unbox__(index)] : PByteSeq___val__(self)[PByteSeq___len__(self) + int___unbox__(index)])
+    ensures int___byte_bounds__(result)
+
+function PByteSeq_take(self: Ref, no: Int): Ref
+    decreases _
+    requires issubtype(typeof(self), PByteSeq())
+    ensures result == PByteSeq___create__(PByteSeq___val__(self)[..no])
+
+function PByteSeq_drop(self: Ref, no: Int): Ref
+    decreases _
+    requires issubtype(typeof(self), PByteSeq())
+    ensures result == PByteSeq___create__(PByteSeq___val__(self)[no..])
+
+function PByteSeq_range(self: Ref, start: Int, end: Int): Ref
+    decreases _
+    requires issubtype(typeof(self), PByteSeq())
+    ensures result == PByteSeq___create__(PByteSeq___val__(self)[start..end])
+
+function PByteSeq_update(self: Ref, index: Int, val: Int): Ref
+    decreases _
+    requires issubtype(typeof(self), PByteSeq())
+    requires index >= 0 && index < PByteSeq___len__(self)
+    ensures int___byte_bounds__(val)
+    ensures result == PByteSeq___create__(PByteSeq___val__(self)[index := val])
+
+function PByteSeq___add__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), PByteSeq())
+    requires issubtype(typeof(other), PByteSeq())
+    ensures result == PByteSeq___create__(PByteSeq___val__(self) ++ PByteSeq___val__(other))
+
+function PByteSeq___eq__(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), PByteSeq())
+    requires issubtype(typeof(other), PByteSeq())
+    ensures result == (PByteSeq___val__(self) == PByteSeq___val__(other))
+    ensures result ==> self == other // extensionality
+    ensures result == object___eq__(self, other)
+
+
+function PByteSeq___sil_seq__(self: Ref): Seq[Ref]
+    decreases _
+    requires issubtype(typeof(self), PByteSeq())
+    ensures PByteSeq___val__(self) == __seq_ref_to_seq_int(result)
+
+
+// Helper function to wrap generic __sil_seq__ calls for conversion to PByteSeq
+function PByteSeq___seq_ref_to_seq_int__(sr: Seq[Ref]): Seq[Int]
+    decreases _
+{
+    __seq_ref_to_seq_int(sr)
+}

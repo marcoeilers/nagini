@@ -20,7 +20,7 @@ ISSUBTYPE = 'issubtype<Bool>'
 UNBOX_INT = 'int___unbox__%limited'
 UNBOX_BOOL = 'bool___unbox__%limited'
 UNBOX_PSEQ = 'PSeq___sil_seq__%limited'
-UNBOX_PINTSEQ = 'PIntSeq___val__%limited'
+UNBOX_PBYTESEQ = 'PByteSeq___val__%limited'
 TYPEOF = 'typeof<PyType>'
 SNAP_TO = '$SortWrappers.'
 SEQ_LENGTH = 'seq_ref_length<Int>'
@@ -516,8 +516,8 @@ class Converter:
             return self.convert_bool_value(val)
         elif t.python_class.name == 'PSeq':
             return self.convert_pseq_value(val, t, name)
-        elif t.python_class.name == 'PIntSeq':
-            return self.convert_pintseq_value(val, name)
+        elif t.python_class.name == 'PByteSeq':
+            return self.convert_PByteSeq_value(val, name)
         elif t.python_class.is_adt:
             return self.convert_adt_value(val, t)
         elif isinstance(t, GenericType) and t.python_class.name == 'tuple':
@@ -630,8 +630,8 @@ class Converter:
         sequence_info = self.convert_sequence_value(sequence, t.type_args[0], name)
         return 'Sequence: {{ {} }}'.format(', '.join(['{} -> {}'.format(k, v) for k, v in sequence_info.items()]))
 
-    def convert_pintseq_value(self, val, name):
-        sequence = self.get_func_value(UNBOX_PINTSEQ, (UNIT, val))
+    def convert_PByteSeq_value(self, val, name):
+        sequence = self.get_func_value(UNBOX_PBYTESEQ, (UNIT, val))
         sequence_info = self.convert_sequence_value(sequence, type(int), name)
         return 'Sequence: {{ {} }}'.format(', '.join(['{} -> {}'.format(k, v) for k, v in sequence_info.items()]))
 

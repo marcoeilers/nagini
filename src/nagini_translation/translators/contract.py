@@ -22,7 +22,7 @@ from nagini_translation.lib.constants import (
     PMSET_TYPE,
     PRIMITIVES,
     PSEQ_TYPE,
-    PINTSEQ_TYPE,
+    PBYTESEQ_TYPE,
     PSET_TYPE,
     RANGE_TYPE,
     BYTEARRAY_TYPE,
@@ -730,9 +730,9 @@ class ContractTranslator(CommonTranslator):
         stmt, arg = self.translate_expr(node.args[0], ctx)
         
         seq_call = self.get_int_sequence(coll_type, arg, node, ctx)
-        seq_class = ctx.module.global_module.classes[PINTSEQ_TYPE]
-        if coll_type.name == BYTEARRAY_TYPE or coll_type.name == BYTES_TYPE:
-            call_name = '__create__bytes__'
+        seq_class = ctx.module.global_module.classes[PBYTESEQ_TYPE]
+        if coll_type.name == BYTEARRAY_TYPE:
+            call_name = '__from_bytes__'
         else:
             call_name = '__create__'
         result = self.get_function_call(seq_class, call_name,
@@ -770,7 +770,7 @@ class ContractTranslator(CommonTranslator):
     
     def translate_int_sequence(self, node: ast.Call,
                            ctx: Context) -> StmtsAndExpr:
-        intseq_class = ctx.module.global_module.classes[PINTSEQ_TYPE]
+        intseq_class = ctx.module.global_module.classes[PBYTESEQ_TYPE]
         viper_type = self.viper.Int
         val_stmts = []
         if node.args:
@@ -1181,7 +1181,7 @@ class ContractTranslator(CommonTranslator):
             return self.translate_let(node, ctx, impure)
         elif func_name == PSEQ_TYPE:
             return self.translate_sequence(node, ctx)
-        elif func_name == PINTSEQ_TYPE:
+        elif func_name == PBYTESEQ_TYPE:
             return self.translate_int_sequence(node, ctx)
         elif func_name == PSET_TYPE:
             return self.translate_pset(node, ctx)
@@ -1189,7 +1189,7 @@ class ContractTranslator(CommonTranslator):
             return self.translate_mset(node, ctx)
         elif func_name == 'ToSeq':
             return self.translate_to_sequence(node, ctx)
-        elif func_name == 'ToIntSeq':
+        elif func_name == 'ToByteSeq':
             return self.translate_to_int_sequence(node, ctx)
         elif func_name == 'ToMS':
             return self.translate_to_multiset(node, ctx)

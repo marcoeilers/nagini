@@ -662,7 +662,7 @@
             "args": ["list"],
             "type": null,
             "MustTerminate": true,
-            "requires": ["list", "list___getitem__", "list___len__", "int___byte__bounds__", "int___unbox__", "__seq_ref_to_seq_int"]
+            "requires": ["list", "list___getitem__", "list___len__", "int___byte_bounds__", "int___unbox__", "__seq_ref_to_seq_int"]
         },
         "__initFromBytearray__": {
             "args": ["bytearray"],
@@ -690,7 +690,7 @@
             "args": ["bytearray", "int", "int"],
             "type": null,
             "MustTerminate": true,
-            "requires": ["__len__", "__getitem__", "int___byte__bounds__", "int___unbox__", "__prim__int___box__"]
+            "requires": ["__len__", "__getitem__", "int___byte_bounds__", "int___unbox__", "__prim__int___box__"]
         },
         "__iter__": {
             "args": ["bytearray"],
@@ -714,7 +714,7 @@
         "__getitem__": {
             "args": ["bytearray", "int"],
             "type": "__prim__int",
-            "requires": ["__len__", "int___byte__bounds__", "int___unbox__"]
+            "requires": ["__len__", "int___byte_bounds__", "int___unbox__"]
         },
         "__contains__": {
             "args": ["bytearray", "int"],
@@ -733,7 +733,7 @@
         "__sil_seq__": {
             "args": ["bytearray"],
             "type": "__prim__Seq",
-            "requires": ["int___byte__bounds__", "__len__", "__prim__int___box__", "int___unbox__", "__prim__int___box__"]
+            "requires": ["int___byte_bounds__", "__len__", "__prim__int___box__", "int___unbox__", "__prim__int___box__"]
         }
     },
     "extends": "object"
@@ -917,35 +917,35 @@
     "type_vars": 1,
     "extends": "object"
 },
-"PIntSeq": {
+"PByteSeq": {
     "functions": {
         "__create__": {
             "args": ["__prim__Seq"],
-            "type": "PIntSeq",
-            "requires": ["__val__", "int___byte__bounds__"]
+            "type": "PByteSeq",
+            "requires": ["__val__", "int___byte_bounds__"]
         },
-        "__create__bytes__": {
+        "__from_bytes__": {
             "args": ["__prim__Seq"],
-            "type": "PIntSeq",
-            "requires": ["__val__", "int___byte__bounds__"]
+            "type": "PByteSeq",
+            "requires": ["__val__"]
         },
         "__unbox__": {
-            "args": ["PIntSeq"],
+            "args": ["PByteSeq"],
             "type": "__prim__Seq",
             "requires": []
         },
         "__contains__": {
-            "args": ["PIntSeq", "__prim__int"],
+            "args": ["PByteSeq", "__prim__int"],
             "type": "__prim__bool",
             "requires": ["__val__"]
         },
         "__getitem__": {
-            "args": ["PIntSeq", "int"],
+            "args": ["PByteSeq", "int"],
             "type": "__prim__int",
-            "requires": ["__val__", "__len__", "int___unbox__"]
+            "requires": ["__val__", "__len__", "int___unbox__", "int___byte_bounds__"]
         },
         "__sil_seq__": {
-            "args": ["PIntSeq"],
+            "args": ["PByteSeq"],
             "type": "__prim__Seq",
             "requires": ["__val__", "__seq_ref_to_seq_int"]
         },
@@ -955,41 +955,41 @@
             "requires": ["__seq_ref_to_seq_int"]
         },
         "__val__": {
-            "args": ["PIntSeq"],
+            "args": ["PByteSeq"],
             "type": "__prim__Seq"
         },
         "__len__": {
-            "args": ["PIntSeq"],
+            "args": ["PByteSeq"],
             "type": "__prim__int",
             "requires": ["__val__"]
         },
         "take": {
-            "args": ["PIntSeq", "__prim__int"],
-            "type": "PIntSeq",
+            "args": ["PByteSeq", "__prim__int"],
+            "type": "PByteSeq",
             "requires": ["__val__", "__create__"]
         },
         "drop": {
-            "args": ["PIntSeq", "__prim__int"],
-            "type": "PIntSeq",
+            "args": ["PByteSeq", "__prim__int"],
+            "type": "PByteSeq",
             "requires": ["__val__", "__create__"]
         },
         "range": {
-            "args": ["PIntSeq", "__prim__int", "__prim__int"],
-            "type": "PIntSeq",
+            "args": ["PByteSeq", "__prim__int", "__prim__int"],
+            "type": "PByteSeq",
             "requires": ["__val__", "__create__"]
         },
         "update": {
-            "args": ["PIntSeq", "__prim__int", "__prim__int"],
-            "type": "PIntSeq",
-            "requires": ["__val__", "__create__"]
+            "args": ["PByteSeq", "__prim__int", "__prim__int"],
+            "type": "PByteSeq",
+            "requires": ["__val__", "__create__", "int___byte_bounds__"]
         },
         "__add__": {
-            "args": ["PIntSeq", "PIntSeq"],
-            "type": "PIntSeq",
+            "args": ["PByteSeq", "PByteSeq"],
+            "type": "PByteSeq",
             "requires": ["__val__", "__create__"]
         },
         "__eq__": {
-            "args": ["PIntSeq", "PIntSeq"],
+            "args": ["PByteSeq", "PByteSeq"],
             "type": "__prim__bool",
             "requires": ["__val__"]
         }

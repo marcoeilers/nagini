@@ -342,7 +342,7 @@ function int___int__(self: Ref): Ref
     requires issubtype(typeof(self), int())
     ensures result == self
 
-function int___byte__bounds__(value: Int): Bool
+function int___byte_bounds__(value: Int): Bool
     decreases _
 {
     0 <= value < 256

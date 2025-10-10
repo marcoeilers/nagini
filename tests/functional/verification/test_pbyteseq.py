@@ -5,9 +5,9 @@ from nagini_contracts.contracts import *
 
 
 def test_seq() -> None:
-    no_ints = PIntSeq()
+    no_ints = PByteSeq()
     assert len(no_ints) == 0
-    ints = PIntSeq(1, 2, 3)
+    ints = PByteSeq(1, 2, 3)
 
     assert 3 in ints and 1 in ints
     assert 4 not in ints
@@ -28,8 +28,22 @@ def test_seq() -> None:
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert False
 
+def test_byteseq_bounds_low(b: PByteSeq) -> None:
+    Requires(len(b) > 1)
+    
+    assert b[0] >= 0
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert b[1] < 0
+    
+def test_byteseq_bounds_high(b: PByteSeq) -> None:
+    Requires(len(b) > 1)
+    
+    assert b[0] <= 255
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert b[1] > 255
+
 def test_range() -> None:
-    ints = PIntSeq(1,3,5,6,8)
+    ints = PByteSeq(1,3,5,6,8)
     r = ints.range(1, 3)
 
     assert len(ints) == 5
@@ -42,23 +56,23 @@ def test_range() -> None:
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert r[1] == 6
 
-def test_list_ToIntSeq() -> None:
+def test_list_ToByteSeq() -> None:
     a = [1,2,3]
-    assert ToIntSeq(a) == PIntSeq(1,2,3)
+    assert ToByteSeq(a) == PByteSeq(1,2,3)
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert False
 
 
-def test_bytearray_ToIntSeq() -> None:
+def test_bytearray_ToByteSeq() -> None:
     a = bytearray([1,2,3])
-    assert ToIntSeq(a) == PIntSeq(1,2,3)
+    assert ToByteSeq(a) == PByteSeq(1,2,3)
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert False
     
 def test_bytearray_bounds(b_array: bytearray) -> None:
     Requires(bytearray_pred(b_array))
     Requires(len(b_array) > 2)    
-    seq = ToIntSeq(b_array)
+    seq = ToByteSeq(b_array)
     
     assert 0 <= seq[0] and seq[0] <= 0xFF
     
