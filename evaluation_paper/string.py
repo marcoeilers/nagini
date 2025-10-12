@@ -72,7 +72,7 @@ class ListString(String):
             Implies(
                 isinstance(other, ListString),
                 Unfolding(self.state(), Unfolding(state_pred(other),
-                    Result() == (self.ls == cast(ListString, other).ls)
+                    Result() == ("".join(self.ls) == "".join(cast(ListString, other).ls))
                 ))
             )
         )
@@ -90,7 +90,7 @@ class ListString(String):
             ))
         elif isinstance(other, ListString):
             return Unfolding(self.state(), Unfolding(state_pred(other),
-                self.ls == cast(ListString, other).ls
+                "".join(self.ls) == "".join(cast(ListString, other).ls)
             ))
         return False
 
