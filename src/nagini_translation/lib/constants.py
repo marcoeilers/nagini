@@ -225,6 +225,7 @@ INTERNAL_NAMES = [
     'T',
     'id',
     't',
+    'f',
     'g',
     'x',
     'y',

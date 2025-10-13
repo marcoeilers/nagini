@@ -1196,6 +1196,22 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                 if (super_func):
                     super_func.opaque = True
 
+            # overrides is not defined if a class doesn't override the function,
+            # but a subclass could still override the function.
+            # Find super_class and super_func for __eq__ and __hash__ functions
+            # even if some intermediate class doesn't override the functions
+            if self.name in ['__eq__', '__hash__']:
+                super_class: PythonClass = self.cls
+                super_func: PythonMethod = self
+                n: str = super_func.name
+                while super_class.superclass:
+                    if super_func:
+                        super_func.opaque = True
+                    super_class = super_class.superclass
+                    super_func = super_class.functions.get(n)
+                if super_func:
+                    super_func.opaque = True
+
             if not super_func.merge_func_name: 
                 if super_func.sil_name == OBJECT_EQ:
                     super_func.merge_func_name = OBJ___EQ__MERGED
