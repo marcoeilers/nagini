@@ -10,8 +10,12 @@ def client_tuple(x: Tuple[Tuple[int, str], bool], y: Tuple[Tuple[int, str], bool
     Requires(Stateless(y))
     Requires(x[0][0] == y[0][0])
     Requires(x[0][1] == y[0][1])
+
+    # If I remove this I get an error when verifying with benchmark mode but
+    # not when verifying with nagini using the vscode debug mode...?
     Requires(Stateless(x[0]))
     Requires(Stateless(y[0]))
+
     Requires(x[0] == y[0])
     Requires(x[1] == y[1])
     Ensures(Result() == x[0][1])
