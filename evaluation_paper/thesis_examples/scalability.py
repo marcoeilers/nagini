@@ -4,11 +4,15 @@
 from nagini_contracts.contracts import *
 from typing import cast
 
+
 class A:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -41,20 +45,19 @@ class A:
 def fooA(a: A, b: A) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(A, a).i == cast(A, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class B:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -87,20 +90,19 @@ class B:
 def fooB(a: B, b: B) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(B, a).i == cast(B, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class C:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -133,20 +135,19 @@ class C:
 def fooC(a: C, b: C) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(C, a).i == cast(C, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class D:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -179,20 +180,19 @@ class D:
 def fooD(a: D, b: D) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(D, a).i == cast(D, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class E:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -225,20 +225,19 @@ class E:
 def fooE(a: E, b: E) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(E, a).i == cast(E, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class F:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -271,20 +270,19 @@ class F:
 def fooF(a: F, b: F) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(F, a).i == cast(F, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class G:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -317,20 +315,19 @@ class G:
 def fooG(a: G, b: G) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(G, a).i == cast(G, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class H:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -363,20 +360,19 @@ class H:
 def fooH(a: H, b: H) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(H, a).i == cast(H, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class I:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -409,20 +405,19 @@ class I:
 def fooI(a: I, b: I) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(I, a).i == cast(I, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class J:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -455,20 +450,19 @@ class J:
 def fooJ(a: J, b: J) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(J, a).i == cast(J, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class K:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -501,20 +495,19 @@ class K:
 def fooK(a: K, b: K) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(K, a).i == cast(K, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class L:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -547,20 +540,19 @@ class L:
 def fooL(a: L, b: L) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(L, a).i == cast(L, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class M:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -593,20 +585,19 @@ class M:
 def fooM(a: M, b: M) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(M, a).i == cast(M, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class N:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -639,20 +630,19 @@ class N:
 def fooN(a: N, b: N) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(N, a).i == cast(N, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class O:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -685,20 +675,19 @@ class O:
 def fooO(a: O, b: O) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(O, a).i == cast(O, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class P:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -731,20 +720,19 @@ class P:
 def fooP(a: P, b: P) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(P, a).i == cast(P, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class Q:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -777,20 +765,19 @@ class Q:
 def fooQ(a: Q, b: Q) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(Q, a).i == cast(Q, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class R:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -823,20 +810,19 @@ class R:
 def fooR(a: R, b: R) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(R, a).i == cast(R, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class S:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -869,20 +855,19 @@ class S:
 def fooS(a: S, b: S) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(S, a).i == cast(S, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class T:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -915,20 +900,19 @@ class T:
 def fooT(a: T, b: T) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(T, a).i == cast(T, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class U:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -961,20 +945,19 @@ class U:
 def fooU(a: U, b: U) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(U, a).i == cast(U, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class V:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -1007,20 +990,19 @@ class V:
 def fooV(a: V, b: V) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(V, a).i == cast(V, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class W:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -1053,20 +1035,19 @@ class W:
 def fooW(a: W, b: W) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(W, a).i == cast(W, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class X:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -1099,20 +1080,19 @@ class X:
 def fooX(a: X, b: X) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(X, a).i == cast(X, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class Y:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -1145,20 +1125,19 @@ class Y:
 def fooY(a: Y, b: Y) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(Y, a).i == cast(Y, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
-    
+
+
 class Z:
     def __init__(self, i: int, s: str, b: bool) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i and self.s is s and self.b is b))
         self.i: int = i
         self.s: str = s
         self.b: bool = b
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -1191,471 +1170,6 @@ class Z:
 def fooZ(a: Z, b: Z) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(Z, a).i == cast(Z, b).i
-    Fold(a.state())
-    Fold(b.state())
-    return 0
-    
-class A1:
-    def __init__(self, i: int, s: str, b: bool) -> None:
-        self.i: int = i
-        self.s: str = s
-        self.b: bool = b
-
-    @Pure
-    def __eq__(self, other: object) -> bool:
-        Requires(state_pred(self))
-        Requires(Implies(not Stateless(other), state_pred(other)))
-        Ensures(Implies(
-            isinstance(other, A1),
-            Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    Result() == (self.i == cast(A1, other).i and 
-                                self.s == cast(A1, other).s and 
-                                self.b == cast(A1, other).b)
-                )
-            )
-        ))
-        if isinstance(other, A1):
-            return Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    self.i == cast(A1, other).i and 
-                    self.s == cast(A1, other).s and 
-                    self.b == cast(A1, other).b
-                )
-            )
-        return False
-
-    @Predicate
-    def state(self) -> bool:
-        return Acc(self.i) and Acc(self.s) and Acc(self.b)
-        
-def fooA1(a: A1, b: A1) -> int:
-    Requires(state_pred(a))
-    Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(A1, a).i == cast(A1, b).i
-    Fold(a.state())
-    Fold(b.state())
-    return 0
-    
-class A2:
-    def __init__(self, i: int, s: str, b: bool) -> None:
-        self.i: int = i
-        self.s: str = s
-        self.b: bool = b
-
-    @Pure
-    def __eq__(self, other: object) -> bool:
-        Requires(state_pred(self))
-        Requires(Implies(not Stateless(other), state_pred(other)))
-        Ensures(Implies(
-            isinstance(other, A2),
-            Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    Result() == (self.i == cast(A2, other).i and 
-                                self.s == cast(A2, other).s and 
-                                self.b == cast(A2, other).b)
-                )
-            )
-        ))
-        if isinstance(other, A2):
-            return Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    self.i == cast(A2, other).i and 
-                    self.s == cast(A2, other).s and 
-                    self.b == cast(A2, other).b
-                )
-            )
-        return False
-
-    @Predicate
-    def state(self) -> bool:
-        return Acc(self.i) and Acc(self.s) and Acc(self.b)
-        
-def fooA2(a: A2, b: A2) -> int:
-    Requires(state_pred(a))
-    Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(A2, a).i == cast(A2, b).i
-    Fold(a.state())
-    Fold(b.state())
-    return 0
-    
-class A3:
-    def __init__(self, i: int, s: str, b: bool) -> None:
-        self.i: int = i
-        self.s: str = s
-        self.b: bool = b
-
-    @Pure
-    def __eq__(self, other: object) -> bool:
-        Requires(state_pred(self))
-        Requires(Implies(not Stateless(other), state_pred(other)))
-        Ensures(Implies(
-            isinstance(other, A3),
-            Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    Result() == (self.i == cast(A3, other).i and 
-                                self.s == cast(A3, other).s and 
-                                self.b == cast(A3, other).b)
-                )
-            )
-        ))
-        if isinstance(other, A3):
-            return Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    self.i == cast(A3, other).i and 
-                    self.s == cast(A3, other).s and 
-                    self.b == cast(A3, other).b
-                )
-            )
-        return False
-
-    @Predicate
-    def state(self) -> bool:
-        return Acc(self.i) and Acc(self.s) and Acc(self.b)
-        
-def fooA3(a: A3, b: A3) -> int:
-    Requires(state_pred(a))
-    Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(A3, a).i == cast(A3, b).i
-    Fold(a.state())
-    Fold(b.state())
-    return 0
-    
-class A4:
-    def __init__(self, i: int, s: str, b: bool) -> None:
-        self.i: int = i
-        self.s: str = s
-        self.b: bool = b
-
-    @Pure
-    def __eq__(self, other: object) -> bool:
-        Requires(state_pred(self))
-        Requires(Implies(not Stateless(other), state_pred(other)))
-        Ensures(Implies(
-            isinstance(other, A4),
-            Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    Result() == (self.i == cast(A4, other).i and 
-                                self.s == cast(A4, other).s and 
-                                self.b == cast(A4, other).b)
-                )
-            )
-        ))
-        if isinstance(other, A4):
-            return Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    self.i == cast(A4, other).i and 
-                    self.s == cast(A4, other).s and 
-                    self.b == cast(A4, other).b
-                )
-            )
-        return False
-
-    @Predicate
-    def state(self) -> bool:
-        return Acc(self.i) and Acc(self.s) and Acc(self.b)
-        
-def fooA4(a: A4, b: A4) -> int:
-    Requires(state_pred(a))
-    Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(A4, a).i == cast(A4, b).i
-    Fold(a.state())
-    Fold(b.state())
-    return 0
-    
-class A5:
-    def __init__(self, i: int, s: str, b: bool) -> None:
-        self.i: int = i
-        self.s: str = s
-        self.b: bool = b
-
-    @Pure
-    def __eq__(self, other: object) -> bool:
-        Requires(state_pred(self))
-        Requires(Implies(not Stateless(other), state_pred(other)))
-        Ensures(Implies(
-            isinstance(other, A5),
-            Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    Result() == (self.i == cast(A5, other).i and 
-                                self.s == cast(A5, other).s and 
-                                self.b == cast(A5, other).b)
-                )
-            )
-        ))
-        if isinstance(other, A5):
-            return Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    self.i == cast(A5, other).i and 
-                    self.s == cast(A5, other).s and 
-                    self.b == cast(A5, other).b
-                )
-            )
-        return False
-
-    @Predicate
-    def state(self) -> bool:
-        return Acc(self.i) and Acc(self.s) and Acc(self.b)
-        
-def fooA5(a: A5, b: A5) -> int:
-    Requires(state_pred(a))
-    Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(A5, a).i == cast(A5, b).i
-    Fold(a.state())
-    Fold(b.state())
-    return 0
-    
-class B1:
-    def __init__(self, i: int, s: str, b: bool) -> None:
-        self.i: int = i
-        self.s: str = s
-        self.b: bool = b
-
-    @Pure
-    def __eq__(self, other: object) -> bool:
-        Requires(state_pred(self))
-        Requires(Implies(not Stateless(other), state_pred(other)))
-        Ensures(Implies(
-            isinstance(other, B1),
-            Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    Result() == (self.i == cast(B1, other).i and 
-                                self.s == cast(B1, other).s and 
-                                self.b == cast(B1, other).b)
-                )
-            )
-        ))
-        if isinstance(other, B1):
-            return Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    self.i == cast(B1, other).i and 
-                    self.s == cast(B1, other).s and 
-                    self.b == cast(B1, other).b
-                )
-            )
-        return False
-
-    @Predicate
-    def state(self) -> bool:
-        return Acc(self.i) and Acc(self.s) and Acc(self.b)
-        
-def fooB1(a: B1, b: B1) -> int:
-    Requires(state_pred(a))
-    Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(B1, a).i == cast(B1, b).i
-    Fold(a.state())
-    Fold(b.state())
-    return 0
-    
-class B2:
-    def __init__(self, i: int, s: str, b: bool) -> None:
-        self.i: int = i
-        self.s: str = s
-        self.b: bool = b
-
-    @Pure
-    def __eq__(self, other: object) -> bool:
-        Requires(state_pred(self))
-        Requires(Implies(not Stateless(other), state_pred(other)))
-        Ensures(Implies(
-            isinstance(other, B2),
-            Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    Result() == (self.i == cast(B2, other).i and 
-                                self.s == cast(B2, other).s and 
-                                self.b == cast(B2, other).b)
-                )
-            )
-        ))
-        if isinstance(other, B2):
-            return Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    self.i == cast(B2, other).i and 
-                    self.s == cast(B2, other).s and 
-                    self.b == cast(B2, other).b
-                )
-            )
-        return False
-
-    @Predicate
-    def state(self) -> bool:
-        return Acc(self.i) and Acc(self.s) and Acc(self.b)
-        
-def fooB2(a: B2, b: B2) -> int:
-    Requires(state_pred(a))
-    Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(B2, a).i == cast(B2, b).i
-    Fold(a.state())
-    Fold(b.state())
-    return 0
-    
-class B3:
-    def __init__(self, i: int, s: str, b: bool) -> None:
-        self.i: int = i
-        self.s: str = s
-        self.b: bool = b
-
-    @Pure
-    def __eq__(self, other: object) -> bool:
-        Requires(state_pred(self))
-        Requires(Implies(not Stateless(other), state_pred(other)))
-        Ensures(Implies(
-            isinstance(other, B3),
-            Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    Result() == (self.i == cast(B3, other).i and 
-                                self.s == cast(B3, other).s and 
-                                self.b == cast(B3, other).b)
-                )
-            )
-        ))
-        if isinstance(other, B3):
-            return Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    self.i == cast(B3, other).i and 
-                    self.s == cast(B3, other).s and 
-                    self.b == cast(B3, other).b
-                )
-            )
-        return False
-
-    @Predicate
-    def state(self) -> bool:
-        return Acc(self.i) and Acc(self.s) and Acc(self.b)
-        
-def fooB3(a: B3, b: B3) -> int:
-    Requires(state_pred(a))
-    Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(B3, a).i == cast(B3, b).i
-    Fold(a.state())
-    Fold(b.state())
-    return 0
-    
-class B4:
-    def __init__(self, i: int, s: str, b: bool) -> None:
-        self.i: int = i
-        self.s: str = s
-        self.b: bool = b
-
-    @Pure
-    def __eq__(self, other: object) -> bool:
-        Requires(state_pred(self))
-        Requires(Implies(not Stateless(other), state_pred(other)))
-        Ensures(Implies(
-            isinstance(other, B4),
-            Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    Result() == (self.i == cast(B4, other).i and 
-                                self.s == cast(B4, other).s and 
-                                self.b == cast(B4, other).b)
-                )
-            )
-        ))
-        if isinstance(other, B4):
-            return Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    self.i == cast(B4, other).i and 
-                    self.s == cast(B4, other).s and 
-                    self.b == cast(B4, other).b
-                )
-            )
-        return False
-
-    @Predicate
-    def state(self) -> bool:
-        return Acc(self.i) and Acc(self.s) and Acc(self.b)
-        
-def fooB4(a: B4, b: B4) -> int:
-    Requires(state_pred(a))
-    Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(B4, a).i == cast(B4, b).i
-    Fold(a.state())
-    Fold(b.state())
-    return 0
-    
-class B5:
-    def __init__(self, i: int, s: str, b: bool) -> None:
-        self.i: int = i
-        self.s: str = s
-        self.b: bool = b
-
-    @Pure
-    def __eq__(self, other: object) -> bool:
-        Requires(state_pred(self))
-        Requires(Implies(not Stateless(other), state_pred(other)))
-        Ensures(Implies(
-            isinstance(other, B5),
-            Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    Result() == (self.i == cast(B5, other).i and 
-                                self.s == cast(B5, other).s and 
-                                self.b == cast(B5, other).b)
-                )
-            )
-        ))
-        if isinstance(other, B5):
-            return Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    self.i == cast(B5, other).i and 
-                    self.s == cast(B5, other).s and 
-                    self.b == cast(B5, other).b
-                )
-            )
-        return False
-
-    @Predicate
-    def state(self) -> bool:
-        return Acc(self.i) and Acc(self.s) and Acc(self.b)
-        
-def fooB5(a: B5, b: B5) -> int:
-    Requires(state_pred(a))
-    Requires(state_pred(b))
-    Unfold(a.state())
-    Unfold(b.state())
-    res = a == b
-    if res:
-        assert cast(B5, a).i == cast(B5, b).i
-    Fold(a.state())
-    Fold(b.state())
+    Requires(Unfolding(a.state(), Unfolding(b.state(), a.i == b.i and a.s == b.s and a.b == b.b)))
+    assert a == b
     return 0
