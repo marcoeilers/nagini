@@ -454,6 +454,10 @@ class MethodTranslator(CommonTranslator):
         posts.append(post)
         fname = func.extended_name if func.extended_name else func.sil_name
 
+        # add a postcondition that ensures that the hash values of self and other are identical
+        if func.name == '__eq__':
+            posts.append(self.encode_hash_post(func, ctx, pos, info))
+
         args = self.viper.to_list(translated_func.formalArgs())
         return (self.viper.Function(
             fname, args, self.viper.Ref, 
@@ -501,7 +505,7 @@ class MethodTranslator(CommonTranslator):
         # the addition postcondition has permissions to access state(self) if 
         # self is stateful (same goes for other)
         for var in vars:
-            pred_acc = self.create_predicate_access(EQUALITY_STATE_PRED, [var], self.viper.WildcardPerm(pos, info), func.node, ctx)
+            pred_acc = self.create_predicate_access(EQUALITY_STATE_PRED, [var], self.viper.FullPerm(pos, info), func.node, ctx)
             not_stateless = self.viper.Not(
                 self.viper.FuncApp(
                     STATELESS_FUNC, [var], self.to_position(func.node, ctx),
@@ -539,6 +543,43 @@ class MethodTranslator(CommonTranslator):
             DOMAIN_EQ_FUNC, [self_var, other_var], self.viper.Bool, pos, info,
             '__Transitivity_Eq'
         )
+
+    def encode_hash_post(self, func: PythonMethod, ctx: Context, pos, info) -> Expr:
+        """Encodes a postcondition for each user-defined equality function that ensures the 
+        hashes of the arguments are identical"""
+        # ensures result ==> hash(self) == hash(other)
+        assert not ctx.merge
+        args = [arg.ref() for arg in func.args.values()]
+        assert len(args) == 2
+        res_box = self.viper.FuncApp(
+            'bool___unbox__',
+            [self.viper.Result(self.viper.Ref, pos, info)],
+            pos, info, self.viper.Bool
+        )
+        func_to_call = func.cls.functions.get('__hash__')  # X___hash___extended
+        l_call_name: str = OBJECT_HASH
+        if func_to_call:
+            l_call_name = func_to_call.extended_name if func_to_call.extended_name else func_to_call.sil_name
+
+        l_call = self.viper.FuncApp(
+            l_call_name,
+            [args[0]],
+            pos, info, self.viper.Ref
+        )
+        r_call = self.viper.FuncApp(
+            OBJECT_HASH,
+            [args[1]],
+            pos, info, self.viper.Bool
+        )
+        if l_call_name == OBJECT_HASH:
+            l_call = self.viper.FuncApp(
+                '__prim__int___box__', [l_call], pos, info, self.viper.Ref
+            )
+        r_boxed_call = self.viper.FuncApp(
+            '__prim__int___box__', [r_call], pos, info, self.viper.Ref
+        )
+        right = self.viper.FuncApp('int___eq___extended', [l_call, r_boxed_call], pos, info, self.viper.Bool)
+        return self.viper.Implies(res_box, right, pos, info)
     
     def encode_reflexivity_post(self, func: PythonMethod, ctx: Context, pos, info) -> Expr:
         self_var, other_var, _, _ = self.get_self_other_as_var_and_decls(func)
@@ -911,7 +952,7 @@ class MethodTranslator(CommonTranslator):
         # inhale state predicate access for self and other
         for var in [self_var, other_var]:
             state_pred = self.viper.PredicateAccess([var], EQUALITY_STATE_PRED, pos, info)
-            acc_state_pred = self.viper.PredicateAccessPredicate(state_pred, self.viper.WildcardPerm(pos, info), pos, info)
+            acc_state_pred = self.viper.PredicateAccessPredicate(state_pred, self.viper.FullPerm(pos, info), pos, info)
             body.append(self.viper.Inhale(acc_state_pred, pos, info))
 
         ctx.use_domain_func_eq = True
@@ -1171,7 +1212,7 @@ class MethodTranslator(CommonTranslator):
 
         for var in [self_var, x, other_var]:
             state_pred = self.viper.PredicateAccess([var], EQUALITY_STATE_PRED, pos, info)
-            acc_state_pred = self.viper.PredicateAccessPredicate(state_pred, self.viper.WildcardPerm(pos, info), pos, info)
+            acc_state_pred = self.viper.PredicateAccessPredicate(state_pred, self.viper.FullPerm(pos, info), pos, info)
             body.append(self.viper.Inhale(acc_state_pred, pos, info))
 
         ctx.use_domain_func_eq = True

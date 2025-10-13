@@ -962,7 +962,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         if ctx.perm_factor:
             perm = self.viper.PermMul(perm, ctx.perm_factor, pos, info)
         elif pred_name == EQUALITY_STATE_PRED:
-            perm = self.viper.WildcardPerm(pos, info)
+            perm = self.viper.FullPerm(pos, info)
         pred_acc_pred = self.viper.PredicateAccessPredicate(pred_acc, perm,
             self.to_position(node, ctx), self.no_info(ctx))
         return pred_acc_pred

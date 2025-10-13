@@ -590,7 +590,7 @@ class ProgramTranslator(CommonTranslator):
                     object_pre = self.viper.TrueLit(pos, info)
                     vars = [self_var, other_var] if eq_or_hash == OBJECT_EQ else [self_var]
                     for var in vars:
-                        acc_precond = self.create_predicate_access(EQUALITY_STATE_PRED, [var], self.viper.WildcardPerm(pos, info), merge_func.node, ctx)
+                        acc_precond = self.create_predicate_access(EQUALITY_STATE_PRED, [var], self.viper.FullPerm(pos, info), merge_func.node, ctx)
                         not_stateless = self.viper.Not(
                             self.viper.FuncApp(
                                 STATELESS_FUNC, [var], self.to_position(merge_func.node, ctx),
@@ -632,7 +632,7 @@ class ProgramTranslator(CommonTranslator):
 
         # TODO: fix
         if eq_or_hash == OBJECT_EQ:
-            acc_precond = self.create_predicate_access(EQUALITY_STATE_PRED, [other_var], self.viper.WildcardPerm(pos, info), merge_func.node, ctx)
+            acc_precond = self.create_predicate_access(EQUALITY_STATE_PRED, [other_var], self.viper.FullPerm(pos, info), merge_func.node, ctx)
             not_stateless = self.viper.Not(
                 self.viper.FuncApp(
                     STATELESS_FUNC, [var], self.to_position(merge_func.node, ctx),
@@ -1956,19 +1956,20 @@ class ProgramTranslator(CommonTranslator):
                         trans_check = self.config.method_translator.encode_transitivity_check(
                             func, ctx, pos, info
                         )
-                        hash_check = self.config.method_translator.encode_same_hash_check(
-                            func, ctx, pos, info, sil_progs
-                        )
+                        if func.cls.functions.get('__hash__'):
+                            hash_check = self.config.method_translator.encode_same_hash_check(
+                                func, ctx, pos, info, sil_progs
+                            )
+                            methods.append(hash_check)
+                            self.add_dependency([hash_check.name()], func.sil_name)
                         # do not add methods if tests are run, whose names 
                         # do not include the substrings transitive or symmetric
                         pattern = r'^test_(?!.*(transitive|symmetric)).*\.py$'
                         if not re.match(pattern, module.file):
                             methods.append(symm_check)
                             methods.append(trans_check)
-                            methods.append(hash_check)
                             self.add_dependency([symm_check.name()], func.sil_name)
                             self.add_dependency([trans_check.name()], func.sil_name)
-                            self.add_dependency([hash_check.name()], func.sil_name)
 
                     func_constants.append(self.translate_function_constant(func, ctx))
                     if ((func_name != '__init__' or

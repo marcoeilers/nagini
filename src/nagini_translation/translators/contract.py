@@ -166,7 +166,7 @@ class ContractTranslator(CommonTranslator):
             stmt, var = self.translate_expr(node.args[0], ctx, target_type=self.viper.Ref)
             if stmt:
                 raise InvalidProgramException(node, 'purity.violated')
-            perm_state_pred = self.viper.WildcardPerm(pos, self.no_info(ctx))
+            perm_state_pred = self.viper.FullPerm(pos, self.no_info(ctx))
             return self.translate_state_pred(node, [var], perm_state_pred, ctx)
         else:
             raise UnsupportedException(node)
