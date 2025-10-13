@@ -97,3 +97,22 @@ class Map:
     @Predicate
     def state(self) -> bool:
         return Acc(self.keys) and Acc(self.values) and Acc(state_pred(self.keys)) and Acc(state_pred(self.values)) 
+
+
+# if __name__ == "__main__":
+#     keys: List[object] = ["Alice", "Bob", "Charlie"]
+#     values: List[object] = [27, 35, 18]
+#     Assert(len(keys) == len(values))
+#     Fold(state_pred(keys))
+#     Fold(state_pred(values))
+#     m: Map = Map(keys, values)
+#     Unfold(m.state())
+#     Unfold(state_pred(m.keys))
+#     Unfold(state_pred(m.values))
+#     Assert(len(m.keys) == len(m.values))
+#     Fold(state_pred(m.values))
+#     Fold(state_pred(m.keys))
+#     Fold(m.state())
+#     age_bob: int = m.lookup("Bob")
+#     Assert(age_bob == 35)
+#     Assert("Charlie" in m)
