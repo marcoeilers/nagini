@@ -687,7 +687,7 @@
             "requires": ["__len__"]
         },
         "__setitem__": {
-            "args": ["bytearray", "int", "int"],
+            "args": ["bytearray", "__prim__int", "int"],
             "type": null,
             "MustTerminate": true,
             "requires": ["__len__", "__getitem__", "int___byte_bounds__", "int___unbox__", "__prim__int___box__"]

@@ -892,6 +892,11 @@
         "__create__": {
             "args": ["__prim__Seq"],
             "type": "PByteSeq",
+            "requires": ["__val__", "int___byte_bounds__"]
+        },
+        "__from_bytes__": {
+            "args": ["__prim__Seq"],
+            "type": "PByteSeq",
             "requires": ["__val__"]
         },
         "__unbox__": {
@@ -907,7 +912,7 @@
         "__getitem__": {
             "args": ["PByteSeq", "int"],
             "type": "__prim__int",
-            "requires": ["__val__", "__len__", "int___unbox__"]
+            "requires": ["__val__", "__len__", "int___unbox__", "int___byte_bounds__"]
         },
         "__sil_seq__": {
             "args": ["PByteSeq"],
@@ -946,7 +951,7 @@
         "update": {
             "args": ["PByteSeq", "__prim__int", "__prim__int"],
             "type": "PByteSeq",
-            "requires": ["__val__", "__create__"]
+            "requires": ["__val__", "__create__", "int___byte_bounds__"]
         },
         "__add__": {
             "args": ["PByteSeq", "PByteSeq"],
