@@ -126,10 +126,24 @@ function int___lshift__(self: Ref, other: Ref): Ref
     requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(self), bool()) ==> int___unbox__(self) <= _INT_MAX)
     requires @error("Negative shift count.")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) >= 0)
     requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) <= _INT_MAX)
-    ensures result == (let val == (int___unbox__(self)) in val >= 0 ?
-        __prim__int___box__(fromBVInt(shlBVInt(toBVInt(val), toBVInt(int___unbox__(other))))) :
-        __prim__int___box__(-fromBVInt(shlBVInt(toBVInt(-val), toBVInt(int___unbox__(other)))))
+{
+    __prim__int___box__(
+        let shift_amt == (int___unbox__(other)) in 
+            let val == (int___unbox__(self)) in 
+                shift_amt == 0 ? val : 
+                shift_amt == 1 ? val * 2 :
+                shift_amt == 2 ? val * 4 :
+                shift_amt == 3 ? val * 8 :
+                shift_amt == 4 ? val * 16 :
+                shift_amt == 5 ? val * 32 :
+                shift_amt == 6 ? val * 64 :
+                shift_amt == 7 ? val * 128 :
+                shift_amt == 8 ? val * 256 :
+                val >= 0 ? fromBVInt(shlBVInt(toBVInt(val), toBVInt(shift_amt))) :
+                -fromBVInt(shlBVInt(toBVInt(-val), toBVInt(shift_amt)))
     )
+}
+
 
 function int___rlshift__(self: Ref, other: Ref): Ref
     decreases _
