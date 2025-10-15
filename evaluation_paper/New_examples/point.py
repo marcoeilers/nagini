@@ -76,3 +76,32 @@ class ColorPoint(Point):
     @Predicate
     def state(self) -> bool:
         return Acc(self.color)
+
+class SpecialPoint(Point):
+    pass
+
+class SelectivePoint(Point):
+    @Pure
+    def __eq__(self, other: object) -> bool:
+        Requires(state_pred(self))
+        Requires(Implies(not Stateless(other), state_pred(other)))
+        Ensures(Implies(self is other, Result()))
+        Ensures(
+            Implies(
+                (type(other) == Point or type(other) == SelectivePoint),
+                Unfolding(self.state(), Unfolding(state_pred(other),
+                                                  Result() == (
+                                                          self.x == cast(Point, other).x and
+                                                          self.y == cast(Point, other).y
+                                                  )
+                                                  ))
+            )
+        )
+        if self is other:
+            return True  # For some reason Nagini cannot prove the self is other post without this.
+        if type(other) == Point or type(other) == SelectivePoint:
+            return Unfolding(self.state(), Unfolding(state_pred(other),
+                                                     self.x == cast(Point, other).x and
+                                                     self.y == cast(Point, other).y
+                                                     ))
+        return False
