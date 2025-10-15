@@ -4,6 +4,9 @@
 from nagini_contracts.contracts import *
 from typing import cast
 
+# Suggested patterns for implementing equality from the paper
+# An Empirical Study of the Design and Implementation of Object Equality in Java
+
 ## Type compatible equality from Fig. 3
 class Point2D1:
     def __init__(self, x: int, y: int):
