@@ -1251,6 +1251,59 @@ class MethodTranslator(CommonTranslator):
             body.append(self.viper.Inhale(inlined_body_self_x, pos, info))
         ctx.use_domain_func_eq = False
 
+        # hacky workaround to assume an equality delegete function (not __eq__ override) is an equivalence relation
+        # TODO: fix if it is inherited and not defined for the class?
+        # TODO: add refl. and symm.
+        for eq_rel in func.cls.functions.values():
+            if eq_rel.eq_rel:
+                one = self.viper.FuncApp(
+                    'bool___unbox__',
+                    [self.viper.FuncApp(
+                        eq_rel.sil_name, [self_var, other_var], pos, info, self.viper.Ref
+                    )], pos, info, self.viper.Bool 
+                )
+                two = self.viper.FuncApp(
+                    'bool___unbox__',
+                    [self.viper.FuncApp(
+                        eq_rel.sil_name, [self_var, x], pos, info, self.viper.Ref
+                    )], pos, info, self.viper.Bool 
+                )
+                right = self.viper.FuncApp(
+                    'bool___unbox__',
+                    [self.viper.FuncApp(
+                        eq_rel.sil_name, [other_var, x], pos, info, self.viper.Ref
+                    )], pos, info, self.viper.Bool 
+                )
+                oneAndtwo = self.viper.And(one, two, pos, info)
+                trans_assumption1 = self.viper.Inhale(
+                    self.viper.Implies(oneAndtwo, right, pos, info), pos, info
+                )
+
+                one = self.viper.FuncApp(
+                    'bool___unbox__',
+                    [self.viper.FuncApp(
+                        eq_rel.sil_name, [other_var, self_var], pos, info, self.viper.Ref
+                    )], pos, info, self.viper.Bool 
+                )
+                two = self.viper.FuncApp(
+                    'bool___unbox__',
+                    [self.viper.FuncApp(
+                        eq_rel.sil_name, [x, self_var], pos, info, self.viper.Ref
+                    )], pos, info, self.viper.Bool 
+                )
+                right = self.viper.FuncApp(
+                    'bool___unbox__',
+                    [self.viper.FuncApp(
+                        eq_rel.sil_name, [x, other_var], pos, info, self.viper.Ref
+                    )], pos, info, self.viper.Bool 
+                )
+                oneAndtwo = self.viper.And(one, two, pos, info)
+                trans_assumption2 = self.viper.Inhale(
+                    self.viper.Implies(oneAndtwo, right, pos, info), pos, info
+                )
+                body.append(trans_assumption1)
+                body.append(trans_assumption2)
+
         guarded_blocks = []
         for c in toposort_classes(set(func.mentioned_classes)):
             cond = self.get_subtype_check_for_custom_class(x, c.sil_name, pos, info)

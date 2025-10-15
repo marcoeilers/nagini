@@ -434,6 +434,13 @@ def Pure(func: T) -> T:
     return func
 
 
+def EqRel(func: T) -> T:
+    """
+    Decorator to mark an equivalence relation (not __eq__). It's a no-op.
+    """
+    return func
+
+
 def Transparent(func: T) -> T:
     """
     Decorator to mark transparent functions. It's a no-op.
@@ -583,6 +590,7 @@ __all__ = [
         'Unfold',
         'Unfolding',
         'Pure',
+        'EqRel',
         'Transparent',
         'Predicate',
         'Inline',

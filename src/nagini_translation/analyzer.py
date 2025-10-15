@@ -684,6 +684,12 @@ class Analyzer(ast.NodeVisitor):
             func.superscope = scope_container
         else:
             pure = is_property_getter or self.is_pure(node)
+
+            if pure:
+                eq_rel = self.is_eq_rel(node)
+            else:
+                eq_rel = False
+
             # properties are transparent
             if is_property_getter:
                 opaque = False
@@ -695,7 +701,7 @@ class Analyzer(ast.NodeVisitor):
                 contract_only = self.contract_only or self.is_contract_only(node)
             func = self.node_factory.create_python_method(
                 name, node, self.current_class, scope_container, pure,
-                contract_only, self.node_factory, opaque=opaque)
+                contract_only, self.node_factory, opaque=opaque, eq_rel=eq_rel)
             if is_property_setter:
                 container[name].setter = func
             else:
@@ -1585,6 +1591,7 @@ class Analyzer(ast.NodeVisitor):
             self.stmt_container.labels.append(finally_name)
         self.visit_default(node)
 
+    # TODO: add EqRel
     def _incompatible_decorators(self, decorators) -> bool:
         return ((('Predicate' in decorators) and ('Pure' in decorators)) or
                 (('Predicate' in decorators) and ('Inline' in decorators)) or
@@ -1637,6 +1644,9 @@ class Analyzer(ast.NodeVisitor):
 
     def is_pure(self, func: ast.FunctionDef) -> bool:
         return self.has_decorator(func, 'Pure')
+
+    def is_eq_rel(self, func: ast.FunctionDef) -> bool:
+        return self.has_decorator(func, 'EqRel')
 
     def is_transparent(self, func: ast.FunctionDef) -> bool:
         return self.has_decorator(func, 'Transparent')

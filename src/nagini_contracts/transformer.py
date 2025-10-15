@@ -19,7 +19,7 @@ contract_keywords = frozenset(["Requires", "Ensures", "Exsures",
                                "Forall", "Exists",
                                "Acc",
                                "Fold", "Unfold", "Unfolding",
-                               "Pure", "Predicate",
+                               "Pure", "Predicate", "EqRel",
                                "Ghost",
                                "Stateless",])
 

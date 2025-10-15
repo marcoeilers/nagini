@@ -1030,7 +1030,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                  interface: bool = False,
                  interface_dict: Dict[str, Any] = None,
                  method_type: MethodType = MethodType.normal,
-                 opaque: bool = True):
+                 opaque: bool = True, eq_rel: bool = False):
         """
         :param cls: Class this method belongs to, if any.
         :param superscope: The scope (class or module) this method belongs to
@@ -1063,6 +1063,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.error_var = None  # infer
         self.declared_exceptions = OrderedDict()  # direct
         self.pure = pure
+        self.eq_rel = eq_rel # assume it's an equivalence relation
         self.opaque = opaque
         self.predicate = False
         self.inline = False
@@ -2011,10 +2012,10 @@ class ProgramNodeFactory:
             interface: bool = False,
             interface_dict: Dict[str, Any] = None,
             method_type: MethodType = MethodType.normal,
-            opaque: bool = True) -> PythonMethod:
+            opaque: bool = True, eq_rel: bool = False) -> PythonMethod:
         return PythonMethod(name, node, cls, superscope, pure, contract_only,
                             container_factory, interface, interface_dict,
-                            method_type, opaque=opaque)
+                            method_type, opaque=opaque, eq_rel=eq_rel)
 
     def create_python_io_operation(self, name: str, node: ast.AST,
                                    superscope: PythonScope,

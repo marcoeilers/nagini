@@ -135,6 +135,7 @@ class Point2D3:
             self.y == cast(Point2D3, other).y
         )) and cast(Point2D3, other).equalsDelegate(self) and self.equalsDelegate(other)
 
+    @EqRel
     @Pure
     def equalsDelegate(self, other: object) -> bool:
         Requires(state_pred(self))
@@ -155,6 +156,7 @@ class ColorPoint(Point2D3):
         self.color: str = color
         Fold(self.state())
 
+    @EqRel
     @Pure
     def equalsDelegate(self, other: object) -> bool:
         Requires(state_pred(self))
