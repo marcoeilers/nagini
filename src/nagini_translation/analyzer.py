@@ -8,6 +8,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import ast
 import logging
 import os
+import re
 import nagini_contracts.io_builtins
 import nagini_contracts.lock
 import tokenize
@@ -101,6 +102,9 @@ class Analyzer(ast.NodeVisitor):
         self.deferred_tasks = []
         self.has_all_low = False
         self.enable_obligations = False
+        # Set to enable preprocessing
+        self.enable_preprocessing = False
+        self.comment_pattern = "#@nagini"
 
     def initialize_io_analyzer(self) -> None:
         self.io_operation_analyzer = IOOperationAnalyzer(
@@ -118,6 +122,24 @@ class Analyzer(ast.NodeVisitor):
         if not self._node_factory:
             self._node_factory = ProgramNodeFactory()
         return self._node_factory
+
+    def preprocess_text(self, text: str, comment_prefix: str) -> str:
+        """
+        Preprocesses the file text by transforming special comments into code.
+        Comments starting with the specified prefix will be converted to regular code.
+        """
+        # Pattern: (whitespace)(comment_pattern)(optional space)(rest of line)
+        escaped_prefix = re.escape(comment_prefix)
+        pattern = re.compile(r'^(\s*)' + escaped_prefix + r' ?(.*)')
+        
+        def process_line(line: str) -> str:
+            match = pattern.match(line)
+            if match:
+                # Return indentation + code
+                return match.group(1) + match.group(2)
+            return line
+        
+        return '\n'.join(process_line(line) for line in text.split('\n'))
 
     def define_new(self, container: Union[PythonModule, PythonClass],
                    name: str, node: ast.AST) -> None:
@@ -154,6 +176,11 @@ class Analyzer(ast.NodeVisitor):
             return
         with tokenize.open(abs_path) as file:
             text = file.read()
+        
+        # Preprocess the text to transform special comments into code
+        if self.enable_preprocessing:
+            text = self.preprocess_text(text, self.comment_pattern)
+        
         parse_result = ast.parse(text)
         try:
             mark_text_ranges(parse_result, text)

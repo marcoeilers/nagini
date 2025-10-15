@@ -132,6 +132,8 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
         return None
 
     analyzer = Analyzer(types, path, selected)
+    analyzer.enable_preprocessing = config.enable_preprocessing
+    analyzer.comment_pattern = config.comment_pattern  
     main_module = analyzer.module
     with open(os.path.join(builtins_index_path, 'builtins.json'), 'r') as file:
         analyzer.add_native_silver_builtins(json.loads(file.read()))
@@ -356,6 +358,17 @@ def main() -> None:
         type=int,
         default=8
     )
+    parser.add_argument(
+        '--comment-pattern',
+        help='Preprocess comments with pattern',
+        type=str,
+        default="#@nagini"
+    )
+    parser.add_argument(
+        '--preprocess',
+        action='store_true',
+        help='Enable preprocessing',
+    )
     args = parser.parse_args()
 
     config.classpath = args.viper_jar_path
@@ -363,6 +376,8 @@ def main() -> None:
     config.z3_path = args.z3
     config.mypy_path = args.mypy_path
     config.set_verifier(args.verifier)
+    config.enable_preprocessing = args.preprocess
+    config.comment_pattern = args.comment_pattern
     if args.ignore_obligations:
         if args.force_obligations:
             parser.error('incompatible arguments: --ignore-obligations and --force-obligations')
