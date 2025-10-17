@@ -196,6 +196,7 @@ class ProgramTranslator(CommonTranslator):
                 body = None
         else:
             body = None
+        posts.append(self.viper.DecreasesWildcard(None, position, self.no_info(ctx)))
         return self.viper.Function(var.sil_name, [], type, [], posts, body,
                                    self.to_position(var.node, ctx),
                                    self.no_info(ctx))
