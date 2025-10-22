@@ -29,3 +29,12 @@ def impure() -> int:
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Result() == 55)
     return GLOBAL_VAR
+
+# Make sure the generated functions are assumed to terminate
+
+A_CONSTANT = 24
+
+@Pure
+def test1() -> int:
+    Decreases(1)
+    return 1 + A_CONSTANT
