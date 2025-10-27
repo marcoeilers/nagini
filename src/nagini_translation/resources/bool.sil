@@ -191,6 +191,12 @@ function int___bool__(self: Ref) : Bool
     ensures self == null ==> !result
     ensures self != null ==> result == (int___unbox__(self) != 0)
 
+function int_bit_length(self: Ref): Ref
+    decreases _
+    requires self != null ==> issubtype(typeof(self), int())
+    ensures typeof(result) == int()
+    // TODO add postcondition for value
+
 function __prim__int___box__(prim: Int): Ref
     decreases _
     ensures typeof(result) == int()

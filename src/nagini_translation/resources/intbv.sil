@@ -7,6 +7,7 @@
 
 // File template: NBITS is to be replaced by the number of bits, INT_MAX_VAL and INT_MIN_VAL by the actual values.
 
+define _BITOPS_SIZE (NBITS)
 define _INT_MAX (INT_MAX_VAL)
 define _INT_MIN (INT_MIN_VAL)
 
@@ -18,4 +19,6 @@ domain ___intbv interpretation (SMTLIB: "(_ BitVec NBITS)", Boogie: "bvNBITS") {
   function xorBVInt(___intbv, ___intbv): ___intbv interpretation "bvxor"
   function shlBVInt(___intbv, ___intbv): ___intbv interpretation "bvshl"
   function shrBVInt(___intbv, ___intbv): ___intbv interpretation "bvlshr"
+  function notBVInt(___intbv): ___intbv interpretation "bvnot"
+  function extractBVInt(i: Int, j: Int, ___intbv): ___intbv interpretation "Extract"
 }

@@ -90,3 +90,37 @@ function PByteSeq___seq_ref_to_seq_int__(sr: Seq[Ref]): Seq[Int]
 {
     __seq_ref_to_seq_int(sr)
 }
+
+// Position starts from least significant bit
+function PByteSeq_int_set_bit(value: Ref, position: Ref, bit: Bool): Ref
+    decreases _
+    requires issubtype(typeof(value), int())
+    requires issubtype(typeof(position), int())
+    requires @error("set_bit is only supported for positive values")(!issubtype(typeof(value), bool()) ==> int___unbox__(value) >= 0)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(value), bool()) ==> int___unbox__(value) <= _INT_MAX)
+    requires @error("Negative position.")(!issubtype(typeof(position), bool()) ==> int___unbox__(position) >= 0)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(position), bool()) ==> int___unbox__(position) < _BITOPS_SIZE)
+    ensures issubtype(typeof(result), int())
+{
+    let val == (toBVInt(int___unbox__(value))) in
+    let mask == (shlBVInt(toBVInt(1), toBVInt(int___unbox__(position)))) in
+    __prim__int___box__(fromBVInt( bit ?
+        orBVInt(val, mask) :
+        andBVInt(val, notBVInt(mask))
+    ))
+}
+
+// Position starts from least significant bit
+// function PByteSeq_int_get_bit(self: Ref, position: Ref): Bool
+//     decreases _
+//     requires issubtype(typeof(value), int())
+//     requires issubtype(typeof(position), int())
+//     requires @error("set_bit is only supported for positive values")(!issubtype(typeof(self), bool()) ==> int___unbox__(self) >= 0)
+//     requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(self), bool()) ==> int___unbox__(self) <= _INT_MAX)
+//     requires @error("Negative position.")(!issubtype(typeof(position), bool()) ==> int___unbox__(position) >= 0)
+//     requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(position), bool()) ==> int___unbox__(position) < _BITOPS_SIZE)
+// {
+//     let val == (toBVInt(int___unbox__(self))) in
+//     let pos == (int___unbox__(position)) in
+//     extractBVInt(pos, pos, val) == toBVInt(1)
+// }

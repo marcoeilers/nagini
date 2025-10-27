@@ -332,6 +332,20 @@ class PByteSeq(Sized, Iterable[int]):
         PByteSeqs can be quantified over; this is only here so thatPByteSeqs
         can be used as arguments for Forall.
         """
+        
+    @staticmethod
+    def int_set_bit(value: int, position: int, bit: bool) -> int:
+        """
+        Helper method to set a specific bit of an integer.
+        Position starts at least significant bit
+        """
+        
+    @staticmethod
+    def int_get_bit(value: int, position: int) -> bool:
+        """
+        Helper method to get a specific bit of an integer.
+        Position starts at least significant bit
+        """
 
 def Previous(it: T) -> PSeq[T]:
     """

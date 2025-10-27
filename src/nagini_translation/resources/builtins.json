@@ -350,7 +350,11 @@
             "type": "int",
             "requires": ["__rshift__"]
         },
-        "__byte__bounds__": {
+        "bit_length": {
+            "args": ["int"],
+            "type": "int"      
+        },
+        "__byte_bounds__": {
             "args": ["__prim__int"],
             "type": "__prim__bool"
         }
@@ -992,6 +996,16 @@
             "args": ["PByteSeq", "PByteSeq"],
             "type": "__prim__bool",
             "requires": ["__val__"]
+        },
+        "int_set_bit": {
+            "args": ["int", "int", "__prim__bool"],
+            "type": "int",
+            "requires": ["__prim__int___box__", "int___unbox__"]
+        },
+        "int_get_bit": {
+            "args": ["int", "int"],
+            "type": "__prim__bool",
+            "requires": ["__prim__int___box__", "int___unbox__"]    
         }
     },
     "extends": "object"

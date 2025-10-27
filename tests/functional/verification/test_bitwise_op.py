@@ -172,7 +172,12 @@ def xor_4(a: int, b: bool, c: int) -> None:
     Requires(c >= -128 and c < 257)
     #:: ExpectedOutput(application.precondition:assertion.false)
     intint = a ^ c
+
+def set_bit() -> None:
+    a = PByteSeq.update(PByteSeq(0), 7, True)
+    assert a == 128
     
+
 def lshift_1(b: int) -> None:
     Requires(b >=0 and b <= 127)
     
