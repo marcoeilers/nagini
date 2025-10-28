@@ -172,16 +172,16 @@ def xor_4(a: int, b: bool, c: int) -> None:
     Requires(c >= -128 and c < 257)
     #:: ExpectedOutput(application.precondition:assertion.false)
     intint = a ^ c
-    
-
-def lshift_1(b: int) -> None:
+        
+def lshift_general(a: int, b: int) -> None:
+    Requires(a > -128 and a <= 127)
     Requires(b >=0 and b <= 127)
     
-    a = 1
     shift = a << b
     
+    # Unfortunately we cannot prove the equivalence shift == a * (2**b)
     if b == 0:
-        assert shift == a * 1
+        assert shift == a
     if b == 1:
         assert shift == a * 2
     if b == 2:
@@ -196,34 +196,23 @@ def lshift_1(b: int) -> None:
         assert shift == a * 64
     if b == 7:
         assert shift == a * 128
-        
-def lshift_general(a: int, b: int) -> None:
-    Requires(a > -100 and a < 100)
-    Requires(b >=0 and b <= 127)
-    
-    shift = a << b
-    
-    # Unfortunately we cannot prove the equivalence shift == a * (2**b)
-    if b == 0:
-        assert shift == a
-    if b == 1:
-        assert shift == a * 2
 
 def lshift_neg(a: int, b: int) -> None:
-    Requires(a > -100 and a < 100)
+    Requires(a > -128 and a <= 127)
     Requires(b >= -128 and b <= 127)
     
     #:: ExpectedOutput(application.precondition:assertion.false)
     shift = a << b
-    
-def rshift_1(b: int) -> None:
+        
+def rshift_general(a: int, b: int) -> None:
+    Requires(a >= -128 and a <= 127)
     Requires(b >=0 and b <= 127)
     
-    a = 127
     shift = a >> b
     
+    # Unfortunately we cannot prove the equivalence shift == a // (2 ** b)
     if b == 0:
-        assert shift == a // 1
+        assert shift == a
     if b == 1:
         assert shift == a // 2
     if b == 2:
@@ -238,15 +227,3 @@ def rshift_1(b: int) -> None:
         assert shift == a // 64
     if b == 7:
         assert shift == a // 128
-        
-def rshift_general(a: int, b: int) -> None:
-    Requires(a >= 0 and a < 100)
-    Requires(b >=0 and b <= 127)
-    
-    shift = a >> b
-    
-    # Unfortunately we cannot prove the equivalence shift == a // (2 ** b)
-    if b == 0:
-        assert shift == a
-    if b == 1:
-        assert shift == a // 2

@@ -11,10 +11,6 @@ define _BITOPS_SIZE (NBITS)
 define _INT_MAX (INT_MAX_VAL)
 define _INT_MIN (INT_MIN_VAL)
 
-domain ___intbv1 interpretation (SMTLIB: "(_ BitVec 1)", Boogie: "bv1") {
-  function toBVInt1(i: Int): ___intbv1 interpretation "(_ int2bv 1)"
-}
-
 domain ___intbv interpretation (SMTLIB: "(_ BitVec NBITS)", Boogie: "bvNBITS") {
   function toBVInt(i: Int): ___intbv interpretation "(_ int2bv NBITS)"
   function fromBVInt(___intbv): Int interpretation "bv2int"
@@ -24,14 +20,4 @@ domain ___intbv interpretation (SMTLIB: "(_ BitVec NBITS)", Boogie: "bvNBITS") {
   function shlBVInt(___intbv, ___intbv): ___intbv interpretation "bvshl"
   function shrBVInt(___intbv, ___intbv): ___intbv interpretation "bvlshr"
   function notBVInt(___intbv): ___intbv interpretation "bvnot"
-
-  // Current implementation of `interpretation` does not allow for the required syntax
-  function extractBVInt_0_0(___intbv): ___intbv1 interpretation "(_ extract 0 0)"
-  function extractBVInt_1_1(___intbv): ___intbv1 interpretation "(_ extract 1 1)"
-  function extractBVInt_2_2(___intbv): ___intbv1 interpretation "(_ extract 2 2)"
-  function extractBVInt_3_3(___intbv): ___intbv1 interpretation "(_ extract 3 3)"
-  function extractBVInt_4_4(___intbv): ___intbv1 interpretation "(_ extract 4 4)"
-  function extractBVInt_5_5(___intbv): ___intbv1 interpretation "(_ extract 5 5)"
-  function extractBVInt_6_6(___intbv): ___intbv1 interpretation "(_ extract 6 6)"
-  function extractBVInt_7_7(___intbv): ___intbv1 interpretation "(_ extract 7 7)"
 }

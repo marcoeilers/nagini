@@ -120,15 +120,6 @@ function PByteSeq_int_get_bit(value: Ref, position: Ref): Bool
     requires @error("Negative position.")(!issubtype(typeof(position), bool()) ==> int___unbox__(position) >= 0)
     requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(position), bool()) ==> int___unbox__(position) < _BITOPS_SIZE)
 {
-    let val == (toBVInt(int___unbox__(value))) in
-    let pos == (int___unbox__(position)) in (
-    pos == 0 ? extractBVInt_0_0(val) :
-    pos == 1 ? extractBVInt_1_1(val) :
-    pos == 2 ? extractBVInt_2_2(val) :
-    pos == 3 ? extractBVInt_3_3(val) :
-    pos == 4 ? extractBVInt_4_4(val) :
-    pos == 5 ? extractBVInt_5_5(val) :
-    pos == 6 ? extractBVInt_6_6(val) :
-               extractBVInt_7_7(val)) == toBVInt1(1)
-    
+    let mask == (shlBVInt(toBVInt(1), toBVInt(int___unbox__(position)))) in
+    andBVInt(toBVInt(int___unbox__(value)), mask) == mask
 }
