@@ -3,6 +3,8 @@
 
 from nagini_contracts.contracts import *
 
-def crash() -> None:
-    #:: ExpectedOutput(invalid.program:invalid.contract.position)
-    Invariant(True)
+
+def client() -> None:
+    #:: ExpectedOutput(invalid.program:invalid.reveal.no.function)
+    a = Reveal(1 + 2)
+

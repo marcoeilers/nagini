@@ -1,8 +1,9 @@
 # Any copyright is dedicated to the Public Domain.
 # http://creativecommons.org/publicdomain/zero/1.0/
 
+from typing import List
 from nagini_contracts.contracts import *
 
-def crash() -> None:
-    #:: ExpectedOutput(invalid.program:invalid.contract.position)
-    Invariant(True)
+a: List[int] = [1]
+a[0] += 1
+
