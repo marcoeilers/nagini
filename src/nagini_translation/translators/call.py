@@ -42,6 +42,7 @@ from nagini_translation.lib.constants import (
     THREAD_POST_PRED,
     THREAD_START_PRED,
     TUPLE_TYPE,
+    TYPE_TYPE,
 )
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
@@ -87,15 +88,46 @@ class CallTranslator(CommonTranslator):
                               ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 2
         target = self.get_target(node.args[1], ctx)
-        assert isinstance(target, (PythonType, PythonVar))
+        type_arg_type = self.get_type(node.args[1], ctx)
         stmt, obj = self.translate_expr(node.args[0], ctx)
         pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        type_stmt = []
         if isinstance(target, PythonType):
             check = self.type_check(obj, target, pos, ctx, inhale_exhale=False)
-        else:
+        elif False and isinstance(target, PythonVar):
             check = self.type_factory.dynamic_type_check(obj, target.ref(), pos,
                                                          ctx)
-        return stmt, check
+        elif type_arg_type.name == TYPE_TYPE:
+            type_stmt, type_obj = self.translate_expr(node.args[1], ctx)
+            check = self.subtype_check(obj, type_obj, pos, ctx)
+        elif type_arg_type.name == TUPLE_TYPE:
+            if isinstance(node.args[1], ast.Tuple):
+                options = []
+                for e in node.args[1].elts:
+                    el_target = self.get_target(e, ctx)
+                    if isinstance(el_target, PythonType):
+                        options.append(self.type_check(obj, el_target, pos, ctx, inhale_exhale=False))
+                    else:
+                        el_stmt, el_obj = self.translate_expr(e, ctx)
+                        type_stmt.extend(el_stmt)
+                        options.append(self.subtype_check(obj, el_obj, pos, ctx))
+                check = self._disjoin(options, pos, info)
+            else:
+                type_stmt, type_obj = self.translate_expr(node.args[1], ctx)
+                if type_arg_type.exact_length:
+                    options = []
+                    for index, ta in enumerate(type_arg_type.type_args):
+                        el_obj = self.get_function_call(type_arg_type, '__getitem__',
+                                        [type_obj, self.viper.IntLit(index, pos, info)], [None, None],
+                                        node, ctx)
+                        options.append(self.subtype_check(obj, el_obj, pos, ctx))
+                    check = self._disjoin(options, pos, info)
+                else:
+                    raise UnsupportedException(node, "isinstance with unknown-length tuple argument is currently not supported")
+        else:
+            print("++")
+        return stmt + type_stmt, check
 
     def _translate_type_func(self, node: ast.Call,
                              ctx: Context) -> StmtsAndExpr:
@@ -194,7 +226,7 @@ class CallTranslator(CommonTranslator):
             else:
                 if arg_type.type.name in PRIMITIVES:
                     v_type = self.translate_type(arg_type.type, ctx)
-                    args[index] = self.to_type(translated_arg, v_type, ctx)
+                    args[index] = self.convert_to_type(translated_arg, v_type, ctx)
 
         # Translate constructor call
         cons_call = self.viper.DomainFuncApp(cons.fresh(cons.adt_prefix +
@@ -232,7 +264,10 @@ class CallTranslator(CommonTranslator):
                                                        '_res',
                                                        target_class,
                                                        self.translator)
-        result_type = self.get_type(node, ctx)
+        if isinstance(node, ast.Call):
+            result_type = self.get_type(node, ctx)
+        else:
+            result_type = self.get_target(node, ctx)
         info = self.no_info(ctx)
 
         # Temporarily bind the type variables of the constructed class to
@@ -690,6 +725,8 @@ class CallTranslator(CommonTranslator):
             # constructor
             return True
         # If normal
+        if not isinstance(called_func, PythonMethod):
+            called_func = self.get_target(node.func, ctx)
         assert isinstance(called_func, PythonMethod)
         if (isinstance(node.func, ast.Attribute) and
                 get_func_name(node.func.value) == 'super'):
@@ -1669,8 +1706,8 @@ class CallTranslator(CommonTranslator):
 
         type_stmt, dynamic_type = self.translate_expr(node.func, ctx)
         assert not type_stmt
-        result_has_type = self.type_factory.dynamic_type_check(res_var.ref(),
-            dynamic_type, self.to_position(node, ctx), ctx)
+        result_has_type = self.viper.EqCmp(self.type_factory.typeof(res_var.ref(), ctx), self.to_type(dynamic_type, ctx),
+                                           self.to_position(node, ctx), self.no_info(ctx))
         # Inhale the type information about the newly created object
         # so that it's already present when calling __init__.
         type_inhale = self.viper.Inhale(result_has_type, pos,
