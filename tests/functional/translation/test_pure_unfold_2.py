@@ -11,7 +11,6 @@ class Cell:
 
 @Pure
 def testing1(c: Cell, b: bool) -> int:
-    Requires(Implies(b, pos(c)))
     Ensures(Result() > 0)
     if b:
         #:: ExpectedOutput(invalid.program:invalid.contract.call)
