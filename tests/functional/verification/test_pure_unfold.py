@@ -59,3 +59,43 @@ def testing5(c: Cell, b: bool) -> int:
         return 4
     Unfold(Acc(pos(c)))
     return c.val
+
+
+@Pure
+def testing6(c: Cell, b: bool) -> int:
+    Requires(pos(c))
+    Ensures(Result() > 0)
+    if b:
+        Unfold(Acc(pos(c)))
+        return 4
+    Unfold(Acc(pos(c)))
+    return c.val
+
+@Pure
+def testing7(c: Cell, b: bool) -> int:
+    Requires(pos(c))
+    Ensures(Result() > 0)
+    Unfold(Acc(pos(c)))
+    if b:
+        return 4
+    return c.val
+
+@Pure
+def testing8(c: Cell, b: bool) -> int:
+    Requires(pos(c))
+    Ensures(Result() > 0)
+    if b:
+        Unfold(Acc(pos(c)))
+    if b:
+        return c.val
+    return 4
+
+@Pure  #:: ExpectedOutput(not.wellformed:insufficient.permission)
+def testing9(c: Cell, b: bool) -> int:
+    Requires(pos(c))
+    Ensures(Result() > 0)
+    if b:
+        Unfold(Acc(pos(c)))
+    if not b:
+        return c.val
+    return 4
