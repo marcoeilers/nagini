@@ -22,7 +22,7 @@ def testing1(c: Cell, b: bool) -> int:
     return 3
 
 
-@Pure  #:: ExpectedOutput(not.wellformed:insufficient.permission)
+@Pure  #:: ExpectedOutput(function.not.wellformed:insufficient.permission)
 def testing2(c: Cell, b: bool) -> int:
     Ensures(Result() > 0)
     if b:
@@ -41,7 +41,7 @@ def testing3(c: Cell, b: bool) -> int:
     return 3
 
 
-@Pure  #:: ExpectedOutput(not.wellformed:insufficient.permission)
+@Pure  #:: ExpectedOutput(function.not.wellformed:insufficient.permission)
 def testing4(c: Cell, b: bool) -> int:
     Requires(Implies(b, pos(c)))
     Ensures(Result() > 0)
@@ -90,7 +90,7 @@ def testing8(c: Cell, b: bool) -> int:
         return c.val
     return 4
 
-@Pure  #:: ExpectedOutput(not.wellformed:insufficient.permission)
+@Pure  #:: ExpectedOutput(function.not.wellformed:insufficient.permission)
 def testing9(c: Cell, b: bool) -> int:
     Requires(pos(c))
     Ensures(Result() > 0)

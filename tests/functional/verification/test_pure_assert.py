@@ -12,7 +12,7 @@ def testing1(i1: int, i2: int) -> int:
     return i2
 
 
-@Pure  #:: ExpectedOutput(not.wellformed:assertion.false)
+@Pure  #:: ExpectedOutput(function.not.wellformed:assertion.false)
 def testing2(i1: int, i2: int) -> int:
     Ensures(Result() >= i1 and Result() >= i2)
     if i1 > i2:
@@ -28,7 +28,7 @@ def testing3(i1: int, i2: int) -> int:
     Assert(i1 <= i2)
     return i2
 
-@Pure  #:: ExpectedOutput(not.wellformed:assertion.false)
+@Pure  #:: ExpectedOutput(function.not.wellformed:assertion.false)
 def testing4(i1: int, i2: int) -> int:
     Ensures(Result() >= i1 and Result() >= i2)
     if i1 > i2:
