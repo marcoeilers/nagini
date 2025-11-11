@@ -200,6 +200,10 @@ def TerminatesSif(cond: bool, rank: int) -> bool:
     """
     pass
 
+PBool = bool
+
+PInt = int
+
 class PSeq(Generic[T], Sized, Iterable[T]):
     """
     A PSeq[T] represents a pure sequence of instances of subtypes of T, and
@@ -678,6 +682,8 @@ __all__ = [
         'dict_pred',
         'set_pred',
         'bytearray_pred',
+        'PBool',
+        'PInt',
         'PSeq',
         'PByteSeq',
         'PSet',
