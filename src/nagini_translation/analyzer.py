@@ -877,6 +877,14 @@ class Analyzer(ast.NodeVisitor):
     def visit_arg(self, node: ast.arg) -> None:
         assert self.current_function is not None
         node_type = self.typeof(node)
+        if isinstance(node.annotation, ast.Name) and node.annotation.id in ('PInt', 'PBool'):
+            if node.annotation.id == 'PInt':
+                assert node_type.name == 'int'
+                node_type = node_type.module.classes['__prim__int']
+            elif node.annotation.id == 'PBool':
+                assert node_type.name == 'bool'
+                node_type = node_type.module.classes['__prim__bool']
+
         self.current_function.args[node.arg] = \
             self.node_factory.create_python_var(node.arg, node, node_type)
         # If we just introduced new type variables, create the expression that
