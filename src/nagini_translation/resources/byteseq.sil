@@ -51,11 +51,6 @@ function PByteSeq_drop(self: Ref, no: Int): Ref
     requires issubtype(typeof(self), PByteSeq())
     ensures result == PByteSeq___create__(PByteSeq___val__(self)[no..])
 
-function PByteSeq_range(self: Ref, start: Int, end: Int): Ref
-    decreases _
-    requires issubtype(typeof(self), PByteSeq())
-    ensures result == PByteSeq___create__(PByteSeq___val__(self)[start..end])
-
 function PByteSeq_update(self: Ref, index: Int, val: Int): Ref
     decreases _
     requires issubtype(typeof(self), PByteSeq())
