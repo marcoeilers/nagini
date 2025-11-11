@@ -954,7 +954,8 @@
         },
         "__val__": {
             "args": ["PByteSeq"],
-            "type": "__prim__Seq"
+            "type": "__prim__Seq",
+            "requires": ["int___byte_bounds__"]
         },
         "__len__": {
             "args": ["PByteSeq"],
