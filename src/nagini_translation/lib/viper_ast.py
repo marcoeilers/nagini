@@ -173,6 +173,9 @@ class ViperAST:
     def Unfolding(self, predicate, expr, position, info):
         return self.ast.Unfolding(predicate, expr, position, info, self.NoTrafos)
 
+    def Asserting(self, ass, expr, position, info):
+        return self.ast.Asserting(ass, expr, position, info, self.NoTrafos)
+
     def SeqType(self, element_type):
         return self.ast.SeqType(element_type)
 

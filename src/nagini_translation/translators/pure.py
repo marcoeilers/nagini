@@ -64,6 +64,19 @@ class UnfoldWrapper:
         self.var = None
 
 
+class AssertWrapper:
+    """
+    Represents an asserting of assertion a, to be executed under conditions conds.
+    """
+
+    def __init__(self, conds: List, a: ast.AST, node: ast.AST):
+        self.cond = conds
+        self.a = a
+        self.node = node
+        self.names = {}
+        self.var = None
+
+
 
 class NotWrapper:
     """
@@ -82,7 +95,7 @@ class BinOpWrapper:
         self.op = op
         self.rhs = rhs
 
-Wrapper = Union[AssignWrapper, ReturnWrapper, UnfoldWrapper]
+Wrapper = Union[AssignWrapper, ReturnWrapper, UnfoldWrapper, AssertWrapper]
 
 
 class PureTranslator(CommonTranslator):
@@ -106,6 +119,9 @@ class PureTranslator(CommonTranslator):
             raise InvalidProgramException(node, 'invalid.contract.position')
         if isinstance(node.value, ast.Call) and get_func_name(node.value) == 'Unfold':
             wrapper = UnfoldWrapper(conds, node.value, node)
+            return [wrapper]
+        if isinstance(node.value, ast.Call) and get_func_name(node.value) == 'Assert':
+            wrapper = AssertWrapper(conds, node.value, node)
             return [wrapper]
         raise UnsupportedException(node)
 
@@ -270,6 +286,35 @@ class PureTranslator(CommonTranslator):
         else:
             return unfolding
 
+    def _translate_assert_wrapper(self, wrapper: Wrapper, previous: Expr,
+                                  function: PythonMethod,
+                                  ctx: Context) -> Expr:
+        info = self.no_info(ctx)
+        position = self.to_position(wrapper.node, ctx)
+        if not previous:
+            raise InvalidProgramException(function.node,
+                                          'function.return.missing')
+
+        if len(wrapper.a.args) != 1:
+            raise InvalidProgramException(wrapper.a, 'invalid.contract.call')
+
+        ass_stmt, ass = self.translate_expr(wrapper.a.args[0], ctx,
+                                            self.viper.Bool, True)
+        if ass_stmt:
+            raise InvalidProgramException(wrapper.node, 'purity.violated')
+
+        asserting = self.viper.Asserting(ass, previous, position, info)
+
+        if wrapper.cond:
+            cond = self._translate_condition(wrapper.cond,
+                                             wrapper.names, ctx)
+
+            new_val = self.viper.CondExp(cond, asserting, previous, position,
+                                         info)
+            return new_val
+        else:
+            return asserting
+
     def _translate_wrapper_expr(self, wrapper: Wrapper,
                                 ctx: Context) -> Expr:
         info = self.no_info(ctx)
@@ -305,6 +350,9 @@ class PureTranslator(CommonTranslator):
                                                   function, ctx)
         elif isinstance(wrapper, UnfoldWrapper):
             return self._translate_unfold_wrapper(wrapper, previous,
+                                                  function, ctx)
+        elif isinstance(wrapper, AssertWrapper):
+            return self._translate_assert_wrapper(wrapper, previous,
                                                   function, ctx)
         else:
             raise UnsupportedException(wrapper)
