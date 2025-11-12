@@ -178,6 +178,20 @@ def lshift_general(a: int, b: int) -> None:
     Requires(b >=0 and b <= 127)
     
     shift = a << b
+
+    if b <= 8:
+        lshift_unlimited(a, b)
+
+    if b == 9:
+        assert shift == a * 512
+
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert shift == 1
+
+def lshift_unlimited(a: int, b: int) -> None:
+    Requires(b >= 0 and b <= 8)
+
+    shift = a << b
     
     # Unfortunately we cannot prove the equivalence shift == a * (2**b)
     if b == 0:
@@ -196,6 +210,11 @@ def lshift_general(a: int, b: int) -> None:
         assert shift == a * 64
     if b == 7:
         assert shift == a * 128
+    if b == 8:
+        assert shift == a * 256
+    
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert shift == 1
 
 def lshift_neg(a: int, b: int) -> None:
     Requires(a > -128 and a <= 127)
@@ -210,6 +229,20 @@ def rshift_general(a: int, b: int) -> None:
     
     shift = a >> b
     
+    if b <= 8:
+        rshift_unlimited(a, b)
+
+    if b == 9:
+        assert shift == a // 512
+
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert shift == 1
+
+def rshift_unlimited(a: int, b: int) -> None:
+    Requires(b >= 0 and b <= 8)
+
+    shift = a >> b
+
     # Unfortunately we cannot prove the equivalence shift == a // (2 ** b)
     if b == 0:
         assert shift == a
@@ -227,3 +260,8 @@ def rshift_general(a: int, b: int) -> None:
         assert shift == a // 64
     if b == 7:
         assert shift == a // 128
+    if b == 8:
+        assert shift == a // 256
+
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert shift == 1
