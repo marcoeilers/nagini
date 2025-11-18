@@ -66,7 +66,7 @@ class TypeTranslator(CommonTranslator):
         else:
             return self.viper.Ref
 
-    def get_type(self, node: ast.AST, ctx: Context) -> Optional[PythonType]:
+    def get_type(self, node: ast.AST, ctx: Context, box: bool = True) -> Optional[PythonType]:
         """
         Returns the type of the expression represented by node as a PythonType,
         or None if the type is void.
@@ -81,7 +81,7 @@ class TypeTranslator(CommonTranslator):
         else:
             # Assume module
             containers.extend(container.get_included_modules())
-        return do_get_type(node, containers, container)
+        return do_get_type(node, containers, container, box)
 
     def type_check(self, lhs: Expr, type: PythonType,
                    position: 'silver.ast.Position',

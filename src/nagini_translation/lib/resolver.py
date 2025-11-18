@@ -20,6 +20,8 @@ from nagini_translation.lib.constants import (
     LEFT_OPERATOR_FUNCTIONS,
     RIGHT_OPERATOR_FUNCTIONS,
     PMSET_TYPE,
+    PRIMITIVE_BOOL_TYPE,
+    PRIMITIVE_INT_TYPE,
     PSEQ_TYPE,
     PSET_TYPE,
     RANGE_TYPE,
@@ -178,7 +180,7 @@ def find_entry(target_name: str, only_top: bool,
 
 
 def get_type(node: ast.AST, containers: List[ContainerInterface],
-             container: PythonNode) -> Optional[PythonType]:
+             container: PythonNode, box: bool = True) -> Optional[PythonType]:
     """
     If ``node`` is an expression, returns its type, assuming that the immediate
     container (e.g. a PythonMethod) of the node is ``container``, by looking in
@@ -187,7 +189,7 @@ def get_type(node: ast.AST, containers: List[ContainerInterface],
     Returns None if the type is void.
     """
     result = _do_get_type(node, containers, container)
-    if isinstance(result, PythonType):
+    if box and isinstance(result, PythonType):
         result = result.try_box()
     return result
 
@@ -275,9 +277,9 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         elif isinstance(node.value, bytes):
             return module.global_module.classes[BYTES_TYPE]
         elif isinstance(node.value, bool):
-            return module.global_module.classes[BOOL_TYPE]
+            return module.global_module.classes[PRIMITIVE_BOOL_TYPE]
         elif isinstance(node.value, int):
-            return module.global_module.classes[INT_TYPE]
+            return module.global_module.classes[PRIMITIVE_INT_TYPE]
         elif isinstance(node.value, float):
             return module.global_module.classes[FLOAT_TYPE]
         elif node.value is None:

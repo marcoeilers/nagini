@@ -27,6 +27,7 @@ from nagini_translation.lib.constants import (
     RIGHT_OPERATOR_FUNCTIONS,
     PRIMITIVE_INT_TYPE,
     PRIMITIVE_PERM_TYPE,
+    PRIMITIVES,
     SET_TYPE,
     STRING_TYPE,
     THREAD_DOMAIN,
@@ -936,8 +937,8 @@ class ExpressionTranslator(CommonTranslator):
         left_stmt, left = self.translate_expr(node.left, ctx)
         right_stmt, right = self.translate_expr(node.right, ctx)
         stmt = left_stmt + right_stmt
-        left_type = self.get_type(node.left, ctx)
-        right_type = self.get_type(node.right, ctx)
+        left_type = self.get_type(node.left, ctx, box = False)
+        right_type = self.get_type(node.right, ctx, box = False)
         op_stmt, result = self.translate_operator(left, right, left_type,
                                                   right_type, node, ctx)
         return stmt + op_stmt, result
@@ -955,12 +956,13 @@ class ExpressionTranslator(CommonTranslator):
         if isinstance(op, (ast.Eq, ast.NotEq)):
             if left_type.python_class.is_adt and right_type.python_class.is_adt:
                 return True
-        return False
+        # return False
         if type(op) not in self._primitive_operations:
             return False
         left_type_boxed = left_type.python_class.try_box()
         right_type_boxed = right_type.python_class.try_box()
         return (right_type_boxed.name in BOXED_PRIMITIVES and
+                left_type.name in PRIMITIVES and
                 right_type_boxed.name == left_type_boxed.name)
 
     def _translate_primitive_operation(self, left: Expr, right: Expr,
@@ -1122,9 +1124,9 @@ class ExpressionTranslator(CommonTranslator):
         if len(node.ops) != 1 or len(node.comparators) != 1:
             raise UnsupportedException(node)
         left_stmt, left = self.translate_expr(node.left, ctx)
-        left_type = self.get_type(node.left, ctx)
+        left_type = self.get_type(node.left, ctx, box = False)
         right_stmt, right = self.translate_expr(node.comparators[0], ctx)
-        right_type = self.get_type(node.comparators[0], ctx)
+        right_type = self.get_type(node.comparators[0], ctx, box = False)
         stmts = left_stmt + right_stmt
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)

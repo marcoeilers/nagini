@@ -109,8 +109,8 @@ class AbstractTranslator(metaclass=ABCMeta):
                         function: PythonMethod, ctx: Context) -> Expr:
         return self.config.pure_translator.translate_exprs(nodes, function, ctx)
 
-    def get_type(self, node: ast.AST, ctx: Context) -> PythonClass:
-        return self.config.type_translator.get_type(node, ctx)
+    def get_type(self, node: ast.AST, ctx: Context, box: bool = True) -> PythonClass:
+        return self.config.type_translator.get_type(node, ctx, box)
 
     def translate_type(self, cls: PythonClass,
                        ctx: Context) -> 'silver.ast.Type':
