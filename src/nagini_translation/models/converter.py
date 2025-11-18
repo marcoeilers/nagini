@@ -740,6 +740,8 @@ class Converter:
             # TODO: handle properly
             return False
         if isinstance(t, PythonType) and not isinstance(t, GenericType) and t.python_class.type_vars:
+            if t.sil_name not in self.model:
+                return False
             arg_options, els = self.get_type_vals(t)
             for _,option in arg_options:
                 bool_or_none = self.get_func_value(ISSUBTYPE, (val_type, option))
