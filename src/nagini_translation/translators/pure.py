@@ -10,7 +10,7 @@ import ast
 from typing import Dict, List, Union
 
 from nagini_contracts.contracts import CONTRACT_WRAPPER_FUNCS
-from nagini_translation.lib.constants import BOOL_TYPE
+from nagini_translation.lib.constants import PRIMITIVE_BOOL_TYPE
 from nagini_translation.lib.program_nodes import PythonMethod, PythonType, PythonVar
 from nagini_translation.lib.typedefs import (
     Expr,
@@ -133,7 +133,7 @@ class PureTranslator(CommonTranslator):
         """
         cond = node.test
         cond_var = ctx.current_function.create_variable('cond',
-            ctx.module.global_module.classes[BOOL_TYPE], self.translator)
+            ctx.module.global_module.classes[PRIMITIVE_BOOL_TYPE], self.translator)
         cond_let = AssignWrapper(cond_var.sil_name, conds, cond, node)
         then_cond = conds + [cond_var.sil_name]
         else_cond = conds + [NotWrapper(cond_var.sil_name)]
@@ -210,7 +210,8 @@ class PureTranslator(CommonTranslator):
                                   ctx: Context) -> Expr:
         info = self.no_info(ctx)
         position = self.to_position(wrapper.node, ctx)
-        val = self.to_ref(self._translate_wrapper_expr(wrapper, ctx), ctx)
+        val = self._translate_wrapper_expr(wrapper, ctx)
+        val = self.to_type(val, wrapper.var.decl.typ(), ctx)
         if not previous:
             raise InvalidProgramException(function.node,
                                           'function.return.missing')
