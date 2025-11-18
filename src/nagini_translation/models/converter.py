@@ -22,11 +22,11 @@ UNBOX_BOOL = 'bool___unbox__%limited'
 UNBOX_PSEQ = 'PSeq___sil_seq__%limited'
 TYPEOF = 'typeof<PyType>'
 SNAP_TO = '$SortWrappers.'
-SEQ_LENGTH = 'seq_ref_length<Int>'
-SEQ_INDEX = 'seq_ref_index<Ref>'
 SET_CARD = 'Set_card'
 DICT_GET = 'Map_apply'
 MAP_CARD = 'Map_card'
+SEQ_LENGTH = 'Seq_length'
+SEQ_INDEX = 'Seq_index'
 
 
 UNIT = '$Snap.unit'
