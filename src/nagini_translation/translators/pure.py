@@ -10,7 +10,7 @@ import ast
 from typing import Dict, List, Union
 
 from nagini_contracts.contracts import CONTRACT_WRAPPER_FUNCS
-from nagini_translation.lib.constants import PRIMITIVE_BOOL_TYPE
+from nagini_translation.lib.constants import PRIMITIVE_BOOL_TYPE, BOOL_TYPE
 from nagini_translation.lib.program_nodes import PythonMethod, PythonType, PythonVar
 from nagini_translation.lib.typedefs import (
     Expr,
@@ -238,8 +238,8 @@ class PureTranslator(CommonTranslator):
                     self.viper.Bool: false,
                     self.viper.Ref: null
                 }
-                old_val = self.to_ref(dummies[wrapper.var.decl.typ()], ctx)
-            new_val = self.viper.CondExp(cond, val, old_val, position,
+                old_val = dummies[wrapper.var.decl.typ()]
+            new_val = self.viper.CondExp(cond, val, self.to_type(old_val, val.typ(), ctx), position,
                                          info)
             return self.viper.Let(wrapper.var.decl, new_val,
                                   previous, position, info)

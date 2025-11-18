@@ -18,8 +18,10 @@ def can_node_be_compressed(marked_execution_tree: 'Node') -> int:
     - int: number of nodes that can be compressed. 0 if None"""
     Requires(Acc(marked_execution_tree.children))
     Requires(Acc(list_pred(marked_execution_tree.children)))
-    Requires(Forall(int, lambda i: Implies(i >= 0 and i < len(marked_execution_tree.children),
-                                           Acc(marked_execution_tree.children[i].function_name))))
+    Requires(Forall(int, lambda i: Implies(type(i) == int and i >= 0 and i < len(marked_execution_tree.children),
+                                           Acc(marked_execution_tree.children[i].function_name) and
+                                           Acc(marked_execution_tree.children[i].children) and
+                                           list_pred(marked_execution_tree.children[i].children))))
     Requires(Acc(marked_execution_tree.function_name))
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Implies(len(marked_execution_tree.children) != 1, Result() == 0))
