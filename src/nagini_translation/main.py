@@ -76,7 +76,7 @@ def parse_sil_file(sil_path: str, bv_path: str, bv_size: int, jvm, float_option:
     none = getobject(jvm.java, jvm.scala, "None")
     tp.beforeParse(text, False)
     diskloader = getobject(jvm.java, jvm.viper.silver.ast.utility, "DiskLoader")
-    parsed = parser.parse(text, path, none, diskloader)
+    parsed = parser.parse(text, path, none, diskloader, True)
 
     parse_result = parsed
     parse_result.initProperties()

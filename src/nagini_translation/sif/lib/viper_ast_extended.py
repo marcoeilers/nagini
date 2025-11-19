@@ -85,7 +85,6 @@ class ViperASTExtended(ViperAST):
 
     def Low(self, expr: Expr, comp: Optional[str], position: Position, info: Info):
         if comp:
-            self.used_names.add(comp)
             comp_opt = self.scala.Some(comp)
         else:
             comp_opt = self.none

@@ -7,19 +7,6 @@
 
 field list_acc : Seq[Ref]
 
-domain _list_ce_helper {
-    function seq_ref_length(___s: Seq[Ref]): Int
-    function seq_ref_index(___s: Seq[Ref], i: Int): Ref
-
-    axiom relate_length {
-        forall ___s: Seq[Ref] :: {|___s|} |___s| == seq_ref_length(___s)
-    }
-
-    axiom relate_index {
-        forall ___s: Seq[Ref], ___i: Int :: { ___s[___i] } ___s[___i] == seq_ref_index(___s, ___i)
-    }
-}
-
 method list___init__() returns (res: Ref)
     ensures acc(res.list_acc)
     ensures res.list_acc == Seq[Ref]()

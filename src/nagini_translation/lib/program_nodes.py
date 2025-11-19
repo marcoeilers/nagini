@@ -660,15 +660,6 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         if self.interface:
             all_methods = list(self.functions.values())
             all_methods.extend(self.methods.values())
-            for method in all_methods:
-                requires = set()
-                for requirement in method.requires:
-                    target = self.get_func_or_method(requirement)
-                    if target:
-                        requires.add(target.sil_name)
-                    else:
-                        requires.add(requirement)
-                translator.set_required_names(method.sil_name, requires)
 
     def issubtype(self, cls: 'PythonClass') -> bool:
         if cls is self:
@@ -1033,7 +1024,6 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.node_factory = node_factory
         self.method_type = method_type
         self.obligation_info = None
-        self.requires = []
         self.type_vars = OrderedDict()
         self.setter = None
         self.func_constant = None
@@ -1069,10 +1059,6 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                                 translator)
         self.obligation_info = translator.create_obligation_info(self)
         if self.interface:
-            requires = set()
-            for requirement in self.requires:
-                requires.add(requirement)
-            translator.set_required_names(self.sil_name, requires)
             return
         func_type = self.module.types.get_func_type(self.scope_prefix)
         if self.type is not None:
