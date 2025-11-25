@@ -256,7 +256,6 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
             files = _test_files(test_dir)
             test_files.extend(files)
             reload_triggers.add(files[0])
-            print(files[0])
         if _pytest_config.single_test and 'verification' in _pytest_config.single_test:
             test_files.append(_pytest_config.single_test)
         float_encoding = None
@@ -282,7 +281,6 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
             if 'select' + os.sep in file:
                 file_name = file.partition('select' + os.sep)[2].partition('.py')[0]
                 select = set(file_name.split('-'))
-            print(os.sep)
             reload_resources = (file in reload_triggers) or (new_float_encoding != float_encoding)
             float_encoding = new_float_encoding
             arp = 'arp' in file
