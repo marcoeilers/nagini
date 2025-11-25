@@ -278,15 +278,20 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
                 sif = False
             if _pytest_config.force_product:
                 sif = True
+            select = set()
+            if 'select' + os.sep in file:
+                file_name = file.partition('select' + os.sep)[2].partition('.py')[0]
+                select = set(file_name.split('-'))
+            print(os.sep)
             reload_resources = (file in reload_triggers) or (new_float_encoding != float_encoding)
             float_encoding = new_float_encoding
             arp = 'arp' in file
             base = file.partition('verification')[0] + 'verification'
             params.extend([(file, base, verifier, sif, reload_resources, arp,
                             ignore_obligations or (None if verifier == 'silicon' else False),
-                            _pytest_config.store_viper, float_encoding) for verifier
+                            _pytest_config.store_viper, float_encoding, select) for verifier
                            in _pytest_config.verifiers])
-        metafunc.parametrize('path,base,verifier,sif,reload_resources,arp,ignore_obligations,print,float_encoding', params)
+        metafunc.parametrize('path,base,verifier,sif,reload_resources,arp,ignore_obligations,print,float_encoding,selection', params)
     else:
         pytest.exit('Unrecognized test function.')
 
