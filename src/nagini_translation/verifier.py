@@ -133,7 +133,11 @@ class Silicon:
         """
         Verifies the given program using Silicon
         """
-        result = self.silicon.verify(prog)
+        result = None
+        try:
+            result = self.silicon.verify(prog)
+        except Exception as e:
+            e.printStackTrace()
         if arp:
             result = get_arp_plugin(self.jvm).map_result(result)
         if isinstance(result, self.silver.verifier.Failure):
