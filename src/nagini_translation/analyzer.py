@@ -14,7 +14,12 @@ import tokenize
 
 from collections import OrderedDict
 from nagini_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
-from nagini_contracts.io_contracts import IO_OPERATION_PROPERTY_FUNCS
+from nagini_contracts.io_contracts import (
+    BUILTIN_IO_OPERATIONS,
+    IO_CONTRACT_FUNCS,
+    IO_OPERATION_PROPERTY_FUNCS
+)
+from nagini_contracts.obligations import OBLIGATION_CONTRACT_FUNCS
 from nagini_translation.analyzer_io import IOOperationAnalyzer
 from nagini_translation.external.ast_util import mark_text_ranges
 from nagini_translation.lib.constants import (
@@ -95,6 +100,7 @@ class Analyzer(ast.NodeVisitor):
         self.selected = selected
         self.deferred_tasks = []
         self.has_all_low = False
+        self.enable_obligations = False
 
     def initialize_io_analyzer(self) -> None:
         self.io_operation_analyzer = IOOperationAnalyzer(
@@ -333,10 +339,6 @@ class Analyzer(ast.NodeVisitor):
                                                     self.module.global_module)
         if if_method.get('generic_type'):
             method.generic_type = if_method['generic_type']
-        if if_method.get('requires'):
-            method.requires = if_method['requires']
-        if cls:
-            method.requires.append(cls.name)
         cont = cls if cls else self.module.global_module
         if predicate:
             cont.predicates[method_name] = method
@@ -653,17 +655,19 @@ class Analyzer(ast.NodeVisitor):
             if not self.is_static_method(node):
                 func.cls = self.current_class
             func.pure = self.is_pure(node)
+            func.opaque = self.is_opaque(node)
             func.node = node
             func.superscope = scope_container
         else:
             pure = is_property_getter or self.is_pure(node)
+            opaque = self.is_opaque(node)
             if pure:
                 contract_only = self.is_declared_contract_only(node)
             else:
                 contract_only = self.contract_only or self.is_contract_only(node)
             func = self.node_factory.create_python_method(
                 name, node, self.current_class, scope_container, pure,
-                contract_only, self.node_factory)
+                contract_only, self.node_factory, opaque=opaque)
             if is_property_setter:
                 container[name].setter = func
             else:
@@ -971,6 +975,8 @@ class Analyzer(ast.NodeVisitor):
             node.func.id in IO_OPERATION_PROPERTY_FUNCS):
             raise InvalidProgramException(
                 node, 'invalid.io_operation.misplaced_property')
+        if self._requires_obligations(node.func):
+            self.enable_obligations = True
         if isinstance(node.func, ast.Name) and node.func.id == 'Thread':
             return
         if isinstance(node.func, ast.Name) and node.func.id == 'getOld':
@@ -985,6 +991,34 @@ class Analyzer(ast.NodeVisitor):
             if contains_stmt(preconditions, node) or contains_stmt(postconditions, node):
                 raise InvalidProgramException(node, 'invalid.contract.position')
         self.visit_default(node)
+
+    def _requires_obligations(self, node: ast.AST) -> bool:
+        """
+        Conservatively checks if the given node, representing a called function, may require the use of obligations.
+        """
+        if isinstance(node, ast.Name):
+            return (node.id in OBLIGATION_CONTRACT_FUNCS or
+                    node.id in BUILTIN_IO_OPERATIONS or
+                    node.id in IO_CONTRACT_FUNCS)
+        elif isinstance(node, ast.Attribute):
+            try:
+                recv_type = self.typeof(node.value)
+            except:
+                # type computation is not implemented fully here, so this may fail
+                recv_type = None
+            if node.attr in ('start', 'join') and (recv_type is None or recv_type.python_class.name == 'Thread'):
+                # Thread operations interact with obligations
+                return True
+            elif node.attr in ('release', 'acquire'):
+                # Lock operations interact with obligations
+                if recv_type is None:
+                    return True
+                while recv_type is not None:
+                    if recv_type.python_class.name == 'Lock':
+                        return True
+                    recv_type = recv_type.superclass
+                return False
+        return False
 
     def _get_parent_of_type(self, node: ast.AST, typ: type) -> ast.AST:
         """
@@ -1411,6 +1445,8 @@ class Analyzer(ast.NodeVisitor):
                     raise UnsupportedException(node)
             elif node.func.id == 'cast':
                 return self.find_or_create_target_class(node.args[0])
+            elif node.func.id == 'super':
+                return self.current_class.superclass
             else:
                 f = self.module.get_func_or_method(node.func.id)
                 if f is not None:
@@ -1498,6 +1534,7 @@ class Analyzer(ast.NodeVisitor):
 
     def _incompatible_decorators(self, decorators) -> bool:
         return ((('Predicate' in decorators) and ('Pure' in decorators)) or
+                (('Opaque' in decorators) and ('Pure' not in decorators)) or
                 (('Predicate' in decorators) and ('Inline' in decorators)) or
                 (('Inline' in decorators) and ('Pure' in decorators)) or
                 (('IOOperation' in decorators) and (len(decorators) != 1)) or
@@ -1548,6 +1585,9 @@ class Analyzer(ast.NodeVisitor):
 
     def is_pure(self, func: ast.FunctionDef) -> bool:
         return self.has_decorator(func, 'Pure')
+
+    def is_opaque(self, func: ast.FunctionDef) -> bool:
+        return self.has_decorator(func, 'Opaque')
 
     def is_predicate(self, func: ast.FunctionDef) -> bool:
         return self.has_decorator(func, 'Predicate')

@@ -37,8 +37,6 @@ class ViperAST:
         self.scala = scala
         self.jvm = jvm
         self.nodes = {}
-        self.used_names = set()
-        self.used_names_sets = {}
 
         def getconst(name):
             return getobject(java, ast, name)
@@ -70,6 +68,7 @@ class ViperAST:
         self.Perm = getconst('Perm')
         self.sourcefile = sourcefile
         self.none = getobject(java, scala, 'None')
+        self.chopper = getobject(java, ast.utility.chopper, 'PluginAwareChopper')
 
     def is_available(self) -> bool:
         """
@@ -112,6 +111,12 @@ class ViperAST:
         for k, v in dict.items():
             result = result.updated(k, v)
         return result
+
+    def to_set(self, s):
+        result = self.scala.collection.mutable.HashSet()
+        for e in s:
+            result.add(e)
+        return result.toSet()
 
     def to_big_int(self, num):
         # We cannot give integers directly to Scala if they don't
@@ -157,7 +162,6 @@ class ViperAST:
                                   body, position, info, self.NoTrafos)
 
     def PredicateAccess(self, args, pred_name, position, info):
-        self.used_names.add(pred_name)
         return self.ast.PredicateAccess(self.to_seq(args), pred_name, position,
                                         info, self.NoTrafos)
 
@@ -172,6 +176,9 @@ class ViperAST:
 
     def Unfolding(self, predicate, expr, position, info):
         return self.ast.Unfolding(predicate, expr, position, info, self.NoTrafos)
+
+    def Asserting(self, ass, expr, position, info):
+        return self.ast.Asserting(ass, expr, position, info, self.NoTrafos)
 
     def SeqType(self, element_type):
         return self.ast.SeqType(element_type)
@@ -202,19 +209,8 @@ class ViperAST:
         seq = self.to_seq(type_vars)
         return self.ast.DomainType(name, map, seq)
 
-    def mark_class_used(self, name: str):
-        if name == 'Iterator':
-            self.used_names.add('list')
-            self.used_names.add('dict')
-            self.used_names.add('set')
-        self.used_names.add(name)
-
     def DomainFuncApp(self, func_name, args, type_passed,
                       position, info, domain_name, type_var_map={}):
-        if func_name.startswith('issubtype'):
-            self.used_names.add(func_name[9:])
-        else:
-            self.used_names.add(func_name)
         arg_decls = [self.LocalVarDecl('arg' + str(i), arg.typ(), arg.pos(),
                                        arg.info())
                      for i, arg in enumerate(args)]
@@ -229,7 +225,6 @@ class ViperAST:
         return self.ast.TypeVar(name)
 
     def MethodCall(self, method_name, args, targets, position, info):
-        self.used_names.add(method_name)
         return self.ast.MethodCall(method_name, self.to_seq(args),
                                    self.to_seq(targets), position, info, self.NoTrafos)
 
@@ -311,8 +306,6 @@ class ViperAST:
         return self.ast.CurrentPerm(location, position, info, self.NoTrafos)
 
     def ForPerm(self, variable, access, body, position, info):
-        if isinstance(access, self.ast.Predicate):
-            self.used_names.add(access.name())
         variables = self.to_seq([variable])
         return self.ast.ForPerm(variables, access, body,
                                 position, info, self.NoTrafos)
@@ -381,9 +374,12 @@ class ViperAST:
         return self.ast.Implies(left, right, position, info, self.NoTrafos)
 
     def FuncApp(self, name, args, position, info, type, formalargs=None):
-        self.used_names.add(name)
         return self.ast.FuncApp(name, self.to_seq(args), position, info, type,
                                 self.NoTrafos)
+
+    def FuncAppWithInfo(self, funcApp, info):
+        return self.ast.FuncApp(funcApp.funcname(), funcApp.args(), funcApp.pos(), info, funcApp.typ(),
+                                funcApp.errT())
 
     def ExplicitSeq(self, elems, position, info):
         return self.ast.ExplicitSeq(self.to_seq(elems), position, info, self.NoTrafos)
@@ -523,6 +519,9 @@ class ViperAST:
 
     def ConsInfo(self, head, tail):
         return self.ast.ConsInfo(head, tail)
+
+    def AnnotationInfo(self, annotation, arguments):
+        return self.ast.AnnotationInfo(self.to_map({annotation: self.to_seq(arguments)}))
 
     def to_position(self, expr, vias, error_string: str=None,
                     rules: Rules=None, file: str = None, py_node=None):

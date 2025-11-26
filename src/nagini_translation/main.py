@@ -76,7 +76,7 @@ def parse_sil_file(sil_path: str, bv_path: str, bv_size: int, jvm, float_option:
     none = getobject(jvm.java, jvm.scala, "None")
     tp.beforeParse(text, False)
     diskloader = getobject(jvm.java, jvm.viper.silver.ast.utility, "DiskLoader")
-    parsed = parser.parse(text, path, none, diskloader)
+    parsed = parser.parse(text, path, none, diskloader, True)
 
     parse_result = parsed
     parse_result.initProperties()
@@ -144,6 +144,9 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
     else:
         translator = Translator(jvm, path, types, viper_ast)
     analyzer.process(translator)
+    if not analyzer.enable_obligations and config.obligation_config.disable_all is None:
+        # only override the default, which is None; if the encoding is forced on or off, it'll be True or False
+        config.obligation_config.disable_all = True
     if 'sil_programs' not in globals() or reload_resources:
         global sil_programs
         sil_programs = load_sil_files(jvm, bv_size, sif, float_encoding)
@@ -318,6 +321,11 @@ def main() -> None:
         help='do not verify liveness properties (obligations)'
     )
     parser.add_argument(
+        '--force-obligations',
+        action='store_true',
+        help='force use of the obligations encoding used to verify liveness properties'
+    )
+    parser.add_argument(
         '--server',
         action='store_true',
         help='start Nagini server'
@@ -356,7 +364,11 @@ def main() -> None:
     config.mypy_path = args.mypy_path
     config.set_verifier(args.verifier)
     if args.ignore_obligations:
+        if args.force_obligations:
+            parser.error('incompatible arguments: --ignore-obligations and --force-obligations')
         config.obligation_config.disable_all = True
+    elif args.force_obligations:
+        config.obligation_config.disable_all = False  # False instead of None: force obligation encoding
 
     if not config.classpath:
         parser.error('missing argument: --viper-jar-path')
