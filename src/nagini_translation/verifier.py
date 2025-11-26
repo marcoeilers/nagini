@@ -119,6 +119,7 @@ class Silicon:
             '--disableCatchingExceptions',
             '--exhaleMode=2',
             '--alternativeFunctionVerificationOrder',
+            '--z3ResourcesPerMillisecond=9000',
             '--disableDefaultPlugins',
             '--plugin=viper.silver.plugin.standard.refute.RefutePlugin:'
             'viper.silver.plugin.standard.termination.TerminationPlugin:'
@@ -137,7 +138,7 @@ class Silicon:
         try:
             result = self.silicon.verify(prog)
         except Exception as e:
-            e.printStackTrace()
+            print(e)
         if arp:
             result = get_arp_plugin(self.jvm).map_result(result)
         if isinstance(result, self.silver.verifier.Failure):
