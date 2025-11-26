@@ -29,6 +29,7 @@ class ViperASTExtended(ViperAST):
         self.equality_comp_functions = set()
         self.ctx = None
         self.type_factory = None
+        self.lowval_functions = set()
 
     def is_extension_available(self) -> bool:
         """
@@ -86,6 +87,7 @@ class ViperASTExtended(ViperAST):
     def Low(self, expr: Expr, comp: Optional[str], position: Position, info: Info):
         if comp:
             comp_opt = self.scala.Some(comp)
+            self.lowval_functions.add(comp)
         else:
             comp_opt = self.none
         return self.ast_extensions.SIFLowExp(

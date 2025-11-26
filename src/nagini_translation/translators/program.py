@@ -1399,6 +1399,11 @@ class ProgramTranslator(CommonTranslator):
 
         all_used_names = set(selected_names)
 
+        if ctx.sif:
+            # Hack: The Chopper does not know about dependencies introduced by Low AST nodes with domain function
+            # references, so we add all of them here to be safe.
+            all_used_names.update(self.viper.lowval_functions)
+
         ctx.current_function = None
 
         domains.append(self.type_factory.create_type_domain(type_funcs,
