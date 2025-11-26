@@ -120,8 +120,6 @@ class Silicon:
             '--exhaleMode=2',
             '--alternativeFunctionVerificationOrder',
             '--disableDefaultPlugins',
-            '--proverEnableResourceBounds',
-            '--proverResourcesPerMillisecond=10000',
             '--plugin=viper.silver.plugin.standard.refute.RefutePlugin:'
             'viper.silver.plugin.standard.termination.TerminationPlugin:'
             'viper.silver.plugin.standard.predicateinstance.PredicateInstancePlugin',

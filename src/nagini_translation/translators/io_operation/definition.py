@@ -8,7 +8,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """Translation of IO operation definition."""
 
 
-from typing import List, Tuple
+from typing import List, Set, Tuple
 
 from nagini_translation.lib.constants import EVAL_IO_SIGNATURE, PRIMITIVES
 from nagini_translation.lib.context import Context
@@ -40,7 +40,7 @@ class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
 
     def translate_io_operation(
             self, operation: PythonIOOperation,
-            ctx: Context) -> Tuple[Predicate, List[Function], List[Method]]:
+            ctx: Context) -> Tuple[Predicate, List[Function], List[Method], Set[str]]:
         """Translate IO operation to Silver.
 
         This means:
@@ -61,30 +61,42 @@ class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
         position = self.to_position(operation.node, ctx)
         info = self.no_info(ctx)
 
+        names = set()
+
         predicate = self.viper.Predicate(operation.sil_name, args, None,
                                          position, info)
+
+        names.add(operation.sil_name)
+
+        getter_names, getter_funcs = [], []
 
         getters = [
             self._construct_getter(
                 operation, result, args, position, info, ctx)
             for result in operation.get_results()]
 
+        if getters:
+            getter_names, getter_funcs = zip(*getters)
+            names.update(getter_names)
+
         if not operation.is_basic():
             self._translate_defining_getters(operation, ctx)
 
-        method = self._create_termination_check(operation, ctx)
+        method, method_name = self._create_termination_check(operation, ctx)
         checks = [method]
+        names.add(method_name)
 
         return (
             predicate,
-            getters,
+            list(getter_funcs),
             checks,
+            names
         )
 
     def _construct_getter(
             self, operation: PythonIOOperation, operation_result: PythonVar,
             args: List[VarDecl], position: Position,
-            info: Info, ctx: Context) -> Function:
+            info: Info, ctx: Context) -> Tuple[str, Function]:
         name = construct_getter_name(operation, operation_result)
         typ = self.translate_type(operation_result.type, ctx)
         if operation_result.type.name not in PRIMITIVES:
@@ -110,7 +122,7 @@ class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
                 posts.append(implication)
         getter = self.viper.Function(
             name, args, typ, [], posts, None, position, info)
-        return getter
+        return name, getter
 
     def _translate_defining_getters(
             self, main_operation: PythonIOOperation,
@@ -132,16 +144,13 @@ class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
 
     def _create_termination_check(
             self, operation: PythonIOOperation,
-            ctx: Context) -> Method:
+            ctx: Context) -> Tuple[Method, str]:
         """Create a termination check."""
         assert not ctx.current_function
         ctx.current_function = operation
 
         name = ctx.module.get_fresh_name(
             operation.sil_name + '__termination_check')
-        if operation.sil_name not in self.viper.used_names_sets:
-            self.viper.used_names_sets[operation.sil_name] = set()
-        self.viper.used_names_sets[operation.sil_name].add(name)
         parameters = [
             parameter.decl
             for parameter in operation.get_parameters()
@@ -183,7 +192,7 @@ class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
             name=name, args=parameters, returns=[], pres=pres, posts=[],
             locals=locals, body=body, position=self.no_position(ctx), info=info)
 
-        return result
+        return result, name
 
     def _create_typeof_pres(self, args,
                             ctx: Context):

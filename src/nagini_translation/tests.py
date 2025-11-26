@@ -40,7 +40,7 @@ import pytest
 import re
 import tokenize
 from collections import Counter
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 
 from nagini_translation.lib import config, jvmaccess
@@ -560,7 +560,7 @@ class VerificationTest(AnnotatedTest):
     def test_file(
             self, path: str, base: str, jvm: jvmaccess.JVM, verifier: ViperVerifier,
             sif: bool, reload_resources: bool, arp: bool, ignore_obligations: bool, store_viper: bool,
-            float_encoding: Optional[str]):
+            float_encoding: Optional[str], selection: Set[str]):
         """Test specific Python file."""
         config.obligation_config.disable_all = ignore_obligations
         annotation_manager = self.get_annotation_manager(path, verifier.name)
@@ -571,7 +571,7 @@ class VerificationTest(AnnotatedTest):
         abspath = os.path.abspath(path)
         absbase = os.path.abspath(base)
         modules, prog = translate(abspath, jvm, 8, base_dir=absbase, sif=sif, arp=arp, reload_resources=reload_resources,
-                                  float_encoding=float_encoding)
+                                  float_encoding=float_encoding, selected=selection)
         assert prog is not None
         if store_viper:
             import string
@@ -621,10 +621,10 @@ class VerificationTest(AnnotatedTest):
 _VERIFICATION_TESTER = VerificationTest()
 
 
-def test_verification(path, base, verifier, sif, reload_resources, arp, ignore_obligations, print, float_encoding):
+def test_verification(path, base, verifier, sif, reload_resources, arp, ignore_obligations, print, float_encoding, selection):
     """Execute provided verification test."""
     _VERIFICATION_TESTER.test_file(path, base, _JVM, verifier, sif, reload_resources, arp, ignore_obligations,
-                                   print, float_encoding)
+                                   print, float_encoding, selection)
 
 
 class TranslationTest(AnnotatedTest):

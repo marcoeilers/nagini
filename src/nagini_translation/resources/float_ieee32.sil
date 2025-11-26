@@ -16,7 +16,7 @@ function float___bool__(self: Ref): Bool
     decreases _
     requires self != null ==> issubtype(typeof(self), float())
     ensures self == null ==> !result
-    ensures result == (float___unbox__(self) != ___float32_zero())
+    ensures self != null ==> result == (float___unbox__(self) != ___float32_zero())
 
 function float___isNaN(f: Ref): Bool
     decreases _
