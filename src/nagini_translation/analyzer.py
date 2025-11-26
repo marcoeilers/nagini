@@ -939,8 +939,22 @@ class Analyzer(ast.NodeVisitor):
                 self.stmt_container.precondition.append(
                     (node.args[0], self._aliases.copy()))
             elif node.func.id == 'Ensures':
-                self.stmt_container.postcondition.append(
-                    (node.args[0], self._aliases.copy()))
+                if len(node.args) > 1:
+                    res_type = self.get_target(node.args[0], self.stmt_container)
+                    if self.current_function.type is None:
+                        raise InvalidProgramException(node, 'invalid.result')
+                    expected_type_name = self.current_function.type.python_class.name
+                    declared_type_name = res_type.name
+                    if expected_type_name != declared_type_name:
+                        raise InvalidProgramException(node, 'invalid.result.type')
+                    assert isinstance(node.args[1], ast.Lambda)
+                    if len(node.args[1].args.args) != 1:
+                        raise InvalidProgramException(node, 'invalid.result.type')
+                    self.stmt_container.postcondition.append(
+                        (node.args[1], self._aliases.copy()))
+                else:
+                    self.stmt_container.postcondition.append(
+                        (node.args[0], self._aliases.copy()))
             elif node.func.id == 'Decreases':
                 if not (isinstance(self.stmt_container, PythonMethod) and self.stmt_container.pure):
                     raise InvalidProgramException(node, 'invalid.contract.position')
