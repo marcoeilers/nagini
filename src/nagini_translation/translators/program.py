@@ -1371,12 +1371,15 @@ class ProgramTranslator(CommonTranslator):
                 if module is not module.global_module:
                     all_names.append(operation.sil_name)
                 self.track_dependencies(selected_names, selected, operation, ctx)
-                predicate, getters, checkers = self.translate_io_operation(
+                predicate, getters, checkers, names = self.translate_io_operation(
                     operation,
                     ctx)
                 predicates.append(predicate)
                 functions.extend(getters)
                 methods.extend(checkers)
+                for name in names:
+                    all_names.append(name)
+                    self.track_dependencies(selected_names, selected, operation, ctx, name)
 
         for root in predicate_families:
             self.track_dependencies(selected_names, selected, root, ctx)
