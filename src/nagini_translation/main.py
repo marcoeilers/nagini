@@ -151,14 +151,10 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
         global sil_programs
         sil_programs = load_sil_files(jvm, bv_size, sif, float_encoding)
     modules = [main_module.global_module] + list(analyzer.modules.values())
-    prog = translator.translate_program(modules, sil_programs, selected,
-                                        arp=arp, ignore_global=ignore_global, sif=sif, float_encoding=float_encoding)
+
     if sif:
         set_all_low_methods(jvm, viper_ast.all_low_methods)
         set_preserves_low_methods(jvm, viper_ast.preserves_low_methods)
-    if verbose:
-        print('Translation successful.')
-    if sif:
         configure_mpp_transformation(jvm,
                                      ctrl_opt=True,
                                      seq_opt=True,
@@ -166,11 +162,16 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
                                      func_opt=True,
                                      all_low=analyzer.has_all_low)
         if counterexample:
-            prog = getobject(jvm.java, jvm.viper.silicon.sif, 'CounterexampleSIFTransformerO').transform(prog, False)
+            sif_trafo = getobject(jvm.java, jvm.viper.silicon.sif, 'CounterexampleSIFTransformerO')
         else:
-            prog = getobject(jvm.java, jvm.viper.silver.sif, 'SIFExtendedTransformer').transform(prog, False)
-        if verbose:
-            print('Transformation to MPP successful.')
+            sif_trafo = getobject(jvm.java, jvm.viper.silver.sif, 'SIFExtendedTransformer')
+    else:
+        sif_trafo = None
+    prog = translator.translate_program(modules, sil_programs, selected, arp=arp, ignore_global=ignore_global,
+                                        sif=sif, sif_trafo=sif_trafo, float_encoding=float_encoding)
+
+    if verbose:
+        print('Translation successful.')
     if arp:
         prog = get_arp_plugin(jvm).before_verify(prog)
         if verbose:

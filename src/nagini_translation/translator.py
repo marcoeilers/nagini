@@ -91,7 +91,7 @@ class Translator:
                           ignore_global: bool = False,
                           arp: bool = False,
                           float_encoding : str = None,
-                          sif = False) -> 'silver.ast.Program':
+                          sif = False, sif_trafo = None) -> 'silver.ast.Program':
         ctx = Context()
         ctx.sif = sif
         ctx.current_class = None
@@ -100,7 +100,7 @@ class Translator:
         ctx.arp = arp
         ctx.float_encoding = float_encoding
         return self.prog_translator.translate_program(modules, sil_progs, ctx,
-                                                      selected, ignore_global)
+                                                      selected, ignore_global, sif_trafo)
 
     def translate_pythonvar_decl(self, var: PythonVar,
             module: PythonModule) -> 'silver.ast.LocalVarDecl':

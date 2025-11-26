@@ -1161,7 +1161,7 @@ class ProgramTranslator(CommonTranslator):
 
     def translate_program(self, modules: List[PythonModule], sil_progs: Program,
                           ctx: Context, selected: Set[str] = None,
-                          ignore_global: bool = False) -> Program:
+                          ignore_global: bool = False, sif_trafo = None) -> Program:
         """
         Translates the PythonModules created by the analyzer to a Viper program.
         """
@@ -1424,6 +1424,9 @@ class ProgramTranslator(CommonTranslator):
         prog = self.viper.Program(domains, fields, functions, predicates,
                                   methods, self.no_position(ctx),
                                   self.no_info(ctx))
+
+        if ctx.sif:
+            prog = sif_trafo.transform(prog, False)
 
         chopped_prog = self.viper.chopper.chop(prog, self.viper.to_set(all_used_names))
 
