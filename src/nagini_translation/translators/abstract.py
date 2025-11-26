@@ -33,13 +33,8 @@ from nagini_translation.lib.typedefs import (
     StmtsAndExpr,
 )
 from nagini_translation.lib.typeinfo import TypeInfo
-from nagini_translation.lib.util import (
-    get_surrounding_try_blocks,
-    InvalidProgramException,
-    UnsupportedException
-)
 from nagini_translation.lib.viper_ast import ViperAST
-from typing import List, Tuple, Union
+from typing import List, Set, Tuple, Union
 
 
 class TranslatorConfig:
@@ -149,6 +144,7 @@ class AbstractTranslator(metaclass=ABCMeta):
                 'ast.silver.Predicate',
                 List['ast.silver.Function'],
                 List['ast.silver.Method'],
+                Set[str]
                 ]:
         return self.config.io_operation_translator.translate_io_operation(
             operation,
@@ -307,9 +303,6 @@ class AbstractTranslator(metaclass=ABCMeta):
             targets: List[Expr], position: Position, info: Info,
             target_method: PythonMethod = None,
             target_node: ast.Call = None) -> List[Stmt]:
-        if target_method is not None:
-            if target_method.cls and target_method.cls.interface:
-                self.viper.mark_class_used(target_method.cls.sil_name)
         translator = self.config.obligation_translator
         return translator.create_method_call_node(
             ctx, methodname, args, targets, position, info, target_method,

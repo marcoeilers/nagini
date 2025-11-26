@@ -544,6 +544,8 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 if isinstance(body_type, PythonType):
                     return body_type
                 raise InvalidProgramException(node, 'invalid.let')
+            elif node.func.id == 'Reveal':
+                return get_type(node.args[0], containers, container)
             else:
                 raise UnsupportedException(node)
         elif node.func.id in BUILTINS:

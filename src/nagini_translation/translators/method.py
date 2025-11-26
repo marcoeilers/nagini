@@ -40,7 +40,8 @@ from nagini_translation.lib.util import (
     get_body_indices,
     get_parent_of_type,
     get_surrounding_try_blocks,
-    InvalidProgramException
+    InvalidProgramException,
+    UnsupportedException
 )
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
@@ -282,6 +283,7 @@ class MethodTranslator(CommonTranslator):
         Translates a pure Python function (may or not belong to a class) to a
         Viper function
         """
+
         old_function = ctx.current_function
         ctx.current_function = func
         self.bind_type_vars(func, ctx)
@@ -327,8 +329,14 @@ class MethodTranslator(CommonTranslator):
             body = self.translate_exprs(actual_body, func, ctx)
         ctx.current_function = old_function
         name = func.sil_name
+
+        # Create Function node and add opaque property if it exists
+        if func.opaque:
+            annotation = self.viper.AnnotationInfo("opaque", [])
+        else:
+            annotation = self.no_info(ctx)
         return self.viper.Function(name, args, type, pres, posts, body,
-                                   pos, self.no_info(ctx))
+                                   pos, annotation)
 
     def extract_contract(self, method: PythonMethod, errorvarname: str,
                          is_constructor: bool,
@@ -969,13 +977,9 @@ class MethodTranslator(CommonTranslator):
         no_pos = self.no_position(ctx)
         no_info = self.no_info(ctx)
 
-        used_names = set()
-        self.viper.used_names = used_names
-
         main = self._get_main_module(modules)
         main_method, locals, stmts = self._create_main_method_setup(modules, ctx)
         method_name = main_method.sil_name
-        self.viper.used_names_sets[method_name] = used_names
 
         # Translate statements in main module. When an import statement is encountered,
         # the translation will include executing the statements in the imported module.

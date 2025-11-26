@@ -1185,6 +1185,11 @@ class CallTranslator(CommonTranslator):
                                  arg_types)
                     receiver_class = receiver_target
                     is_predicate = False
+                elif target.interface:
+                    # Statically bound call to an interface method
+                    # Cannot be inlined; we translate like a normal call.
+                    receiver_class = receiver_target
+                    is_predicate = False
                 else:
                     # Statically bound call
                     is_super = get_func_name(node.func.value) == 'super'

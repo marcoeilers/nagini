@@ -661,15 +661,6 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         if self.interface:
             all_methods = list(self.functions.values())
             all_methods.extend(self.methods.values())
-            for method in all_methods:
-                requires = set()
-                for requirement in method.requires:
-                    target = self.get_func_or_method(requirement)
-                    if target:
-                        requires.add(target.sil_name)
-                    else:
-                        requires.add(requirement)
-                translator.set_required_names(method.sil_name, requires)
 
     def issubtype(self, cls: 'PythonClass') -> bool:
         if cls is self:
@@ -988,7 +979,8 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                  node_factory: 'ProgramNodeFactory',
                  interface: bool = False,
                  interface_dict: Dict[str, Any] = None,
-                 method_type: MethodType = MethodType.normal):
+                 method_type: MethodType = MethodType.normal,
+                 opaque: bool = False):
         """
         :param cls: Class this method belongs to, if any.
         :param superscope: The scope (class or module) this method belongs to
@@ -997,6 +989,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         implementation, just its contract
         :param interface: True iff the method implementation is provided in
         native Silver.
+        :param opaque: True iff ir's opaque
         """
         PythonNode.__init__(self, name, node)
         PythonScope.__init__(self, None, superscope)
@@ -1020,6 +1013,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.error_var = None  # infer
         self.declared_exceptions = OrderedDict()  # direct
         self.pure = pure
+        self.opaque = opaque
         self.predicate = False
         self.inline = False
         self.all_low = False
@@ -1033,7 +1027,6 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.node_factory = node_factory
         self.method_type = method_type
         self.obligation_info = None
-        self.requires = []
         self.type_vars = OrderedDict()
         self.setter = None
         self.func_constant = None
@@ -1069,10 +1062,6 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                                 translator)
         self.obligation_info = translator.create_obligation_info(self)
         if self.interface:
-            requires = set()
-            for requirement in self.requires:
-                requires.add(requirement)
-            translator.set_required_names(self.sil_name, requires)
             return
         func_type = self.module.types.get_func_type(self.scope_prefix)
         if self.type is not None:
@@ -1855,10 +1844,11 @@ class ProgramNodeFactory:
             container_factory: 'ProgramNodeFactory',
             interface: bool = False,
             interface_dict: Dict[str, Any] = None,
-            method_type: MethodType = MethodType.normal) -> PythonMethod:
+            method_type: MethodType = MethodType.normal,
+            opaque: bool = False) -> PythonMethod:
         return PythonMethod(name, node, cls, superscope, pure, contract_only,
                             container_factory, interface, interface_dict,
-                            method_type)
+                            method_type, opaque)
 
     def create_python_io_operation(self, name: str, node: ast.AST,
                                    superscope: PythonScope,
