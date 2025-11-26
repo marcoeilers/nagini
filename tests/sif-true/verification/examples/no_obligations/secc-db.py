@@ -22,9 +22,11 @@ FAILURE = 1
 def lookup(elems: List[Elem], key: int) -> Tuple[int, int]:
     Requires(Acc(list_pred(elems)))
     Requires(Low(len(elems)) and Low(key))
-    Requires(Forall(int, lambda i: (Implies(i >= 0 and i < len(elems), Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value))), [[elems[i]]])))
+    Requires(Forall(int, lambda i: (Implies(type(i) == int and i >= 0 and i < len(elems),
+                                            Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value))), [[elems[i]]])))
     Ensures(Acc(list_pred(elems)))
-    Ensures(Forall(int, lambda i: (Implies(i >= 0 and i < len(elems), Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value))), [[elems[i]]])))
+    Ensures(Forall(int, lambda i: (Implies(type(i) == int and i >= 0 and i < len(elems),
+                                           Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value))), [[elems[i]]])))
     Ensures(Implies(Result()[0] == SUCCESS, Low(Result()[1])))
     Ensures(Implies(Result()[0] == FAILURE, Result()[1] == -1))
     Ensures(Result()[0] == SUCCESS or Result()[0] == FAILURE)
@@ -33,8 +35,9 @@ def lookup(elems: List[Elem], key: int) -> Tuple[int, int]:
     while i < len(elems):
         Invariant(Acc(list_pred(elems)) and Low(len(elems)))
         Invariant(Low(i) and LowExit())
-        Invariant(i >= 0 and i <= len(elems))
-        Invariant(Forall(int, lambda j: (Implies(j >= 0 and j < len(elems), Acc(elems[j].key) and Acc(elems[j].value) and Low(elems[j].key) and Implies(elems[j].key is key, Low(elems[j].value))), [[elems[j]]])))
+        Invariant(type(i) == int and i >= 0 and i <= len(elems))
+        Invariant(Forall(int, lambda j: (Implies(type(j) == int and j >= 0 and j < len(elems),
+                                                 Acc(elems[j].key) and Acc(elems[j].value) and Low(elems[j].key) and Implies(elems[j].key is key, Low(elems[j].value))), [[elems[j]]])))
 
         if elems[i].key is key:
             return (SUCCESS, elems[i].value)
@@ -46,9 +49,11 @@ def binsearch(elems: List[Elem], from_: int, l: int, key: int) -> Tuple[int, int
     Requires(Acc(list_pred(elems)))
     Requires(Low(l) and Low(key) and Low(from_))
     Requires(0 <= from_ and from_ + l <= len(elems))
-    Requires(Forall(int, lambda i: (Implies(i >= 0 and i < len(elems), Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value))), [[elems[i]]])))
+    Requires(Forall(int, lambda i: (Implies(type(i) == int and i >= 0 and i < len(elems),
+                                            Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value))), [[elems[i]]])))
     Ensures(Acc(list_pred(elems)))
-    Ensures(Forall(int, lambda i: (Implies(i >= 0 and i < len(elems), Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value))), [[elems[i]]])))
+    Ensures(Forall(int, lambda i: (Implies(type(i) == int and i >= 0 and i < len(elems),
+                                           Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value))), [[elems[i]]])))
     Ensures(Implies(Result()[0] == SUCCESS, Low(Result()[1])))
     Ensures(Implies(Result()[0] == FAILURE, Result()[1] == -1))
     Ensures(Result()[0] == SUCCESS or Result()[0] == FAILURE)
@@ -74,18 +79,22 @@ def binsearch(elems: List[Elem], from_: int, l: int, key: int) -> Tuple[int, int
 def sum_all(elems: List[Elem], key: int) -> int:
     Requires(Acc(list_pred(elems)))
     Requires(Low(len(elems)) and Low(key))
-    Requires(Forall(int, lambda i: (Implies(i >= 0 and i < len(elems), Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value))), [[elems[i]]])))
+    Requires(Forall(int, lambda i: (Implies(type(i) == int and i >= 0 and i < len(elems),
+                                            Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value))), [[elems[i]]])))
     Ensures(Acc(list_pred(elems)))
-    Ensures(Forall(int, lambda i: (Implies(i >= 0 and i < len(elems), Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value))), [[elems[i]]])))
+    Ensures(Forall(int, lambda i: (Implies(type(i) == int and i >= 0 and i < len(elems),
+                                           Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value))), [[elems[i]]])))
     Ensures(Low(Result()))
 
     sum = 0
     i = 0
     while i < len(elems):
         Invariant(Acc(list_pred(elems)) and Low(len(elems)))
-        Invariant(i >= 0 and i <= len(elems))
+        Invariant(type(i) == int and i >= 0 and i <= len(elems))
         Invariant(Low(sum) and Low(i))
-        Invariant(Forall(int, lambda j: (Implies(j >= 0 and j < len(elems), Acc(elems[j].key) and Acc(elems[j].value) and Low(elems[j].key) and Implies(elems[j].key is key, Low(elems[j].value))), [[elems[j]]])))
+        Invariant(Forall(int, lambda j: (Implies(type(j) == int and j >= 0 and j < len(elems),
+                                                 Acc(elems[j].key) and
+                                                 Acc(elems[j].value) and Low(elems[j].key) and Implies(elems[j].key is key, Low(elems[j].value))), [[elems[j]]])))
 
         if elems[i].key is key:
             sum += elems[i].value
@@ -96,10 +105,12 @@ def sum_all(elems: List[Elem], key: int) -> int:
 def sum_all_rec(elems: List[Elem], from_: int, l: int, key: int, init: int) -> int:
     Requires(Acc(list_pred(elems)))
     Requires(Low(l) and Low(key) and Low(from_) and Low(init))
-    Requires(0 <= from_ and from_ + l <= len(elems))
-    Requires(Forall(int, lambda i: Implies(i >= 0 and i < len(elems), Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value)))))
+    Requires(type(from_) == int and 0 <= from_ and from_ + l <= len(elems))
+    Requires(Forall(int, lambda i: Implies(type(i) == int and i >= 0 and i < len(elems),
+                                           Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value)))))
     Ensures(Acc(list_pred(elems)))
-    Ensures(Forall(int, lambda i: Implies(i >= 0 and i < len(elems), Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value)))))
+    Ensures(Forall(int, lambda i: Implies(type(i) == int and i >= 0 and i < len(elems),
+                                          Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value)))))
     Ensures(Low(Result()))
 
     if l > 0:
@@ -115,16 +126,19 @@ def sum_all_rec(elems: List[Elem], from_: int, l: int, key: int, init: int) -> i
 def remove_all(elems: List[Elem], key: int) -> None:
     Requires(Acc(list_pred(elems)))
     Requires(Low(len(elems)) and Low(key))
-    Requires(Forall(int, lambda i: (Implies(i >= 0 and i < len(elems), Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value))), [[elems[i]]])))
+    Requires(Forall(int, lambda i: (Implies(type(i) == int and i >= 0 and i < len(elems),
+                                            Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value))), [[elems[i]]])))
     Ensures(Acc(list_pred(elems)))
-    Ensures(Forall(int, lambda i: (Implies(i >= 0 and i < len(elems), Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value))), [[elems[i]]])))
+    Ensures(Forall(int, lambda i: (Implies(type(i) == int and i >= 0 and i < len(elems),
+                                           Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value))), [[elems[i]]])))
 
     i = 0
     while i < len(elems):
         Invariant(Acc(list_pred(elems)) and Low(len(elems)))
-        Invariant(i >= 0 and i <= len(elems))
+        Invariant(type(i) == int and i >= 0 and i <= len(elems))
         Invariant(Low(i))
-        Invariant(Forall(int, lambda j: (Implies(j >= 0 and j < len(elems), Acc(elems[j].key) and Acc(elems[j].value) and Low(elems[j].key) and Implies(elems[j].key is key, Low(elems[j].value))), [[elems[j]]])))
+        Invariant(Forall(int, lambda j: (Implies(type(j) == int and j >= 0 and j < len(elems),
+                                                 Acc(elems[j].key) and Acc(elems[j].value) and Low(elems[j].key) and Implies(elems[j].key is key, Low(elems[j].value))), [[elems[j]]])))
 
         if elems[i].key is key:
             elems[i].value = 0
