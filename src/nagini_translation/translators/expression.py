@@ -685,7 +685,8 @@ class ExpressionTranslator(CommonTranslator):
                     not isinstance(node.ctx, ast.Store) and
                     self.is_local_variable(var, ctx)):
                 result = self.wrap_definedness_check(var.ref(node, ctx), var, node, ctx)
-            elif var is ctx.actual_function.result and ctx.actual_function.pure:
+            elif (isinstance(ctx.actual_function, PythonMethod) and
+                  var is ctx.actual_function.result and ctx.actual_function.pure):
                 pos = self.to_position(node, ctx)
                 info = self.no_info(ctx)
                 result = self.viper.Result(self.translate_type(ctx.actual_function.result.type, ctx), pos, info)
