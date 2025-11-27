@@ -49,6 +49,7 @@ from nagini_translation.lib.util import (
     find_loop_for_previous,
     get_func_name,
     InvalidProgramException,
+    isStr,
     OldExpressionTransformer,
     pprint,
     UnsupportedException,
@@ -301,9 +302,9 @@ class ContractTranslator(CommonTranslator):
         rec_type = self.get_type(node.args[0], ctx)
         if stmt:
             raise InvalidProgramException(node.args[0], 'purity.violated')
-        if not isinstance(node.args[1], ast.Str):
+        if not isStr(node.args[1]):
             raise InvalidProgramException(node.args[1], 'invalid.may.set')
-        field = rec_type.get_field(node.args[1].s)
+        field = rec_type.get_field(node.args[1].value)
         if not field:
             raise InvalidProgramException(node.args[1], 'invalid.may.set')
         may_set_pred = self.get_may_set_predicate(rec, field, ctx, pos)
@@ -330,9 +331,9 @@ class ContractTranslator(CommonTranslator):
         rec_type = self.get_type(node.args[0], ctx)
         if stmt:
             raise InvalidProgramException(node.args[0], 'purity.violated')
-        if not isinstance(node.args[1], ast.Str):
+        if not isStr(node.args[1]):
             raise InvalidProgramException(node.args[1], 'invalid.may.create')
-        field = rec_type.get_field(node.args[1].s)
+        field = rec_type.get_field(node.args[1].value)
         if not field:
             raise InvalidProgramException(node.args[1], 'invalid.may.create')
         return [], self.get_may_set_predicate(rec, field, ctx, pos)

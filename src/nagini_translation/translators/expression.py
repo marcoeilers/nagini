@@ -9,7 +9,6 @@ import ast
 import inspect
 
 from nagini_translation.lib.constants import (
-    BOOL_TYPE,
     BOXED_PRIMITIVES,
     BYTES_TYPE,
     CHECK_DEFINED_FUNC,
@@ -61,13 +60,18 @@ from nagini_translation.lib.util import (
     get_func_name,
     get_surrounding_try_blocks,
     InvalidProgramException,
+    isBytes,
+    isEllipsis,
+    isNameConstant,
+    isNum,
+    isStr,
     join_three_expressions,
     join_expressions,
     UnsupportedException,
 )
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Union
 from math import isnan, isinf
 
 
@@ -240,17 +244,17 @@ class ExpressionTranslator(CommonTranslator):
             sif_checks.append(self.viper.Assert(self.viper.Low(seq_len, None, low_pos, info), low_pos, info))
         return iter_stmt + [inhale] + sif_checks
 
-    def translate_Num(self, node: ast.Num, ctx: Context) -> StmtsAndExpr:
+    def translate_Num(self, node: ast.Constant, ctx: Context) -> StmtsAndExpr:
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
-        if isinstance(node.n, int):
-            lit = self.viper.IntLit(node.n, pos, info)
+        if isinstance(node.value, int):
+            lit = self.viper.IntLit(node.value, pos, info)
             int_class = ctx.module.global_module.classes[PRIMITIVE_INT_TYPE]
             boxed_lit = self.get_function_call(int_class, '__box__', [lit],
                                                [None], node, ctx)
             return [], boxed_lit
-        if isinstance(node.n, float):
-            return [], self.translate_float_literal(node.n, node, ctx)
+        if isinstance(node.value, float):
+            return [], self.translate_float_literal(node.value, node, ctx)
         raise UnsupportedException(node, 'Unsupported number literal')
 
     def translate_float_literal(self, lit: float, node: ast.AST, ctx: Context) -> Expr:
@@ -382,8 +386,8 @@ class ExpressionTranslator(CommonTranslator):
             stmt.append(self.viper.FieldAssign(field_acc, content_seq, position, info))
         return stmt, result
 
-    def translate_Str(self, node: ast.Str, ctx: Context) -> StmtsAndExpr:
-        return [], self.translate_string(node.s, node, ctx)
+    def translate_Str(self, node: ast.Constant, ctx: Context) -> StmtsAndExpr:
+        return [], self.translate_string(node.value, node, ctx)
 
     def translate_string(self, s: str, node: ast.AST, ctx: Context) -> Expr:
         length = len(s)
@@ -404,7 +408,7 @@ class ExpressionTranslator(CommonTranslator):
         return call
 
 
-    def translate_Bytes(self, node: ast.Bytes, ctx: Context) -> StmtsAndExpr:
+    def translate_Bytes(self, node: ast.Constant, ctx: Context) -> StmtsAndExpr:
         elems = []
         for c in node.s:
             lit = self.viper.IntLit(c, self.to_position(node, ctx),
@@ -1202,19 +1206,19 @@ class ExpressionTranslator(CommonTranslator):
 
     def translate_Constant(self, node: 'ast.Constant', ctx: Context) -> StmtsAndExpr:
         # Compatibility with Python 3.8; ast.Constant replaces all of the other node types mentioned below.
-        if isinstance(node.value, (bool, type(None))):
+        if isNameConstant(node):
             return self.translate_NameConstant(node, ctx)
-        if isinstance(node.value, (int, float, complex)):
+        if isNum(node):
             return self.translate_Num(node, ctx)
-        if isinstance(node.value, str):
+        if isStr(node):
             return self.translate_Str(node, ctx)
-        if isinstance(node.value, bytes):
+        if isBytes(node):
             return self.translate_Bytes(node, ctx)
-        if isinstance(node.value, type(...)):
+        if isEllipsis(node):
             return self.translate_Ellipsis(node, ctx)
         raise UnsupportedException(node)
 
-    def translate_NameConstant(self, node: ast.NameConstant,
+    def translate_NameConstant(self, node: ast.Constant,
                                ctx: Context) -> StmtsAndExpr:
         if node.value is True:
             return ([], self.viper.TrueLit(self.to_position(node, ctx),

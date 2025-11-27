@@ -19,6 +19,7 @@ from nagini_translation.lib.util import (
     flatten,
     get_func_name,
     InvalidProgramException,
+    isStr,
     UnsupportedException,
 )
 from nagini_translation.translators.abstract import Context
@@ -112,7 +113,7 @@ class PureTranslator(CommonTranslator):
 
     def translate_pure_Expr(self, conds: List, node: ast.Expr,
                             ctx: Context) -> List[Wrapper]:
-        if isinstance(node.value, ast.Str):
+        if isStr(node.value):
             # Ignore docstrings.
             return []
         if isinstance(node.value, ast.Call) and get_func_name(node.value) in CONTRACT_WRAPPER_FUNCS:

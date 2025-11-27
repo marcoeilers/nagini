@@ -1,28 +1,27 @@
 # This workflow will install Python dependencies, run tests and lint with a single version of Python
 # For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-name: Nagini Basic Tests Windows Python 3.11
+name: Nagini Minimal Tests Ubuntu Python 3.9
 
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build:
 
-    runs-on: windows-latest
+    runs-on: ubuntu-22.04
     env:
       BOOGIE_EXE: "/home/runner/.dotnet/tools/boogie"
     steps:
     - uses: actions/checkout@v2
-    - name: Set up Java 17
-      uses: actions/setup-java@v4.4.0
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v3
       with:
-        java-version: 17
-        distribution: oracle
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v2
-      with:
-        python-version: "3.11"
+        python-version: "3.9"
         architecture: "x64"
+    - name: Setup .NET
+      uses: xt0rted/setup-dotnet@v1.5.0
+      with:
+        dotnet-version: 6.0.x
     - name: Install Boogie
       run: |
         dotnet tool install --global Boogie --version 2.15.9
@@ -30,8 +29,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install setuptools==68.2.0
-        pip install pytest
         pip install .
     - name: Test with pytest
       run: |
-        pytest -v -p no:faulthandler src/nagini_translation/tests.py --silicon --functional
+        pytest -v -p no:faulthandler src/nagini_translation/tests.py --silicon --minimal

@@ -11,7 +11,10 @@ import copy
 from nagini_translation.lib.constants import BOOL_TYPE
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import PythonMethod
-from nagini_translation.lib.util import InvalidProgramException
+from nagini_translation.lib.util import (
+    InvalidProgramException,
+    isStr
+)
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
 from toposort import toposort_flatten
@@ -121,7 +124,7 @@ class PredicateTranslator(CommonTranslator):
             actual_body_start = 0
             while (actual_body_start < len(instance.node.body) and
                        isinstance(instance.node.body[actual_body_start], ast.Expr) and
-                    isinstance(instance.node.body[actual_body_start].value, ast.Str)):
+                    isStr(instance.node.body[actual_body_start].value)):
                 actual_body_start += 1
             if len(instance.node.body[actual_body_start:]) != 1:
                 raise InvalidProgramException(instance.node,

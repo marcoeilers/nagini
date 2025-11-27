@@ -42,6 +42,7 @@ from nagini_translation.lib.util import (
     get_parent_of_type,
     get_surrounding_try_blocks,
     InvalidProgramException,
+    isEllipsis,
     UnsupportedException
 )
 from nagini_translation.translators.abstract import Context
@@ -108,7 +109,7 @@ class MethodTranslator(CommonTranslator):
                     if cond_stmt:
                         raise InvalidProgramException(args[1], 'purity.violated')
                 measure_node = args[0]
-                if isinstance(measure_node, ast.NameConstant) and measure_node.value is None:
+                if isinstance(measure_node, ast.Constant) and measure_node.value is None:
                     decreases_clause = self.viper.DecreasesWildcard(condition, pos, info)
                 else:
                     measure = None
@@ -334,7 +335,7 @@ class MethodTranslator(CommonTranslator):
         actual_body = statements[start:end]
         if (func.contract_only or
                 (len(actual_body) == 1 and isinstance(actual_body[0], ast.Expr) and
-                 isinstance(actual_body[0].value, ast.Ellipsis))):
+                 isEllipsis(actual_body[0].value))):
             body = None
         else:
             body = self.translate_exprs(actual_body, func, ctx)
