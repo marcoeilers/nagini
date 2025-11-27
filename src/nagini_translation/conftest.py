@@ -25,6 +25,8 @@ _TRANSLATION_TESTS_SUFFIX = 'translation'
 _VERIFICATION_TESTS_SUFFIX = 'verification'
 
 _FUNCTIONAL_TESTS_DIR = 'tests/functional/'
+_MINIMAL_TESTS_DIR = 'tests/minimal/'
+_FUNCTIONAL_EXAMPLES_TESTS_DIR = 'tests/functional/verification/examples'
 _SIF_TRUE_TESTS_DIR = 'tests/sif-true/'
 _SIF_POSS_TESTS_DIR = 'tests/sif-poss/'
 _SIF_PROB_TESTS_DIR = 'tests/sif-prob/'
@@ -60,6 +62,8 @@ class PyTestConfig:
             self.force_product = True
         if test == 'functional':
             self._add_test_dir(_FUNCTIONAL_TESTS_DIR)
+        elif test == 'minimal':
+            self._add_test_dir(_MINIMAL_TESTS_DIR)
         elif test == 'sif-true':
             self._add_test_dir(_SIF_TRUE_TESTS_DIR)
         elif test == 'sif-poss':
@@ -131,6 +135,7 @@ def pytest_addoption(parser: 'pytest.config.Parser'):
     parser.addoption('--single-test', dest='single_test', action='store', default=None)
     parser.addoption('--all-tests', dest='all_tests', action='store_true')
     parser.addoption('--functional', dest='functional', action='store_true')
+    parser.addoption('--minimal', dest='minimal', action='store_true')
     parser.addoption('--functional-product', dest='functional_product', action='store_true')
     parser.addoption('--sif-true', dest='sif_true', action='store_true')
     parser.addoption('--sif-poss', dest='sif_poss', action='store_true')
@@ -154,6 +159,8 @@ def pytest_configure(config: 'pytest.config.Config'):
     else:
         if config.option.functional:
             tests.append('functional')
+        if config.option.minimal:
+            tests.append('minimal')
         if config.option.sif_true:
             tests.append('sif-true')
         if config.option.sif_poss:
