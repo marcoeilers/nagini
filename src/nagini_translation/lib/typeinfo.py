@@ -291,9 +291,10 @@ class TypeInfo:
         result.export_types = True
         result.preserve_asts = True
         result.warn_no_return = False
-        result.incremental = False
-        # This is an experimental feature atm and you actually have to
-        # enable it like this
+        result.incremental = True
+        # Since we run mypy twice with different options, we use different cache dirs for different configurations,
+        # otherwise Mypy throws away the cache every time.
+        result.cache_dir = '.mypy_cache_strict' if strict_optional else '.mypy_cache_nonstrict'
         return result
 
     def check(self, filename: str, base_dir: str = None) -> bool:
