@@ -10,7 +10,6 @@ import ast
 from nagini_translation.lib.constants import (
     END_LABEL,
     ERROR_NAME,
-    FILE_VAR,
     GLOBAL_VAR_FIELD,
     MAIN_METHOD_NAME,
     MODULE_VARS,
@@ -18,12 +17,12 @@ from nagini_translation.lib.constants import (
     OBJECT_TYPE,
     PRIMITIVES,
     STRING_TYPE,
+    TYPE_TYPE,
 )
 from nagini_translation.lib.program_nodes import (
     GenericType,
     MethodType,
     PythonExceptionHandler,
-    PythonField,
     PythonMethod,
     PythonModule,
     PythonTryBlock,
@@ -228,8 +227,12 @@ class MethodTranslator(CommonTranslator):
                         continue
                     if func.method_type == MethodType.class_method:
                         cls_arg = arg.ref()
+                        type_type = ctx.module.global_module.classes[TYPE_TYPE]
+                        type_check = self.type_factory.type_check(
+                            cls_arg, type_type, self.no_position(ctx), ctx)
+                        pres.append(type_check)
                         type_check = self.type_factory.subtype_check(
-                            cls_arg, func.cls, self.no_position(ctx), ctx)
+                            self.to_type(cls_arg, ctx), func.cls, self.no_position(ctx), ctx)
                         pres.append(type_check)
                         continue
                 type_check = self.get_parameter_typeof(arg, ctx)
@@ -638,7 +641,7 @@ class MethodTranslator(CommonTranslator):
                                                  block.error_var.ref(), pos,
                                                  info)
         error_case.append(value_assign)
-        error_type = self.type_factory.typeof(block.error_var.ref(), ctx)
+        error_type = self.to_ref(self.type_factory.typeof(block.error_var.ref(), ctx), ctx)
         type_assign = self.viper.LocalVarAssign(type_var.ref(), error_type,
                                                 pos, info)
         error_case.append(type_assign)
