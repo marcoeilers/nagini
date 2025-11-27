@@ -498,6 +498,8 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 if isinstance(body_type, PythonType):
                     return body_type
                 raise InvalidProgramException(node, 'invalid.let')
+            elif node.func.id == 'Reveal':
+                return get_type(node.args[0], containers, container)
             else:
                 raise UnsupportedException(node)
         elif node.func.id in BUILTINS:
@@ -563,6 +565,7 @@ def _get_subscript_type(value_type: PythonType, module: PythonModule,
                 raise UnsupportedException(node, 'tuple slicing')
             if len(value_type.type_args) == 1:
                 return value_type.type_args[0]
+            index = None
             if isinstance(node.slice, ast.UnaryOp):
                 if (isinstance(node.slice.op, ast.USub) and
                         isinstance(node.slice.operand, ast.Num)):
@@ -571,7 +574,10 @@ def _get_subscript_type(value_type: PythonType, module: PythonModule,
                     raise UnsupportedException(node, 'dynamic subscript type')
             elif isinstance(node.slice, ast.Num):
                 index = node.slice.n
-            return value_type.type_args[index]
+            if index is not None:
+                return value_type.type_args[index]
+            else:
+                return common_supertype(value_type.type_args)
         else:
             return common_supertype(value_type.type_args)
     elif value_type.name == LIST_TYPE:

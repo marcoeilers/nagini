@@ -389,8 +389,12 @@ class ExpressionTranslator(CommonTranslator):
         length = len(s)
         length_arg = self.viper.IntLit(length, self.no_position(ctx),
                                        self.no_info(ctx))
-        val_arg = self.viper.IntLit(self._get_string_value(s),
-                                    self.no_position(ctx), self.no_info(ctx))
+        elements = [self.viper.IntLit(ord(c), self.no_position(ctx), self.no_info(ctx)) for c in s]
+
+        if elements:
+            val_arg = self.viper.ExplicitSeq(elements, self.no_position(ctx), self.no_info(ctx))
+        else:
+            val_arg = self.viper.EmptySeq(self.viper.Int, self.no_position(ctx), self.no_info(ctx))
         args = [length_arg, val_arg]
         arg_types = [None, None]
         str_type = ctx.module.global_module.classes[STRING_TYPE]
@@ -681,6 +685,11 @@ class ExpressionTranslator(CommonTranslator):
                     not isinstance(node.ctx, ast.Store) and
                     self.is_local_variable(var, ctx)):
                 result = self.wrap_definedness_check(var.ref(node, ctx), var, node, ctx)
+            elif (isinstance(ctx.actual_function, PythonMethod) and
+                  var is ctx.actual_function.result and ctx.actual_function.pure):
+                pos = self.to_position(node, ctx)
+                info = self.no_info(ctx)
+                result = self.viper.Result(self.translate_type(ctx.actual_function.result.type, ctx), pos, info)
             else:
                 result = var.ref(node, ctx)
             return [], result
@@ -993,7 +1002,11 @@ class ExpressionTranslator(CommonTranslator):
             return stmt, result
         
         if left_type == right_type or isinstance(right_type, TypeVar):
-            call_stmt, call = self.get_func_or_method_call(left_type, LEFT_OPERATOR_FUNCTIONS[type(node.op)], [left, right], [left_type, right_type], node, ctx)
+            func_name = LEFT_OPERATOR_FUNCTIONS[type(node.op)]
+            if (isinstance(node.op, ast.Pow) and left_type.python_class.name == INT_TYPE and
+                    isinstance(node.right, ast.Constant) and isinstance(node.right.value, int)):
+                func_name = "__pow_unrolled__"
+            call_stmt, call = self.get_func_or_method_call(left_type, func_name, [left, right], [left_type, right_type], node, ctx)
             if call is None:
                 raise UnsupportedException(node, "Unsupported binary operator")
             return stmt + call_stmt, call

@@ -225,8 +225,17 @@ function int___pow__(self: Int, other: Int): Int
     decreases _
     requires @error("** is currently only supported for non-negative exponents.")(other >= 0)
 {
-    ___pow(self, other)
+    other == 0 ? 1 :
+      (other == 1 ? self :
+        (other == 2 ? self * self :
+          self * int___pow__(self, other - 1)))
 }
+
+function int___pow_unrolled__(self: Int, other: Int): Int
+    decreases _
+    requires @error("** is currently only supported for non-negative exponents.")(other >= 0)
+    ensures result == int___pow__(self, other)
+    ensures result == ___pow(self, other)
 
 domain ____pow_helper {
   function ___pow(Int, Int): Int
