@@ -337,9 +337,15 @@ class TypeInfo:
                     if i in fl:
                         imports_not_handled.remove(i)
                         for ii in fl[i][0].imports:
-                            if ii.id not in IGNORED_IMPORTS:
-                                imports_not_handled.add(ii.id)
-                                directly_imported.add(ii.id)
+                            ids = []
+                            if isinstance(ii, mypy.build.Import):
+                                ids.extend([id for id, _ in ii.ids])
+                            else:
+                                ids.append(ii.id)
+                            for id in ids:
+                                if id not in IGNORED_IMPORTS:
+                                    imports_not_handled.add(id)
+                                    directly_imported.add(id)
                 if id == '__main__' or id == module_name:
                     imports_not_handled.add(id)
                     directly_imported.add(id)
