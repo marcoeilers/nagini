@@ -101,3 +101,17 @@ def caller_1(t: Tuple[int, int], t2: Tuple[int, str]) -> None:
     #:: ExpectedOutput(application.precondition:assertion.false)
     umm = cast(Tuple[int, ...], t2)
 
+def dynamic_index(t: Tuple[int, bool, int], i: int) -> int:
+  Requires(0 <= i and i < 3)
+  #:: ExpectedOutput(postcondition.violated:assertion.false)
+  Ensures(Result() >= 5)
+  j: int = t[i]
+  return j + 5
+
+def dynamic_index2(t: Tuple[int, bool, int], i: int) -> int:
+  Requires(0 <= i and i < 3)
+  Requires(t[0] >= 0 and t[2] >= 0)
+  Ensures(Result() >= 5)
+  j: int = t[i]
+  k: bool = t[i] == 34
+  return j + 5

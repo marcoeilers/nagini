@@ -22,11 +22,11 @@ UNBOX_BOOL = 'bool___unbox__%limited'
 UNBOX_PSEQ = 'PSeq___sil_seq__%limited'
 TYPEOF = 'typeof<PyType>'
 SNAP_TO = '$SortWrappers.'
-SEQ_LENGTH = 'seq_ref_length<Int>'
-SEQ_INDEX = 'seq_ref_index<Ref>'
 SET_CARD = 'Set_card'
 DICT_GET = 'Map_apply'
 MAP_CARD = 'Map_card'
+SEQ_LENGTH = 'Seq_length'
+SEQ_INDEX = 'Seq_index'
 
 
 UNIT = '$Snap.unit'
@@ -167,6 +167,10 @@ def evaluate_term(jvm, term, model):
         return str(model[key])
     elif isinstance(term, jvm.viper.silicon.state.terms.App):
         fname = str(term.applicable().id()) + '%limited'
+        if fname == 'str___create__%limited':
+            seq_arg = list(ScalaIterableWrapper(term.args()))[2]
+            seq_val = evaluate_term(jvm, seq_arg, model)
+            return '"' + seq_val + '"'
         if fname not in model:
             fname = str(term.applicable().id())
             if fname not in model:
@@ -200,6 +204,19 @@ def evaluate_term(jvm, term, model):
         psf_value = evaluate_term(jvm, term.psf(), model)
         snap_value = evaluate_term(jvm, snap, model)
         return get_func_value(model, lookup_func_name, (psf_value, snap_value))
+    elif isinstance(term, jvm.viper.silicon.state.terms.SeqAppend):
+        p0_val = evaluate_term(jvm, term.p0(), model)
+        p1_val = evaluate_term(jvm, term.p1(), model)
+        return p0_val + p1_val
+    elif isinstance(term, jvm.viper.silicon.state.terms.SeqSingleton):
+        p_val = evaluate_term(jvm, term.p(), model)
+        try:
+            p_int_val = int(p_val)
+            return chr(p_int_val)
+        except ValueError:
+            return "?"
+    elif isinstance(term, jvm.viper.silicon.state.terms.SeqNil):
+        return ""
     raise Exception(str(term))
 
 
@@ -487,6 +504,9 @@ class Converter:
                 return self.parse_bool(val)
             if t.python_class.name == '__prim__Seq':
                 raise Exception # TODO
+        if t.python_class.name == 'str':
+            if val.startswith('"') and val.endswith('"'):
+                return val
         if t.python_class.name == 'int':
             return self.convert_int_value(val)
         elif t.python_class.name == 'bool':
@@ -720,6 +740,8 @@ class Converter:
             # TODO: handle properly
             return False
         if isinstance(t, PythonType) and not isinstance(t, GenericType) and t.python_class.type_vars:
+            if t.sil_name not in self.model:
+                return False
             arg_options, els = self.get_type_vals(t)
             for _,option in arg_options:
                 bool_or_none = self.get_func_value(ISSUBTYPE, (val_type, option))
