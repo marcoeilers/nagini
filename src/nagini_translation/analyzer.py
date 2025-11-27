@@ -8,10 +8,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import ast
 import logging
 import os
-import re
 import nagini_contracts.io_builtins
 import nagini_contracts.lock
-import tokenize
 
 from collections import OrderedDict
 from nagini_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
@@ -63,6 +61,7 @@ from nagini_translation.lib.util import (
     get_parent_of_type,
     InvalidProgramException,
     is_io_existential,
+    read_source_file,
     UnsupportedException,
 )
 from nagini_translation.lib.views import PythonModuleView
@@ -123,24 +122,6 @@ class Analyzer(ast.NodeVisitor):
             self._node_factory = ProgramNodeFactory()
         return self._node_factory
 
-    def preprocess_text(self, text: str, comment_prefix: str) -> str:
-        """
-        Preprocesses the file text by transforming special comments into code.
-        Comments starting with the specified prefix will be converted to regular code.
-        """
-        # Pattern: (whitespace)(comment_pattern)(optional space)(rest of line)
-        escaped_prefix = re.escape(comment_prefix)
-        pattern = re.compile(r'^(\s*)' + escaped_prefix + r' ?(.*)')
-        
-        def process_line(line: str) -> str:
-            match = pattern.match(line)
-            if match:
-                # Return indentation + code
-                return match.group(1) + match.group(2)
-            return line
-        
-        return '\n'.join(process_line(line) for line in text.split('\n'))
-
     def define_new(self, container: Union[PythonModule, PythonClass],
                    name: str, node: ast.AST) -> None:
         """
@@ -174,13 +155,8 @@ class Analyzer(ast.NodeVisitor):
             # This is a module that corresponds to a directory, so it has no
             # contents of its own.
             return
-        with tokenize.open(abs_path) as file:
-            text = file.read()
         
-        # Preprocess the text to transform special comments into code
-        if self.enable_preprocessing:
-            text = self.preprocess_text(text, self.comment_pattern)
-        
+        text = read_source_file(abs_path)        
         parse_result = ast.parse(text)
         try:
             mark_text_ranges(parse_result, text)
@@ -904,14 +880,6 @@ class Analyzer(ast.NodeVisitor):
     def visit_arg(self, node: ast.arg) -> None:
         assert self.current_function is not None
         node_type = self.typeof(node)
-        if isinstance(node.annotation, ast.Name) and node.annotation.id in ('PInt', 'PBool'):
-            if node.annotation.id == 'PInt':
-                assert node_type.name == 'int'
-                node_type = node_type.module.classes['__prim__int']
-            elif node.annotation.id == 'PBool':
-                assert node_type.name == 'bool'
-                node_type = node_type.module.classes['__prim__bool']
-
         self.current_function.args[node.arg] = \
             self.node_factory.create_python_var(node.arg, node, node_type)
         # If we just introduced new type variables, create the expression that

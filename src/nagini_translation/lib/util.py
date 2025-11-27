@@ -7,6 +7,9 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import ast
 import astunparse
+import re
+import tokenize
+from nagini_translation.lib import config
 
 from typing import (
     Any,
@@ -22,6 +25,32 @@ from typing import (
 T = TypeVar('T')
 V = TypeVar('V')
 
+
+def preprocess_text(text: str, comment_prefix: str) -> str:
+    """
+    Preprocesses the file text by transforming special comments into code.
+    Comments starting with the specified prefix will be converted to regular code.
+    """
+    # Pattern: (whitespace)(comment_prefix)(optional space)(rest of line)
+    escaped_prefix = re.escape(comment_prefix)
+    pattern = re.compile(r'^(\s*)' + escaped_prefix + r' ?(.*)')
+    
+    def process_line(line: str) -> str:
+        match = pattern.match(line)
+        if match:
+            # Return indentation + code
+            return match.group(1) + match.group(2)
+        return line
+    
+    return '\n'.join(process_line(line) for line in text.split('\n'))
+
+def read_source_file(path: str) -> str:
+    with tokenize.open(path) as file:
+        text = file.read()
+    
+    if config.enable_preprocessing:
+        text = preprocess_text(text, config.comment_pattern)
+    return text
 
 def flatten(lists: List[List[T]]) -> List[T]:
     """

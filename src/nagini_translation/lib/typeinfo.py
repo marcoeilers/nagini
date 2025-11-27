@@ -296,10 +296,10 @@ class TypeInfo:
         # enable it like this
         return result
 
-    def check(self, filename: str, base_dir: str = None) -> bool:
+    def check(self, filename: str, base_dir: str = None, text: Optional[str] = None) -> bool:
         """
         Typechecks the given file and collects all type information needed for
-        the translation to Viper
+        the translation to Viper. Optionally pass preprocessed text content.
         """
 
         def report_errors(errors: List[str]) -> None:
@@ -320,7 +320,7 @@ class TypeInfo:
         try:
             options_strict = self._create_options(True)
             res_strict = mypy.build.build(
-                [BuildSource(filename, module_name, None, base_dir=base_dir)],
+                [BuildSource(filename, module_name, text, base_dir=base_dir)],
                 options_strict
                 )
 
@@ -329,7 +329,7 @@ class TypeInfo:
                 # s.t. we don't get overapproximated none-related errors.
                 options_non_strict = self._create_options(False)
                 res_non_strict = mypy.build.build(
-                    [BuildSource(filename, module_name, None, base_dir=base_dir)],
+                    [BuildSource(filename, module_name, text, base_dir=base_dir)],
                     options_non_strict
                 )
                 if res_non_strict.errors:

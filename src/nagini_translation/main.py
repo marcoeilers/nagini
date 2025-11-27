@@ -21,6 +21,7 @@ from jpype._jexception import JException
 from nagini_translation.analyzer import Analyzer
 from nagini_translation.sif_translator import SIFTranslator
 from nagini_translation.lib import config
+from nagini_translation.lib.util import read_source_file
 from nagini_translation.lib.constants import DEFAULT_SERVER_SOCKET
 from nagini_translation.lib.errors import error_manager
 from nagini_translation.lib.jvmaccess import (
@@ -126,8 +127,9 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
         raise Exception('Viper not found on classpath.')
     if sif and not viper_ast.is_extension_available():
         raise Exception('Viper AST SIF extension not found on classpath.')
+    
     types = TypeInfo()
-    type_correct = types.check(path, base_dir)
+    type_correct = types.check(path, base_dir, text=read_source_file(path))
     if not type_correct:
         return None
 
