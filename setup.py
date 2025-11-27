@@ -24,7 +24,7 @@ setup(
             'distribute',
             ],
         install_requires=[
-            'mypy==0.782',
+            'mypy==0.900',
             'toposort==1.5',
             'typed-ast==1.5.0',
             'jpype1==1.4.0',
