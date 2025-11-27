@@ -7,7 +7,6 @@ Dependencies (Ubuntu Linux)
 ===================================
 
 1.  Install Java 11 or newer (64 bit) and a Python version between Python 3.9 and 3.12 (64 bit, newer versions *will not work*).
-    Note that we have observed worse performance with newer Python versions, in particular 3.12, so we recommend using older versions.
 
 2.  Install the the required libraries, in particular, python3.x-dev.
 
@@ -17,7 +16,6 @@ Dependencies (Windows)
 ==========================
 
 1.  Install Java 11 or newer (64 bit) and a Python version between Python 3.9 and 3.12 (64 bit, newer versions *will not work*).
-    Note that we have observed significantly worse performance with newer Python versions, in particular 3.12, so we recommend using older versions.
 
 2.  Install the required version of either Visual C++ Build Tools or Visual Studio.
 
@@ -53,9 +51,9 @@ Execute the following commands (on Windows, you may have to use ``cmd`` and not 
         cd nagini
         pip install .
 
-4.  Optionally, try running the tests::
+4.  Optionally, try running some tests::
 
-        pytest -v -p no:faulthandler src/nagini_translation/tests.py --silicon
+        pytest -v -p no:faulthandler src/nagini_translation/tests.py --silicon --minimal
 
 Command Line Usage
 ==================
