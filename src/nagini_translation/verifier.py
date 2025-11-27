@@ -119,6 +119,7 @@ class Silicon:
             '--disableCatchingExceptions',
             '--exhaleMode=2',
             '--alternativeFunctionVerificationOrder',
+            '--z3ResourcesPerMillisecond=9000',
             '--disableDefaultPlugins',
             '--plugin=viper.silver.plugin.standard.refute.RefutePlugin:'
             'viper.silver.plugin.standard.termination.TerminationPlugin:'
