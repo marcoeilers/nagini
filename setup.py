@@ -26,6 +26,7 @@ setup(
         install_requires=[
             'mypy==0.782',
             'toposort==1.5',
+            'typed-ast==1.5.0',
             'jpype1==1.4.0',
             'astunparse==1.6.2',
             'pytest==7.0.0',
