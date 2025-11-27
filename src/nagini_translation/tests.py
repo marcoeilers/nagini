@@ -235,7 +235,7 @@ class ErrorMatchingAnnotationMixIn:
 
     def match(self, error: Error) -> bool:
         """Check is error matches this annotation."""
-        return (self._id == error.full_id.replace(', ', '; ') and
+        return (self._id == error.full_id.replace(', ', '; ').replace('"', "'") and
                 self.line == error.line and
                 self.get_vias() == error.get_vias())
 
