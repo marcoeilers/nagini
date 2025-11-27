@@ -15,7 +15,9 @@ Dependencies (Windows)
 
 1.  Install Java 11 or newer (64 bit) and Python 3.12 (64 bit, other versions likely *will not work*).
 
-2.  Install the required version of either Visual C++ Build Tools or Visual Studio. 
+2.  Install the required version of either Visual C++ Build Tools or Visual Studio.
+
+3.  For usage with Viper's verification condition generation backend Carbon, you will also need to install Boogie (version 2.15.9).
 
 Note that we have observed *significantly* worse performance when using Nagini on Windows on some
 systems. We currently do not know why this happens, but will investigate the issue when possible.

@@ -178,7 +178,9 @@ domain tuple_types {
   }
 
   axiom tuple_self_subtype {
-    (forall seq1: Seq[PyType], seq2: Seq[PyType] ::seq1 != seq2 &&
+    (forall seq1: Seq[PyType], seq2: Seq[PyType] ::
+      {issubtype(tuple(seq1), tuple(seq2))}
+      seq1 != seq2 &&
       |seq1| == |seq2| &&
       (forall i: Int ::i >= 0 && i < |seq1| ==> issubtype(seq1[i], seq2[i])) ==>
       issubtype(tuple(seq1), tuple(seq2)))

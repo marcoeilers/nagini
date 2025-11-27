@@ -64,6 +64,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         Creates non-initialized IO operation from an AST node and adds
         it to the module.
         """
+        self._parent._enable_obligations = True
         name = node.name
         assert isinstance(name, str)
         operation = self._node_factory.create_python_io_operation(

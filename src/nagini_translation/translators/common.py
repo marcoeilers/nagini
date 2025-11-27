@@ -113,11 +113,11 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         return e.isPure()
 
     def to_type(self, e: Expr, t, ctx) -> Expr:
-        if t is self.viper.Ref:
+        if t == self.viper.Ref:
             return self.to_ref(e, ctx)
-        if t is self.viper.Int:
+        if t == self.viper.Int:
             return self.to_int(e, ctx)
-        if t is self.viper.Bool:
+        if t == self.viper.Bool:
             return self.to_bool(e, ctx)
         return e
 
@@ -551,7 +551,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             call = self.get_method_call(receiver, func_name, args, arg_types, [val], node,
                                         ctx)
             return call, val
-        return [], None
+        raise UnsupportedException(node, f"Unsupported function or method {func_name} in type {receiver.name}")
 
     def get_quantifier_lhs(self, in_expr: Expr, dom_type: PythonType, dom_arg: Expr,
                            node: ast.AST, ctx: Context, position: Position,
