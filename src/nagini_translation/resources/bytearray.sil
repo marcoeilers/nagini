@@ -42,8 +42,10 @@ method bytearray___initFromList__(values: Ref) returns (res: Ref)
     ensures Low(values) ==> Low(res)
 
 function bytearray_hex(self: Ref): Ref
+    decreases _
     requires issubtype(typeof(self), bytearray())
-    ensures issubtype(typeof(res), str())
+    requires acc(self.bytearray_acc, wildcard)
+    ensures typeof(result) == str()
 
 function bytearray___len__(self: Ref) : Int
     decreases _

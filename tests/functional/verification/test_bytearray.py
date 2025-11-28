@@ -199,3 +199,11 @@ def test_bytearray_iter_bounds(b: bytearray) -> None:
     
     for byte in b:
         assert 0 <= byte and byte < 256
+
+def test_bytearray_hex(b: bytearray) -> None:
+    Requires(bytearray_pred(b))
+    
+    value = b.hex()
+    
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert value == ""
