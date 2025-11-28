@@ -41,6 +41,10 @@ method bytearray___initFromList__(values: Ref) returns (res: Ref)
     ensures res.bytearray_acc == __seq_ref_to_seq_int(values.list_acc)
     ensures Low(values) ==> Low(res)
 
+function bytearray_hex(self: Ref): Ref
+    requires issubtype(typeof(self), bytearray())
+    ensures issubtype(typeof(res), str())
+
 function bytearray___len__(self: Ref) : Int
     decreases _
     requires issubtype(typeof(self), bytearray())

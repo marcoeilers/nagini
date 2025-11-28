@@ -305,23 +305,19 @@
         },
         "__lshift__": {
             "args": ["int", "int"],
-            "type": "int",
-            "requires": ["__prim__int___box__", "int___unbox__", "__prim__bool___box__", "bool___unbox__"]
+            "type": "int"
         },
         "__rlshift__": {
             "args": ["int", "int"],
-            "type": "int",
-            "requires": ["__lshift__"]
+            "type": "int"
         },
         "__rshift__": {
             "args": ["int", "int"],
-            "type": "int",
-            "requires": ["__prim__int___box__", "int___unbox__", "__prim__bool___box__", "bool___unbox__"]
+            "type": "int"
         },
         "__rrshift__": {
             "args": ["int", "int"],
-            "type": "int",
-            "requires": ["__rshift__"]
+            "type": "int"
         },
         "bit_length": {
             "args": ["int"],
@@ -584,6 +580,92 @@
     },
     "extends": "object"
 },
+"bytearray": {
+    "methods": {
+        "__init__": {
+            "args": [],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__initFromInt__": {
+            "args": ["int"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__initFromList__": {
+            "args": ["list"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__initFromBytearray__": {
+            "args": ["bytearray"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "append": {
+            "args": ["bytearray", "int"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "extend": {
+            "args": ["bytearray", "bytearray"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "reverse": {
+            "args": ["bytearray"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__setitem__": {
+            "args": ["bytearray", "__prim__int", "int"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__iter__": {
+            "args": ["bytearray"],
+            "type": "Iterator",
+            "MustTerminate": true
+        },
+        "__getitem_slice__": {
+            "args": ["bytearray", "slice"],
+            "type": "bytearray",
+            "display_name": "__getitem__",
+            "MustTerminate": true
+        }
+    },
+    "functions": {
+        "hex": {
+            "args": ["bytearray"],
+            "type": "str"
+        },
+        "__len__": {
+            "args": ["bytearray"],
+            "type": "__prim__int"
+        },
+        "__getitem__": {
+            "args": ["bytearray", "int"],
+            "type": "__prim__int"
+        },
+        "__contains__": {
+            "args": ["bytearray", "int"],
+            "type": "__prim__bool"
+        },
+        "__bool__": {
+            "args": ["bytearray"],
+            "type": "__prim__bool"
+        },
+        "__eq__": {
+            "args": ["bytearray", "object"],
+            "type": "__prim__bool"
+        },
+        "__sil_seq__": {
+            "args": ["bytearray"],
+            "type": "__prim__Seq"
+        }
+    },
+    "extends": "object"
+},
 "tuple": {
     "functions": {
         "__create0__": {
@@ -734,73 +816,59 @@
     "functions": {
         "__create__": {
             "args": ["__prim__Seq"],
-            "type": "PByteSeq",
-            "requires": ["__val__", "int___byte_bounds__"]
+            "type": "PByteSeq"
         },
         "__from_bytes__": {
             "args": ["__prim__Seq"],
-            "type": "PByteSeq",
-            "requires": ["__val__"]
+            "type": "PByteSeq"
         },
         "__unbox__": {
             "args": ["PByteSeq"],
-            "type": "__prim__Seq",
-            "requires": []
+            "type": "__prim__Seq"
         },
         "__contains__": {
             "args": ["PByteSeq", "__prim__int"],
-            "type": "__prim__bool",
-            "requires": ["__val__"]
+            "type": "__prim__bool"
         },
         "__getitem__": {
             "args": ["PByteSeq", "int"],
-            "type": "__prim__int",
-            "requires": ["__val__", "__len__", "int___unbox__", "int___byte_bounds__"]
+            "type": "__prim__int"
         },
         "__sil_seq__": {
             "args": ["PByteSeq"],
-            "type": "__prim__Seq",
-            "requires": ["__val__", "__seq_ref_to_seq_int"]
+            "type": "__prim__Seq"
         },
         "__seq_ref_to_seq_int__": {
             "args": ["__prim__Seq"],
-            "type": "__prim__Seq",
-            "requires": ["__seq_ref_to_seq_int"]
+            "type": "__prim__Seq"
         },
         "__val__": {
             "args": ["PByteSeq"],
-            "type": "__prim__Seq",
-            "requires": ["int___byte_bounds__"]
+            "type": "__prim__Seq"
         },
         "__len__": {
             "args": ["PByteSeq"],
-            "type": "__prim__int",
-            "requires": ["__val__"]
+            "type": "__prim__int"
         },
         "take": {
             "args": ["PByteSeq", "__prim__int"],
-            "type": "PByteSeq",
-            "requires": ["__val__", "__create__"]
+            "type": "PByteSeq"
         },
         "drop": {
             "args": ["PByteSeq", "__prim__int"],
-            "type": "PByteSeq",
-            "requires": ["__val__", "__create__"]
+            "type": "PByteSeq"
         },
         "update": {
             "args": ["PByteSeq", "__prim__int", "__prim__int"],
-            "type": "PByteSeq",
-            "requires": ["__val__", "__create__", "int___byte_bounds__"]
+            "type": "PByteSeq"
         },
         "__add__": {
             "args": ["PByteSeq", "PByteSeq"],
-            "type": "PByteSeq",
-            "requires": ["__val__", "__create__"]
+            "type": "PByteSeq"
         },
         "__eq__": {
             "args": ["PByteSeq", "PByteSeq"],
-            "type": "__prim__bool",
-            "requires": ["__val__"]
+            "type": "__prim__bool"
         }
     },
     "extends": "object"
