@@ -13,6 +13,7 @@ from nagini_translation.lib.constants import (
     BUILTINS,
     BYTES_TYPE,
     DICT_TYPE,
+    ELLIPSIS_TYPE,
     FLOAT_TYPE,
     INT_TYPE,
     LIST_TYPE,
@@ -287,6 +288,8 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
             return module.global_module.classes[FLOAT_TYPE]
         elif node.value is None:
             return module.global_module.classes['NoneType']
+        elif node.value is ...:
+            return module.global_module.classes[ELLIPSIS_TYPE]
         else:
             raise UnsupportedException(node, f"Unsupported constant value type {type(node.value)}")
     if isNum(node):

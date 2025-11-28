@@ -19,6 +19,15 @@
         }
     }
 },
+"ellipsis": {
+    "functions": {
+        "__create__": {
+            "args": [],
+            "type": "ellipsis"
+        }
+    },
+    "extends": "object"
+},
 "list": {
     "methods": {
         "__init__": {

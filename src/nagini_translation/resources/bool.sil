@@ -391,3 +391,7 @@ domain __SumHelper[T$] {
         forall __ss1: Seq[Int], __ss2: Seq[Int] :: { __sum(__ss1), __sum(__ss2) } __toMS(__ss1) == __toMS(__ss2) ==> __sum(__ss1) == __sum(__ss2)
     }
 }
+
+function ellipsis___create__(): Ref
+    ensures typeof(result) == ellipsis()
+    ensures forall r: Ref :: { issubtype(typeof(r), ellipsis()) } issubtype(typeof(r), ellipsis()) ==> r == result
