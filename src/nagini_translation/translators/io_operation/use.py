@@ -18,7 +18,6 @@ from nagini_translation.lib.program_nodes import (
     PythonIOExistentialVar,
     PythonMethod,
     PythonIOOperation,
-    TypeVar,
 )
 from nagini_translation.lib.typedefs import (
     Expr,
@@ -28,6 +27,7 @@ from nagini_translation.lib.typedefs import (
 from nagini_translation.lib.util import (
     get_func_name,
     InvalidProgramException,
+    isStr,
     UnsupportedException,
 )
 from nagini_translation.translators.io_operation.common import (
@@ -134,9 +134,9 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
 
         operation_call, result_name_node = cast(ast.Call, node.value).args
 
-        if not isinstance(result_name_node, ast.Str):
+        if not isStr(result_name_node):
             raise_invalid_get_ghost_output('result_identifier_not_str', node)
-        result_name = cast(ast.Str, result_name_node).s
+        result_name = cast(ast.Constant, result_name_node).value
 
         if not (isinstance(operation_call, ast.Call) and
                 isinstance(operation_call.func, ast.Name)):

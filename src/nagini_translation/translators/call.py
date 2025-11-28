@@ -75,6 +75,7 @@ from nagini_translation.lib.util import (
     OldExpressionCollector,
     OldExpressionTransformer,
     pprint,
+    isStr,
     UnsupportedException,
 )
 from nagini_translation.translators.abstract import Context
@@ -147,7 +148,7 @@ class CallTranslator(CommonTranslator):
 
     def _translate_float(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
-        if isinstance(node.args[0], ast.Str):
+        if isStr(node.args[0]):
             string_val = node.args[0].s
             try:
                 float_val = float(string_val)
@@ -743,7 +744,7 @@ class CallTranslator(CommonTranslator):
                     return False
                 elif (isinstance(rec_target, PythonClass) and
                       not isinstance(node.func.value, ast.Call) and
-                      not isinstance(node.func.value, ast.Str)):
+                      not isStr(node.func.value)):
                     return False
                 else:
                     return True
@@ -1172,7 +1173,7 @@ class CallTranslator(CommonTranslator):
         if isinstance(node.func, ast.Attribute):
             receiver_target = self.get_target(node.func.value, ctx)
             if (isinstance(receiver_target, PythonClass) and
-                    (not isinstance(node.func.value, (ast.Call, ast.Str)) or
+                    (not (isinstance(node.func.value, ast.Call) or isStr(node.func.value)) or
                              get_func_name(node.func.value) == 'super')):
                 if target.method_type == MethodType.static_method:
                     # Static method

@@ -59,6 +59,8 @@ from nagini_translation.lib.typedefs import (
 )
 from nagini_translation.lib.util import (
     InvalidProgramException,
+    isNameConstant,
+    isStr
 )
 from nagini_translation.sif.lib.viper_ast_extended import ViperASTExtended
 from nagini_translation.translators.abstract import Context
@@ -69,7 +71,6 @@ class ProgramTranslator(CommonTranslator):
     def __init__(self, config: 'TranslatorConfig', jvm: 'JVM', source_file: str,
                  type_info: 'TypeInfo', viper_ast: 'ViperAST') -> None:
         super().__init__(config, jvm, source_file, type_info, viper_ast)
-        self.required_names = {}
 
     def translate_field(self, field: PythonField,
                         ctx: Context) -> 'silver.ast.Field':
@@ -101,17 +102,11 @@ class ProgramTranslator(CommonTranslator):
                 # This is a property
                 if cls.module is not cls.module.global_module:
                     all_names.append(field.sil_name)
-                used_names = set()
-                self.viper.used_names = used_names
-                self.viper.used_names_sets[field.sil_name] = used_names
                 if field.overrides:
                     raise InvalidProgramException(field.node, 'invalid.override')
                 getter = self.translate_function(field, ctx)
                 functions.append(getter)
                 if field.setter:
-                    used_names = set()
-                    self.viper.used_names = used_names
-                    self.viper.used_names_sets[field.setter.sil_name] = used_names
                     setter = self.translate_method(field.setter, ctx)
                     if cls.module is not cls.module.global_module:
                         all_names.append(field.setter.sil_name)
@@ -211,7 +206,7 @@ class ProgramTranslator(CommonTranslator):
         stmts.append(end_lbl)
 
     def create_inherit_check(self, method: PythonMethod, cls: PythonClass,
-                             ctx: Context) -> 'silver.ast.Callable':
+                             ctx: Context) -> (str, 'silver.ast.Callable'):
         """
         Creates a Viper function/method with the contract of the overridden
         function which calls the overriding function, to check behavioural
@@ -247,7 +242,6 @@ class ProgramTranslator(CommonTranslator):
 
         mname = ctx.module.get_fresh_name(cls.name + '_' + method.name +
                                           '_inherit_check')
-        self.viper.used_names_sets[method.sil_name].add(mname)
         pres, posts = self.extract_contract(method, ERROR_NAME,
                                             False, ctx)
         if method.method_type == MethodType.normal:
@@ -277,10 +271,10 @@ class ProgramTranslator(CommonTranslator):
 
         ctx.position.pop()
         self.info = None
-        return result
+        return mname, result
 
     def create_override_check(self, method: PythonMethod,
-                              ctx: Context) -> 'silver.ast.Callable':
+                              ctx: Context) -> (str, 'silver.ast.Callable'):
         """
         Creates a Viper function/method with the contract of the overridden
         function which calls the overriding function, to check behavioural
@@ -311,7 +305,6 @@ class ProgramTranslator(CommonTranslator):
         self.bind_type_vars(method.overrides, ctx)
 
         mname = ctx.module.get_fresh_name(method.sil_name + '_override_check')
-        self.viper.used_names_sets[method.sil_name].add(mname)
         pres, posts = self.extract_contract(method.overrides, '_err',
                                             False, ctx)
         self_arg = None
@@ -348,7 +341,7 @@ class ProgramTranslator(CommonTranslator):
 
         ctx.current_function = old_function
         self.info = None
-        return result
+        return mname, result
 
     def _create_override_check_body_impure(self, method: PythonMethod,
             has_subtype: Expr, calledname: str,
@@ -443,7 +436,7 @@ class ProgramTranslator(CommonTranslator):
             definition_deps = method.cls.definition_deps
         for arg in method.args.values():
             if (arg.node and arg.node.annotation and
-                    not isinstance(arg.node.annotation, (ast.Str, ast.NameConstant))):
+                    not (isStr(arg.node.annotation) or isNameConstant(arg.node.annotation))):
                 type = self.get_target(arg.node.annotation, ctx)
                 if type and not type.python_class.interface:
                     definition_deps.add((arg.node.annotation, type.python_class,
@@ -453,7 +446,7 @@ class ProgramTranslator(CommonTranslator):
                 if not stmt and expr:
                     arg.default_expr = expr
         if (method.node and method.node.returns and
-                not isinstance(method.node.returns, (ast.Str, ast.NameConstant))):
+                not (isStr(method.node.returns) or isNameConstant(method.node.returns))):
             type = self.get_target(method.node.returns, ctx)
             if type and not type.python_class.interface:
                 definition_deps.add((method.node.returns, type.python_class,
@@ -501,25 +494,8 @@ class ProgramTranslator(CommonTranslator):
                                        self.no_info(ctx)))
         return fields
 
-    def _add_all_used_names(self, initial: Set[str]) -> None:
-        """
-        Calculates the names of all methods and functions used by the program,
-        based on the names reported to be used by the viper_ast module, and adds
-        them to the given set.
-        """
-        used_names = initial
-        to_add = list(self.viper.used_names)
-        index = 0
-        while index < len(to_add):
-            current = to_add[index]
-            if current not in used_names:
-                used_names.add(current)
-                if current in self.required_names:
-                    to_add.extend(self.required_names[current])
-            index = index + 1
-
     def _convert_silver_elements(
-            self, sil_progs: Program, all_used: List[str], include_names_domain: bool,
+            self, sil_progs: Program, include_names_domain: bool,
             ctx: Context) -> Tuple[List[Domain],
                                    List[Predicate],
                                    List[Function],
@@ -534,39 +510,21 @@ class ProgramTranslator(CommonTranslator):
         predicates = []
         methods = []
 
-        if all_used:
-            used_names = set(all_used)
-            self.viper.used_names = set()
-        else:
-            used_names = set()
-            self._add_all_used_names(used_names)
-
-        # Reset used names set, we only need the additional ones used by the
-        # upcoming method transformation.
-        self.viper.used_names = set()
         for method in self.viper.to_list(sil_progs.methods()):
-            if method.name() in used_names:
-                body = self.viper.from_option(method.body())
-                converted_method = self.create_method_node(
-                    ctx=ctx,
-                    name=method.name(),
-                    args=self.viper.to_list(method.formalArgs()),
-                    returns=self.viper.to_list(method.formalReturns()),
-                    pres=self.viper.to_list(method.pres()),
-                    posts=self.viper.to_list(method.posts()),
-                    locals=[],
-                    body=body,
-                    position=method.pos(),
-                    info=method.info(),
-                )
-                methods.append(converted_method)
-
-        # Some obligation-related functions may only be used by the code added
-        # by the method conversion we just performed, so we have to add
-        # the names which have been used in the meantime. This works assuming
-        # that the converted code does not introduce additional method
-        # requirements (which should never be the case).
-        self._add_all_used_names(used_names)
+            body = self.viper.from_option(method.body())
+            converted_method = self.create_method_node(
+                ctx=ctx,
+                name=method.name(),
+                args=self.viper.to_list(method.formalArgs()),
+                returns=self.viper.to_list(method.formalReturns()),
+                pres=self.viper.to_list(method.pres()),
+                posts=self.viper.to_list(method.posts()),
+                locals=[],
+                body=body,
+                position=method.pos(),
+                info=method.info(),
+            )
+            methods.append(converted_method)
 
         excluded_domains = ('PyType', NAME_DOMAIN) if not include_names_domain else ('PyType',)
         domains += [
@@ -575,35 +533,25 @@ class ProgramTranslator(CommonTranslator):
 
         functions += [
             function
-            for function in self.viper.to_list(sil_progs.functions())
-            if function.name() in used_names]
+            for function in self.viper.to_list(sil_progs.functions())]
         predicates += self.viper.to_list(sil_progs.predicates())
 
         return domains, predicates, functions, methods
 
     def track_dependencies(self, selected_names: List[str], selected: Set[str],
-                           node: PythonNode, ctx: Context) -> None:
+                           node: PythonNode, ctx: Context, name: str = None) -> None:
         """
-        If specific parts of the program have been selected to be verified,
-        marks that the given PythonNode is about to be translated, s.t. it can
-        be tracked which other elements are referenced by the translation of
-        this node. Also checks if the given element is among those selected
-        to be verified, and adds its Silver name to the list of selected Silver
-        names later used when computing which parts of the program to give to
-        Viper.
+        Checks if the given element is among those selected to be verified, and
+        adds its Silver name to the list of selected Silver names later used when
+        computing which parts of the program to give to Viper.
         """
-        if node.sil_name in self.viper.used_names_sets:
-            used_names = self.viper.used_names_sets[node.sil_name]
-        else:
-            used_names = set()
-        self.viper.used_names = used_names
-        self.viper.used_names_sets[node.sil_name] = used_names
+        actual_name = node.sil_name if name is None else name
         if selected_names is None:
             return
         if (node.name in selected or
                 (hasattr(node, 'cls') and node.cls and
-                 node.cls.name + '.' + node.name in selected)):
-            selected_names.append(node.sil_name)
+                 (node.cls.name + '.' + node.name in selected or node.cls.name in selected))):
+            selected_names.append(actual_name)
 
     def create_functions_domain(self, constants: List, ctx: Context):
         return self.viper.Domain(FUNCTION_DOMAIN_NAME, constants, [], [],
@@ -1291,21 +1239,17 @@ class ProgramTranslator(CommonTranslator):
                 for function in container.functions.values():
                     if module is not module.global_module:
                         all_names.append(function.sil_name)
-                    self.track_dependencies(None, selected, function, ctx)
                     self.translate_default_args(function, ctx)
                 for method in container.methods.values():
                     if module is not module.global_module:
                         all_names.append(method.sil_name)
-                    self.track_dependencies(None, selected, method, ctx)
                     self.translate_default_args(method, ctx)
                 for pred in container.predicates.values():
                     if module is not module.global_module:
                         all_names.append(pred.sil_name)
-                    self.track_dependencies(None, selected, pred, ctx)
                     self.translate_default_args(pred, ctx)
 
         for root, classes in static_fields.items():
-            self.track_dependencies(None, selected, root, ctx)
             functions.append(self.create_static_field_function(root, classes,
                                                                ctx))
 
@@ -1327,8 +1271,8 @@ class ProgramTranslator(CommonTranslator):
                 self.track_dependencies(selected_names, selected, method, ctx)
                 methods.append(self.translate_method(method, ctx))
             for pred in module.predicates.values():
-                self.track_dependencies(selected_names, selected, pred, ctx)
                 predicates.append(self.translate_predicate(pred, ctx))
+                self.track_dependencies(selected_names, selected, pred, ctx)
             for class_name, cls in module.classes.items():
                 if class_name in PRIMITIVES or class_name != cls.name:
                     # Skip primitives and type variable entries.
@@ -1367,7 +1311,10 @@ class ProgramTranslator(CommonTranslator):
                              (cls.superclass and
                               cls.superclass.python_class.has_classmethod)) and
                             method.overrides):
-                        methods.append(self.create_override_check(method, ctx))
+                        override_check_name, check_method = self.create_override_check(method, ctx)
+                        methods.append(check_method)
+                        all_names.append(override_check_name)
+                        self.track_dependencies(selected_names, selected, method, ctx, override_check_name)
                 for method_name in cls.static_methods:
                     method = cls.static_methods[method_name]
                     if module is not module.global_module:
@@ -1377,7 +1324,10 @@ class ProgramTranslator(CommonTranslator):
                     self.track_dependencies(selected_names, selected, method, ctx)
                     methods.append(self.translate_method(method, ctx))
                     if method.overrides:
-                        methods.append(self.create_override_check(method, ctx))
+                        override_check_name, check_method = self.create_override_check(method, ctx)
+                        methods.append(check_method)
+                        all_names.append(override_check_name)
+                        self.track_dependencies(selected_names, selected, method, ctx, override_check_name)
                 for method_name in cls.all_methods:
                     method = cls.get_method(method_name)
                     if (method.cls and method.cls != cls and
@@ -1386,8 +1336,11 @@ class ProgramTranslator(CommonTranslator):
                             not method.interface and
                             not method.contract_only):
                         # Inherited
-                        methods.append(self.create_inherit_check(method, cls,
-                                                                 ctx))
+                        inherit_check_name, check_method = self.create_inherit_check(method, cls,
+                                                                 ctx)
+                        methods.append(check_method)
+                        all_names.append(inherit_check_name)
+                        self.track_dependencies(selected_names, selected, method, ctx, inherit_check_name)
                 for pred_name in cls.predicates:
                     pred = cls.predicates[pred_name]
                     cpred = pred
@@ -1424,51 +1377,41 @@ class ProgramTranslator(CommonTranslator):
                 if module is not module.global_module:
                     all_names.append(operation.sil_name)
                 self.track_dependencies(selected_names, selected, operation, ctx)
-                predicate, getters, checkers = self.translate_io_operation(
+                predicate, getters, checkers, names = self.translate_io_operation(
                     operation,
                     ctx)
                 predicates.append(predicate)
                 functions.extend(getters)
                 methods.extend(checkers)
+                for name in names:
+                    all_names.append(name)
+                    self.track_dependencies(selected_names, selected, operation, ctx, name)
 
         for root in predicate_families:
             self.track_dependencies(selected_names, selected, root, ctx)
             preds, pred_self_framing_checks = self.translate_predicate_family(root, predicate_families[root], ctx)
+            for pred in preds:
+                pred_name = pred.name()
+                all_names.append(pred_name)
+                self.track_dependencies(selected_names, selected, root, ctx, pred_name)
+            for check_method in pred_self_framing_checks:
+                method_name = check_method.name()
+                all_names.append(method_name)
+                self.track_dependencies(selected_names, selected, root, ctx, method_name)
             predicates.extend(preds)
             methods.extend(pred_self_framing_checks)
 
-        all_used_names = None
 
         if not selected:
             selected_names = all_names
-            selected_names.extend(
-                ['MustTerminate', 'MustInvokeBounded', 'MustInvokeUnbounded', 'Level', '_MaySet', 'main'])
-            for cname in ['NoneType', 'object', 'Place', 'Thread', 'Exception', 'PSeq', 'PSet', 'tuple']:
-                selected_names.append(module.global_module.classes[cname].sil_name)
-            # Compute all dependencies of directly selected methods/...
-        all_used_names = list(selected_names)
-        i = 0
-        while i < len(all_used_names):
-            name = all_used_names[i]
-            to_add = set()
-            if name in self.viper.used_names_sets:
-                to_add = self.viper.used_names_sets[name]
-            if name in self.required_names:
-                to_add = self.required_names[name]
-            for add in to_add:
-                if not add in all_used_names:
-                    all_used_names.append(add)
-            if name in modules[0].global_module.classes:
-                superclass = modules[0].global_module.classes[name].superclass
-                if superclass is not None:
-                    all_used_names.append(superclass.sil_name)
-            i += 1
+            selected_names.extend(['main'])
 
-        all_used_names = set(all_used_names)
-        # Filter out anything the selected part does not depend on.
-        predicates = [p for p in predicates if p.name() in all_used_names]
-        functions = [f for f in functions if f.name() in all_used_names]
-        methods = [m for m in methods if m.name() in all_used_names]
+        all_used_names = set(selected_names)
+
+        if ctx.sif:
+            # Hack: The Chopper does not know about dependencies introduced by Low AST nodes with domain function
+            # references, so we add all of them here to be safe.
+            all_used_names.update(self.viper.lowval_functions)
 
         ctx.current_function = None
 
@@ -1485,7 +1428,7 @@ class ProgramTranslator(CommonTranslator):
         domains.extend(adts_domains)
         functions.extend(adts_functions)
 
-        converted_sil_progs = self._convert_silver_elements(sil_progs, all_used_names, not ignore_global, ctx)
+        converted_sil_progs = self._convert_silver_elements(sil_progs, not ignore_global, ctx)
         s_domains, s_predicates, s_functions, s_methods = converted_sil_progs
         domains += s_domains
         predicates += s_predicates
@@ -1495,5 +1438,14 @@ class ProgramTranslator(CommonTranslator):
         prog = self.viper.Program(domains, fields, functions, predicates,
                                   methods, self.no_position(ctx),
                                   self.no_info(ctx))
+
+        chopped_prog = self.viper.chopper.chop(prog, self.viper.to_set(all_used_names))
+
+        if chopped_prog.isEmpty():
+            print('Nothing was selected to be verified.')
+            prog = self.viper.Program([], [], [], [], [], self.no_position(ctx),
+                                       self.no_info(ctx))
+        else:
+            prog = chopped_prog.get()
 
         return prog

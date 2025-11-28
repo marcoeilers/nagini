@@ -23,11 +23,11 @@ UNBOX_PSEQ = 'PSeq___sil_seq__%limited'
 UNBOX_PBYTESEQ = 'PByteSeq___val__%limited'
 TYPEOF = 'typeof<PyType>'
 SNAP_TO = '$SortWrappers.'
-SEQ_LENGTH = 'seq_ref_length<Int>'
-SEQ_INDEX = 'seq_ref_index<Ref>'
 SET_CARD = 'Set_card'
 DICT_GET = 'Map_apply'
 MAP_CARD = 'Map_card'
+SEQ_LENGTH = 'Seq_length'
+SEQ_INDEX = 'Seq_index'
 
 
 UNIT = '$Snap.unit'
@@ -750,6 +750,8 @@ class Converter:
             # TODO: handle properly
             return False
         if isinstance(t, PythonType) and not isinstance(t, GenericType) and t.python_class.type_vars:
+            if t.sil_name not in self.model:
+                return False
             arg_options, els = self.get_type_vals(t)
             for _,option in arg_options:
                 bool_or_none = self.get_func_value(ISSUBTYPE, (val_type, option))

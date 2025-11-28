@@ -291,9 +291,10 @@ class TypeInfo:
         result.export_types = True
         result.preserve_asts = True
         result.warn_no_return = False
-        result.incremental = False
-        # This is an experimental feature atm and you actually have to
-        # enable it like this
+        result.incremental = True
+        # Since we run mypy twice with different options, we use different cache dirs for different configurations,
+        # otherwise Mypy throws away the cache every time.
+        result.cache_dir = '.mypy_cache_strict' if strict_optional else '.mypy_cache_nonstrict'
         return result
 
     def check(self, filename: str, base_dir: str = None, text: Optional[str] = None) -> bool:
@@ -319,6 +320,42 @@ class TypeInfo:
                 module_name = relpath
         try:
             options_strict = self._create_options(True)
+
+            # Terrible dirty hack:
+            # We want mypy to use its cache as much as possible, however, all files that Nagini needs to analyze
+            # must be re-checked by mypy, otherwise there are no mypy ASTs for these files for us to use.
+            # So: We monkey-patch the function that tries to find cached type information for the given file s.t.
+            # it returns None (= no cached info to use) for all files transitively imported from __main__, ignoring
+            # modules in IGNORED_IMPORTS and everything imported solely by those.
+            old_find_cache_meta = mypy.build.find_cache_meta
+            directly_imported = set()
+            imports_not_handled = set()
+            def my_find_cache_meta(id, path, mgr):
+                fl = mgr.ast_cache
+                to_handle = set(imports_not_handled)
+                for i in to_handle:
+                    if i in fl:
+                        imports_not_handled.remove(i)
+                        for ii in fl[i][0].imports:
+                            ids = []
+                            if isinstance(ii, mypy.build.Import):
+                                ids.extend([id for id, _ in ii.ids])
+                            else:
+                                ids.append(ii.id)
+                            for id in ids:
+                                if id not in IGNORED_IMPORTS:
+                                    imports_not_handled.add(id)
+                                    directly_imported.add(id)
+                if id == '__main__' or id == module_name:
+                    imports_not_handled.add(id)
+                    directly_imported.add(id)
+
+                prefix = os.path.join(*id.split('.'))
+                if prefix.replace(os.sep, '.') not in directly_imported:
+                    return old_find_cache_meta(id, path, mgr)
+                return None
+            mypy.build.find_cache_meta = my_find_cache_meta
+
             res_strict = mypy.build.build(
                 [BuildSource(filename, module_name, text, base_dir=base_dir)],
                 options_strict
@@ -344,8 +381,10 @@ class TypeInfo:
                     if dep_name not in relevant_files:
                         relevant_files.append(dep_name)
                 i += 1
-            relevant_files = [(name, res_strict.files[name]) for name in relevant_files]
-            for name, file in relevant_files:
+            relevant_files = [(name, res_strict.graph[name]) for name in relevant_files]
+
+            for name, file_graph in relevant_files:
+                file = file_graph.tree
                 real_name = None
                 if name == module_name:
                     real_name = name.split('.')

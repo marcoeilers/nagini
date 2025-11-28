@@ -26,6 +26,7 @@ from nagini_translation.lib.typedefs import (
 )
 from nagini_translation.lib.util import (
     join_expressions,
+    isNum
 )
 
 
@@ -73,8 +74,8 @@ class PythonIntExpression(IntExpression):
         self._node = node
 
     def get_value(self) -> int:
-        if isinstance(self._node, ast.Num):
-            return self._node.n
+        if isNum(self._node):
+            return self._node.value
         else:
             return None
 

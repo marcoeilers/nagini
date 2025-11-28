@@ -25,6 +25,8 @@ _TRANSLATION_TESTS_SUFFIX = 'translation'
 _VERIFICATION_TESTS_SUFFIX = 'verification'
 
 _FUNCTIONAL_TESTS_DIR = 'tests/functional/'
+_MINIMAL_TESTS_DIR = 'tests/minimal/'
+_FUNCTIONAL_EXAMPLES_TESTS_DIR = 'tests/functional/verification/examples'
 _SIF_TRUE_TESTS_DIR = 'tests/sif-true/'
 _SIF_POSS_TESTS_DIR = 'tests/sif-poss/'
 _SIF_PROB_TESTS_DIR = 'tests/sif-prob/'
@@ -60,6 +62,8 @@ class PyTestConfig:
             self.force_product = True
         if test == 'functional':
             self._add_test_dir(_FUNCTIONAL_TESTS_DIR)
+        elif test == 'minimal':
+            self._add_test_dir(_MINIMAL_TESTS_DIR)
         elif test == 'sif-true':
             self._add_test_dir(_SIF_TRUE_TESTS_DIR)
         elif test == 'sif-poss':
@@ -131,6 +135,7 @@ def pytest_addoption(parser: 'pytest.config.Parser'):
     parser.addoption('--single-test', dest='single_test', action='store', default=None)
     parser.addoption('--all-tests', dest='all_tests', action='store_true')
     parser.addoption('--functional', dest='functional', action='store_true')
+    parser.addoption('--minimal', dest='minimal', action='store_true')
     parser.addoption('--functional-product', dest='functional_product', action='store_true')
     parser.addoption('--sif-true', dest='sif_true', action='store_true')
     parser.addoption('--sif-poss', dest='sif_poss', action='store_true')
@@ -154,6 +159,8 @@ def pytest_configure(config: 'pytest.config.Config'):
     else:
         if config.option.functional:
             tests.append('functional')
+        if config.option.minimal:
+            tests.append('minimal')
         if config.option.sif_true:
             tests.append('sif-true')
         if config.option.sif_poss:
@@ -256,7 +263,6 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
             files = _test_files(test_dir)
             test_files.extend(files)
             reload_triggers.add(files[0])
-            print(files[0])
         if _pytest_config.single_test and 'verification' in _pytest_config.single_test:
             test_files.append(_pytest_config.single_test)
         float_encoding = None
@@ -278,15 +284,19 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
                 sif = False
             if _pytest_config.force_product:
                 sif = True
+            select = set()
+            if 'select' + os.sep in file:
+                file_name = file.partition('select' + os.sep)[2].partition('.py')[0]
+                select = set(file_name.split('-'))
             reload_resources = (file in reload_triggers) or (new_float_encoding != float_encoding)
             float_encoding = new_float_encoding
             arp = 'arp' in file
             base = file.partition('verification')[0] + 'verification'
             params.extend([(file, base, verifier, sif, reload_resources, arp,
                             ignore_obligations or (None if verifier == 'silicon' else False),
-                            _pytest_config.store_viper, float_encoding) for verifier
+                            _pytest_config.store_viper, float_encoding, select) for verifier
                            in _pytest_config.verifiers])
-        metafunc.parametrize('path,base,verifier,sif,reload_resources,arp,ignore_obligations,print,float_encoding', params)
+        metafunc.parametrize('path,base,verifier,sif,reload_resources,arp,ignore_obligations,print,float_encoding,selection', params)
     else:
         pytest.exit('Unrecognized test function.')
 

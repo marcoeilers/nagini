@@ -28,7 +28,6 @@ from nagini_translation.lib.constants import (
     INPLACE_OPERATOR_FUNCTIONS,
 )
 from nagini_translation.lib.program_nodes import (
-    GenericType,
     OptionalType,
     PythonField,
     PythonGlobalVar,
@@ -59,6 +58,8 @@ from nagini_translation.lib.util import (
     get_surrounding_try_blocks,
     InvalidProgramException,
     is_get_ghost_output,
+    isEllipsis,
+    isStr,
     UnsupportedException,
 )
 from nagini_translation.translators.abstract import Context
@@ -999,7 +1000,7 @@ class StatementTranslator(CommonTranslator):
                 assign = self.viper.LocalVarAssign(res_var.ref(), val, pos, info)
                 stmt.append(assign)
             return stmt
-        elif isinstance(node.value, (ast.Str, ast.Ellipsis)):
+        elif isStr(node.value) or isEllipsis(node.value):
             # Docstring or ellipsis, just skip.
             return []
         else:

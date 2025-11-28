@@ -359,6 +359,7 @@ IGNORED_IMPORTS = {'_importlib_modulespec',
                    'abc',
                    'builtins',
                    'nagini_contracts',
+                   'nagini_contracts.adt',
                    'nagini_contracts.contracts',
                    'nagini_contracts.io_contracts',
                    'nagini_contracts.obligations',
@@ -366,6 +367,7 @@ IGNORED_IMPORTS = {'_importlib_modulespec',
                    'sys',
                    'types',
                    'typing',
+                   'typing_extensions'
                    }
 
 IGNORED_MODULE_NAMES = {

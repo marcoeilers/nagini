@@ -218,7 +218,7 @@ def is_exception_decl(stmt: ast.AST) -> bool:
 def is_docstring(stmt: ast.AST) -> bool:
     """Return True if statement is a docstring."""
     if (isinstance(stmt, ast.Expr) and
-            isinstance(stmt.value, ast.Str)):
+            isStr(stmt.value)):
         return True
     else:
         return False
@@ -422,7 +422,7 @@ class OldExpressionTransformer(ast.NodeTransformer):
         if node.id in self.arg_names:
             index = self.arg_names.index(node.id)
             return ast.Call(func=ast.Name(id='arg', ctx=ast.Load()),
-                            args=[ast.Num(n=index)],
+                            args=[ast.Constant(value=index)],
                             keywords=[])
         return node
 
@@ -474,3 +474,18 @@ def list_to_seq(lst, jvm, t=None):
     for i, element in enumerate(lst):
         seq.update(i, element)
     return seq.toSeq()
+
+def isNum(node: ast.AST) -> bool:
+    return isinstance(node, ast.Constant) and isinstance(node.value, (int, float, complex))
+
+def isEllipsis(node: ast.AST) -> bool:
+    return isinstance(node, ast.Constant) and node.value == ...
+
+def isStr(node: ast.AST) -> bool:
+    return isinstance(node, ast.Constant) and isinstance(node.value, str)
+
+def isNameConstant(node: ast.AST) -> bool:
+    return isinstance(node, ast.Constant) and isinstance(node.value, (bool, type(None)))
+
+def isBytes(node: ast.AST) -> bool:
+    return isinstance(node, ast.Constant) and isinstance(node.value, bytes)

@@ -42,6 +42,7 @@ from nagini_translation.lib.util import (
     get_parent_of_type,
     get_surrounding_try_blocks,
     InvalidProgramException,
+    isEllipsis,
     UnsupportedException
 )
 from nagini_translation.translators.abstract import Context
@@ -108,7 +109,7 @@ class MethodTranslator(CommonTranslator):
                     if cond_stmt:
                         raise InvalidProgramException(args[1], 'purity.violated')
                 measure_node = args[0]
-                if isinstance(measure_node, ast.NameConstant) and measure_node.value is None:
+                if isinstance(measure_node, ast.Constant) and measure_node.value is None:
                     decreases_clause = self.viper.DecreasesWildcard(condition, pos, info)
                 else:
                     measure = None
@@ -141,7 +142,14 @@ class MethodTranslator(CommonTranslator):
                                     self.no_position(ctx), self.no_info(ctx))
         for post, aliases in method.postcondition:
             with ctx.additional_aliases(aliases):
-                stmt, expr = self.translate_expr(post, ctx, self.viper.Bool, True)
+                if isinstance(post, ast.Lambda):
+                    res_name = post.args.args[0].arg
+                    res_var = ctx.current_function.result
+                    res_aliases = {res_name: res_var}
+                    with ctx.additional_aliases(res_aliases):
+                        stmt, expr = self.translate_expr(post.body, ctx, self.viper.Bool, True)
+                else:
+                    stmt, expr = self.translate_expr(post, ctx, self.viper.Bool, True)
             if stmt:
                 raise InvalidProgramException(post, 'purity.violated')
             if method.declared_exceptions:
@@ -300,7 +308,14 @@ class MethodTranslator(CommonTranslator):
         posts = []
         for post, aliases in func.postcondition:
             with ctx.additional_aliases(aliases):
-                stmt, expr = self.translate_expr(post, ctx, self.viper.Bool)
+                if isinstance(post, ast.Lambda):
+                    res_name = post.args.args[0].arg
+                    res_var = ctx.current_function.result
+                    res_aliases = {res_name: res_var}
+                    with ctx.additional_aliases(res_aliases):
+                        stmt, expr = self.translate_expr(post.body, ctx, self.viper.Bool, True)
+                else:
+                    stmt, expr = self.translate_expr(post, ctx, self.viper.Bool)
             if stmt:
                 raise InvalidProgramException(post, 'purity.violated')
             posts.append(expr)
@@ -320,7 +335,7 @@ class MethodTranslator(CommonTranslator):
         actual_body = statements[start:end]
         if (func.contract_only or
                 (len(actual_body) == 1 and isinstance(actual_body[0], ast.Expr) and
-                 isinstance(actual_body[0].value, ast.Ellipsis))):
+                 isEllipsis(actual_body[0].value))):
             body = None
         else:
             body = self.translate_exprs(actual_body, func, ctx)
@@ -974,13 +989,9 @@ class MethodTranslator(CommonTranslator):
         no_pos = self.no_position(ctx)
         no_info = self.no_info(ctx)
 
-        used_names = set()
-        self.viper.used_names = used_names
-
         main = self._get_main_module(modules)
         main_method, locals, stmts = self._create_main_method_setup(modules, ctx)
         method_name = main_method.sil_name
-        self.viper.used_names_sets[method_name] = used_names
 
         # Translate statements in main module. When an import statement is encountered,
         # the translation will include executing the statements in the imported module.
