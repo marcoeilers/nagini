@@ -665,6 +665,8 @@ class ExpressionTranslator(CommonTranslator):
 
     def translate_Name(self, node: ast.Name, ctx: Context) -> StmtsAndExpr:
         target = self.get_target(node, ctx)
+        if node.id == 'Ellipsis':
+            return self.translate_Ellipsis(node, ctx)
         if isinstance(target, PythonGlobalVar):
             return self.translate_global_var_reference(target, node, ctx)
         elif isinstance(target, PythonMethod):

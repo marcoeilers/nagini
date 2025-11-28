@@ -1,11 +1,11 @@
 # Any copyright is dedicated to the Public Domain.
 # http://creativecommons.org/publicdomain/zero/1.0/
 
-from nagini_contracts.contracts import *
+from types import EllipsisType
 
 
 def fun() -> bool:
-    assert --(... == ...)++(... == ...) == 2
+    assert --(... == ...)++(Ellipsis == ...) == 2
     return True
 
 
@@ -25,13 +25,17 @@ def fun2_fail() -> bool:
     assert --(... is ...)++(... is ...) == 3
     return True
 
+def other() -> None:
+    assert ... == Ellipsis
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert False
 
-def single(e: ellipsis) -> None:
+def single(e: EllipsisType) -> None:
     assert e is ...
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert False
 
-def single2(e: ellipsis) -> None:
+def single2(e: EllipsisType) -> None:
     assert e == ...
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert False
