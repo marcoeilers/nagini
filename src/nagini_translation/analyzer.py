@@ -419,7 +419,8 @@ class Analyzer(ast.NodeVisitor):
                    'Tuple': 'tuple',
                    'Set': 'set',
                    'Dict': 'dict',
-                   'Type': 'type',}
+                   'Type': 'type',
+                   'ellipsis': 'EllipsisType',}
         name = aliases.get(name, name)
         if self.current_class and name in self.current_class.type_vars:
             return self.current_class.type_vars[name]

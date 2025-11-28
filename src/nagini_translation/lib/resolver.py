@@ -13,6 +13,7 @@ from nagini_translation.lib.constants import (
     BUILTINS,
     BYTES_TYPE,
     DICT_TYPE,
+    ELLIPSIS_TYPE,
     FLOAT_TYPE,
     INT_TYPE,
     LIST_TYPE,
@@ -271,6 +272,8 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                 candidates = [find_entry(node.attr, False, [t]) for t in lhs.type_args]
                 if all(isinstance(c, (PythonField, PythonVarBase)) for c in candidates):
                     return common_supertype([c.type for c in candidates])
+        if isinstance(node, ast.Name) and node.id == 'Ellipsis':
+            return module.global_module.classes[ELLIPSIS_TYPE]
         # All these cases should be handled by get_target, so if we get here,
         # the node refers to something unknown in the given context.
         return None
@@ -287,6 +290,8 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
             return module.global_module.classes[FLOAT_TYPE]
         elif node.value is None:
             return module.global_module.classes['NoneType']
+        elif node.value is ...:
+            return module.global_module.classes[ELLIPSIS_TYPE]
         else:
             raise UnsupportedException(node, f"Unsupported constant value type {type(node.value)}")
     if isNum(node):
