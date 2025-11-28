@@ -19,11 +19,11 @@
         }
     }
 },
-"ellipsis": {
+"EllipsisType": {
     "functions": {
         "__create__": {
             "args": [],
-            "type": "ellipsis"
+            "type": "EllipsisType"
         }
     },
     "extends": "object"

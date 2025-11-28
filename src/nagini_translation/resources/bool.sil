@@ -392,6 +392,6 @@ domain __SumHelper[T$] {
     }
 }
 
-function ellipsis___create__(): Ref
-    ensures typeof(result) == ellipsis()
-    ensures forall r: Ref :: { issubtype(typeof(r), ellipsis()) } issubtype(typeof(r), ellipsis()) ==> r == result
+function EllipsisType___create__(): Ref
+    ensures typeof(result) == EllipsisType()
+    ensures forall r: Ref :: { issubtype(typeof(r), EllipsisType()) } issubtype(typeof(r), EllipsisType()) ==> r == result

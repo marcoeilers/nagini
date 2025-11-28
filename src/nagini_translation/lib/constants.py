@@ -311,7 +311,7 @@ FLOAT_TYPE = 'float'
 
 BOOL_TYPE = 'bool'
 
-ELLIPSIS_TYPE = 'ellipsis'
+ELLIPSIS_TYPE = 'EllipsisType'
 
 PRIMITIVE_PREFIX = '__prim__'
 
