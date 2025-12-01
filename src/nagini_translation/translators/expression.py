@@ -13,6 +13,7 @@ from nagini_translation.lib.constants import (
     BYTES_TYPE,
     CHECK_DEFINED_FUNC,
     DICT_TYPE,
+    ELLIPSIS_TYPE,
     END_LABEL,
     FLOAT_TYPE,
     FUNCTION_DOMAIN_NAME,
@@ -434,6 +435,12 @@ class ExpressionTranslator(CommonTranslator):
         """
         stmt, exp = self.translate_expr(node.value, ctx)
         return stmt, exp
+    
+    def translate_Ellipsis(self, node: ast.Ellipsis, ctx: Context) -> StmtsAndExpr:
+        ellipsis_class = ctx.module.global_module.classes[ELLIPSIS_TYPE]
+        func_name = '__create__'
+        call = self.get_function_call(ellipsis_class, func_name, [], [], node, ctx)
+        return [], call
 
     def translate_Bytes(self, node: ast.Constant, ctx: Context) -> StmtsAndExpr:
         elems = []
@@ -685,6 +692,8 @@ class ExpressionTranslator(CommonTranslator):
 
     def translate_Name(self, node: ast.Name, ctx: Context) -> StmtsAndExpr:
         target = self.get_target(node, ctx)
+        if node.id == 'Ellipsis':
+            return self.translate_Ellipsis(node, ctx)
         if isinstance(target, PythonGlobalVar):
             return self.translate_global_var_reference(target, node, ctx)
         elif isinstance(target, PythonMethod):

@@ -41,4 +41,5 @@ domain PyType {
     unique function str(): PyType
     unique function object(): PyType
     unique function NoneType(): PyType
+    unique function EllipsisType(): PyType
 }
