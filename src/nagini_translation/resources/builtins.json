@@ -747,6 +747,22 @@
         "__box__": {
             "args": ["__prim__int"],
             "type": "int"
+        },
+        "__lshift__": {
+            "args": ["__prim__int", "__prim__int"],
+            "type": "__prim__int"
+        },
+        "__rlshift__": {
+            "args": ["__prim__int", "__prim__int"],
+            "type": "__prim__int"
+        },
+        "__rshift__": {
+            "args": ["__prim__int", "__prim__int"],
+            "type": "__prim__int"
+        },
+        "__rrshift__": {
+            "args": ["__prim__int", "__prim__int"],
+            "type": "__prim__int"
         }
     }
 },

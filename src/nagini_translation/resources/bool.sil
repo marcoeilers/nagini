@@ -118,6 +118,43 @@ function int___rxor__(self: Ref, other: Ref): Ref
     int___xor__(self, other)
 }
 
+function __shift_factor(amount: Int): Int
+    decreases _
+    requires 0 <= amount && amount <= 8
+{
+    amount == 0 ? 1 :
+    amount == 1 ? 2 :
+    amount == 2 ? 4 :
+    amount == 3 ? 8 :
+    amount == 4 ? 16 :
+    amount == 5 ? 32 :
+    amount == 6 ? 64 :
+    amount == 7 ? 128 :
+    256
+}
+
+function __prim__int___lshift__(self: Int, other: Int): Int
+    decreases _
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(other <= 8 || self >= _INT_MIN)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(other <= 8 || self <= _INT_MAX)
+    requires @error("Negative shift count.")(other >= 0)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(other <= _INT_MAX)
+{
+    0 <= other <= 8 ? self * __shift_factor(other) :
+    self >= 0 ? fromBVInt(shlBVInt(toBVInt(self), toBVInt(other))) :
+    -fromBVInt(shlBVInt(toBVInt(-self), toBVInt(other))) 
+}
+
+function __prim__int___rlshift__(self: Int, other: Int): Int
+    decreases _
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(other <= 8 || self >= _INT_MIN)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(other <= 8 || self <= _INT_MAX)
+    requires @error("Negative shift count.")(other >= 0)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(other <= _INT_MAX)
+{
+    __prim__int___lshift__(self, other)
+}
+
 function int___lshift__(self: Ref, other: Ref): Ref
     decreases _
     requires issubtype(typeof(self), int())
@@ -127,21 +164,7 @@ function int___lshift__(self: Ref, other: Ref): Ref
     requires @error("Negative shift count.")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) >= 0)
     requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) <= _INT_MAX)
 {
-    __prim__int___box__(
-        let shift_amt == (int___unbox__(other)) in 
-            let val == (int___unbox__(self)) in 
-                shift_amt == 0 ? val : 
-                shift_amt == 1 ? val * 2 :
-                shift_amt == 2 ? val * 4 :
-                shift_amt == 3 ? val * 8 :
-                shift_amt == 4 ? val * 16 :
-                shift_amt == 5 ? val * 32 :
-                shift_amt == 6 ? val * 64 :
-                shift_amt == 7 ? val * 128 :
-                shift_amt == 8 ? val * 256 :
-                val >= 0 ? fromBVInt(shlBVInt(toBVInt(val), toBVInt(shift_amt))) :
-                -fromBVInt(shlBVInt(toBVInt(-val), toBVInt(shift_amt)))
-    )
+    __prim__int___box__(__prim__int___lshift__(int___unbox__(self), int___unbox__(other)))
 }
 
 
@@ -157,6 +180,29 @@ function int___rlshift__(self: Ref, other: Ref): Ref
     int___lshift__(self, other)
 }
 
+function __prim__int___rshift__(self: Int, other: Int): Int
+    decreases _
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(other <= 8 || self >= _INT_MIN)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(other <= 8 || self <= _INT_MAX)
+    requires @error("Negative shift count.")(other >= 0)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(other <= _INT_MAX)
+{
+    
+    0 <= other <= 8 ? self / __shift_factor(other) :
+    self >= 0 ? fromBVInt(shrBVInt(toBVInt(self), toBVInt(other))) :
+    -fromBVInt(shrBVInt(toBVInt(-self), toBVInt(other)))
+}
+
+function __prim__int___rrshift__(self: Int, other: Int): Int
+    decreases _
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(other <= 8 || self >= _INT_MIN)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(other <= 8 || self <= _INT_MAX)
+    requires @error("Negative shift count.")(other >= 0)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(other <= _INT_MAX)
+{
+    __prim__int___rshift__(self, other)
+}
+
 function int___rshift__(self: Ref, other: Ref): Ref
     decreases _
     requires issubtype(typeof(self), int())
@@ -166,21 +212,7 @@ function int___rshift__(self: Ref, other: Ref): Ref
     requires @error("Negative shift count.")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) >= 0)
     requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) <= _INT_MAX)
 {
-    __prim__int___box__(
-        let shift_amt == (int___unbox__(other)) in 
-            let val == (int___unbox__(self)) in 
-                shift_amt == 0 ? val : 
-                shift_amt == 1 ? val / 2 :
-                shift_amt == 2 ? val / 4 :
-                shift_amt == 3 ? val / 8 :
-                shift_amt == 4 ? val / 16 :
-                shift_amt == 5 ? val / 32 :
-                shift_amt == 6 ? val / 64 :
-                shift_amt == 7 ? val / 128 :
-                shift_amt == 8 ? val / 256 :
-                val >= 0 ? fromBVInt(shrBVInt(toBVInt(val), toBVInt(shift_amt))) :
-                -fromBVInt(shrBVInt(toBVInt(-val), toBVInt(shift_amt)))
-    )
+    __prim__int___box__(__prim__int___rshift__(int___unbox__(self), int___unbox__(other)))
 }
 
 
