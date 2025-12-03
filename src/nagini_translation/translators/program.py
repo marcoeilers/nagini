@@ -1292,7 +1292,7 @@ class ProgramTranslator(CommonTranslator):
                     self.track_dependencies(selected_names, selected, func, ctx)
                     functions.append(self.translate_function(func, ctx))
                     func_constants.append(self.translate_function_constant(func, ctx))
-                    if func.overrides and not ((func_name in ('__str__', '__bool__') and
+                    if func.overrides and not ((func_name in ('__str__', '__bool__', '__eq__') and
                                                 func.overrides.cls.name == 'object') or
                                                (func_name in ('__getitem__',) and func.overrides.cls.name == 'dict')):
                         # We allow overriding certain methods, since the basic versions

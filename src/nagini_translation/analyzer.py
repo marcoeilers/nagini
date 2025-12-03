@@ -579,9 +579,62 @@ class Analyzer(ast.NodeVisitor):
         if cls.python_class not in cls.superclass.python_class.direct_subclasses:
             cls.superclass.python_class.direct_subclasses.append(cls.python_class)
 
-        for member in node.body:
+        if self.is_dataclass(node):
+            cls.dataclass = True
+        if self.is_frozen_dataclass(node):
+            cls.frozen = True
+            
+        if cls.dataclass and not cls.frozen:
+            raise UnsupportedException(node, 'Non frozen dataclass currently not supported')
+            
+        for member in node.body.copy():
             self.visit(member, node)
+        if cls.dataclass and "__init__" not in cls.methods.keys():
+            self._add_dataclass_init_method(node)
+            
         self.current_class = None
+
+    def _add_dataclass_init_method(self, node: ast.ClassDef) -> None:
+        """Adds the implicit __init__ method for dataclasses"""
+        assert self.current_class != None
+
+        args: list[ast.arg] = []
+        stmts: list[ast.stmt] = []
+        
+        # Parse fields, add implicit args and post conditions
+        args.append(self._create_arg_ast(node, 'self', None))
+        for name, field in self.current_class.fields.items():
+            args.append(self._create_arg_ast(node, name, field.type.name))
+            stmts.append(self._create_eq_postcondition(node, name, name))
+            
+        ast_arguments = ast.arguments([], args, None, [], [], None, [])
+
+        # Could add implicit field assignments for non-frozen dataclass
+        
+        # Add decorators
+        decorator_list: list[ast.expr] = [self._create_name_ast('ContractOnly', node)]
+        
+        function_def = ast.FunctionDef('__init__', ast_arguments, stmts, decorator_list, returns=None, lineno=node.lineno, col_offset=0)
+        self.visit(function_def, node)
+        node.body.append(function_def)
+        return
+        
+    def _create_arg_ast(self, node, arg: str, type_name: Optional[str] = None) -> ast.arg:
+        name_node = None
+        if type_name != None:
+            name_node = self._create_name_ast(type_name, node)
+        return ast.arg(arg, name_node, lineno=node.lineno, col_offset=0)
+
+    def _create_eq_postcondition(self, node, attribute: str, arg: str) -> ast.stmt:
+        compare = ast.Compare(
+                    ast.Attribute(self._create_name_ast('self', node), attribute, ast.Load(), lineno=node.lineno, col_offset=0),
+                    ops=[ast.Eq()],
+                    comparators=[self._create_name_ast(arg, node)],
+                    lineno=node.lineno, col_offset=0)
+        return ast.Expr(ast.Call(self._create_name_ast('Ensures', node), [compare], [], lineno=node.lineno, col_offset=0))
+
+    def _create_name_ast(self, id: str, node) -> ast.Name:
+        return ast.Name(id, ast.Load(), lineno=node.lineno, col_offset=0)
 
     def _is_illegal_magic_method_name(self, name: str) -> bool:
         """
@@ -1129,6 +1182,33 @@ class Analyzer(ast.NodeVisitor):
                         self.track_access(node, var)
                 self.deferred_tasks.append(todo)
                 return
+            elif self.current_class.dataclass and self.current_class.frozen:
+                # Node is a field of a frozen dataclass
+                if isinstance(node.ctx, ast.Load):
+                    return
+
+                # Add type info for self in this context, can retrieve the correct type from __init__.self
+                context =  tuple([self.module.type_prefix, self.current_class.name, node.id, 'self'])
+                self_type, _ = self.module.get_type([self.current_class.name, '__init__'], 'self')
+                self.module.types.all_types[context] = self_type
+
+                # Create a property for this field
+                ast_arguments = ast.arguments([], [self._create_arg_ast(node, 'self', None)], None, [], [], None, [])
+                stmts = [ast.Expr(ast.Call(self._create_name_ast('Decreases', node), [ast.Constant(None)], []))]
+                decorator_list: list[ast.expr] = [ast.Name('property'), ast.Name('ContractOnly')]
+                function_def = ast.FunctionDef(node.id, ast_arguments, stmts, decorator_list, returns=node._parent.annotation, lineno=node.lineno, col_offset=0)
+                self.visit(function_def, self.current_class.node)
+                
+                # Adjust the class body
+                assign = node._parent
+                self.current_class.node.body.remove(assign)
+                self.current_class.node.body.append(function_def)
+                
+                if(assign.value != None):
+                    raise UnsupportedException(assign, 'Default value for dataclass fields not supported')
+                # func.result = assign.value # Temporarily set value, because it will be used as default
+
+                return
             else:
                 # Node is a static field.
                 if isinstance(node.ctx, ast.Load):
@@ -1308,7 +1388,7 @@ class Analyzer(ast.NodeVisitor):
                 msg = f'Type could not be fully inferred (this usually means that a type argument is unknown)'
             raise InvalidProgramException(node, 'partial.type', message=msg)
         else:
-            msg = 'Unsupported type: {}'.format(mypy_type.__class__.__name__)
+            msg = 'Unsupported type: {} for node {}'.format(mypy_type.__class__.__name__, node.id)
             raise UnsupportedException(node, desc=msg)
         return result
 
@@ -1472,6 +1552,7 @@ class Analyzer(ast.NodeVisitor):
             return method.type
         else:
             raise UnsupportedException(node)
+        
 
     def _get_basic_name(self, node: Union[ast.Name, ast.Attribute]) -> str:
         """
@@ -1545,13 +1626,21 @@ class Analyzer(ast.NodeVisitor):
             self.stmt_container.labels.append(finally_name)
         self.visit_default(node)
 
-    def _incompatible_decorators(self, decorators) -> bool:
+    def _class_incompatible_decorators(self, decorators: set[str]) -> bool:
+        return ((('dataclass' in decorators) and (len(decorators) != 1)) or
+                (('dataclass' not in decorators) and (len(decorators) > 0))
+                )
+
+    def _class_unsupported_decorator_keywords(self, decorator: str, keyword: str) -> bool:
+        return ((('dataclass' == decorator) and (keyword != 'frozen')))
+
+    def _function_incompatible_decorators(self, decorators) -> bool:
         return ((('Predicate' in decorators) and ('Pure' in decorators)) or
                 (('Opaque' in decorators) and ('Pure' not in decorators)) or
                 (('Predicate' in decorators) and ('Inline' in decorators)) or
                 (('Inline' in decorators) and ('Pure' in decorators)) or
                 (('IOOperation' in decorators) and (len(decorators) != 1)) or
-                (('property' in decorators) and (len(decorators) != 1)) or
+                (('property' in decorators) and not(len(decorators) == 1 or (len(decorators) == 2 and 'ContractOnly' in decorators))) or
                 (('AllLow' in decorators) and ('PreservesLow' in decorators)) or
                 ((('AllLow' in decorators) or ('PreservesLow' in decorators)) and (
                     ('Predicate' in decorators) or ('Pure' in decorators)))
@@ -1563,7 +1652,7 @@ class Analyzer(ast.NodeVisitor):
         respective decorator.
         """
         decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
-        if self._incompatible_decorators(decorators):
+        if self._function_incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
         result = 'ContractOnly' in decorators
         return result
@@ -1590,35 +1679,68 @@ class Analyzer(ast.NodeVisitor):
             result = result or (not selected)
         return result
 
-    def has_decorator(self, func: ast.FunctionDef, decorator: str) -> bool:
+    def __resolve_decorator(self, decorator: ast.expr) -> Tuple[bool, str]:
+        if isinstance(decorator, ast.Name):
+            return (True, decorator.id)
+        elif isinstance(decorator, ast.Call):
+            return self.__resolve_decorator(decorator.func)
+        return (False, "")
+    
+    def __get_decorators(self, decorator_list: list[ast.expr]) -> set[str]:
+        return {res[1] for d in decorator_list if (res := self.__resolve_decorator(d))[0]}
+
+    def __decorator_has_keyword_value(self, decorator_list: list[ast.expr], decorator: str, keyword: str, value) -> bool:
+        for d in decorator_list:
+            if isinstance(d, ast.Call) and isinstance(d.func, ast.Name) and d.func.id == decorator:
+                for k in d.keywords:
+                    if self._class_unsupported_decorator_keywords(decorator, k.arg):
+                        raise UnsupportedException(d, "keyword unsupported")
+                    
+                    if k.arg == keyword and isinstance(k.value, ast.Constant):
+                        return k.value.value == value
+        return False
+
+    def class_has_decorator(self, cls: ast.ClassDef, decorator: str) -> bool:
+        decorators = self.__get_decorators(cls.decorator_list)
+        if self._class_incompatible_decorators(decorators):
+            raise InvalidProgramException(cls, "decorators.incompatible")
+        return decorator in decorators
+
+    def is_dataclass(self, cls: ast.ClassDef) -> bool:
+        return self.class_has_decorator(cls, 'dataclass')
+    
+    def is_frozen_dataclass(self, cls: ast.ClassDef) -> bool:
+        return self.__decorator_has_keyword_value(cls.decorator_list, 'dataclass', 'frozen', True)
+
+    def function_has_decorator(self, func: ast.FunctionDef, decorator: str) -> bool:
         decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
-        if self._incompatible_decorators(decorators):
+        if self._function_incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
         return decorator in decorators
 
     def is_pure(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'Pure')
+        return self.function_has_decorator(func, 'Pure')
 
     def is_opaque(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'Opaque')
+        return self.function_has_decorator(func, 'Opaque')
 
     def is_predicate(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'Predicate')
+        return self.function_has_decorator(func, 'Predicate')
 
     def is_inline_method(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'Inline')
+        return self.function_has_decorator(func, 'Inline')
 
     def is_static_method(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'staticmethod')
+        return self.function_has_decorator(func, 'staticmethod')
 
     def is_class_method(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'classmethod')
+        return self.function_has_decorator(func, 'classmethod')
 
     def is_io_operation(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'IOOperation')
+        return self.function_has_decorator(func, 'IOOperation')
 
     def is_property_getter(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'property')
+        return self.function_has_decorator(func, 'property')
 
     def is_property_setter(self, func: ast.FunctionDef) -> bool:
         setter_decorator = [d for d in func.decorator_list
@@ -1630,7 +1752,7 @@ class Analyzer(ast.NodeVisitor):
         return self.current_class.fields[setter_decorator[0].value.id]
 
     def is_all_low(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'AllLow')
+        return self.function_has_decorator(func, 'AllLow')
 
     def preserves_low(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'PreservesLow')
+        return self.function_has_decorator(func, 'PreservesLow')

@@ -360,6 +360,7 @@ EVAL_IO_SIGNATURE = ('eval_io', 'func', 'arg', 'result')
 IGNORED_IMPORTS = {'_importlib_modulespec',
                    'abc',
                    'builtins',
+                   'dataclasses',
                    'nagini_contracts',
                    'nagini_contracts.adt',
                    'nagini_contracts.contracts',

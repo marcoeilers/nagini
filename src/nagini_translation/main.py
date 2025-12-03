@@ -494,11 +494,12 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                 issue = 'Not supported: '
                 if e.args[0]:
                     issue += e.args[0]
-                else:
+                elif e.node != None:
                     issue += astunparse.unparse(e.node)
-            line = str(e.node.lineno)
-            col = str(e.node.col_offset)
-            print(issue + ' (' + python_file + '@' + line + '.' + col + ')')
+            if e.node != None:
+                line = str(e.node.lineno)
+                col = str(e.node.col_offset)
+                print(issue + ' (' + python_file + '@' + line + '.' + col + ')')
             traceback.print_exc()
         if isinstance(e, TypeException):
             for msg in e.messages:
