@@ -591,6 +591,18 @@
             "args": ["object", "object", "object", "object", "object", "object", "type", "type", "type", "type", "type", "type", "__prim__int"],
             "type": "tuple"
         },
+        "__create7__": {
+            "args": ["object", "object", "object", "object", "object", "object", "object", "type", "type", "type", "type", "type", "type", "type", "__prim__int"],
+            "type": "tuple"
+        },
+        "__create8__": {
+            "args": ["object", "object", "object", "object", "object", "object", "object", "object", "type", "type", "type", "type", "type", "type", "type", "type", "__prim__int"],
+            "type": "tuple"
+        },
+        "__create9__": {
+            "args": ["object", "object", "object", "object", "object", "object", "object", "object", "object", "type", "type", "type", "type", "type", "type", "type", "type", "type", "__prim__int"],
+            "type": "tuple"
+        },
         "__getitem__": {
             "args": ["tuple", "__prim__int"],
             "type": "object"

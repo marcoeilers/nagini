@@ -454,7 +454,10 @@ class ExpressionTranslator(CommonTranslator):
         Creates a tuple containing the given values.
         """
         tuple_class = ctx.module.global_module.classes[TUPLE_TYPE]
-        func_name = '__create' + str(len(vals)) + '__'
+        tuple_len = len(vals)
+        if tuple_len > 9:
+            raise UnsupportedException(node, "Tuples longer than 9 elements are currently unsupported. Please file an issue to resolve this.")
+        func_name = '__create' + str(tuple_len) + '__'
         types = [self.get_tuple_type_arg(v, t, node, ctx)
                  for (t, v) in zip(val_types, vals)]
         args = vals + types
