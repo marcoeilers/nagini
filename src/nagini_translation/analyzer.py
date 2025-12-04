@@ -102,8 +102,6 @@ class Analyzer(ast.NodeVisitor):
         self.deferred_tasks = []
         self.has_all_low = False
         self.enable_obligations = False
-        # Set to enable preprocessing
-        self.enable_preprocessing = False
         self.comment_pattern = "#@nagini"
 
     def initialize_io_analyzer(self) -> None:

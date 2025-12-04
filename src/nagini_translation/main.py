@@ -134,7 +134,6 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
         return None
 
     analyzer = Analyzer(types, path, selected)
-    analyzer.enable_preprocessing = config.enable_preprocessing
     analyzer.comment_pattern = config.comment_pattern  
     main_module = analyzer.module
     with open(os.path.join(builtins_index_path, 'builtins.json'), 'r') as file:
