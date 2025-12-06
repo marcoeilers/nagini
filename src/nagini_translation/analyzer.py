@@ -25,6 +25,7 @@ from nagini_translation.lib.constants import (
     CALLABLE_TYPE,
     IGNORED_IMPORTS,
     INT_TYPE,
+    PRIMITIVE_INT_TYPE,
     LEGAL_MAGIC_METHODS,
     LITERALS,
     MYPY_SUPERCLASSES,
@@ -576,7 +577,8 @@ class Analyzer(ast.NodeVisitor):
             cls.superclass = self.find_or_create_class(OBJECT_TYPE)
         if cls.python_class not in cls.superclass.python_class.direct_subclasses:
             cls.superclass.python_class.direct_subclasses.append(cls.python_class)
-
+        if cls.superclass.name == "IntEnum":
+            cls.enum = True
         if self.is_dataclass(node):
             cls.dataclass = True
         if self.is_frozen_dataclass(node):
@@ -603,7 +605,9 @@ class Analyzer(ast.NodeVisitor):
         args.append(self._create_arg_ast(node, 'self', None))
         for name, field in self.current_class.fields.items():
             args.append(self._create_arg_ast(node, name, field.type.name))
-            stmts.append(self._create_eq_postcondition(node, name, name))
+            stmts.append(self._create_eq_postcondition(node, 
+                            ast.Attribute(self._create_name_ast('self', node), name, ast.Load(), lineno=node.lineno, col_offset=0), 
+                            self._create_name_ast(name, node)))
             
         ast_arguments = ast.arguments([], args, None, [], [], None, [])
 
@@ -623,11 +627,11 @@ class Analyzer(ast.NodeVisitor):
             name_node = self._create_name_ast(type_name, node)
         return ast.arg(arg, name_node, lineno=node.lineno, col_offset=0)
 
-    def _create_eq_postcondition(self, node, attribute: str, arg: str) -> ast.stmt:
+    def _create_eq_postcondition(self, node, left: ast.expr, right: ast.expr) -> ast.stmt:
         compare = ast.Compare(
-                    ast.Attribute(self._create_name_ast('self', node), attribute, ast.Load(), lineno=node.lineno, col_offset=0),
+                    left,
                     ops=[ast.Eq()],
-                    comparators=[self._create_name_ast(arg, node)],
+                    comparators=[right],
                     lineno=node.lineno, col_offset=0)
         return ast.Expr(ast.Call(self._create_name_ast('Ensures', node), [compare], [], lineno=node.lineno, col_offset=0))
 
@@ -1206,31 +1210,44 @@ class Analyzer(ast.NodeVisitor):
                     raise UnsupportedException(assign, 'Default value for dataclass fields not supported')
                 # func.result = assign.value # Temporarily set value, because it will be used as default
 
+                if node.id in self.current_class.fields:
+                    del self.current_class.fields[node.id]
+
+                return
+            elif self.current_class.superclass.name == "IntEnum":
+                # Node is an enum member. Basically a static field that returns an instance of the enum instead
+                if isinstance(node.ctx, ast.Load):
+                    return
+                
+                node_type = self.typeof(node)
+                if node_type.name != INT_TYPE:
+                    raise InvalidProgramException(node, 'invalid literal for int() with base 10')
+                
+                assign = node._parent
+                if (not isinstance(assign, ast.Assign)
+                        or len(assign.targets) != 1):
+                    msg = ('only simple assignments and reads allowed for '
+                            'enum members')
+                    raise UnsupportedException(assign, msg)
+                
+                value = ast.Call(ast.Attribute(self._create_name_ast(self.current_class.name, assign), "__box__", ast.Load(), lineno=assign.lineno, col_offset=0), 
+                                 [assign.value], [], lineno=assign.lineno, col_offset=0)
+                self.create_static_field(node, self.current_class, value)
                 return
             else:
                 # Node is a static field.
                 if isinstance(node.ctx, ast.Load):
                     return
-                cls = self.typeof(node)
-                self.define_new(self.current_class, node.id, node)
-                var = self.node_factory.create_static_field(node.id, node, cls,
-                                                            self.module,
-                                                            self.current_class)
+                
                 assign = node._parent
                 if (not isinstance(assign, ast.Assign)
                         or len(assign.targets) != 1):
                     msg = ('only simple assignments and reads allowed for '
-                           'static fields')
+                            'static fields')
                     raise UnsupportedException(assign, msg)
-                var.value = assign.value
-                self.current_class.static_fields[node.id] = var
-                if node.id in self.current_class.fields:
-                    # It's possible that we encountered a read of this field
-                    # before seeing the definition, assumed it's a normal
-                    # (non-static) field, and created the field. We remove it
-                    # again now that we now it's actually static.
-                    del self.current_class.fields[node.id]
-                self.track_access(node, var)
+                
+                cls = self.typeof(node)
+                self.create_static_field(node, cls, assign.value)
                 return
         # We're in a function
         if isinstance(node.ctx, ast.Store):
@@ -1281,6 +1298,23 @@ class Analyzer(ast.NodeVisitor):
 
 
             self.track_access(node, var)
+
+    def create_static_field(self, node: ast.Name, type_: PythonType, val: ast.expr) -> None:
+        assert self.current_class != None
+        
+        self.define_new(self.current_class, node.id, node)
+        var = self.node_factory.create_static_field(node.id, node, type_,
+                                                    self.module,
+                                                    self.current_class)
+        var.value = val
+        self.current_class.static_fields[node.id] = var
+        if node.id in self.current_class.fields:
+            # It's possible that we encountered a read of this field
+            # before seeing the definition, assumed it's a normal
+            # (non-static) field, and created the field. We remove it
+            # again now that we now it's actually static.
+            del self.current_class.fields[node.id]
+        self.track_access(node, var)
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
         """
