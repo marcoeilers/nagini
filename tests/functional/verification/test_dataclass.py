@@ -39,21 +39,21 @@ def test_1(val: int) -> None:
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert a.data == 2
     
-# def test_2() -> None:
-#     a1 = A(0)
-#     a2 = A(3)
-#     a3 = A(42)
-#     c = C([a1, a2, a3])
+def test_2() -> None:
+    a1 = A(0)
+    a2 = A(3)
+    a3 = A(42)
+    c = C([a1, a2, a3])
     
-#     assert len(c.fields) == 3
-#     assert c.fields[0].data == 0
+    assert len(c.fields) == 3
+    assert c.fields[0].data == 0
     
-#     c.fields.append(A(20))
-#     assert len(c.fields) == 4
-#     assert c.fields[3].data == 20
+    c.fields.append(A(20))
+    assert len(c.fields) == 4
+    assert c.fields[3].data == 20
     
-#     #:: ExpectedOutput(assert.failed:assertion.false)
-#     assert c.fields[1].data == c.fields[2].data
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert c.fields[1].data == c.fields[2].data
    
 def test_eq_1(val: int) -> None:
     a1 = A(val)

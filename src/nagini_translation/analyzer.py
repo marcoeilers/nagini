@@ -605,9 +605,9 @@ class Analyzer(ast.NodeVisitor):
         args.append(self._create_arg_ast(node, 'self', None))
         for name, field in self.current_class.fields.items():
             args.append(self._create_arg_ast(node, name, field.type.name))
-            stmts.append(self._create_eq_postcondition(node, 
+            stmts.append(self._create_comp_postcondition(node, 
                             ast.Attribute(self._create_name_ast('self', node), name, ast.Load(), lineno=node.lineno, col_offset=0), 
-                            self._create_name_ast(name, node)))
+                            self._create_name_ast(name, node), ast.Is()))
             
         ast_arguments = ast.arguments([], args, None, [], [], None, [])
 
@@ -627,10 +627,10 @@ class Analyzer(ast.NodeVisitor):
             name_node = self._create_name_ast(type_name, node)
         return ast.arg(arg, name_node, lineno=node.lineno, col_offset=0)
 
-    def _create_eq_postcondition(self, node, left: ast.expr, right: ast.expr) -> ast.stmt:
+    def _create_comp_postcondition(self, node, left: ast.expr, right: ast.expr, op: ast.cmpop) -> ast.stmt:
         compare = ast.Compare(
                     left,
-                    ops=[ast.Eq()],
+                    ops=[op],
                     comparators=[right],
                     lineno=node.lineno, col_offset=0)
         return ast.Expr(ast.Call(self._create_name_ast('Ensures', node), [compare], [], lineno=node.lineno, col_offset=0))
@@ -1209,9 +1209,6 @@ class Analyzer(ast.NodeVisitor):
                 if(assign.value != None):
                     raise UnsupportedException(assign, 'Default value for dataclass fields not supported')
                 # func.result = assign.value # Temporarily set value, because it will be used as default
-
-                if node.id in self.current_class.fields:
-                    del self.current_class.fields[node.id]
 
                 return
             elif self.current_class.superclass.name == "IntEnum":
