@@ -145,7 +145,11 @@ class ProgramTranslator(CommonTranslator):
             ctx.current_class = field.cls
             ctx.module = field.cls.module
             # Compute the field value
-            stmt, value = self.translate_expr(field.value, ctx)
+            if cls.enum:
+                stmt, value = self.translate_expr(field.value, ctx, self.viper.Int)
+                value = self.viper.FuncApp(cls.name + '__box__', [value], position, info, self.viper.Ref)
+            else:
+                stmt, value = self.translate_expr(field.value, ctx)
             if stmt:
                 raise InvalidProgramException('purity.violated', field.node)
             field_position = self.to_position(field.node, ctx)
@@ -1166,45 +1170,55 @@ class ProgramTranslator(CommonTranslator):
         return domains, functions
 
     def _create_enum_func_box_and_unbox(self, enum: PythonClass, ctx: Context) -> list[Function]:
-        """Create __box__ and __unbox__ functions for IntEnum. Other enum types currently not supported"""
-
+        """Create __box__ and __unbox__ functions for IntEnum. Other enum types currently not supported."""
+        
         pos = self.to_position(enum, ctx)
         info = self.no_info(ctx)
+        terminates_wildcard = self.viper.DecreasesWildcard(None, pos, info)
+        
+        box_func_name = enum.sil_name + '__box__'
+        unbox_func_name = enum.sil_name + '__unbox__'
 
         ## Create box function (Int -> Ref)
         int_val_use = self.viper.LocalVar('value', self.viper.Int, pos, info)
         int_val_decl = self.viper.LocalVarDecl('value', self.viper.Int, pos, info)
-        postconds = []
         result = self.viper.Result(self.viper.Ref, pos, info)
-        postconds.append(self.type_factory.type_check(result, enum, pos, ctx))
+        preconds = [terminates_wildcard]
+        postconds = []
         
-        # Ensure boxing is injective: forall other: Int :: (other == value) == (box(other) == result)
-        other_int_use = self.viper.LocalVar('___other', self.viper.Int, pos, info)
-        other_int_decl = self.viper.LocalVarDecl('___other', self.viper.Int, pos, info)
-        box_func_name = enum.sil_name + '__box__'
-        other_object = self.viper.FuncApp(box_func_name, [other_int_use], pos, info, self.viper.Ref)
-        other_is_result = self.viper.EqCmp(other_object, result, pos, info)
-        args_equal = self.viper.EqCmp(int_val_use, other_int_use, pos, info)
-        both_equal = self.viper.EqCmp(args_equal, other_is_result, pos, info)
-        trigger = self.viper.Trigger([other_object], pos, info)
-        quant = self.viper.Forall([other_int_decl], [trigger], both_equal, pos, info)
-        postconds.append(quant)
+        postconds.append(self.type_factory.type_check(result, enum, pos, ctx, True))
         
-        terminates_wildcard = self.viper.DecreasesWildcard(None, pos, info)
+        unbox_func = self.viper.FuncApp(unbox_func_name, [result], pos, info, self.viper.Int)
+        postconds.append(self.viper.EqCmp(unbox_func, int_val_use, pos, info))
+        
         yield self.viper.Function(box_func_name,
-                                [int_val_decl], self.viper.Ref, [terminates_wildcard], postconds,
+                                [int_val_decl], self.viper.Ref, preconds, postconds,
                                 None, pos, info)
 
         ## Create unbox function (Ref -> Int)
+        ref_use = self.viper.LocalVar('box', self.viper.Ref, pos, info)
+        ref_decl = self.viper.LocalVarDecl('box', self.viper.Ref, pos, info)
+        result = self.viper.Result(self.viper.Int, pos, info)
         preconds = [terminates_wildcard]
         postconds = []
-        ref_use = self.viper.LocalVar('ref', self.viper.Ref, pos, info)
-        preconds.append(self.type_factory.type_check(ref_use, enum, pos, ctx))
-        result = self.viper.Result(self.viper.Int, pos, info)
-        box_func = self.viper.FuncApp(box_func_name, [result], pos, info, self.viper.Ref)
-        postconds.append(self.viper.EqCmp(box_func, ref_use, pos, info))
-        ref_decl = self.viper.LocalVarDecl('ref', self.viper.Ref, pos, info)
-        yield self.viper.Function(enum.sil_name + '__unbox__',
+        
+        preconds.append(self.type_factory.type_check(ref_use, enum, pos, ctx, True))
+        
+        # Add forall postcondition
+        i_var_use = self.viper.LocalVar('i', self.viper.Ref, pos, info)
+        i_var_decl = self.viper.LocalVarDecl('i', self.viper.Ref, pos, info)
+        obj_eq_check = self.viper.EqCmp(ref_use, i_var_use, pos, info)
+        type_check = self.type_factory.type_check(i_var_use, enum, pos, ctx, True)
+        condition = self.viper.And(obj_eq_check, type_check, pos, info)        
+        unbox_eq = self.viper.EqCmp(self.viper.FuncApp(unbox_func_name, [i_var_use], pos, info, self.viper.Int),
+                                    result, pos, info)
+        implication = self.viper.Implies(condition, unbox_eq, pos, info)
+        
+        trigger = self.viper.Trigger([obj_eq_check, unbox_eq], pos, info)        
+        forall_postcond = self.viper.Forall([i_var_decl], [trigger], implication, pos, info)
+        postconds.append(forall_postcond)
+        
+        yield self.viper.Function(unbox_func_name,
                                 [ref_decl], self.viper.Int, preconds, postconds,
                                 None, pos, info)
 
@@ -1276,6 +1290,12 @@ class ProgramTranslator(CommonTranslator):
                     while current_field.overrides:
                         current_field = current_field.overrides
                     static_fields.setdefault(current_field, []).append(cls)
+                if cls.enum:
+                    enum_functions = list(self._create_enum_func_box_and_unbox(cls, ctx))
+                    functions.extend(enum_functions)
+                    if module is not module.global_module:
+                        for function in enum_functions:
+                            all_names.append(function.name())
 
             ctx.current_class = None
             # Translate default args
@@ -1394,9 +1414,6 @@ class ProgramTranslator(CommonTranslator):
                         predicate_families[cpred].append(pred)
                     else:
                         predicate_families[cpred] = [pred]
-                if cls.enum:
-                    enum_functions = list(self._create_enum_func_box_and_unbox(cls, ctx))
-                    functions.extend(enum_functions)
 
                 ctx.current_class = old_class
 
