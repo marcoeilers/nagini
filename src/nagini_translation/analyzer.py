@@ -1226,11 +1226,7 @@ class Analyzer(ast.NodeVisitor):
                     msg = ('only simple assignments and reads allowed for '
                             'enum members')
                     raise UnsupportedException(assign, msg)
-                
-                # value = ast.Call(ast.Attribute(self._create_name_ast(self.current_class.name, assign), "__box__", ast.Load(), lineno=assign.lineno, col_offset=0), 
-                #                  [assign.value], [], lineno=assign.lineno, col_offset=0)
-                # self.create_static_field(node, self.current_class, value)
-                self.create_static_field(node, node_type, assign.value)
+                self.create_static_field(node, self.current_class, assign.value)
                 return
             else:
                 # Node is a static field.
