@@ -1179,7 +1179,7 @@ class ProgramTranslator(CommonTranslator):
         box_func_name = enum.sil_name + '__box__'
         unbox_func_name = enum.sil_name + '__unbox__'
 
-        ## Create box function (Int -> Ref)
+        # Create box function (Int -> Ref)
         int_val_use = self.viper.LocalVar('value', self.viper.Int, pos, info)
         int_val_decl = self.viper.LocalVarDecl('value', self.viper.Int, pos, info)
         result = self.viper.Result(self.viper.Ref, pos, info)
@@ -1195,7 +1195,7 @@ class ProgramTranslator(CommonTranslator):
                                 [int_val_decl], self.viper.Ref, preconds, postconds,
                                 None, pos, info)
 
-        ## Create unbox function (Ref -> Int)
+        # Create unbox function (Ref -> Int)
         ref_use = self.viper.LocalVar('box', self.viper.Ref, pos, info)
         ref_decl = self.viper.LocalVarDecl('box', self.viper.Ref, pos, info)
         result = self.viper.Result(self.viper.Int, pos, info)
@@ -1204,10 +1204,9 @@ class ProgramTranslator(CommonTranslator):
         
         preconds.append(self.type_factory.type_check(ref_use, enum, pos, ctx, True))
         
-        ## Add forall postcondition
+        # Add forall postcondition
         i_var_use = self.viper.LocalVar('i', self.viper.Ref, pos, info)
         i_var_decl = self.viper.LocalVarDecl('i', self.viper.Ref, pos, info)
-        # obj_eq_check = self.viper.EqCmp(ref_use, i_var_use, pos, info) # TODO should be object___eq__
         obj_eq_check = self.viper.DomainFuncApp('object___eq__', [ref_use, i_var_use], self.viper.Bool, pos, info, '__ObjectEquality')
         type_check = self.type_factory.type_check(i_var_use, enum, pos, ctx, True)
         condition = self.viper.And(obj_eq_check, type_check, pos, info)  
@@ -1215,7 +1214,6 @@ class ProgramTranslator(CommonTranslator):
         unbox_eq = self.viper.EqCmp(unbox_apply, result, pos, info)
         implication = self.viper.Implies(condition, unbox_eq, pos, info)
         
-        # trigger = self.viper.Trigger([unbox_apply], pos, info)
         trigger = self.viper.Trigger([obj_eq_check, unbox_apply], pos, info)
         forall_postcond = self.viper.Forall([i_var_decl], [trigger], implication, pos, info)
         postconds.append(forall_postcond)

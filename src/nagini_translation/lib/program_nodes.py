@@ -381,6 +381,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self.dataclass = False
         self.frozen = False
         self.enum = False
+        self.enum_type = None
         self.defined = False
         self._has_classmethod = False
         self.type_vars = OrderedDict()

@@ -209,6 +209,21 @@ class CallTranslator(CommonTranslator):
 
         return box_func
 
+    def translate_enum_cons(self, enum: PythonClass, args: List[FuncApp],
+                           pos: Position, ctx: Context) -> Expr:
+        """
+        Cosntruct Enums via a sequence of constructor calls and
+        boxing/unboxing calls.
+        """
+        assert len(args) == 1
+
+        info = self.no_info(ctx)
+        args[0] = self.to_type(args[0], self.viper.Int, ctx) 
+        box_func_name = enum.sil_name + '__box__'
+        box_func = self.viper.FuncApp(box_func_name, args, pos, info, self.viper.Ref)
+        return box_func
+
+
     def _is_lock_subtype(self, cls: PythonClass) -> bool:
         if cls is None:
             return False
@@ -229,6 +244,9 @@ class CallTranslator(CommonTranslator):
 
         if target_class.is_adt:
             return arg_stmts, self.translate_adt_cons(target_class, args, pos, ctx)
+
+        if target_class.enum:
+            return arg_stmts, self.translate_enum_cons(target_class, args, pos, ctx)
 
         res_var = ctx.current_function.create_variable(target_class.name +
                                                        '_res',

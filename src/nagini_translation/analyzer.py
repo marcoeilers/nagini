@@ -579,6 +579,7 @@ class Analyzer(ast.NodeVisitor):
             cls.superclass.python_class.direct_subclasses.append(cls.python_class)
         if cls.superclass.name == "IntEnum":
             cls.enum = True
+            cls.enum_type = INT_TYPE
         if self.is_dataclass(node):
             cls.dataclass = True
         if self.is_frozen_dataclass(node):
@@ -1203,7 +1204,7 @@ class Analyzer(ast.NodeVisitor):
                 
                 # Adjust the class body
                 assign = node._parent
-                self.current_class.node.body.remove(assign)
+                self.current_class.node.body.remove(assign) # TODO is this necessary?
                 self.current_class.node.body.append(function_def)
                 
                 if(assign.value != None):
