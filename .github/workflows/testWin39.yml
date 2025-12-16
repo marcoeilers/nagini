@@ -10,7 +10,7 @@ jobs:
 
     runs-on: windows-latest
     env:
-      BOOGIE_EXE: "%USERPROFILE%\.dotnet\tools\boogie"
+      BOOGIE_EXE: "$HOME\.dotnet\tools\boogie"
     steps:
     - uses: actions/checkout@v2
     - name: Set up Java 17
