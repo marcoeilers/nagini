@@ -1092,6 +1092,9 @@
     },
     "extends": "object"
 },
+"IntEnum": {
+    "extends": "int"
+},
 "global": {
     "functions": {
         "max": {
