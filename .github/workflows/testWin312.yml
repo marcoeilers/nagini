@@ -10,7 +10,7 @@ jobs:
 
     runs-on: windows-latest
     env:
-      BOOGIE_EXE: "/home/runner/.dotnet/tools/boogie"
+      BOOGIE_EXE: "C:\\Users\\runneradmin\\.dotnet\\tools\\boogie"
     steps:
     - uses: actions/checkout@v2
     - name: Set up Java 17
@@ -23,6 +23,10 @@ jobs:
       with:
         python-version: "3.12"
         architecture: "x64"
+    - name: Setup .NET
+      uses: xt0rted/setup-dotnet@v1.5.0
+      with:
+        dotnet-version: 6.0.x
     - name: Install Boogie
       run: |
         dotnet tool install --global Boogie --version 2.15.9
