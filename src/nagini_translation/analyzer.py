@@ -1357,6 +1357,8 @@ class Analyzer(ast.NodeVisitor):
         """
         Converts an internal mypy type to a PythonType.
         """
+        if (self.types.is_literal_type(mypy_type)):
+            mypy_type = mypy_type.fallback
         if (self.types.is_void_type(mypy_type) or
                 self.types.is_none_type(mypy_type)):
             result = None

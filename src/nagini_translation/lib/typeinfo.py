@@ -455,6 +455,9 @@ class TypeInfo:
     def is_instance_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.Instance)
 
+    def is_literal_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.LiteralType) # TODO use correct type here
+
     def is_tuple_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.TupleType)
 
