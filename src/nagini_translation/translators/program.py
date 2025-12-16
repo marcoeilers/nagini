@@ -1184,12 +1184,24 @@ class ProgramTranslator(CommonTranslator):
         int_val_decl = self.viper.LocalVarDecl('value', self.viper.Int, pos, info)
         result = self.viper.Result(self.viper.Ref, pos, info)
         preconds = [terminates_wildcard]
-        postconds = []
         
+        # Add precondition for allowed values
+        enum_value_precond = self.viper.FalseLit(pos, info)
+        for field_name in enum.static_fields:
+            field = enum.get_static_field(field_name)
+            if field and field.value:
+                _, enum_value_expr = self.translate_expr(field.value, ctx, self.viper.Int)
+                value_check = self.viper.EqCmp(int_val_use, enum_value_expr, pos, info)                
+                enum_value_precond = self.viper.Or(enum_value_precond, value_check, pos, info)
+        preconds.append(enum_value_precond)            
+        
+        postconds = []        
         postconds.append(self.type_factory.type_check(result, enum, pos, ctx, True))
         
         unbox_func = self.viper.FuncApp(unbox_func_name, [result], pos, info, self.viper.Int)
         postconds.append(self.viper.EqCmp(unbox_func, int_val_use, pos, info))
+        int_unbox_func = self.viper.FuncApp('int___unbox__', [result], pos, info, self.viper.Int)
+        postconds.append(self.viper.EqCmp(int_unbox_func, int_val_use, pos, info))
         
         yield self.viper.Function(box_func_name,
                                 [int_val_decl], self.viper.Ref, preconds, postconds,

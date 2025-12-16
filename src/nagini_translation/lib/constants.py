@@ -378,6 +378,8 @@ IGNORED_MODULE_NAMES = {
     '_importlib_modulespec': [],
     'abc': [],
     'builtins': [],
+    'dataclasses': [],
+    'enum': [],
     'nagini_contracts': [],
     'nagini_contracts.contracts': [],
     'nagini_contracts.io_contracts': [],
