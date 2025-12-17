@@ -46,7 +46,7 @@ from typing import Any, Dict, List, Optional, Set
 from nagini_translation.lib import config, jvmaccess
 from nagini_translation.lib.errors import error_manager
 from nagini_translation.lib.typeinfo import TypeException
-from nagini_translation.lib.util import InvalidProgramException
+from nagini_translation.lib.util import InvalidProgramException, UnsupportedException
 from nagini_translation.main import translate, verify, TYPE_ERROR_PATTERN
 from nagini_translation.verifier import VerificationResult, ViperVerifier
 
@@ -153,6 +153,28 @@ class InvalidProgramError(Error):
     @property
     def full_id(self) -> str:
         return 'invalid.program:' + self._exception.code
+
+    @property
+    def line(self) -> int:
+        return self._exception.node.lineno
+
+    def get_vias(self) -> List[int]:
+        return []
+
+
+class UnsupportedError(Error):
+    """Unsupported feature error reported by translator."""
+
+    def __init__(self, exception: UnsupportedException) -> None:
+        self._exception = exception
+
+    def __repr__(self) -> str:
+        return 'UnsupportedError({}, line={}, vias={})'.format(
+            self.full_id, self.line, self.get_vias())
+
+    @property
+    def full_id(self) -> str:
+        return 'unsupported:' + self._exception.desc
 
     @property
     def line(self) -> int:
@@ -648,6 +670,8 @@ class TranslationTest(AnnotatedTest):
             actual_errors = [
                 TypeCheckError(msg) for msg in exp2.messages
                 if _MYPY_ERROR_MATCHER.match(msg)]
+        except UnsupportedException as exp3:
+            actual_errors = [UnsupportedError(exp3)]
         annotation_manager.check_errors(actual_errors)
         if annotation_manager.has_unexpected_missing():
             pytest.skip('Unexpected or missing output')
