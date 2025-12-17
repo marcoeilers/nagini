@@ -24,6 +24,7 @@ from nagini_translation.analyzer_io import IOOperationAnalyzer
 from nagini_translation.external.ast_util import mark_text_ranges
 from nagini_translation.lib.constants import (
     CALLABLE_TYPE,
+    EXTENDABLE_BUILTINS,
     IGNORED_IMPORTS,
     INT_TYPE,
     LEGAL_MAGIC_METHODS,
@@ -569,6 +570,8 @@ class Analyzer(ast.NodeVisitor):
             cls.superclass = self.find_or_create_target_class(actual_bases[0])
             if isinstance(cls.superclass, PythonClass) and cls.superclass.is_adt:
                 actual_bases = self._visit_ADT(cls, actual_bases, node, ast)
+            if cls.superclass.interface and cls.superclass.name not in EXTENDABLE_BUILTINS:
+                raise UnsupportedException(node, 'Subclassing builtin type is currently not supported.')
         if len(actual_bases) > 1:
             raise UnsupportedException(node, 'multiple inheritance')
         if len(actual_bases) == 0:

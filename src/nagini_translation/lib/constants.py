@@ -27,6 +27,13 @@ BUILTINS = ['cast',
             'list',
             'enumerate']
 
+EXTENDABLE_BUILTINS = [
+    'object',
+    'Exception',
+    'Lock',
+    'int'
+]
+
 THREADING = ['Thread']
 
 BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred', 'MayStart', 'ThreadPost']
