@@ -30,6 +30,11 @@ class B:
 class C:
     fields: list[A]
 
+@dataclass(frozen=True)
+class D:
+    value: int
+    length: int
+    text: str
 
 def test_1(val: int) -> None:
     a = A(val)
@@ -54,7 +59,16 @@ def test_2() -> None:
     
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert c.fields[1].data == c.fields[2].data
-   
+
+def test_named_param(val: int, length: int) -> None:
+    d = D(length=length, value=val, text="")
+
+    assert d.value == val
+    assert d.text == ""
+
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert d.length == 2
+
 def test_eq_1(val: int) -> None:
     a1 = A(val)
     a2 = A(val)

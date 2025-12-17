@@ -13,3 +13,8 @@ class foo:
 @dataclass(frozen=True)
 class A:
     data: foo
+
+def test_cons() -> None:
+    f1 = foo(1, "hello", [])
+
+    f2 = foo(num=2, name="hello", obj=[])
