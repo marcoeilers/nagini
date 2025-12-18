@@ -129,7 +129,8 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
         raise Exception('Viper AST SIF extension not found on classpath.')
     
     types = TypeInfo()
-    type_correct = types.check(path, base_dir, text=read_source_file(path))
+    preprocessed_text = read_source_file(path) if config.enable_preprocessing else None
+    type_correct = types.check(path, base_dir, text=preprocessed_text)
     if not type_correct:
         return None
 
