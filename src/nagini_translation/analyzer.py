@@ -1420,7 +1420,12 @@ class Analyzer(ast.NodeVisitor):
                 msg = f'Type could not be fully inferred (this usually means that a type argument is unknown)'
             raise InvalidProgramException(node, 'partial.type', message=msg)
         else:
-            msg = 'Unsupported type: {} for node {}'.format(mypy_type.__class__.__name__, node.id)
+            name = ""
+            if hasattr(node, 'id'):
+                name = node.id
+            elif hasattr(node, 'name'):
+                name = node.name
+            msg = 'Unsupported type: {} for node {}'.format(mypy_type.__class__.__name__, name)
             raise UnsupportedException(node, desc=msg)
         return result
 
@@ -1584,7 +1589,6 @@ class Analyzer(ast.NodeVisitor):
             return method.type
         else:
             raise UnsupportedException(node)
-        
 
     def _get_basic_name(self, node: Union[ast.Name, ast.Attribute]) -> str:
         """
