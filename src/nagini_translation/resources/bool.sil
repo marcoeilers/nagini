@@ -248,7 +248,7 @@ function __prim__int___box__(prim: Int): Ref
 function int___unbox__(box: Ref): Int
     decreases _
     requires issubtype(typeof(box), int())
-    ensures !issubtype(typeof(box), bool()) ==> __prim__int___box__(result) == box
+    ensures typeof(box) == int() ==> __prim__int___box__(result) == box
     ensures issubtype(typeof(box), bool()) ==> __prim__bool___box__(result != 0) == box
     ensures forall i: Ref :: {object___eq__(box, i), int___unbox__(i)} (object___eq__(box, i) && issubtype(typeof(i), int())) ==> int___unbox__(i) == result
 

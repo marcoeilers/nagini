@@ -6,6 +6,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import logging
+import sys
+
 import mypy.build
 import os
 
@@ -291,7 +293,8 @@ class TypeInfo:
         result.export_types = True
         result.preserve_asts = True
         result.warn_no_return = False
-        result.incremental = True
+        # Incremental mode in Python 3.9 leads to problems
+        result.incremental = sys.version_info[1] > 9
         # Since we run mypy twice with different options, we use different cache dirs for different configurations,
         # otherwise Mypy throws away the cache every time.
         result.cache_dir = '.mypy_cache_strict' if strict_optional else '.mypy_cache_nonstrict'
@@ -354,12 +357,13 @@ class TypeInfo:
                 if prefix.replace(os.sep, '.') not in directly_imported:
                     return old_find_cache_meta(id, path, mgr)
                 return None
-            mypy.build.find_cache_meta = my_find_cache_meta
+            if sys.version_info[1] > 9:
+                # In Python 3.9 or newer, we use the incremental mode, and we have to monkey-patch mypy.
+                mypy.build.find_cache_meta = my_find_cache_meta
 
-            res_strict = mypy.build.build(
-                [BuildSource(filename, module_name, text, base_dir=base_dir)],
-                options_strict
-                )
+            sources = [BuildSource(filename, module_name, text, base_dir=base_dir)]
+
+            res_strict = mypy.build.build(sources, options_strict)
 
             if res_strict.errors:
                 # Run mypy a second time with strict optional checking disabled,
