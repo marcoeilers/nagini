@@ -13,3 +13,7 @@ class foo:
 @dataclass(frozen=True)
 class A:
     data: foo
+    
+@dataclass(frozen=True)
+class B:
+    num: int = 2

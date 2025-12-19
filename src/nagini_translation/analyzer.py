@@ -603,6 +603,7 @@ class Analyzer(ast.NodeVisitor):
         assert self.current_class != None
 
         args: list[ast.arg] = []
+        defaults: list[ast.expr] = []
         stmts: list[ast.stmt] = []
         
         # Parse fields, add implicit args and post conditions
@@ -612,8 +613,11 @@ class Analyzer(ast.NodeVisitor):
             stmts.append(self._create_comp_postcondition(node, 
                             ast.Attribute(self._create_name_ast('self', node), name, ast.Load(), lineno=node.lineno, col_offset=0), 
                             self._create_name_ast(name, node), ast.Is()))
+            if field.result != None:
+                defaults.append(field.result)
+                field.result = None
             
-        ast_arguments = ast.arguments([], args, None, [], [], None, [])
+        ast_arguments = ast.arguments([], args, None, [], [], None, defaults)
 
         # Could add implicit field assignments for non-frozen dataclass
         
@@ -1207,12 +1211,21 @@ class Analyzer(ast.NodeVisitor):
                 
                 # Adjust the class body
                 assign = node._parent
-                self.current_class.node.body.remove(assign) # TODO is this necessary?
+                self.current_class.node.body.remove(assign)
                 self.current_class.node.body.append(function_def)
                 
-                if(assign.value != None):
-                    raise UnsupportedException(assign, 'Default value for dataclass fields not supported')
-                # func.result = assign.value # Temporarily set value, because it will be used as default
+                if not ((isinstance(assign, ast.Assign) and len(assign.targets) == 1) or
+                        (isinstance(assign, ast.AnnAssign) and assign.simple == 1)):
+                    msg = ('only simple assignments and reads allowed for '
+                            'dataclass fields')
+                    raise UnsupportedException(assign, msg)
+                
+                if assign.value != None:
+                    if not isinstance(assign.value, ast.Constant):
+                        raise UnsupportedException(assign, 'Only constants allowed for datafield default value')
+                    
+                    # Temporarily set value, because it will be used as default
+                    self.current_class.fields[node.id].result = assign.value
 
                 return
             elif self.current_class.superclass.name == "IntEnum":
