@@ -32,7 +32,8 @@ EXTENDABLE_BUILTINS = [
     'object',
     'Exception',
     'Lock',
-    'int'
+    'int',
+    'IntEnum'
 ]
 
 THREADING = ['Thread']
