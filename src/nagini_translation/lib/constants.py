@@ -28,6 +28,13 @@ BUILTINS = ['cast',
             'enumerate',
             'bytearray']
 
+EXTENDABLE_BUILTINS = [
+    'object',
+    'Exception',
+    'Lock',
+    'int'
+]
+
 THREADING = ['Thread']
 
 BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred', 'bytearray_pred', 'MayStart', 'ThreadPost']

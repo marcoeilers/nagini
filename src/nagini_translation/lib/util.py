@@ -84,6 +84,7 @@ class UnsupportedException(Exception):
 
     def __init__(self, ast_element: ast.AST, desc=""):
         self.node = ast_element
+        self.desc = desc
         super().__init__(desc)
 
 

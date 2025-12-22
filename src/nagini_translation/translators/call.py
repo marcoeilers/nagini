@@ -319,6 +319,22 @@ class CallTranslator(CommonTranslator):
             stmts.append(self.viper.Fold(acc_pred, lock_pos, info))
 
         target = target_class.get_method('__init__')
+
+        # Special cases: Subclasses of builtin types.
+        int_class = target_class.module.global_module.classes[INT_TYPE]
+        if target_class.issubtype(int_class) and int_class != target_class:
+            # assume int___unbox__(res_var) == arg[0] if args else 0
+            int_value = self.get_function_call(int_class, '__unbox__', [res_var.ref()], [None], node, ctx, pos)
+            if len(args) == 1 or target:
+                arg_value = self.viper.IntLit(0, pos, info)
+            elif len(args) == 2:
+                arg_value = self.to_int(args[1], ctx)
+            else:
+                raise UnsupportedException(node, 'Unsupported int constructor')
+            int_value_equal = self.viper.EqCmp(int_value, arg_value, pos, info)
+            stmts.append(self.viper.Inhale(int_value_equal, pos, info))
+
+
         if target:
             target_class = target.cls
             targets = []

@@ -23,6 +23,7 @@ from nagini_translation.analyzer_io import IOOperationAnalyzer
 from nagini_translation.external.ast_util import mark_text_ranges
 from nagini_translation.lib.constants import (
     CALLABLE_TYPE,
+    EXTENDABLE_BUILTINS,
     IGNORED_IMPORTS,
     INT_TYPE,
     PRIMITIVE_INT_TYPE,
@@ -571,6 +572,8 @@ class Analyzer(ast.NodeVisitor):
             cls.superclass = self.find_or_create_target_class(actual_bases[0])
             if isinstance(cls.superclass, PythonClass) and cls.superclass.is_adt:
                 actual_bases = self._visit_ADT(cls, actual_bases, node, ast)
+            if cls.superclass.python_class.interface and cls.superclass.python_class.name not in EXTENDABLE_BUILTINS:
+                raise UnsupportedException(node, 'Subclassing builtin type is currently not supported.')
         if len(actual_bases) > 1:
             raise UnsupportedException(node, 'multiple inheritance')
         if len(actual_bases) == 0:
@@ -600,6 +603,7 @@ class Analyzer(ast.NodeVisitor):
         assert self.current_class != None
 
         args: list[ast.arg] = []
+        defaults: list[ast.expr] = []
         stmts: list[ast.stmt] = []
         
         # Parse fields, add implicit args and post conditions
@@ -609,8 +613,11 @@ class Analyzer(ast.NodeVisitor):
             stmts.append(self._create_comp_postcondition(node, 
                             ast.Attribute(self._create_name_ast('self', node), name, ast.Load(), lineno=node.lineno, col_offset=0), 
                             self._create_name_ast(name, node), ast.Is()))
+            if field.result != None:
+                defaults.append(field.result)
+                field.result = None
             
-        ast_arguments = ast.arguments([], args, None, [], [], None, [])
+        ast_arguments = ast.arguments([], args, None, [], [], None, defaults)
 
         # Could add implicit field assignments for non-frozen dataclass
         
@@ -1204,12 +1211,21 @@ class Analyzer(ast.NodeVisitor):
                 
                 # Adjust the class body
                 assign = node._parent
-                self.current_class.node.body.remove(assign) # TODO is this necessary?
+                self.current_class.node.body.remove(assign)
                 self.current_class.node.body.append(function_def)
                 
-                if(assign.value != None):
-                    raise UnsupportedException(assign, 'Default value for dataclass fields not supported')
-                # func.result = assign.value # Temporarily set value, because it will be used as default
+                if not ((isinstance(assign, ast.Assign) and len(assign.targets) == 1) or
+                        (isinstance(assign, ast.AnnAssign) and assign.simple == 1)):
+                    msg = ('only simple assignments and reads allowed for '
+                            'dataclass fields')
+                    raise UnsupportedException(assign, msg)
+                
+                if assign.value != None:
+                    if not isinstance(assign.value, ast.Constant):
+                        raise UnsupportedException(assign, 'Only constants allowed for datafield default value')
+                    
+                    # Temporarily set value, because it will be used as default
+                    self.current_class.fields[node.id].result = assign.value
 
                 return
             elif self.current_class.superclass.name == "IntEnum":
@@ -1417,7 +1433,12 @@ class Analyzer(ast.NodeVisitor):
                 msg = f'Type could not be fully inferred (this usually means that a type argument is unknown)'
             raise InvalidProgramException(node, 'partial.type', message=msg)
         else:
-            msg = 'Unsupported type: {} for node {}'.format(mypy_type.__class__.__name__, node.id)
+            name = ""
+            if hasattr(node, 'id'):
+                name = node.id
+            elif hasattr(node, 'name'):
+                name = node.name
+            msg = 'Unsupported type: {} for node {}'.format(mypy_type.__class__.__name__, name)
             raise UnsupportedException(node, desc=msg)
         return result
 
@@ -1581,7 +1602,6 @@ class Analyzer(ast.NodeVisitor):
             return method.type
         else:
             raise UnsupportedException(node)
-        
 
     def _get_basic_name(self, node: Union[ast.Name, ast.Attribute]) -> str:
         """
