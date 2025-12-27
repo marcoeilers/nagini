@@ -131,7 +131,7 @@ function __prim__int___box__(prim: Int): Ref
 function int___unbox__(box: Ref): Int
     decreases _
     requires issubtype(typeof(box), int())
-    ensures !issubtype(typeof(box), bool()) ==> __prim__int___box__(result) == box
+    ensures typeof(box) == int() ==> __prim__int___box__(result) == box
     ensures issubtype(typeof(box), bool()) ==> __prim__bool___box__(result != 0) == box
     ensures forall i: Ref :: {object___eq__(box, i), int___unbox__(i)} (object___eq__(box, i) && issubtype(typeof(i), int())) ==> int___unbox__(i) == result
 
@@ -391,3 +391,7 @@ domain __SumHelper[T$] {
         forall __ss1: Seq[Int], __ss2: Seq[Int] :: { __sum(__ss1), __sum(__ss2) } __toMS(__ss1) == __toMS(__ss2) ==> __sum(__ss1) == __sum(__ss2)
     }
 }
+
+function EllipsisType___create__(): Ref
+    ensures typeof(result) == EllipsisType()
+    ensures forall r: Ref :: { issubtype(typeof(r), EllipsisType()) } issubtype(typeof(r), EllipsisType()) ==> r == result

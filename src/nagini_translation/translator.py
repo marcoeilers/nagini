@@ -130,13 +130,6 @@ class Translator:
     def no_info(self, ctx: Context) -> 'silver.ast.Info':
         return self.to_info([], ctx)
 
-    def set_required_names(self, name: str, required_names: Set[str]) -> None:
-        """
-        Registers that the native Silver method/function named 'name' depends
-        on the methods/functions in the given set.
-        """
-        self.prog_translator.required_names[name] = required_names
-
     def create_obligation_info(self, method: PythonMethod) -> object:
         """
         Create an obligation info for method. This method should be

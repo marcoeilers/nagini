@@ -40,13 +40,13 @@ import pytest
 import re
 import tokenize
 from collections import Counter
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 
 from nagini_translation.lib import config, jvmaccess
 from nagini_translation.lib.errors import error_manager
 from nagini_translation.lib.typeinfo import TypeException
-from nagini_translation.lib.util import InvalidProgramException
+from nagini_translation.lib.util import InvalidProgramException, UnsupportedException
 from nagini_translation.main import translate, verify, TYPE_ERROR_PATTERN
 from nagini_translation.verifier import VerificationResult, ViperVerifier
 
@@ -153,6 +153,28 @@ class InvalidProgramError(Error):
     @property
     def full_id(self) -> str:
         return 'invalid.program:' + self._exception.code
+
+    @property
+    def line(self) -> int:
+        return self._exception.node.lineno
+
+    def get_vias(self) -> List[int]:
+        return []
+
+
+class UnsupportedError(Error):
+    """Unsupported feature error reported by translator."""
+
+    def __init__(self, exception: UnsupportedException) -> None:
+        self._exception = exception
+
+    def __repr__(self) -> str:
+        return 'UnsupportedError({}, line={}, vias={})'.format(
+            self.full_id, self.line, self.get_vias())
+
+    @property
+    def full_id(self) -> str:
+        return 'unsupported:' + self._exception.desc
 
     @property
     def line(self) -> int:
@@ -560,7 +582,7 @@ class VerificationTest(AnnotatedTest):
     def test_file(
             self, path: str, base: str, jvm: jvmaccess.JVM, verifier: ViperVerifier,
             sif: bool, reload_resources: bool, arp: bool, ignore_obligations: bool, store_viper: bool,
-            float_encoding: Optional[str]):
+            float_encoding: Optional[str], selection: Set[str]):
         """Test specific Python file."""
         config.obligation_config.disable_all = ignore_obligations
         annotation_manager = self.get_annotation_manager(path, verifier.name)
@@ -571,7 +593,7 @@ class VerificationTest(AnnotatedTest):
         abspath = os.path.abspath(path)
         absbase = os.path.abspath(base)
         modules, prog = translate(abspath, jvm, 8, base_dir=absbase, sif=sif, arp=arp, reload_resources=reload_resources,
-                                  float_encoding=float_encoding)
+                                  float_encoding=float_encoding, selected=selection)
         assert prog is not None
         if store_viper:
             import string
@@ -621,10 +643,10 @@ class VerificationTest(AnnotatedTest):
 _VERIFICATION_TESTER = VerificationTest()
 
 
-def test_verification(path, base, verifier, sif, reload_resources, arp, ignore_obligations, print, float_encoding):
+def test_verification(path, base, verifier, sif, reload_resources, arp, ignore_obligations, print, float_encoding, selection):
     """Execute provided verification test."""
     _VERIFICATION_TESTER.test_file(path, base, _JVM, verifier, sif, reload_resources, arp, ignore_obligations,
-                                   print, float_encoding)
+                                   print, float_encoding, selection)
 
 
 class TranslationTest(AnnotatedTest):
@@ -648,6 +670,8 @@ class TranslationTest(AnnotatedTest):
             actual_errors = [
                 TypeCheckError(msg) for msg in exp2.messages
                 if _MYPY_ERROR_MATCHER.match(msg)]
+        except UnsupportedException as exp3:
+            actual_errors = [UnsupportedError(exp3)]
         annotation_manager.check_errors(actual_errors)
         if annotation_manager.has_unexpected_missing():
             pytest.skip('Unexpected or missing output')

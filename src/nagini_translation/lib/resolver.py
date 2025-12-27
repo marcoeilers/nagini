@@ -13,6 +13,7 @@ from nagini_translation.lib.constants import (
     BUILTINS,
     BYTES_TYPE,
     DICT_TYPE,
+    ELLIPSIS_TYPE,
     FLOAT_TYPE,
     INT_TYPE,
     LIST_TYPE,
@@ -45,6 +46,11 @@ from nagini_translation.lib.program_nodes import (
 from nagini_translation.lib.util import (
     get_func_name,
     InvalidProgramException,
+    isBytes,
+    isEllipsis,
+    isNameConstant,
+    isNum,
+    isStr,
     UnsupportedException,
 )
 from typing import List, Optional
@@ -63,8 +69,8 @@ def get_target(node: ast.AST,
     """
     if isinstance(node, ast.Name):
         return find_entry(node.id, True, containers)
-    elif type and isinstance(node, ast.Str):
-        return find_entry(node.s, True, containers)
+    elif type and isStr(node):
+        return find_entry(node.value, True, containers)
     elif isinstance(node, ast.Call):
         # For calls, we return the type of the result of the call
         if isinstance(node.func, ast.Call):
@@ -138,7 +144,7 @@ def get_target(node: ast.AST,
                 fixed_size = True
                 # Look up the type arguments. Also consider string arguments.
                 if isinstance(node.slice, ast.Tuple):
-                    if len(node.slice.elts) == 2 and isinstance(node.slice.elts[1], ast.Ellipsis):
+                    if len(node.slice.elts) == 2 and isEllipsis(node.slice.elts[1]):
                         args = [get_target(node.slice.elts[0], containers, container, True)]
                         fixed_size = False
                     else:
@@ -266,6 +272,8 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                 candidates = [find_entry(node.attr, False, [t]) for t in lhs.type_args]
                 if all(isinstance(c, (PythonField, PythonVarBase)) for c in candidates):
                     return common_supertype([c.type for c in candidates])
+        if isinstance(node, ast.Name) and node.id == 'Ellipsis':
+            return module.global_module.classes[ELLIPSIS_TYPE]
         # All these cases should be handled by get_target, so if we get here,
         # the node refers to something unknown in the given context.
         return None
@@ -282,12 +290,14 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
             return module.global_module.classes[FLOAT_TYPE]
         elif node.value is None:
             return module.global_module.classes['NoneType']
+        elif node.value is ...:
+            return module.global_module.classes[ELLIPSIS_TYPE]
         else:
-            raise UnsupportedException(node.value, f"Unsupported contant value type {type(node.value)}")
-    if isinstance(node, ast.Num):
-        if isinstance(node.n, int):
+            raise UnsupportedException(node, f"Unsupported constant value type {type(node.value)}")
+    if isNum(node):
+        if isinstance(node.value, int):
             return module.global_module.classes[INT_TYPE]
-        if isinstance(node.n, float):
+        if isinstance(node.value, float):
             return module.global_module.classes[FLOAT_TYPE]
     elif isinstance(node, ast.Tuple):
         args = [get_type(arg, containers, container) for arg in node.elts]
@@ -295,9 +305,9 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                            args)
     elif isinstance(node, ast.Subscript):
         return get_subscript_type(node, module, containers, container)
-    elif isinstance(node, ast.Str):
+    elif isStr(node):
         return module.global_module.classes[STRING_TYPE]
-    elif isinstance(node, ast.Bytes):
+    elif isBytes(node):
         return module.global_module.classes[BYTES_TYPE]
     elif isinstance(node, ast.Compare):
         return module.global_module.classes[BOOL_TYPE]
@@ -360,7 +370,7 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
             return get_type(node.operand, containers, container).get_func_or_method('__invert__').type
         else:
             raise UnsupportedException(node)
-    elif isinstance(node, ast.NameConstant):
+    elif isNameConstant(node):
         if (node.value is True) or (node.value is False):
             return module.global_module.classes[BOOL_TYPE]
         elif node.value is None:
@@ -498,6 +508,8 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 if isinstance(body_type, PythonType):
                     return body_type
                 raise InvalidProgramException(node, 'invalid.let')
+            elif node.func.id == 'Reveal':
+                return get_type(node.args[0], containers, container)
             else:
                 raise UnsupportedException(node)
         elif node.func.id in BUILTINS:
@@ -566,12 +578,12 @@ def _get_subscript_type(value_type: PythonType, module: PythonModule,
             index = None
             if isinstance(node.slice, ast.UnaryOp):
                 if (isinstance(node.slice.op, ast.USub) and
-                        isinstance(node.slice.operand, ast.Num)):
-                    index = -node.slice.operand.n
+                        isNum(node.slice.operand)):
+                    index = -node.slice.operand.value
                 else:
                     raise UnsupportedException(node, 'dynamic subscript type')
-            elif isinstance(node.slice, ast.Num):
-                index = node.slice.n
+            elif isNum(node.slice):
+                index = node.slice.value
             if index is not None:
                 return value_type.type_args[index]
             else:

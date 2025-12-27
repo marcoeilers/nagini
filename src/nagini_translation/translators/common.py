@@ -59,6 +59,7 @@ from nagini_translation.lib.typedefs import (
 from nagini_translation.lib.util import (
     get_surrounding_try_blocks,
     InvalidProgramException,
+    isStr,
     string_to_int,
     UnsupportedException
 )
@@ -112,11 +113,11 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         return e.isPure()
 
     def to_type(self, e: Expr, t, ctx) -> Expr:
-        if t is self.viper.Ref:
+        if t == self.viper.Ref:
             return self.to_ref(e, ctx)
-        if t is self.viper.Int:
+        if t == self.viper.Int:
             return self.to_int(e, ctx)
-        if t is self.viper.Bool:
+        if t == self.viper.Bool:
             return self.to_bool(e, ctx)
         return e
 
@@ -445,7 +446,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         if isinstance(node, ast.Attribute):
             pref = self._get_name_parts(node.value)
             return pref + [node.attr]
-        if isinstance(node, ast.Str):
+        if isStr(node):
             return []
         return [node.name]
 
