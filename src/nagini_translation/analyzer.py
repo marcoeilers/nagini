@@ -13,7 +13,7 @@ import nagini_contracts.lock
 import tokenize
 
 from collections import OrderedDict
-from nagini_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
+from nagini_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS, GHOST_BUILTINS
 from nagini_contracts.io_contracts import (
     BUILTIN_IO_OPERATIONS,
     IO_CONTRACT_FUNCS,
@@ -349,6 +349,41 @@ class Analyzer(ast.NodeVisitor):
         else:
             cont.methods[method_name] = method
 
+    def defines_ghost(self, node: Union[ast.ClassDef, ast.FunctionDef, 
+                                        ast.arg, ast.AnnAssign, ast.Assign]) -> bool:
+        """
+        Returns whether the given node defines a ghost element.
+        """
+        in_ghost_class = self.current_class is not None and self.current_class.is_ghost
+        in_ghost_func = self.current_function is not None and self.current_function.is_ghost
+
+        if isinstance(node, ast.ClassDef):
+            return "Ghost" in [dec.id for dec in node.decorator_list]
+        elif isinstance(node, ast.FunctionDef):
+            return in_ghost_class or "Ghost" in [dec.id for dec in node.decorator_list]
+        elif isinstance(node, (ast.arg, ast.AnnAssign)):
+            ann_as_ghost = self.is_ghost_annotation(node.annotation)
+            return in_ghost_class or in_ghost_func or ann_as_ghost
+        else: # 
+            assert isinstance(node, ast.Assign), f"Unexpected type of {type(node)}"
+            return in_ghost_class or in_ghost_func
+   
+    def is_ghost_annotation(self, ann: Optional[ast.expr]) -> bool:
+        if isinstance(ann, ast.Constant):
+            if isinstance(ann.value, str):
+                return ann.value in self.module.ghost_names or ann.value in GHOST_BUILTINS
+            else:
+                # assume None
+                return False
+        elif isinstance(ann, ast.Name):
+            return ann.id in self.module.ghost_names or ann.id in GHOST_BUILTINS
+        elif isinstance(ann, ast.Subscript):
+            # We check the soundness of the annotation later, so we just take the first element
+            sub_ann = ann.slice.elts[0]
+            return self.is_ghost_annotation(sub_ann)
+        else:
+            InvalidProgramException(ann, None, "Cannot resolve annotation.")
+
     def visit_module(self, module: PythonModule) -> None:
         self.visit(module.node, None)
 
@@ -542,6 +577,7 @@ class Analyzer(ast.NodeVisitor):
         cls = self.find_or_create_class(name)
         cls.defined = True
         cls.node = node
+        cls.is_ghost = self.defines_ghost(node)
         self.current_class = cls
         actual_bases = []
         current_index = 0
@@ -626,6 +662,18 @@ class Analyzer(ast.NodeVisitor):
             self.analyze_import(name.name)
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
+        if node.module in IGNORED_IMPORTS:
+            return
+        for mod in self.modules.values():
+            if mod.type_prefix == node.module:
+                imp_mod = mod
+                break
+        for name in node.names:
+            if name.name in imp_mod.ghost_names:
+                # Capture imported ghost names
+                new_ghost_name = name.asname if name.asname is not None else name.name
+                self.module.ghost_names.add(new_ghost_name)
+                
         self.analyze_import(node.module)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
@@ -663,6 +711,7 @@ class Analyzer(ast.NodeVisitor):
             func.opaque = self.is_opaque(node)
             func.node = node
             func.superscope = scope_container
+            func.is_ghost = self.defines_ghost(node)
         else:
             pure = is_property_getter or self.is_pure(node)
             opaque = self.is_opaque(node)
@@ -673,6 +722,7 @@ class Analyzer(ast.NodeVisitor):
             func = self.node_factory.create_python_method(
                 name, node, self.current_class, scope_container, pure,
                 contract_only, self.node_factory, opaque=opaque)
+            func.is_ghost = self.defines_ghost(node)
             if is_property_setter:
                 container[name].setter = func
             else:
@@ -790,6 +840,13 @@ class Analyzer(ast.NodeVisitor):
                 raise InvalidProgramException(node, 'local.typevar')
         else:
             self.visit_default(node)
+            # Handle ghost assignment
+            if self.defines_ghost(node):
+                targets = node.targets
+                if isinstance(targets, ast.Tuple):
+                    targets = targets.elts
+                for target in targets:
+                    self.set_ghost_if_var(target)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
         is_alias = False
@@ -808,6 +865,14 @@ class Analyzer(ast.NodeVisitor):
                 raise InvalidProgramException(node, 'local.typevar')
         else:
             self.visit_default(node)
+            # Handle ghost assignment
+            if self.defines_ghost(node):
+                self.set_ghost_if_var(node.target)
+
+    def set_ghost_if_var(self, target: Union[ast.Name, ast.Attribute, ast.Subscript]) -> None:
+        if isinstance(target, ast.Name) and target.id in self.current_function.locals:
+            var = self.current_function.locals[target.id]
+            var.is_ghost = True 
 
     def visit_arguments(self, node: ast.arguments) -> None:
         assert self.current_function is not None
@@ -828,12 +893,14 @@ class Analyzer(ast.NodeVisitor):
             annotated_type.exact_length = False
             var_arg = self.node_factory.create_python_var(arg.arg, arg,
                                                           annotated_type)
+            var_arg.is_ghost = self.defines_ghost(arg)
             self.current_function.var_arg = var_arg
         if node.kwarg:
             arg = node.kwarg
             annotated_type = self.typeof(arg)
             kw_arg = self.node_factory.create_python_var(arg.arg, arg,
                                                          annotated_type)
+            kw_arg.is_ghost = self.defines_ghost(arg)
             self.current_function.kw_arg = kw_arg
 
     def visit_ListComp(self, node: ast.Lambda) -> None:
@@ -842,6 +909,7 @@ class Analyzer(ast.NodeVisitor):
         local_name = name + '$' + target.id
         var = self.node_factory.create_python_var(
             target.id, target, self.typeof(target))
+        # We do not infer var.is_ghost as it does not matter
         self.current_function.special_vars[local_name] = var
         self.visit_but_ignore(node, node._parent)
         return
@@ -862,6 +930,7 @@ class Analyzer(ast.NodeVisitor):
             else:
                 var = self.node_factory.create_python_var(
                     arg.arg, arg, self.typeof(arg))
+            var.is_ghost = True
             alts = self.get_alt_types(node)
             var.alt_types = alts
             local_name = name + '$' + arg.arg
@@ -882,6 +951,7 @@ class Analyzer(ast.NodeVisitor):
             self.node_factory.create_python_var(node.arg, node, node_type)
         # If we just introduced new type variables, create the expression that
         # represents their value.
+        self.current_function.args[node.arg].is_ghost = self.defines_ghost(node)
         for type_var in self.current_function.type_vars.values():
             if type_var.type_expr:
                 continue

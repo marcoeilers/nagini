@@ -594,6 +594,12 @@ class ContractTranslator(CommonTranslator):
             raise InvalidProgramException(node, 'purity.violated')
         return self.translator.obligation_translator._translate_must_terminate(node, ctx)
 
+    def translate_markghost(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to the MarkGhost() contract function. It's a no-op.
+        """
+        return [], None
+
     def _translate_triggers(self, body: ast.AST, node: ast.Call,
                             ctx: Context) -> List['silver.ast.Trigger']:
         """
@@ -1092,7 +1098,7 @@ class ContractTranslator(CommonTranslator):
             if not impure:
                 raise InvalidProgramException(node, 'invalid.contract.position')
             return self.translate_may_create(node, ctx)
-        elif func_name in ('Assert', 'Assume', 'Fold', 'Unfold', 'Refute'):
+        elif func_name in ('Assert', 'Assume', 'Fold', 'Unfold', 'Refute', 'MarkGhost'):
             if not statement:
                 raise InvalidProgramException(node, 'invalid.contract.position')
             if func_name == 'Assert':
@@ -1105,6 +1111,8 @@ class ContractTranslator(CommonTranslator):
                 return self.translate_unfold(node, ctx)
             elif func_name == 'Refute':
                 return self.translate_refute(node, ctx)
+            elif func_name == 'MarkGhost':
+                return self.translate_markghost(node, ctx)
         elif func_name == 'Implies':
             return self.translate_implies(node, ctx, impure)
         elif func_name == 'Old':

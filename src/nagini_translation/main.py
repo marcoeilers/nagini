@@ -157,7 +157,7 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
     ghost_ctx = Context()
     ghost_ctx.current_class = None
     ghost_ctx.current_function = None
-    ghost_ctx.module = modules[0]
+    ghost_ctx.module = modules[1]
     ghost_checker.check(ghost_ctx)
     prog = translator.translate_program(modules, sil_programs, selected,
                                         arp=arp, ignore_global=ignore_global, sif=sif, float_encoding=float_encoding)
