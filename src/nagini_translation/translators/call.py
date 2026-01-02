@@ -336,21 +336,34 @@ class CallTranslator(CommonTranslator):
 
 
         if target:
-            target_class = target.cls
-            targets = []
-            if target.declared_exceptions:
-                error_var = self.get_error_var(node, ctx)
-                targets.append(error_var)
-            method_name = target_class.get_method('__init__').sil_name
-            init = self.create_method_call_node(
-                ctx, method_name, args, targets, self.to_position(node, ctx),
-                self.no_info(ctx), target_method=target, target_node=node)
-            stmts.extend(init)
-            if target.declared_exceptions:
-                catchers = self.create_exception_catchers(error_var,
-                    ctx.actual_function.try_blocks, node, ctx)
-                stmts = stmts + catchers
+            init_stmts = self._translate_init_call(target, args, node, ctx)
+            stmts.extend(init_stmts)
+
+        # If the init method was created implicitly, we have to check for __post_init__ 
+        if target_class.dataclass and target_class.implicit_init:
+            target = target_class.get_method('__post_init__')
+            if target:
+                post_init_stmts = self._translate_init_call(target, [res_var.ref()], node, ctx, '__post_init__')
+                stmts.extend(post_init_stmts)
+
         return arg_stmts + defined_check + stmts, res_var.ref()
+
+    def _translate_init_call(self, target: PythonMethod, args: list, node: ast.Call, ctx: Context, name = '__init__') -> list:
+        target_class = target.cls
+        targets = []
+
+        if target.declared_exceptions:
+            error_var = self.get_error_var(node, ctx)
+            targets.append(error_var)
+        method_name = target_class.get_method(name).sil_name
+        stmts = self.create_method_call_node(
+            ctx, method_name, args, targets, self.to_position(node, ctx),
+            self.no_info(ctx), target_method=target, target_node=node)
+        if target.declared_exceptions:
+            catchers = self.create_exception_catchers(error_var,
+                ctx.actual_function.try_blocks, node, ctx)
+            stmts = stmts + catchers
+        return stmts
 
     def _translate_list(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         contents = None

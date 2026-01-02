@@ -260,6 +260,7 @@ LEGAL_MAGIC_METHODS = {
     '__ror__',
 
     '__init__',
+    '__post_init__',
     '__enter__',
     '__exit__',
     '__str__',

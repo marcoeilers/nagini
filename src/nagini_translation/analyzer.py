@@ -627,6 +627,7 @@ class Analyzer(ast.NodeVisitor):
         function_def = ast.FunctionDef('__init__', ast_arguments, stmts, decorator_list, returns=None, lineno=node.lineno, col_offset=0)
         self.visit(function_def, node)
         node.body.append(function_def)
+        self.current_class.implicit_init = True
         return
         
     def _create_arg_ast(self, node, arg: str, type_name: Optional[str] = None) -> ast.arg:

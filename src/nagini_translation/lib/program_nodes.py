@@ -379,6 +379,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self.type = None  # infer, domain type
         self.interface = interface
         self.dataclass = False
+        self.implicit_init = False
         self.frozen = False
         self.enum = False
         self.enum_type = None
