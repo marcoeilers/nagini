@@ -28,6 +28,13 @@ BUILTINS = ['cast',
             'enumerate',
             'hash']
 
+EXTENDABLE_BUILTINS = [
+    'object',
+    'Exception',
+    'Lock',
+    'int'
+]
+
 THREADING = ['Thread']
 
 BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred', 'MayStart', 'ThreadPost', 'state_pred']
@@ -424,6 +431,8 @@ BUILTIN_TYPES = {
     'List', 'Dict', 'Set', 'Tuple', 'Literal', 'Self', 'ClassVar', 'Final',
 }
 
+ELLIPSIS_TYPE = 'EllipsisType'
+
 PRIMITIVE_PREFIX = '__prim__'
 
 PRIMITIVE_INT_TYPE = PRIMITIVE_PREFIX + INT_TYPE
@@ -466,6 +475,7 @@ IGNORED_IMPORTS = {'_importlib_modulespec',
                    'abc',
                    'builtins',
                    'nagini_contracts',
+                   'nagini_contracts.adt',
                    'nagini_contracts.contracts',
                    'nagini_contracts.io_contracts',
                    'nagini_contracts.obligations',
@@ -473,6 +483,7 @@ IGNORED_IMPORTS = {'_importlib_modulespec',
                    'sys',
                    'types',
                    'typing',
+                   'typing_extensions'
                    }
 
 IGNORED_MODULE_NAMES = {

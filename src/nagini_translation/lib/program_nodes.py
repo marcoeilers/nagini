@@ -702,15 +702,6 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         if self.interface:
             all_methods = list(self.functions.values())
             all_methods.extend(self.methods.values())
-            for method in all_methods:
-                requires = set()
-                for requirement in method.requires:
-                    target = self.get_func_or_method(requirement)
-                    if target:
-                        requires.add(target.sil_name)
-                    else:
-                        requires.add(requirement)
-                translator.set_required_names(method.sil_name, requires)
 
     def issubtype(self, cls: 'PythonClass') -> bool:
         if cls is self:
@@ -1030,7 +1021,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                  interface: bool = False,
                  interface_dict: Dict[str, Any] = None,
                  method_type: MethodType = MethodType.normal,
-                 opaque: bool = True):
+                 opaque: bool = False):
         """
         :param cls: Class this method belongs to, if any.
         :param superscope: The scope (class or module) this method belongs to
@@ -1040,6 +1031,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         :param interface: True iff the method implementation is provided in
         native Silver.
         :param pure: True iff ir's opaque
+        :param opaque: True iff ir's opaque
         """
         PythonNode.__init__(self, name, node)
         PythonScope.__init__(self, None, superscope)
@@ -1077,7 +1069,6 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.node_factory = node_factory
         self.method_type = method_type
         self.obligation_info = None
-        self.requires = []
         self.type_vars = OrderedDict()
         self.setter = None
         self.func_constant = None
@@ -1132,10 +1123,6 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                                 translator)
         self.obligation_info = translator.create_obligation_info(self)
         if self.interface:
-            requires = set()
-            for requirement in self.requires:
-                requires.add(requirement)
-            translator.set_required_names(self.sil_name, requires)
             if self.sil_name in BUILTIN___EQ___FUNCTIONS:
                 self.merge_func_name = OBJ___EQ__MERGED
                 if self.sil_name != OBJECT_EQ:
@@ -1480,7 +1467,7 @@ class PythonIOOperation(PythonNode, PythonScope, ContainerInterface):
         If it was not set, it sets a default ``False``.
         """
         if self._terminates is None:
-            self._terminates = ast.NameConstant(False)
+            self._terminates = ast.Constant(False)
             self._terminates.lineno = self.node.lineno
             self._terminates.col_offset = self.node.col_offset
         return self._terminates
@@ -1502,7 +1489,7 @@ class PythonIOOperation(PythonNode, PythonScope, ContainerInterface):
         If it was not set, it sets a default ``1``.
         """
         if self._termination_measure is None:
-            self._termination_measure = ast.Num(1)
+            self._termination_measure = ast.Constant(1)
             self._termination_measure.lineno = self.node.lineno
             self._termination_measure.col_offset = self.node.col_offset
         return self._termination_measure
@@ -2011,7 +1998,7 @@ class ProgramNodeFactory:
             interface: bool = False,
             interface_dict: Dict[str, Any] = None,
             method_type: MethodType = MethodType.normal,
-            opaque: bool = True) -> PythonMethod:
+            opaque: bool = False) -> PythonMethod:
         return PythonMethod(name, node, cls, superscope, pure, contract_only,
                             container_factory, interface, interface_dict,
                             method_type, opaque=opaque)

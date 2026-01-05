@@ -10,7 +10,7 @@ import ast
 from typing import Dict, List, Union
 
 from nagini_contracts.contracts import CONTRACT_WRAPPER_FUNCS
-from nagini_translation.lib.constants import BOOL_TYPE
+from nagini_translation.lib.constants import PRIMITIVE_BOOL_TYPE, BOOL_TYPE
 from nagini_translation.lib.program_nodes import PythonMethod, PythonType, PythonVar
 from nagini_translation.lib.typedefs import (
     Expr,
@@ -19,6 +19,7 @@ from nagini_translation.lib.util import (
     flatten,
     get_func_name,
     InvalidProgramException,
+    isStr,
     UnsupportedException,
 )
 from nagini_translation.translators.abstract import Context
@@ -51,6 +52,33 @@ class ReturnWrapper:
         self.names = {}
 
 
+class UnfoldWrapper:
+    """
+    Represents an unfolding of predicate pred, to be executed under conditions conds.
+    """
+
+    def __init__(self, conds: List, pred: ast.AST, node: ast.AST):
+        self.cond = conds
+        self.pred = pred
+        self.node = node
+        self.names = {}
+        self.var = None
+
+
+class AssertWrapper:
+    """
+    Represents an asserting of assertion a, to be executed under conditions conds.
+    """
+
+    def __init__(self, conds: List, a: ast.AST, node: ast.AST):
+        self.cond = conds
+        self.a = a
+        self.node = node
+        self.names = {}
+        self.var = None
+
+
+
 class NotWrapper:
     """
     Represents a negation of the condition cond.
@@ -68,7 +96,7 @@ class BinOpWrapper:
         self.op = op
         self.rhs = rhs
 
-Wrapper = Union[AssignWrapper, ReturnWrapper]
+Wrapper = Union[AssignWrapper, ReturnWrapper, UnfoldWrapper, AssertWrapper]
 
 
 class PureTranslator(CommonTranslator):
@@ -85,11 +113,17 @@ class PureTranslator(CommonTranslator):
 
     def translate_pure_Expr(self, conds: List, node: ast.Expr,
                             ctx: Context) -> List[Wrapper]:
-        if isinstance(node.value, ast.Str):
+        if isStr(node.value):
             # Ignore docstrings.
             return []
         if isinstance(node.value, ast.Call) and get_func_name(node.value) in CONTRACT_WRAPPER_FUNCS:
             raise InvalidProgramException(node, 'invalid.contract.position')
+        if isinstance(node.value, ast.Call) and get_func_name(node.value) == 'Unfold':
+            wrapper = UnfoldWrapper(conds, node.value, node)
+            return [wrapper]
+        if isinstance(node.value, ast.Call) and get_func_name(node.value) == 'Assert':
+            wrapper = AssertWrapper(conds, node.value, node)
+            return [wrapper]
         raise UnsupportedException(node)
 
     def translate_pure_If(self, conds: List, node: ast.If,
@@ -100,7 +134,7 @@ class PureTranslator(CommonTranslator):
         """
         cond = node.test
         cond_var = ctx.current_function.create_variable('cond',
-            ctx.module.global_module.classes[BOOL_TYPE], self.translator)
+            ctx.module.global_module.classes[PRIMITIVE_BOOL_TYPE], self.translator)
         cond_let = AssignWrapper(cond_var.sil_name, conds, cond, node)
         then_cond = conds + [cond_var.sil_name]
         else_cond = conds + [NotWrapper(cond_var.sil_name)]
@@ -177,7 +211,8 @@ class PureTranslator(CommonTranslator):
                                   ctx: Context) -> Expr:
         info = self.no_info(ctx)
         position = self.to_position(wrapper.node, ctx)
-        val = self.to_ref(self._translate_wrapper_expr(wrapper, ctx), ctx)
+        val = self._translate_wrapper_expr(wrapper, ctx)
+        val = self.to_type(val, wrapper.var.decl.typ(), ctx)
         if not previous:
             raise InvalidProgramException(function.node,
                                           'function.return.missing')
@@ -204,14 +239,83 @@ class PureTranslator(CommonTranslator):
                     self.viper.Bool: false,
                     self.viper.Ref: null
                 }
-                old_val = self.to_ref(dummies[wrapper.var.decl.typ()], ctx)
-            new_val = self.viper.CondExp(cond, val, old_val, position,
+                old_val = dummies[wrapper.var.decl.typ()]
+            new_val = self.viper.CondExp(cond, val, self.to_type(old_val, val.typ(), ctx), position,
                                          info)
             return self.viper.Let(wrapper.var.decl, new_val,
                                   previous, position, info)
         else:
             return self.viper.Let(wrapper.var.decl, val,
                                   previous, position, info)
+
+    def _translate_unfold_wrapper(self, wrapper: Wrapper, previous: Expr,
+                                  function: PythonMethod,
+                                  ctx: Context) -> Expr:
+        info = self.no_info(ctx)
+        position = self.to_position(wrapper.node, ctx)
+        if not previous:
+            raise InvalidProgramException(function.node,
+                                          'function.return.missing')
+
+        if len(wrapper.pred.args) != 1:
+            raise InvalidProgramException(wrapper.pred, 'invalid.contract.call')
+        if not isinstance(wrapper.pred.args[0], ast.Call):
+            raise InvalidProgramException(wrapper.pred, 'invalid.contract.call')
+        if get_func_name(wrapper.pred.args[0]) in ('Acc', 'Rd'):
+            pred_call = wrapper.pred.args[0].args[0]
+        else:
+            pred_call = wrapper.pred.args[0]
+        target_pred = self.get_target(pred_call, ctx)
+        if (target_pred and
+                (not isinstance(target_pred, PythonMethod) or not target_pred.predicate)):
+            raise InvalidProgramException(wrapper.pred, 'invalid.contract.call')
+        if target_pred and target_pred.contract_only:
+            raise InvalidProgramException(wrapper.pred, 'abstract.predicate.fold')
+        pred_stmt, pred = self.translate_expr(wrapper.pred.args[0], ctx,
+                                              self.viper.Bool, True)
+        if pred_stmt:
+            raise InvalidProgramException(wrapper.node, 'purity.violated')
+
+        unfolding = self.viper.Unfolding(pred, previous, position, info)
+
+        if wrapper.cond:
+            cond = self._translate_condition(wrapper.cond,
+                                             wrapper.names, ctx)
+
+            new_val = self.viper.CondExp(cond, unfolding, previous, position,
+                                         info)
+            return new_val
+        else:
+            return unfolding
+
+    def _translate_assert_wrapper(self, wrapper: Wrapper, previous: Expr,
+                                  function: PythonMethod,
+                                  ctx: Context) -> Expr:
+        info = self.no_info(ctx)
+        position = self.to_position(wrapper.node, ctx)
+        if not previous:
+            raise InvalidProgramException(function.node,
+                                          'function.return.missing')
+
+        if len(wrapper.a.args) != 1:
+            raise InvalidProgramException(wrapper.a, 'invalid.contract.call')
+
+        ass_stmt, ass = self.translate_expr(wrapper.a.args[0], ctx,
+                                            self.viper.Bool, True)
+        if ass_stmt:
+            raise InvalidProgramException(wrapper.node, 'purity.violated')
+
+        asserting = self.viper.Asserting(ass, previous, position, info)
+
+        if wrapper.cond:
+            cond = self._translate_condition(wrapper.cond,
+                                             wrapper.names, ctx)
+
+            new_val = self.viper.CondExp(cond, asserting, previous, position,
+                                         info)
+            return new_val
+        else:
+            return asserting
 
     def _translate_wrapper_expr(self, wrapper: Wrapper,
                                 ctx: Context) -> Expr:
@@ -245,6 +349,12 @@ class PureTranslator(CommonTranslator):
                                                   function, ctx)
         elif isinstance(wrapper, AssignWrapper):
             return self._translate_assign_wrapper(wrapper, previous,
+                                                  function, ctx)
+        elif isinstance(wrapper, UnfoldWrapper):
+            return self._translate_unfold_wrapper(wrapper, previous,
+                                                  function, ctx)
+        elif isinstance(wrapper, AssertWrapper):
+            return self._translate_assert_wrapper(wrapper, previous,
                                                   function, ctx)
         else:
             raise UnsupportedException(wrapper)

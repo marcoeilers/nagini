@@ -9,4 +9,5 @@ def specialVals() -> None:
     one = float("1.0")
     Assert(nf > one)
     Assert(not nan == nan)
+    #:: ExpectedOutput(assert.failed:assertion.false)
     Assert(nan == nan)

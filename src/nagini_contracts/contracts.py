@@ -14,6 +14,7 @@ from typing import (
     Iterator,
     List,
     Optional,
+    overload,
     Sized,
     Tuple,
     Type,
@@ -31,7 +32,7 @@ CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'ResultT', 'Implies', 'Fo
                   'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding', 'Previous',
                   'RaisedException', 'PSeq', 'PSet', 'ToSeq', 'ToMS', 'MaySet', 'MayCreate',
                   'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',
-                  'PMultiset', 'LowExit', 'Refute', 'isNaN', 'Stateless', 'State']
+                  'PMultiset', 'LowExit', 'Refute', 'isNaN', 'Reveal', 'Stateless', 'State']
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -44,8 +45,12 @@ U4 = TypeVar('U4')
 def Requires(expr: bool) -> bool:
     pass
 
-
+@overload
 def Ensures(expr: bool) -> bool:
+    pass
+
+@overload
+def Ensures(t: Type[T], expr: Callable[[T], bool]) -> bool:
     pass
 
 
@@ -413,11 +418,21 @@ def Wildcard(field) -> bool:
 
 
 def Fold(predicate: bool) -> None:
-    pass
+    """
+    Folds the given predicate (exchanges the predicate body for an instance of the predicate).
+    """
 
 
 def Unfold(predicate: bool) -> None:
-    pass
+    """
+    Unfolds the given predicate (exchanges the predicate instance for the predicate body).
+    """
+
+
+def Reveal(funcApp: T) -> T:
+    """
+    Reveals the implementation of the given application of a pure function
+    """
 
 
 def Unfolding(predicate: bool, expr: T) -> T:
@@ -436,7 +451,17 @@ def Pure(func: T) -> T:
 
 def Transparent(func: T) -> T:
     """
-    Decorator to mark pure functions defined in classes as transparent (i.e., not opaque, which is the default).
+    Decorator to mark pure functions defined in classes as transparent (i.e.,
+    not opaque, which is the default inside classes).
+    It's a no-op.
+    """
+    return func
+
+def Opaque(func: T) -> T:
+    """
+    Decorator to mark pure functions outside classes as opaque, meaning that
+    they are treated modularly in terms of their specifications, and callers
+    do not get to use their implementation unless it is revealed (using Reveal()).
     It's a no-op.
     """
     return func
@@ -583,8 +608,10 @@ __all__ = [
         'Fold',
         'Unfold',
         'Unfolding',
+        'Reveal',
         'Pure',
         'Transparent',
+        'Opaque',
         'Predicate',
         'Inline',
         'Ghost',

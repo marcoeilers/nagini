@@ -27,7 +27,6 @@ from nagini_translation.lib.constants import (
     INPLACE_OPERATOR_FUNCTIONS,
 )
 from nagini_translation.lib.program_nodes import (
-    GenericType,
     OptionalType,
     PythonField,
     PythonGlobalVar,
@@ -58,6 +57,8 @@ from nagini_translation.lib.util import (
     get_surrounding_try_blocks,
     InvalidProgramException,
     is_get_ghost_output,
+    isEllipsis,
+    isStr,
     UnsupportedException,
 )
 from nagini_translation.translators.abstract import Context
@@ -990,7 +991,7 @@ class StatementTranslator(CommonTranslator):
                 assign = self.viper.LocalVarAssign(res_var.ref(), val, pos, info)
                 stmt.append(assign)
             return stmt
-        elif isinstance(node.value, (ast.Str, ast.Ellipsis)):
+        elif isStr(node.value) or isEllipsis(node.value):
             # Docstring or ellipsis, just skip.
             return []
         else:
@@ -1170,7 +1171,11 @@ class StatementTranslator(CommonTranslator):
                                                                           List[Expr]]:
         # Special treatment for subscript; instead of an assignment, we
         # need to call a setitem method.
-        if isinstance(node.targets[0].slice, ast.Slice):
+        if isinstance(node, ast.Assign):
+            target = node.targets[0]
+        elif isinstance(node, (ast.AnnAssign, ast.AugAssign)):
+            target = node.target
+        if isinstance(target.slice, ast.Slice):
             raise UnsupportedException(node, 'assignment to slice')
         position = self.to_position(node, ctx)
         target_cls = self.get_type(lhs.value, ctx)

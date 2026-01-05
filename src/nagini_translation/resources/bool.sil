@@ -130,9 +130,9 @@ function __prim__int___box__(prim: Int): Ref
 
 function int___unbox__(box: Ref): Int
     decreases _
-    ensures !issubtype(typeof(box), bool()) ==> __prim__int___box__(result) == box
+    requires issubtype(typeof(box), int())
+    ensures typeof(box) == int() ==> __prim__int___box__(result) == box
     ensures issubtype(typeof(box), bool()) ==> __prim__bool___box__(result != 0) == box
-    ensures issubtype(typeof(box), int()) ==> forall i: Ref :: {object___eq__(box, i), int___unbox__(i)} (issubtype(typeof(i), int()) && object___eq__(box, i)) ==> int___unbox__(i) == result
 
 function __prim__bool___box__(prim: Bool): Ref
     decreases _
@@ -464,3 +464,7 @@ domain __Transitivity_Eq {
             (((o1 == null) != (o2 == null)) ==> !eq(o1, o2))
     }
 }
+
+function EllipsisType___create__(): Ref
+    ensures typeof(result) == EllipsisType()
+    ensures forall r: Ref :: { issubtype(typeof(r), EllipsisType()) } issubtype(typeof(r), EllipsisType()) ==> r == result

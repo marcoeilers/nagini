@@ -25,6 +25,8 @@ _TRANSLATION_TESTS_SUFFIX = 'translation'
 _VERIFICATION_TESTS_SUFFIX = 'verification'
 
 _FUNCTIONAL_TESTS_DIR = 'tests/functional/'
+_MINIMAL_TESTS_DIR = 'tests/minimal/'
+_FUNCTIONAL_EXAMPLES_TESTS_DIR = 'tests/functional/verification/examples'
 _SIF_TRUE_TESTS_DIR = 'tests/sif-true/'
 _SIF_POSS_TESTS_DIR = 'tests/sif-poss/'
 _SIF_PROB_TESTS_DIR = 'tests/sif-prob/'
@@ -42,6 +44,7 @@ class PyTestConfig:
         self.verifiers = []
         self.store_viper = False
         self.force_product = False
+        self.selected_modes = []
 
         self.init_from_config_file()
 
@@ -60,6 +63,8 @@ class PyTestConfig:
             self.force_product = True
         if test == 'functional':
             self._add_test_dir(_FUNCTIONAL_TESTS_DIR)
+        elif test == 'minimal':
+            self._add_test_dir(_MINIMAL_TESTS_DIR)
         elif test == 'sif-true':
             self._add_test_dir(_SIF_TRUE_TESTS_DIR)
         elif test == 'sif-poss':
@@ -72,8 +77,15 @@ class PyTestConfig:
             self._add_test_dir(_OBLIGATIONS_TESTS_DIR)
         elif test == 'arp':
             self._add_test_dir(_ARP_TESTS_DIR)
+        elif test == _TRANSLATION_TESTS_SUFFIX:
+            self._add_test_mode(_TRANSLATION_TESTS_SUFFIX)
+        elif test == _VERIFICATION_TESTS_SUFFIX:
+            self._add_test_mode(_VERIFICATION_TESTS_SUFFIX)
         else:
             print('Unrecognized test set.')
+
+    def _add_test_mode(self, mode: str):
+        self.selected_modes.append(mode)
 
     def _add_test_dir(self, path: str):
         self.translation_test_dirs.append(os.path.join(
@@ -131,6 +143,7 @@ def pytest_addoption(parser: 'pytest.config.Parser'):
     parser.addoption('--single-test', dest='single_test', action='store', default=None)
     parser.addoption('--all-tests', dest='all_tests', action='store_true')
     parser.addoption('--functional', dest='functional', action='store_true')
+    parser.addoption('--minimal', dest='minimal', action='store_true')
     parser.addoption('--functional-product', dest='functional_product', action='store_true')
     parser.addoption('--sif-true', dest='sif_true', action='store_true')
     parser.addoption('--sif-poss', dest='sif_poss', action='store_true')
@@ -143,6 +156,8 @@ def pytest_addoption(parser: 'pytest.config.Parser'):
     parser.addoption('--silicon', dest='silicon', action='store_true')
     parser.addoption('--carbon', dest='carbon', action='store_true')
     parser.addoption('--store-viper', dest='store_viper', action='store_true')
+    parser.addoption('--translation', dest='translation', action='store_true')
+    parser.addoption('--verification', dest='verification', action='store_true')
 
 
 def pytest_configure(config: 'pytest.config.Config'):
@@ -154,6 +169,8 @@ def pytest_configure(config: 'pytest.config.Config'):
     else:
         if config.option.functional:
             tests.append('functional')
+        if config.option.minimal:
+            tests.append('minimal')
         if config.option.sif_true:
             tests.append('sif-true')
         if config.option.sif_poss:
@@ -166,6 +183,10 @@ def pytest_configure(config: 'pytest.config.Config'):
             tests.append('obligations')
         if config.option.arp:
             tests.append('arp')
+        if config.option.translation:
+            tests.append('translation')
+        if config.option.verification:
+            tests.append('verification')
         if config.option.functional_product:
             tests = ['functional-product']
     if tests:
@@ -224,69 +245,75 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
     reload_triggers = set()
     params = []
     if func_name == _TRANSLATION_TEST_FUNCTION_NAME:
-        for test_dir in _pytest_config.translation_test_dirs:
-            files = _test_files(test_dir)
-            test_files.extend(files)
-            if files:
-                reload_triggers.add(files[0])
-        if _pytest_config.single_test and 'translation' in _pytest_config.single_test:
-            test_files.append(_pytest_config.single_test)
-        for file in test_files:
-            if 'float_real' in file:
-                float_encoding = 'real'
-            elif 'float_ieee32' in file:
-                float_encoding = 'ieee32'
-            else:
-                float_encoding = None
-            if 'sif-true' in file:
-                sif = True
-            elif 'sif-poss' in file:
-                sif = 'poss'
-            elif 'sif-prob' in file:
-                sif = 'prob'
-            else:
-                sif = False
-            reload_resources = file in reload_triggers
-            arp = 'arp' in file
-            base = file.partition('translation')[0] + 'translation'
-            params.append((file, base, sif, reload_resources, arp, float_encoding))
+        if not _pytest_config.selected_modes or 'translation' in _pytest_config.selected_modes:
+            for test_dir in _pytest_config.translation_test_dirs:
+                files = _test_files(test_dir)
+                test_files.extend(files)
+                if files:
+                    reload_triggers.add(files[0])
+            if _pytest_config.single_test and 'translation' in _pytest_config.single_test:
+                test_files.append(_pytest_config.single_test)
+            for file in test_files:
+                if 'float_real' in file:
+                    float_encoding = 'real'
+                elif 'float_ieee32' in file:
+                    float_encoding = 'ieee32'
+                else:
+                    float_encoding = None
+                if 'sif-true' in file:
+                    sif = True
+                elif 'sif-poss' in file:
+                    sif = 'poss'
+                elif 'sif-prob' in file:
+                    sif = 'prob'
+                else:
+                    sif = False
+                reload_resources = file in reload_triggers
+                arp = 'arp' in file
+                base = file.partition('translation')[0] + 'translation'
+                params.append((file, base, sif, reload_resources, arp, float_encoding))
         metafunc.parametrize('path,base,sif,reload_resources,arp,float_encoding', params)
     elif func_name == _VERIFICATION_TEST_FUNCTION_NAME:
-        for test_dir in _pytest_config.verification_test_dirs:
-            files = _test_files(test_dir)
-            test_files.extend(files)
-            reload_triggers.add(files[0])
-            print(files[0])
-        if _pytest_config.single_test and 'verification' in _pytest_config.single_test:
-            test_files.append(_pytest_config.single_test)
-        float_encoding = None
-        for file in test_files:
-            ignore_obligations = 'no_obligations' in file
-            if 'float_real' in file:
-                new_float_encoding = 'real'
-            elif 'float_ieee32' in file:
-                new_float_encoding = 'ieee32'
-            else:
-                new_float_encoding = None
-            if 'sif-true' in file:
-                sif = True
-            elif 'sif-poss' in file:
-                sif = 'poss'
-            elif 'sif-prob' in file:
-                sif = 'prob'
-            else:
-                sif = False
-            if _pytest_config.force_product:
-                sif = True
-            reload_resources = (file in reload_triggers) or (new_float_encoding != float_encoding)
-            float_encoding = new_float_encoding
-            arp = 'arp' in file
-            base = file.partition('verification')[0] + 'verification'
-            params.extend([(file, base, verifier, sif, reload_resources, arp,
-                            ignore_obligations or (None if verifier == 'silicon' else False),
-                            _pytest_config.store_viper, float_encoding) for verifier
-                           in _pytest_config.verifiers])
-        metafunc.parametrize('path,base,verifier,sif,reload_resources,arp,ignore_obligations,print,float_encoding', params)
+        if not _pytest_config.selected_modes or 'verification' in _pytest_config.selected_modes:
+            for test_dir in _pytest_config.verification_test_dirs:
+                files = _test_files(test_dir)
+                test_files.extend(files)
+                if len(files) > 0:
+                    reload_triggers.add(files[0])
+            if _pytest_config.single_test and 'verification' in _pytest_config.single_test:
+                test_files.append(_pytest_config.single_test)
+            float_encoding = None
+            for file in test_files:
+                ignore_obligations = 'no_obligations' in file
+                if 'float_real' in file:
+                    new_float_encoding = 'real'
+                elif 'float_ieee32' in file:
+                    new_float_encoding = 'ieee32'
+                else:
+                    new_float_encoding = None
+                if 'sif-true' in file:
+                    sif = True
+                elif 'sif-poss' in file:
+                    sif = 'poss'
+                elif 'sif-prob' in file:
+                    sif = 'prob'
+                else:
+                    sif = False
+                if _pytest_config.force_product:
+                    sif = True
+                select = set()
+                if 'select' + os.sep in file:
+                    file_name = file.partition('select' + os.sep)[2].partition('.py')[0]
+                    select = set(file_name.split('-'))
+                reload_resources = (file in reload_triggers) or (new_float_encoding != float_encoding)
+                float_encoding = new_float_encoding
+                arp = 'arp' in file
+                base = file.partition('verification')[0] + 'verification'
+                params.extend([(file, base, verifier, sif, reload_resources, arp,
+                                ignore_obligations or (None if verifier == 'silicon' else False),
+                                _pytest_config.store_viper, float_encoding, select) for verifier
+                               in _pytest_config.verifiers])
+        metafunc.parametrize('path,base,verifier,sif,reload_resources,arp,ignore_obligations,print,float_encoding,selection', params)
     else:
         pytest.exit('Unrecognized test function.')
 

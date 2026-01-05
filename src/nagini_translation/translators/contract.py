@@ -52,6 +52,7 @@ from nagini_translation.lib.util import (
     find_loop_for_previous,
     get_func_name,
     InvalidProgramException,
+    isStr,
     OldExpressionTransformer,
     pprint,
     UnsupportedException,
@@ -329,9 +330,9 @@ class ContractTranslator(CommonTranslator):
         rec_type = self.get_type(node.args[0], ctx)
         if stmt:
             raise InvalidProgramException(node.args[0], 'purity.violated')
-        if not isinstance(node.args[1], ast.Str):
+        if not isStr(node.args[1]):
             raise InvalidProgramException(node.args[1], 'invalid.may.set')
-        field = rec_type.get_field(node.args[1].s)
+        field = rec_type.get_field(node.args[1].value)
         if not field:
             raise InvalidProgramException(node.args[1], 'invalid.may.set')
         may_set_pred = self.get_may_set_predicate(rec, field, ctx, pos)
@@ -358,9 +359,9 @@ class ContractTranslator(CommonTranslator):
         rec_type = self.get_type(node.args[0], ctx)
         if stmt:
             raise InvalidProgramException(node.args[0], 'purity.violated')
-        if not isinstance(node.args[1], ast.Str):
+        if not isStr(node.args[1]):
             raise InvalidProgramException(node.args[1], 'invalid.may.create')
-        field = rec_type.get_field(node.args[1].s)
+        field = rec_type.get_field(node.args[1].value)
         if not field:
             raise InvalidProgramException(node.args[1], 'invalid.may.create')
         return [], self.get_may_set_predicate(rec, field, ctx, pos)
@@ -429,6 +430,30 @@ class ContractTranslator(CommonTranslator):
         stmt, exp = self.translate_expr(node.args[0], ctx)
         res = self.viper.Old(exp, self.to_position(node, ctx),
                              self.no_info(ctx))
+        return stmt, res
+
+    def translate_reveal(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to the Reveal() contract function.
+        """
+        if len(node.args) != 1:
+            raise InvalidProgramException(node, 'invalid.contract.call')
+        inner_call = node.args[0]
+        if not isinstance(inner_call, ast.Call):
+            raise InvalidProgramException(node, 'invalid.reveal.no.function')
+        call_target = self.get_target(inner_call, ctx)
+        if not (isinstance(call_target, PythonMethod) and call_target.pure):
+            raise InvalidProgramException(node, 'invalid.reveal.no.pure.function')
+        if not (isinstance(call_target, PythonMethod) and call_target.opaque):
+            raise InvalidProgramException(node, 'invalid.reveal.no.opaque.function')
+
+        stmt, exp = self.translate_expr(node.args[0], ctx)
+        if not isinstance(exp, self.viper.ast.FuncApp):
+            raise UnsupportedException(node, "Unexpected: Revealed function application did not translate to a Viper FuncApp.")
+
+
+        res = self.viper.FuncAppWithInfo(exp, self.viper.AnnotationInfo('reveal', []))
+
         return stmt, res
 
     def translate_fold(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
@@ -1098,10 +1123,16 @@ class ContractTranslator(CommonTranslator):
                         raise InvalidProgramException(node, 'invalid.acc')
                     return self.translate_acc_global(node, perm, ctx)
         elif func_name in BUILTIN_PREDICATES:
+            if not impure:
+                raise InvalidProgramException(node, 'invalid.contract.position')
             return [], self.translate_unwrapped_builtin_predicate(node, ctx)
         elif func_name == 'MaySet':
+            if not impure:
+                raise InvalidProgramException(node, 'invalid.contract.position')
             return self.translate_may_set(node, ctx)
         elif func_name == 'MayCreate':
+            if not impure:
+                raise InvalidProgramException(node, 'invalid.contract.position')
             return self.translate_may_create(node, ctx)
         elif func_name in ('Assert', 'Assume', 'Fold', 'Unfold', 'Refute'):
             if not statement:
@@ -1122,6 +1153,8 @@ class ContractTranslator(CommonTranslator):
             return self.translate_old(node, ctx)
         elif func_name == 'Unfolding':
             return self.translate_unfolding(node, ctx, impure)
+        elif func_name == 'Reveal':
+            return self.translate_reveal(node, ctx)
         elif func_name == 'Low':
             return self.translate_low(node, ctx)
         elif func_name == 'LowVal':

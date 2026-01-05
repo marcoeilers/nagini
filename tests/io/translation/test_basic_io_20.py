@@ -16,5 +16,5 @@ def test() -> Place:
         )
     )
 
-    #:: ExpectedOutput(type.error:Name 't2' is not defined)
+    #:: ExpectedOutput(type.error:Name "t2" is not defined)
     a = t2

@@ -24,6 +24,7 @@ from nagini_translation.analyzer_io import IOOperationAnalyzer
 from nagini_translation.external.ast_util import mark_text_ranges
 from nagini_translation.lib.constants import (
     CALLABLE_TYPE,
+    EXTENDABLE_BUILTINS,
     IGNORED_IMPORTS,
     INT_TYPE,
     LEGAL_MAGIC_METHODS,
@@ -69,6 +70,7 @@ from nagini_translation.lib.util import (
     get_parent_of_type,
     InvalidProgramException,
     is_io_existential,
+    isStr,
     UnsupportedException,
 )
 from nagini_translation.lib.views import PythonModuleView
@@ -359,10 +361,6 @@ class Analyzer(ast.NodeVisitor):
                                                     self.module.global_module)
         if if_method.get('generic_type'):
             method.generic_type = if_method['generic_type']
-        if if_method.get('requires'):
-            method.requires = if_method['requires']
-        if cls:
-            method.requires.append(cls.name)
         cont = cls if cls else self.module.global_module
         if predicate:
             cont.predicates[method_name] = method
@@ -380,7 +378,7 @@ class Analyzer(ast.NodeVisitor):
                                  ast.ImportFrom, ast.Assign, ast.AnnAssign)):
                 continue
             if (isinstance(stmt, ast.Expr) and
-                    isinstance(stmt.value, ast.Str)):
+                    isStr(stmt.value)):
                 # A docstring.
                 continue
             if get_func_name(stmt) == 'Import':
@@ -442,7 +440,8 @@ class Analyzer(ast.NodeVisitor):
                    'Tuple': 'tuple',
                    'Set': 'set',
                    'Dict': 'dict',
-                   'Type': 'type',}
+                   'Type': 'type',
+                   'ellipsis': 'EllipsisType',}
         name = aliases.get(name, name)
         if self.current_class and name in self.current_class.type_vars:
             return self.current_class.type_vars[name]
@@ -469,8 +468,8 @@ class Analyzer(ast.NodeVisitor):
         """
         if isinstance(node, ast.Name):
             return self.find_or_create_class(node.id)
-        elif isinstance(node, ast.Str):
-            return self.find_or_create_class(node.s)
+        elif isStr(node):
+            return self.find_or_create_class(node.value)
         elif isinstance(node, ast.Attribute):
             ctx = self.get_target(node.value, self.module)
             return self.find_or_create_class(node.attr, module=ctx)
@@ -478,7 +477,7 @@ class Analyzer(ast.NodeVisitor):
             cls = self.find_or_create_target_class(node.value)
             if isinstance(node.slice, ast.Name):
                 ast_args = [node.slice]
-            elif isinstance(node.slice, ast.Str):
+            elif isStr(node.slice):
                 ast_args = [node.slice]
             else:
                 ast_args = node.slice.elts
@@ -517,7 +516,7 @@ class Analyzer(ast.NodeVisitor):
                     'used to define constructors')
             # The name of the NamedTuple should match the ADT constructor being
             # defined
-            if not (adt.name == actual_bases[1].args[0].s):
+            if not (adt.name == actual_bases[1].args[0].value):
                 raise InvalidProgramException(actual_bases[1], 'malformed.adt',
                     'malformed algebraic data type: name of NamedTuple has to ' +
                     'be the same of the class (ADT Constructor)')
@@ -549,7 +548,7 @@ class Analyzer(ast.NodeVisitor):
             # Parse NamedTuple's fields and their respective types
             for field_decl in actual_bases[1].args[1].elts:
                 field_name, field_type = field_decl.elts
-                cls.add_field(field_name.s, field_decl,
+                cls.add_field(field_name.value, field_decl,
                     self.get_target(field_type, self.module).try_unbox())
             # Consider ADTs as a special case of single inheritance
             actual_bases = [actual_bases[0]]
@@ -591,6 +590,8 @@ class Analyzer(ast.NodeVisitor):
             cls.superclass = self.find_or_create_target_class(actual_bases[0])
             if isinstance(cls.superclass, PythonClass) and cls.superclass.is_adt:
                 actual_bases = self._visit_ADT(cls, actual_bases, node, ast)
+            if cls.superclass.python_class.interface and cls.superclass.python_class.name not in EXTENDABLE_BUILTINS:
+                raise UnsupportedException(node, 'Subclassing builtin type is currently not supported.')
         if len(actual_bases) > 1:
             raise UnsupportedException(node, 'multiple inheritance')
         if len(actual_bases) == 0:
@@ -679,7 +680,10 @@ class Analyzer(ast.NodeVisitor):
             if not self.is_static_method(node):
                 func.cls = self.current_class
             func.pure = self.is_pure(node)
-            func.opaque = not self.is_transparent(node)
+            if self.current_class is not None:
+                func.opaque = not self.is_transparent(node)
+            else:
+                func.opaque = self.is_opaque(node)
             func.node = node
             func.superscope = scope_container
         else:
@@ -689,7 +693,10 @@ class Analyzer(ast.NodeVisitor):
             if is_property_getter:
                 opaque = False
             else:
-                opaque = not self.is_transparent(node)
+                if self.current_class is not None:
+                    opaque = not self.is_transparent(node)
+                else:
+                    opaque = self.is_opaque(node)
             if pure:
                 contract_only = self.is_declared_contract_only(node)
             else:
@@ -968,8 +975,22 @@ class Analyzer(ast.NodeVisitor):
                 self.stmt_container.precondition.append(
                     (node.args[0], self._aliases.copy()))
             elif node.func.id == 'Ensures':
-                self.stmt_container.postcondition.append(
-                    (node.args[0], self._aliases.copy()))
+                if len(node.args) > 1:
+                    res_type = self.get_target(node.args[0], self.stmt_container)
+                    if self.current_function.type is None:
+                        raise InvalidProgramException(node, 'invalid.result')
+                    expected_type_name = self.current_function.type.python_class.name
+                    declared_type_name = res_type.name
+                    if expected_type_name != declared_type_name:
+                        raise InvalidProgramException(node, 'invalid.result.type')
+                    assert isinstance(node.args[1], ast.Lambda)
+                    if len(node.args[1].args.args) != 1:
+                        raise InvalidProgramException(node, 'invalid.result.type')
+                    self.stmt_container.postcondition.append(
+                        (node.args[1], self._aliases.copy()))
+                else:
+                    self.stmt_container.postcondition.append(
+                        (node.args[0], self._aliases.copy()))
             elif node.func.id == 'Decreases':
                 if not (isinstance(self.stmt_container, PythonMethod) and self.stmt_container.pure):
                     raise InvalidProgramException(node, 'invalid.contract.position')
@@ -1588,6 +1609,7 @@ class Analyzer(ast.NodeVisitor):
 
     def _incompatible_decorators(self, decorators) -> bool:
         return ((('Predicate' in decorators) and ('Pure' in decorators)) or
+                (('Opaque' in decorators) and ('Pure' not in decorators)) or
                 (('Predicate' in decorators) and ('Inline' in decorators)) or
                 (('Inline' in decorators) and ('Pure' in decorators)) or
                 (('IOOperation' in decorators) and (len(decorators) != 1)) or
@@ -1641,6 +1663,9 @@ class Analyzer(ast.NodeVisitor):
 
     def is_transparent(self, func: ast.FunctionDef) -> bool:
         return self.has_decorator(func, 'Transparent')
+
+    def is_opaque(self, func: ast.FunctionDef) -> bool:
+        return self.has_decorator(func, 'Opaque')
 
     def is_predicate(self, func: ast.FunctionDef) -> bool:
         return self.has_decorator(func, 'Predicate')

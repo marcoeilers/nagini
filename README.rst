@@ -6,19 +6,21 @@ Our CAV 2018 tool paper describing Nagini can be found `here <http://pm.inf.ethz
 Dependencies (Ubuntu Linux)
 ===================================
 
-Install Java 11 or newer (64 bit) and Python 3.9 (64 bit, other versions likely *will not work*) and the required libraries (in particular, python3.9-dev). 
-Experimental support for newer Python versions is available on the branches `py310 <https://github.com/marcoeilers/nagini/tree/py310>`_, `py311 <https://github.com/marcoeilers/nagini/tree/py311>`_ and `py312 <https://github.com/marcoeilers/nagini/tree/py312>`_ but may offer significantly worse performance.
-For usage with Viper's verification condition generation backend Carbon, you will also need to install Boogie (version 2.15.9).
+1.  Install Java 11 or newer (64 bit) and a Python version between Python 3.9 and 3.12 (64 bit, newer versions *will not work*).
+
+2.  Install the the required libraries, in particular, python3.x-dev.
+
+3.  For usage with Viper's verification condition generation backend Carbon, you will also need to install Boogie (version 2.15.9).
 
 Dependencies (Windows)
 ==========================
 
-Install Java 11 or newer (64 bit) and Python 3.9 (64 bit, other versions likely *will not work*), as well as the required version of either Visual C++ Build Tools or Visual Studio if necessary.
-Experimental support for newer Python versions is available on the branches `py310 <https://github.com/marcoeilers/nagini/tree/py310>`_, `py311 <https://github.com/marcoeilers/nagini/tree/py311>`_ and `py312 <https://github.com/marcoeilers/nagini/tree/py312>`_ but may offer significantly worse performance and is currently untested on Windows.
-For usage with Viper's verification condition generation backend Carbon, you will also need to install Boogie (version 2.15.9).
+1.  Install Java 11 or newer (64 bit) and a Python version between Python 3.9 and 3.12 (64 bit, newer versions *will not work*).
 
-Note that we have observed *significantly* worse performance when using Nagini on Windows on some
-systems. We currently do not know why this happens, but will investigate the issue when possible.
+2.  Install the required version of either Visual C++ Build Tools or Visual Studio.
+
+3.  For usage with Viper's verification condition generation backend Carbon, you will also need to install Boogie (version 2.15.9).
+
 
 Getting Started
 ===============
@@ -27,7 +29,7 @@ Execute the following commands (on Windows, you may have to use ``cmd`` and not 
 
 1.  Create a virtual environment::
 
-        virtualenv --python=python3.9 <env>
+        virtualenv --python=python3.12 <env>
         
 2.  Activate it::
 
@@ -49,9 +51,9 @@ Execute the following commands (on Windows, you may have to use ``cmd`` and not 
         cd nagini
         pip install .
 
-4.  Optionally, try running the tests::
+4.  Optionally, try running some tests::
 
-        pytest -v -p no:faulthandler src/nagini_translation/tests.py --silicon
+        pytest -v -p no:faulthandler src/nagini_translation/tests.py --silicon --minimal
 
 Command Line Usage
 ==================

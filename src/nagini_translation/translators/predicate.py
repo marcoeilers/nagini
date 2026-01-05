@@ -11,7 +11,10 @@ import copy
 from nagini_translation.lib.constants import BOOL_TYPE, STATE_PREDS, EQUALITY_STATE_PRED, PRED_NOT_COLLECTION_TYPE
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import PythonMethod
-from nagini_translation.lib.util import InvalidProgramException
+from nagini_translation.lib.util import (
+    InvalidProgramException,
+    isStr
+)
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
 from toposort import toposort_flatten
@@ -108,7 +111,7 @@ class PredicateTranslator(CommonTranslator):
             ctx.current_function = instance
             ctx.module = instance.module
             self.bind_type_vars(instance, ctx)
-            
+
             if instance.sil_name == EQUALITY_STATE_PRED:
                 content = ast.parse("True", mode='eval')
                 content.lineno = 0
@@ -121,7 +124,7 @@ class PredicateTranslator(CommonTranslator):
                 # Replace variables in instance by variables in root, since we use the
                 # parameter names from root.
                 for root_name, current_name in zip(root.args.keys(),
-                                                instance.args.keys()):
+                                                   instance.args.keys()):
                     root_var = root.args[root_name]
                     # For the receiver parameter, we need it to have the same sil_name as
                     # that of the root, but the type of the current instance when translating

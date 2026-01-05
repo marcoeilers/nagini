@@ -1,0 +1,35 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: Nagini Minimal Tests Ubuntu Python 3.12
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-22.04
+    env:
+      BOOGIE_EXE: "/home/runner/.dotnet/tools/boogie"
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.12"
+        architecture: "x64"
+    - name: Setup .NET
+      uses: xt0rted/setup-dotnet@v1.5.0
+      with:
+        dotnet-version: 6.0.x
+    - name: Install Boogie
+      run: |
+        dotnet tool install --global Boogie --version 2.15.9
+    - name: Install Nagini
+      run: |
+        python -m pip install --upgrade pip
+        pip install setuptools==68.2.0
+        pip install .
+    - name: Test with pytest
+      run: |
+        pytest -v -p no:faulthandler src/nagini_translation/tests.py --minimal
