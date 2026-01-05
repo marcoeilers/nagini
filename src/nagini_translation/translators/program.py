@@ -1947,7 +1947,8 @@ class ProgramTranslator(CommonTranslator):
                         if func_to_call:
                             self.add_dependency([func_to_call], func.sil_name)
 
-                    if func.name == '__eq__' and not module.file in NO_TRANS_SYMM:
+                    # Disabled for now
+                    if False and func.name == '__eq__' and not module.file in NO_TRANS_SYMM:
                         pos = self.to_position(func.node, ctx)
                         info = self.no_info(ctx)
                         symm_check  = self.config.method_translator.encode_symmetry_check(
