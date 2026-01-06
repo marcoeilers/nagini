@@ -490,8 +490,8 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         Adds a field with the given name and type if it doesn't exist yet in
         this class or a superclass.
         """
-        field = self.get_field(name)
-        if field != None:
+        if name in self.fields:
+            field = self.fields[name]
             assert self.types_match(field.type.try_box(), type.try_box())
         elif name in self.static_fields:
             field = self.static_fields[name]
@@ -1797,7 +1797,7 @@ class PythonField(PythonNode):
         translation; this function will return the field that is actually used.
         """
         result = self
-        while result.inherited is not None:
+        while isinstance(result, PythonField) and result.inherited is not None:
             result = result.inherited
         return result
 
