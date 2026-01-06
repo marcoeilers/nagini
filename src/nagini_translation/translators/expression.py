@@ -740,7 +740,7 @@ class ExpressionTranslator(CommonTranslator):
             raise InvalidProgramException(node, 'field.nonexistent')
         if isinstance(field, PythonField):
             field = field.actual_field
-            if field.is_mangled() and (field.cls is not ctx.current_class and
+            if isinstance(field, PythonField) and field.is_mangled() and (field.cls is not ctx.current_class and
                                        field.cls is not ctx.actual_function.cls):
                 raise InvalidProgramException(node, 'private.field.access')
 
