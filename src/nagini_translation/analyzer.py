@@ -1595,12 +1595,21 @@ class Analyzer(ast.NodeVisitor):
                 f = self.module.get_func_or_method(node.func.id)
                 if f is not None:
                     return f.type
+                cls = self.get_target(node.func, self.module)
+                if isinstance(cls, PythonType):
+                    return cls
                 raise UnsupportedException(node)
         elif isinstance(node, ast.Call) and isinstance(node.func,
                                                        ast.Attribute):
             receiver = self.typeof(node.func.value)
             method = receiver.get_func_or_method(node.func.attr)
             return method.type
+        elif isinstance(node, ast.Call) and isinstance(node.func,
+                                                       ast.Subscript):
+            cls = self.get_target(node.func, self.module)
+            if isinstance(cls, PythonType):
+                return cls
+            raise UnsupportedException(node)
         else:
             raise UnsupportedException(node)
 

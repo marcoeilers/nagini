@@ -112,3 +112,56 @@ class TestClassGeneric(Generic[W]):
     def __init__(self, w: W) -> None:
         Ensures(Acc(self.val))  # type: ignore
         self.val = w.m()
+
+
+# Generic constructor calls
+
+
+class CA(Generic[T, V]):
+    def __init__(self, a: V) -> None:
+        self.a = a
+        Ensures(Acc(self.a) and self.a is a)
+
+    @Pure
+    def get(self) -> V:
+        Requires(Acc(self.a))
+        return self.a
+
+
+class CB:
+    def get(self) -> int:
+        return 5
+
+
+def client1() -> CA[CB, bool]:
+    return CA[CB, bool](True)
+
+
+def client1f() -> CA[CB, bool]:
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(Acc(Result().a) and Result().a == False)
+    return CA[CB, bool](True)
+
+
+def client2(b: CA[int, int]) -> None:
+    d = CB().get()
+
+
+def client2f(b: CA[int, int]) -> None:
+    d = CB().get()
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    Assert(False)
+
+
+def client3(b: CA[int, int]) -> bool:
+    Requires(Acc(b.a))
+    c = b.get()
+    return CA[CB, bool](True).get()
+
+
+def client3f(b: CA[int, int]) -> bool:
+    Requires(Acc(b.a))
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(Result() == False)
+    c = b.get()
+    return CA[CB, bool](True).get()
