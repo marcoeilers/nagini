@@ -1805,7 +1805,7 @@ class PythonField(PythonNode):
         translation; this function will return the field that is actually used.
         """
         result = self
-        while result.inherited is not None:
+        while isinstance(result, PythonField) and result.inherited is not None:
             result = result.inherited
         return result
 
