@@ -1457,7 +1457,7 @@ class Analyzer(ast.NodeVisitor):
                 if f is not None:
                     return f.type
                 cls = self.get_target(node.func, self.module)
-                if cls is not None:
+                if isinstance(cls, PythonType):
                     return cls
                 raise UnsupportedException(node)
         elif isinstance(node, ast.Call) and isinstance(node.func,
@@ -1468,7 +1468,7 @@ class Analyzer(ast.NodeVisitor):
         elif isinstance(node, ast.Call) and isinstance(node.func,
                                                        ast.Subscript):
             cls = self.get_target(node.func, self.module)
-            if cls is not None:
+            if isinstance(cls, PythonType):
                 return cls
             raise UnsupportedException(node)
         else:
