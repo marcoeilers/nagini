@@ -245,7 +245,7 @@ class CallTranslator(CommonTranslator):
         if target_class.python_class.is_adt:
             return arg_stmts, self.translate_adt_cons(target_class, args, pos, ctx)
 
-        if target_class.enum:
+        if target_class.python_class.enum:
             return arg_stmts, self.translate_enum_cons(target_class, args, pos, ctx)
 
         res_var = ctx.current_function.create_variable(target_class.name +
@@ -340,7 +340,7 @@ class CallTranslator(CommonTranslator):
             stmts.extend(init_stmts)
 
         # If the init method was created implicitly, we have to check for __post_init__ 
-        if target_class.dataclass and target_class.implicit_init:
+        if target_class.python_class.dataclass and target_class.python_class.implicit_init:
             target = target_class.get_method('__post_init__')
             if target:
                 post_init_stmts = self._translate_init_call(target, [res_var.ref()], node, ctx, '__post_init__')
