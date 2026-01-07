@@ -254,7 +254,7 @@ class MethodTranslator(CommonTranslator):
                                                        pos, info)
             pres.append(type_check)
             pres.append(acc_pred)
-        if func.cls:
+        if func.cls and func.method_type == MethodType.normal:
             # Add upper bound information for type variables.
             for name, var in func.cls.type_vars.items():
                 var_expr = self.type_factory.translate_type_literal(var, pos,
