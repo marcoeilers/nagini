@@ -1370,7 +1370,7 @@ class Analyzer(ast.NodeVisitor):
     def visit_Nonlocal(self, node: ast.Nonlocal) -> None:
         raise UnsupportedException(node)
 
-    def convert_type(self, mypy_type, node) -> PythonType:
+    def convert_type(self, mypy_type, node, bound_type_vars: Dict[str, PythonType] = None) -> PythonType:
         """
         Converts an internal mypy type to a PythonType.
         """
@@ -1416,7 +1416,7 @@ class Analyzer(ast.NodeVisitor):
         elif self.types.is_union_type(mypy_type):
             return self._convert_union_type(mypy_type, node)
         elif self.types.is_type_var(mypy_type):
-            return self._convert_type_var(mypy_type, node)
+            return self._convert_type_var(mypy_type, node, bound_type_vars)
         elif self.types.is_type_type(mypy_type):
             return self._convert_type_type(mypy_type, node)
         elif self.types.is_callable_type(mypy_type):
@@ -1481,8 +1481,10 @@ class Analyzer(ast.NodeVisitor):
             result = OptionalType(result)
         return result
 
-    def _convert_type_var(self, mypy_type, node) -> PythonType:
+    def _convert_type_var(self, mypy_type, node, bound_type_vars: Dict[str, PythonType] = None) -> PythonType:
         name = mypy_type.name
+        if bound_type_vars and name in bound_type_vars:
+            return bound_type_vars[name]
         assert name in self.module.type_vars
         if (self.current_class and name in self.current_class.type_vars):
             return self.current_class.type_vars[name]
@@ -1562,8 +1564,13 @@ class Analyzer(ast.NodeVisitor):
             else:
                 context = [receiver.name]
                 module = receiver.module
+            bound_type_vars = None
+            if isinstance(receiver, GenericType) or (isinstance(receiver, OptionalType) and isinstance(receiver.optional_type, GenericType)):
+                gt = receiver if isinstance(receiver, GenericType) else receiver.optional_type
+                bound_type_vars = zip(gt.cls.type_vars.keys(), gt.type_args)
+                bound_type_vars = {k: v for (k, v) in bound_type_vars}
             type, _ = module.get_type(context, node.attr)
-            return self.convert_type(type, node)
+            return self.convert_type(type, node, bound_type_vars)
         elif isinstance(node, ast.arg):
             # Special case for cls parameter of classmethods; for those, we
             # return the type 'type[C]', where C is the class the method
