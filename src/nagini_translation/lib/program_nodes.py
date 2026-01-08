@@ -691,7 +691,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         used by get_target). If 'only_top' is true, returns only top level
         elements that can be accessed without a receiver.
         """
-        dicts = [self.static_methods, self.static_fields]
+        dicts = [self.static_methods, self.static_fields, self.type_vars]
         if not only_top:
             dicts.extend([self.functions, self.fields, self.methods,
                           self.predicates])
@@ -866,7 +866,7 @@ class UnionType(GenericType):
     def __init__(self, args: List[PythonType]) -> None:
         self.name = 'Union'
         self._cls = None
-        self.module = args[0].module
+        self.module = next(x for x in args if x is not None).module
         self.type_args = args
         self.exact_length = True
 
@@ -875,10 +875,10 @@ class UnionType(GenericType):
         if self._cls is None:
             # Get common supertype of all types in the union.
             args = self.type_args
-            cls = args[0]
+            cls = next(x for x in args if x is not None)
             if isinstance(cls, GenericType):
                 cls = cls.cls
-            for type_option in args[1:]:
+            for type_option in args:
                 if type_option:
                     if isinstance(type_option, GenericType):
                         type_option = type_option.cls
