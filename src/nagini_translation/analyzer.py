@@ -1414,7 +1414,7 @@ class Analyzer(ast.NodeVisitor):
             result = GenericType(self.module.global_module.classes[TUPLE_TYPE],
                                  args)
         elif self.types.is_union_type(mypy_type):
-            return self._convert_union_type(mypy_type, node)
+            return self._convert_union_type(mypy_type, node, bound_type_vars)
         elif self.types.is_type_var(mypy_type):
             return self._convert_type_var(mypy_type, node, bound_type_vars)
         elif self.types.is_type_type(mypy_type):
@@ -1464,8 +1464,8 @@ class Analyzer(ast.NodeVisitor):
     def _convert_callable_type(self, mypy_type, node) -> PythonType:
         return self.find_or_create_class(CALLABLE_TYPE, module=self.module.global_module)
 
-    def _convert_union_type(self, mypy_type, node) -> PythonType:
-        args = [self.convert_type(arg_type, node)
+    def _convert_union_type(self, mypy_type, node, bound_type_vars: Dict[str, PythonType] = None) -> PythonType:
+        args = [self.convert_type(arg_type, node, bound_type_vars)
                 for arg_type in mypy_type.items
                 if not self.types.is_any_type_from_error(arg_type)]
         optional = False
