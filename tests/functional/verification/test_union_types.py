@@ -2,6 +2,7 @@
 # http://creativecommons.org/publicdomain/zero/1.0/
 
 from typing import Union
+from nagini_contracts.contracts import *
 
 
 class A:
@@ -97,3 +98,17 @@ def m5(u: Union[A, B], a: A) -> None:
 
 def m6(u: Union[C, B], a: A) -> None:
     assert a is not u
+
+
+class MA:
+    def __init__(self) -> None:
+        self.x = 5
+
+
+class MB:
+    def __init__(self) -> None:
+        self.x = 5
+
+def umm(y: Union[None, MA, MB]) -> int:
+    Requires(False)
+    return y.x

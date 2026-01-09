@@ -1548,6 +1548,8 @@ class Analyzer(ast.NodeVisitor):
             return self.convert_type(type, node)
         elif isinstance(node, ast.Attribute):
             receiver = self.typeof(node.value)
+            if isinstance(receiver, OptionalType):
+                receiver = receiver.optional_type
             if isinstance(receiver, UnionType) and not isinstance(receiver, OptionalType):
                 set_of_types = set()
                 for type_in_union in receiver.get_types() - {None}:
