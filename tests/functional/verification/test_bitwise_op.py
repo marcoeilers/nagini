@@ -189,7 +189,7 @@ def lshift_general(a: int, b: int) -> None:
     assert shift == 1
 
 def lshift_unlimited(a: int, b: int) -> None:
-    Requires(b >= 0 and b <= 8)
+    Requires(b >= 0 and b <= 64)
 
     shift = a << b
     
@@ -212,6 +212,10 @@ def lshift_unlimited(a: int, b: int) -> None:
         assert shift == a * 128
     if b == 8:
         assert shift == a * 256
+    if b == 32:
+        assert shift == a * 4_294_967_296
+    if b == 33:
+        assert shift == a * 8_589_934_592
     
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert shift == 1
@@ -265,3 +269,21 @@ def rshift_unlimited(a: int, b: int) -> None:
 
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert shift == 1
+
+def int_bit_length() -> None:
+
+    assert (0).bit_length() == 0
+    assert (1).bit_length() == 1
+    assert (3).bit_length() == 2
+    assert (7).bit_length() == 3
+    assert (15).bit_length() == 4
+
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert (3245).bit_length() == 6
+
+def int_bit_length_general(a: int) -> None:
+    Requires(a >= 0 and a < (1 << 64))
+
+    if a > 2:
+        assert a.bit_length() == (a >> 1).bit_length() + 1
+    

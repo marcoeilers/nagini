@@ -330,7 +330,7 @@
         },
         "bit_length": {
             "args": ["int"],
-            "type": "int"      
+            "type": "__prim__int"      
         },
         "__byte_bounds__": {
             "args": ["__prim__int"],
