@@ -158,7 +158,7 @@ function __prim__int___lshift__(self: Int, other: Int): Int
     requires @error("Negative shift count.")(other >= 0)
     requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(other <= _INT_MAX)
 {
-    0 <= other <= 8 ? self * __shift_factor64(other) :
+    0 <= other <= 64 ? self * __shift_factor64(other) :
     self >= 0 ? fromBVInt(shlBVInt(toBVInt(self), toBVInt(other))) :
     -fromBVInt(shlBVInt(toBVInt(-self), toBVInt(other))) 
 }
@@ -206,7 +206,7 @@ function __prim__int___rshift__(self: Int, other: Int): Int
     requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(other <= _INT_MAX)
 {
     
-    0 <= other <= 8 ? self / __shift_factor64(other) :
+    0 <= other <= 64 ? self / __shift_factor64(other) :
     self >= 0 ? fromBVInt(shrBVInt(toBVInt(self), toBVInt(other))) :
     -fromBVInt(shrBVInt(toBVInt(-self), toBVInt(other)))
 }
