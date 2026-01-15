@@ -121,6 +121,8 @@ def get_func_name(stmt: ast.AST) -> Optional[str]:
         return call.func.id
     elif isinstance(call.func, ast.Attribute):
         return call.func.attr
+    elif isinstance(call.func, ast.Call):
+        return get_func_name(call.func)
     else:
         raise UnsupportedException(stmt)
 

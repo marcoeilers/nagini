@@ -8,19 +8,32 @@ import ast
 from typing import List, Optional, Union, Tuple, Callable
 
 from nagini_contracts.contracts import CONTRACT_FUNCS, GHOST_BUILTINS, CONTRACT_WRAPPER_FUNCS
-from nagini_translation.lib.program_nodes import (PythonModule, PythonType, PythonMethod, PythonIOOperation, 
-                                                  PythonVarBase, PythonClass, PythonNode, PythonField)
+from nagini_contracts.io_contracts import (
+    BUILTIN_IO_OPERATIONS, IO_CONTRACT_FUNCS, 
+    IO_OPERATION_PROPERTY_FUNCS, IO_FUNCS
+    )
+from nagini_translation.lib.constants import OBJECT_TYPE, THREADING
+from nagini_translation.lib.program_nodes import (
+    PythonModule, PythonType, PythonMethod, PythonIOOperation, 
+    PythonVarBase, PythonClass, PythonNode, PythonField, UnionType, GenericType
+    )
 from nagini_translation.lib.context import Context
 from collections import OrderedDict
 from nagini_translation.lib.resolver import get_target as do_get_target
 from nagini_translation.lib.resolver import get_type as do_get_type
 from nagini_translation.lib.util import (
     get_func_name,
+    construct_lambda_prefix,
     InvalidProgramException,
     UnsupportedException,
 )
 
-annotation_t = Union[ast.Name, ast.Constant, ast.Subscript]
+annotation_t = Union[ast.Name, ast.Constant, ast.Attribute, ast.Subscript]
+
+ALL_CONTRACT_ELEMS = (CONTRACT_FUNCS + CONTRACT_WRAPPER_FUNCS + THREADING +
+                        IO_CONTRACT_FUNCS + IO_OPERATION_PROPERTY_FUNCS +
+                        list(BUILTIN_IO_OPERATIONS) + IO_FUNCS)
+IGNORE_REG_CALLS = ['TypeVar']
 
 class GhostChecker(ast.NodeVisitor):
     """
@@ -49,8 +62,8 @@ class GhostChecker(ast.NodeVisitor):
 
         # Classes may only have explicit bases of the same ghost type, 
         # i.e. ghost classes only have explicit ghost bases (and the implicit object base).
-        OBJECT_TYPE = ast.Name('object', None) #TODO: Does a cleaner solution exist?
-        object_class = self.get_target(OBJECT_TYPE, self.ctx)
+        OBJECT_NAME = ast.Name(OBJECT_TYPE, None) #TODO: Does a cleaner solution exist?
+        object_class = self.get_target(OBJECT_NAME, self.ctx)
         superclass = current_class.superclass
         if not (superclass == object_class or superclass.is_ghost == current_class.is_ghost):
             raise InvalidProgramException(node, "invalid.ghost.classDef")
@@ -62,37 +75,66 @@ class GhostChecker(ast.NodeVisitor):
         self.ctx.current_class = None
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        scope = self.ctx.current_class if self.ctx.current_class else self.modules[1]
-        current_function: PythonMethod = scope.methods[node.name] # TODO: Func may also be in scope.functions (maybe use get_func_or_method)
+        # Functions with the following decorators are assumed valid or are verified later, so we just proceed
+        IGNORE_DECORATORS = ['ContractOnly', 'IOOperation', 'Predicate']
+        decorators = {d.id for d in node.decorator_list if isinstance(d, ast.Name)}
+        if any([dec in IGNORE_DECORATORS for dec in decorators]):
+            return
+        
+        # Resolve created function
+        if 'property' in decorators:
+            if not isinstance(self.ctx.current_class, PythonClass):
+                raise InvalidProgramException(node, 'invalid.property', "Property outside of class.")
+            current_function = self.ctx.current_class.get_field(node.name)
+        else:
+            scope = self.ctx.current_class if self.ctx.current_class else self.modules[1]
+            current_function = scope.get_func_or_method(node.name)
+        if current_function is None:
+            attr_decorators = [d for d in node.decorator_list if isinstance(d, ast.Attribute)]
+            if len(attr_decorators) == 1 and attr_decorators[0].attr == 'setter':
+                if not isinstance(self.ctx.current_class, PythonClass):
+                    raise InvalidProgramException(node, 'invalid.property', "Property outside of class.")
+                property_function = self.ctx.current_class.get_field(attr_decorators[0].value.id)
+                current_function = property_function.setter
+
+        if current_function is None:
+            raise InvalidProgramException(node, 'invalid.ghost.functionDef', f"Couldn't correctly resolve function {node.name}")
         self.ctx.current_function = current_function
         old_ghost_ctx = self.in_ghost_ctx
         self.in_ghost_ctx = current_function.is_ghost
         
-        # Each (non-variadic) argument must be clearly regular or ghost
-        norm_args = list(node.args.args)
-        norm_args.extend(node.args.posonlyargs)
-        norm_args.extend(node.args.kwonlyargs)
-        for arg in norm_args:
-            if arg.annotation is not None:
-                self.check_annotation(arg.annotation)
-
-        # Variadic arguments must be regular
-        for arg in [node.args.vararg, node.args.kwarg]:
-            if arg is not None and arg.annotation is not None and self.check_annotation(arg.annotation):
-                raise InvalidProgramException(arg, 'invalid.ghost.annotation')
-
-        # The return must be None, a Tuple[only_reg, only_ghost] or clearly regular or ghost
-        return_ann = node.returns
-        if isinstance(return_ann, ast.Constant) and return_ann.value is None:
-            pass
-        elif isinstance(return_ann, ast.Subscript) and \
-            self.get_subscript_name(return_ann) == 'Tuple' and len(return_ann.slice.elts) == 2:
-            is_fst_ghost = self.check_annotation(return_ann.slice.elts[0])
-            is_snd_ghost = self.check_annotation(return_ann.slice.elts[1])
-            if is_fst_ghost and not is_snd_ghost:
-                raise InvalidProgramException(return_ann, 'invalid.ghost.annotation')
+        # Check annotations
+        if not current_function.is_ghost:
+            # Each (non-variadic) argument must be clearly regular or ghost
+            norm_args = list(node.args.args)
+            norm_args.extend(node.args.posonlyargs)
+            norm_args.extend(node.args.kwonlyargs)
+            for arg in norm_args:
+                if arg.annotation is not None:
+                    self.check_annotation(arg.annotation)
+            
+            # Variadic arguments must be regular
+            for arg in [node.args.vararg, node.args.kwarg]:
+                if arg is not None and arg.annotation is not None and self.check_annotation(arg.annotation):
+                    raise InvalidProgramException(arg, 'invalid.ghost.annotation')
+            
+            # The return must be None, a Tuple[only_reg, only_ghost] or clearly regular or ghost
+            return_ann = node.returns
+            if isinstance(return_ann, ast.Constant) and return_ann.value is None:
+                pass
+            elif isinstance(return_ann, ast.Subscript) and \
+                self.get_subscript_name(return_ann) == 'Tuple' and len(return_ann.slice.elts) == 2:
+                is_fst_ghost = self.check_annotation(return_ann.slice.elts[0])
+                is_snd_ghost = self.check_annotation(return_ann.slice.elts[1])
+                if is_fst_ghost and not is_snd_ghost:
+                    raise InvalidProgramException(return_ann, 'invalid.ghost.annotation')
+            else:
+                self.check_annotation(return_ann)
         else:
-            self.check_annotation(return_ann)
+            # All elements must be ghost, so annotations do not need to be further analyzed.
+            # However, the function may not have variadic arguments
+            if node.args.vararg is not None or node.args.kwarg is not None:
+                raise InvalidProgramException(node, 'invalid.ghost.functionDef')
 
         for stmt in node.body:
             self.visit(stmt)
@@ -100,23 +142,23 @@ class GhostChecker(ast.NodeVisitor):
         self.ctx.current_function = None
         self.in_ghost_ctx = old_ghost_ctx
 
-    def visit_Return(self, node: ast.Return) -> None: #TODO: handle Union and Optional
+    def visit_Return(self, node: ast.Return) -> None:
         if not self.in_ghost_ctx: 
             expect_ret = self.ctx.current_function.node.returns
             if node.value is None:
-                return # Returning nothing cannot be invalid
+                return # Returning nothing cannot be invalid or mypy would throw error
             elif isinstance(node.value, ast.Tuple):
                 expect_list = expect_ret.slice.elts
                 index = 0
                 for ret in node.value.elts:
                     expect_ret = expect_list[index]
-                    expect_ret = self.resolve_future_references(expect_ret)
+                    expect_type = self.check_annotation(expect_ret)
                     if not self.is_assignable(ret, expect_ret):
                         raise InvalidProgramException(node, 'invalid.ghost.return')
                     index += 1
             else:
-                expect_ret = self.resolve_future_references(expect_ret)
-                if not self.is_assignable(node.value, expect_ret):
+                expect_type = self.check_annotation(expect_ret)
+                if not self.is_assignable(node.value, expect_type):
                     raise InvalidProgramException(node, 'invalid.ghost.return')
 
     def visit_Delete(self, node: ast.Delete):
@@ -135,8 +177,8 @@ class GhostChecker(ast.NodeVisitor):
                 self.check_assign(node.value, target)
 
     def visit_AugAssign(self, node: ast.AugAssign):
-        binop = ast.BinOp(node.target, node.op, node.value)
-        self.check_assign(binop, node.target)
+        is_value_ghost = self.is_ghost(node.value)
+        self.check_assign(is_value_ghost, node.target)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
         self.check_annotation(node.annotation)
@@ -256,28 +298,35 @@ class GhostChecker(ast.NodeVisitor):
             raise InvalidProgramException(node, 'invalid.ghost.raise')
 
     def visit_Assert(self, node: ast.Assert):
-        if self.in_ghost_ctx or self.is_ghost(node.test) or self.is_ghost(node.msg):
-            raise InvalidProgramException(node, 'invalid.ghost.assert', "Use the Assert contract function when working with ghost elements")
+        is_test_ghost = self.is_ghost(node.test)
+        is_msg_ghost = self.is_ghost(node.msg) if node.msg is not None else False
+        if self.in_ghost_ctx or is_test_ghost or is_msg_ghost:
+            raise InvalidProgramException(node, 'invalid.ghost.assert', "Use the Assert contract function when working with ghost elements.")
 
     def visit_Expr(self, node: ast.Expr):
+        self.check_for_call(node)
+
+    def check_for_call(self, node: ast.AST):
         # Scan expression for function calls
         for field, value in ast.iter_fields(node):
             if isinstance(value, list):
                 for item in value:
                     if isinstance(item, ast.Call):
                         self.check_call(item)
+                    elif isinstance(item, ast.AST):
+                        self.check_for_call(item)
             elif isinstance(value, ast.Call):
                 self.check_call(value)
+            elif isinstance(value, ast.AST):
+                self.check_for_call(value)
 
-    def resolve_future_references(self, ann: ast.AST) -> ast.AST:
-        """
-        Annotations may contain references to classes and functions which are defined later in the module.
-        This function changes these references so that they can be correctly resolved in a later is_ghost call.
-        """
-        if isinstance(ann, ast.Constant) and isinstance(ann.value, str):
-            return ast.Name(ann.value, None)
-        else:
-            return ann
+    def visit_Break(self, node: ast.Break):
+        if self.in_ghost_ctx:
+            raise InvalidProgramException(node, 'invalid.ghost.break')
+    
+    def visit_Continue(self, node: ast.Continue):
+        if self.in_ghost_ctx:
+            raise InvalidProgramException(node, 'invalid.ghost.continue')
 
     def check_annotation(self, ann: annotation_t) -> bool:
         """
@@ -291,14 +340,27 @@ class GhostChecker(ast.NodeVisitor):
         elif isinstance(ann, ast.Constant):
             # Must be valid or mypy would throw error
             return ann.value in self.modules[1].ghost_names or ann.value in GHOST_BUILTINS
+        elif isinstance(ann, ast.Attribute):
+            # Must be valid or mypy would throw error. Find module and check for ghost name
+            mod: Optional[PythonModule] = self.get_target(ann.value, self.ctx)
+            if mod is None:
+                raise InvalidProgramException(ann, 'invalid.ghost.annotation', f"Couldn't correctly resolve module {ann.value.id}")
+            return ann.attr in mod.ghost_names
         else: 
             assert isinstance(ann, ast.Subscript), f"Unexpected type of {type(ann)}"
             if isinstance(ann.slice, (ast.Name, ast.Subscript)): #TODO: Find cleaner way to deal with subscripts?
                 return self.check_annotation(ann.slice)
             assert isinstance(ann.slice, (ast.Tuple, ast.List)), f"Unexpected type of {type(ann.slice)}"
             sub_anns = ann.slice.elts
-            fst = self.check_annotation(sub_anns[0])
-            for idx in range(1, len(sub_anns)):
+            if len(sub_anns) == 1:
+                return self.check_annotation(sub_anns[0])
+
+            if isinstance(sub_anns[0], ast.Constant) and sub_anns[0].value is None:
+                start_idx = 1
+            else:
+                start_idx = 0
+            fst = self.check_annotation(sub_anns[start_idx])
+            for idx in range(start_idx+1, len(sub_anns)):
                 sub_ann = sub_anns[idx]
                 if isinstance(sub_ann, ast.Constant) and sub_ann.value is None:
                     # We ignore None and assume there is at least one other value in the subscript
@@ -315,22 +377,61 @@ class GhostChecker(ast.NodeVisitor):
         If the call is valid, we return whether the called function is ghost. 
         If the function is regular and has an annotation for its return type, we return the annotation as well.
         """     
-        if get_func_name(call) in CONTRACT_FUNCS + CONTRACT_WRAPPER_FUNCS:
+        func_name = get_func_name(call)
+        if func_name == "Unfolding":
+            return self.is_ghost(call.args[1]), None
+        elif func_name in ALL_CONTRACT_ELEMS:
             return True, None
-        called_func = self.get_target(call.func, self.ctx)
-        if isinstance(called_func, PythonClass):
-            # Instantiation of class: We resolve it as a call to __init__
-            called_func = called_func.methods['__init__']
-        if not isinstance(called_func, PythonMethod):
-            raise InvalidProgramException(call, None, "Couldn't correctly resolve function")
+        elif func_name in IGNORE_REG_CALLS:
+            return False, None
+        
+        called_func = None
+        if isinstance(call.func, ast.Attribute):
+            called_type = self.get_type(call.func.value, self.ctx)
+            if isinstance(called_type, PythonClass) and called_type.name in THREADING:
+                return True, None
+            if isinstance(called_type, UnionType):
+                types = called_type.get_types()
+                funcs = [t.get_func_or_method(func_name) for t in types]
+                if None in funcs:
+                    raise InvalidProgramException(call, 'invalid.ghost.call', f"Cannot resolve {func_name} of all possible types.")
+                if not self.only_equivalent_signatures(funcs):
+                    raise InvalidProgramException(call, 'invalid.ghost.call', "Call of function with multiple possible signatures.")
+                called_func = funcs[0]
+        
+        if called_func is None:
+            called_func = self.get_target(call.func, self.ctx)
 
-        # Ghost func calls are always valid
-        if self.is_ghost(called_func):
-            return True, None
+        if isinstance(called_func, PythonClass):
+            # Instantiation of the class: We resolve it as a call to __init__
+            curr_cls = called_func
+            while curr_cls is not None:
+                if curr_cls.name == OBJECT_TYPE:
+                    # Empty object init
+                    return self.is_ghost(called_func), None
+                init = curr_cls.get_func_or_method('__init__')
+                if init is None:
+                    curr_cls = curr_cls.superclass
+                else:
+                    called_func = init
+                    break
+        elif isinstance(called_func, PythonVarBase):
+            pass #TODO: Function stored in var is called, e.g. calling classmethod's cls element
+
+        if not isinstance(called_func, PythonMethod):
+            raise InvalidProgramException(call, 'invalid.ghost.call', f"Couldn't correctly resolve function {func_name}")
+
+        is_func_ghost = self.is_ghost(called_func)
 
         # We cannot call a regular function in a ghost context
         if self.in_ghost_ctx:
-            raise InvalidProgramException(call, 'invalid.ghost.call')
+            if not is_func_ghost:
+                raise InvalidProgramException(call, 'invalid.ghost.call')
+            self.check_for_call(call)
+
+        # Ghost func calls accept all arguments and have no (informative) return, so we immediately proceed
+        if is_func_ghost:
+            return True, None
         
         # Get expected parameters
         params = called_func.args
@@ -370,6 +471,20 @@ class GhostChecker(ast.NodeVisitor):
         ret_type = called_func.node.returns if called_func.node is not None else None
         return False, ret_type
         
+    def only_equivalent_signatures(self, funcs: List[PythonMethod]) -> bool:
+        if len(funcs) < 2:
+            return True
+        fst = funcs[0]
+        is_fst_ghost = self.is_ghost(fst)
+        # is_fst_return_ghost = is_fst_ghost or self.check_annotation(fst.node.returns)
+        for idx in range(1, len(funcs)):
+            next_func = funcs[idx]
+            if is_fst_ghost != self.is_ghost(next_func) or len(fst.args) != len(next_func.args):
+                return False
+            for fst_arg, next_arg in zip(fst.args, next_func.args):
+                pass #TODO
+            #TODO: Return types
+        return True
 
     def is_assignable(self, e1, e2) -> bool:
         """
@@ -395,11 +510,11 @@ class GhostChecker(ast.NodeVisitor):
             return elem.is_ghost
         elif isinstance(elem, ast.expr):
             return self._is_expr_ghost(elem)
+        elif isinstance(elem, GenericType):
+            return False #TODO: Maybe need to determine dynamically
         elif isinstance(elem, bool):
             return elem
-        else:
-            assert False, f"Unsupported Ghost resolution of {type(elem)}"
-            # raise UnsupportedException(elem, "Unsupported Ghost resolution")
+        raise UnsupportedException(elem, f"Unsupported Ghost resolution of type {type(elem)}")
 
     def _is_expr_ghost(self, expr: ast.Expr):
         if isinstance(expr, ast.BoolOp):
@@ -411,7 +526,6 @@ class GhostChecker(ast.NodeVisitor):
         elif isinstance(expr, ast.UnaryOp):
             return self.is_ghost(expr.operand)
         elif isinstance(expr, ast.Lambda):
-            #TODO: Properly verify lambda somewhere (e.g. set vars ghost)
             return True
         elif isinstance(expr, ast.IfExp):
             test_b = self.is_ghost(expr.test)
@@ -424,41 +538,45 @@ class GhostChecker(ast.NodeVisitor):
         elif isinstance(expr, ast.Set):
             return any([self.is_ghost(e) for e in expr.elts])
         elif isinstance(expr, (ast.DictComp, ast.ListComp, ast.SetComp, ast.GeneratorExp)):
+            if len(expr.generators) != 1:
+                raise UnsupportedException(expr, 'Multiple generators in list comprehension.')
+            if expr.generators[0].ifs:
+                raise UnsupportedException(expr, 'Filter in list comprehension.')
+            
+            # Create alias for loop variable
+            name = construct_lambda_prefix(expr.lineno, expr.col_offset)
+            target = expr.generators[0].target
+            local_name = name + '$' + target.id
+            element_var = self.ctx.actual_function.special_vars[local_name]
+            self.ctx.set_alias(target.id, element_var)
+            
+            is_gen_ghost = self.is_ghost(expr.generators[0].iter)
+            element_var.is_ghost = is_gen_ghost
             if isinstance(expr, ast.DictComp):
                 is_elt_ghost = self.is_ghost(expr.key) or self.is_ghost(expr.value)
             else:
                 is_elt_ghost = self.is_ghost(expr.elt)
-            
-            if is_elt_ghost:
-                return True
-            for gen in expr.generators:
-                if self.is_ghost(gen.iter):
-                    return True
-                for cond in gen.ifs:
-                    if self.is_ghost(cond):
-                        return True
-            return False
+
+            self.ctx.remove_alias(target.id)
+            return is_gen_ghost or is_elt_ghost
         elif isinstance(expr, ast.Await):
             return self.is_ghost(expr.value)
         elif isinstance(expr, ast.Compare):
             return any([self.is_ghost(e) for e in [expr.left] + expr.comparators])
         elif isinstance(expr, ast.Call):
             is_func_ghost, ret_type = self.check_call(expr)
-            if ret_type is None:
-                return False
-            elif is_func_ghost:
+            if is_func_ghost:
                 return True
-            return self.is_ghost(ret_type)
-        elif isinstance(expr, ast.FormattedValue):
-            return self.is_ghost(expr.value)
-        elif isinstance(expr, ast.JoinedStr):
-            return any([self.is_ghost(e) for e in expr.values])
+            elif ret_type is None:
+                return False
+            else:
+                return self.is_ghost(ret_type)
         elif isinstance(expr, ast.Constant):
             return False
         elif isinstance(expr, ast.Attribute):
             attr = self.get_target(expr, self.ctx)
             if attr is None:
-                raise InvalidProgramException(expr, None, "Couldn't correctly resolve attribute")
+                raise InvalidProgramException(expr, 'invalid.ghost.attribute', f"Couldn't correctly resolve attribute {expr.attr}")
             return self.is_ghost(attr)
         elif isinstance(expr, ast.Subscript):
             name = self.get_subscript_name(expr)
@@ -474,12 +592,15 @@ class GhostChecker(ast.NodeVisitor):
         elif isinstance(expr, ast.Name):
             if expr.id in self.modules[1].ghost_names or expr.id in GHOST_BUILTINS:
                 return True
+            if expr.id in self.modules[1].type_vars:
+                return False
             obj = self.get_target(expr, self.ctx)
+            if obj is None:
+                raise InvalidProgramException(expr, 'invalid.ghost.name', f"Couldn't correctly resolve name {expr.id}")
             return self.is_ghost(obj)
         elif isinstance(expr, (ast.List, ast.Tuple)):
             return any([self.is_ghost(e) for e in expr.elts])
-        assert False, f"Not implemented Ghost resolution of {type(expr)}"
-        # raise UnsupportedException(expr, "Unsupported Expression")
+        raise UnsupportedException(expr, f"Unsupported Expression of type {type(expr)}")
 
     def get_subscript_name(self, sub: ast.Subscript) -> Optional[str]:
         return sub.value.id if isinstance(sub.value, ast.Name) else None

@@ -222,17 +222,17 @@ class TypeVisitor(TraverserVisitor):
             # Verify MarkGhost call and collect ghost names
             if len(node.args) != 1:
                 msg = self.path + ':' + str(node.get_line()) + ': error: MarkGhost may only define one ghost name at a time.'
-                raise TypeException(msg)
+                raise TypeException([msg])
             ghost_type = node.args[0]
             if not isinstance(ghost_type.node, mypy.nodes.TypeAlias):
                 msg = self.path + ':' + str(node.get_line()) + ': error: MarkGhost takes only Type aliases.'
-                raise TypeException(msg)
+                raise TypeException([msg])
             if not self.path in self.ghost_names:
                 self.ghost_names[self.path] = set()
             curr_set = self.ghost_names[self.path]
             if ghost_type.name in curr_set:
                 msg = self.path + ':' + str(node.get_line()) + ': error: MarkGhost may only define ghost names once.'
-                raise TypeException(msg)
+                raise TypeException([msg])
             curr_set.add(ghost_type.name)
         for a in node.args:
             self.visit(a)

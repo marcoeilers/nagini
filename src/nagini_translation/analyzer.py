@@ -358,9 +358,9 @@ class Analyzer(ast.NodeVisitor):
         in_ghost_func = self.current_function is not None and self.current_function.is_ghost
 
         if isinstance(node, ast.ClassDef):
-            return "Ghost" in [dec.id for dec in node.decorator_list]
+            return "Ghost" in {d.id for d in node.decorator_list if isinstance(d, ast.Name)}
         elif isinstance(node, ast.FunctionDef):
-            return in_ghost_class or "Ghost" in [dec.id for dec in node.decorator_list]
+            return in_ghost_class or "Ghost" in {d.id for d in node.decorator_list if isinstance(d, ast.Name)}
         elif isinstance(node, (ast.arg, ast.AnnAssign)):
             ann_as_ghost = self.is_ghost_annotation(node.annotation)
             return in_ghost_class or in_ghost_func or ann_as_ghost
@@ -378,9 +378,14 @@ class Analyzer(ast.NodeVisitor):
         elif isinstance(ann, ast.Name):
             return ann.id in self.module.ghost_names or ann.id in GHOST_BUILTINS
         elif isinstance(ann, ast.Subscript):
-            # We check the soundness of the annotation later, so we just take the first element
-            sub_ann = ann.slice.elts[0]
-            return self.is_ghost_annotation(sub_ann)
+            if isinstance(ann.slice, (ast.Name, ast.Subscript)): 
+                return self.is_ghost_annotation(ann.slice)
+            else:
+                # We check the soundness of the annotation later, so we just take the first (non-None) element
+                sub_ann = ann.slice.elts[0]
+                if isinstance(sub_ann, ast.Constant) and sub_ann.value is None:
+                    sub_ann = ann.slice.elts[1]
+                return self.is_ghost_annotation(sub_ann)
         else:
             InvalidProgramException(ann, None, "Cannot resolve annotation.")
 
@@ -668,6 +673,12 @@ class Analyzer(ast.NodeVisitor):
             if mod.type_prefix == node.module:
                 imp_mod = mod
                 break
+            if mod.type_prefix == '__main__':
+                main_module = mod
+        else:
+            # type prefix of the main module is __main__, therefore isn't found.
+            imp_mod = main_module
+            
         for name in node.names:
             if name.name in imp_mod.ghost_names:
                 # Capture imported ghost names

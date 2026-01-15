@@ -14,6 +14,7 @@ def bar(i: int, gi: GInt) -> Tuple[int, GInt]: # OK
     res: GInt = gi + i  # OK
     j = i + 2           # OK
     gi += 1             # OK
+    i, gi = i+1, gi+1   # OK
     # j += gi           # Throw invalid.ghost.assign
 
     return j, res       # OK
@@ -27,6 +28,10 @@ def simple(i: int, gi: GInt) -> int:
 def simple2() -> List[Tuple[List[int],int]]:    # OK
     return []
 
+def simple3() -> GInt:
+    # Do something with potential side-effects
+    return 0
+
 def reg_call() -> Tuple[Tuple[int, int], Tuple[GInt, GInt]]: # OK
     i = simple(0, 0)                    # OK
     gi: GInt = foo(0)                   # OK
@@ -36,6 +41,8 @@ def reg_call() -> Tuple[Tuple[int, int], Tuple[GInt, GInt]]: # OK
     gj: GInt = 0
     gk: GInt = 0
     # (gi,gj), (gk,i) = ghost_return()  # Throw invalid.ghost.assign
+
+    gi = ghost_simple(simple3())        # OK
 
     return (i,1), (gi, gj)
 
@@ -47,10 +54,10 @@ def reg_call() -> Tuple[Tuple[int, int], Tuple[GInt, GInt]]: # OK
 
 def unpacking(i: int) -> None:
     gi: GInt = 0
-    # j = bar(0, 0)                         # Throw invalid.ghost.assign
+    # j = bar(0,0)                          # Throw invalid.ghost.assign
     i, gi = bar(0, 0)                       # OK
+    gtuple: Tuple[GInt, GInt] = bar(0,0)    # OK
 
-    # gtuple: GintTuple = (0,0)
     gk: GInt = 0
     r, (gi,gk) = reg_call()                 # OK
     i, gi = r                               # OK
@@ -75,8 +82,16 @@ def unpacking(i: int) -> None:
 class RegClass:         # OK
     static = 0
     
-    def __init__(self) -> None:
-        self.fld = 0
+    def __init__(self, i: int) -> None:
+        self.fld = i
+    
+    @property
+    def prop(self) -> int:              # OK
+        return self.fld * 2
+    
+    @prop.setter
+    def prop(self, i: int) -> None:     # OK
+        self.fld = i // 2
 
     def simple(self) -> int:
         return 0
@@ -142,12 +157,52 @@ def control_flow(i: int, gi: GInt) -> None:
         # i += y        # Throw invalid.ghost.assign
     
     lst2 = [(0,0), (1,1)]
-    a: GInt             # OK
+    a: GInt = 0         # OK
     # for a,b in lst2:  # Throw invalid.ghost.For
     #     pass
 
-    # assert gi >= 0    # Throw invalid.ghost.assert
+    # assert gi >= 0    # Throw "Use the Assert contract function when working with ghost elements"
 
+    while i < 5:
+        i += 1
+        if i == 4:
+            break
+        continue
+
+    while i > 0:
+        i -= 1
+        if gi == 6:
+            pass
+            # break     # Throw invalid.ghost.break
+    
+    while i < 5:
+        i += 1
+        if gi == 6:
+            gi -= 1
+            # continue  # Throw invalid.ghost.continue
+        lst.append(i)
+    
+    # if len(glst) > 0:
+    #     gi = glst[0]
+
+class NoInit(RegClass):  # OK
+
+    def give_zero(self) -> int:
+        return 0
+
+def find_init() -> None:
+    cls = NoInit(0)      # OK
+
+    gi: GInt = 0
+    # cls = NoInit(gi)   # Throw invalid.ghost.call
+
+def comprehensions(lst: List[int]) -> None:
+    newLst = [item * 2 for item in lst]                 # OK
+
+    gi: GInt = 3
+    # newLst = [item * gi for item in lst]              # Throw invalid.ghost.assign
+
+    # newLst = [ghost_simple3(item) for item in lst]    # Throw invalid.ghost.assign
 
 @Ghost
 def foo(gi: int) -> int:                # OK
@@ -169,14 +224,28 @@ def foo(gi: int) -> int:                # OK
     
     # assert glist[0] != 2              # Throw "Use the Assert contract function when working with ghost elements"
 
-    return gi
+    # gi = ghost_simple(simple3())      # Throw invalid.ghost.call
+
+    gi = ghost_simple2([0, 1, ghost_simple(0), 3])              # OK
+    # gi = ghost_simple2([0, 1, ghost_simple(simple3()), 3])    # Throw invalid.ghost.call
+
+    return gi                           # OK
 
 @Ghost
-def ghost_simple(i: int) -> Tuple[int, int]:
-    return i,i
+def ghost_simple(i: int) -> int:
+    return i
 
 @Ghost
-def ghost_return() -> Tuple[Tuple[int, int], Tuple[int, int]]:
+def ghost_simple2(l: List[int]) -> int:
+    return l[0]
+
+@Ghost
+@Pure
+def ghost_simple3(i: int) -> int:
+    return i+2
+
+@Ghost
+def ghost_return() -> Tuple[Tuple[int, int], Tuple[GInt, int]]:
     return (0,1), (2,3)
 
 @Ghost
@@ -192,14 +261,19 @@ class SubClass(GhostClass):
     pass
 
 
-# Imports tests
+# --Test Importing--
+
 from z_import_test.import_test import GBool as ImportedGBool, ghost_func
+import z_import_test.import_test as imp_test
 
 GBool = bool
 MarkGhost(GBool)
 
 def imports(b:GBool) -> ImportedGBool:
     return b        # OK
+
+def imports2(b:GBool) -> imp_test.GBool:
+    return b          # OK
 
 @Ghost
 def imported_func() -> None:

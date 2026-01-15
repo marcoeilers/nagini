@@ -36,6 +36,25 @@ IO_CONTRACT_FUNCS = [
     'eval_io',
 ]
 
+IO_FUNCS = [
+    'IOForall',
+    'IOExists',
+    'IOExists1',
+    'IOExists2',
+    'IOExists3',
+    'IOExists4',
+    'IOExists5',
+    'IOExists6',
+    'IOExists7',
+    'IOExists8',
+    'IOExists9',
+    'IOExists10',
+    'IOExists11',
+    'IOExists12',
+    'IOExists13',
+    'IOExists14',
+    'IOExists15',
+]
 
 T = TypeVar('T')
 T1 = TypeVar('T1')
