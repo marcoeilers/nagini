@@ -1232,6 +1232,8 @@ class ProgramTranslator(CommonTranslator):
             ctx.current_class = None
             # Translate default args
             for container in containers:
+                if isinstance(container, PythonClass):
+                    ctx.current_class = container
                 for function in container.functions.values():
                     if module is not module.global_module:
                         all_names.append(function.sil_name)
@@ -1244,6 +1246,7 @@ class ProgramTranslator(CommonTranslator):
                     if module is not module.global_module:
                         all_names.append(pred.sil_name)
                     self.translate_default_args(pred, ctx)
+                ctx.current_class = None
 
         for root, classes in static_fields.items():
             functions.append(self.create_static_field_function(root, classes,
