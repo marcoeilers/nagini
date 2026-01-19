@@ -233,13 +233,12 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
             return target.type
         if isinstance(target, PythonField):
             result = target.type
-            if isinstance(result, TypeVar):
+            if result.contains_type_var():
                 assert isinstance(node, ast.Attribute)
                 rec_type = _do_get_type(node.value, containers, container)
-                while (rec_type.python_class is not
-                        result.target_type.python_class):
-                    rec_type = rec_type.superclass
-                result = rec_type.type_args[result.index]
+                type_subs = rec_type.get_bound_type_vars()
+                subst = result.substitute(type_subs)
+                return subst
             return result
         if isinstance(target, PythonIOOperation):
             return module.global_module.classes[BOOL_TYPE]

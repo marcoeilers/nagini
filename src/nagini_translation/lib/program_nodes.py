@@ -309,6 +309,15 @@ class PythonType(metaclass=ABCMeta):
         # By default, just return self. Subclasses can override.
         return self
 
+    def contains_type_var(self) -> bool:
+        return False
+
+    def substitute(self, types: Dict['TypeVar', 'PythonType']):
+        return self
+
+    def get_bound_type_vars(self) -> Dict['TypeVar', 'PythonType']:
+        return {}
+
 
 class SilverType(PythonType):
     """
@@ -348,6 +357,14 @@ class TypeVar(PythonType, ContainerInterface):
     @property
     def python_class(self) -> 'PythonClass':
         return self.bound
+
+    def contains_type_var(self) -> bool:
+        return True
+
+    def substitute(self, types: Dict['TypeVar', 'PythonType']):
+        if self in types:
+            return types[self]
+        return self
 
 
 class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
@@ -390,6 +407,11 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self.is_adt = name == 'ADT' # This flag is set when the class is
         # defining an algebraic data type or one of its constructors.
         # This flag is set transitively across subclasses.
+
+    def get_bound_type_vars(self) -> Dict['TypeVar', 'PythonType']:
+        if self.superclass:
+            return self.superclass.get_bound_type_vars()
+        return {}
 
     @property
     def is_defining_adt(self) -> bool:
@@ -753,6 +775,17 @@ class GenericType(PythonType):
         self.type_args = args
         self.exact_length = True
 
+    def get_bound_type_vars(self) -> Dict['TypeVar', 'PythonType']:
+        res = {k: v for (k, v) in zip(self.cls.type_vars.values(), self.type_args)}
+        res.update(self.superclass.get_bound_type_vars())
+        return res
+
+    def substitute(self, types: Dict['TypeVar', 'PythonType']):
+        return GenericType(self.cls, [a.substitute(types) for a in self.type_args])
+
+    def contains_type_var(self) -> bool:
+        return any([a.contains_type_var() for a in self.type_args])
+
     @property
     def python_class(self) -> PythonClass:
         return self.cls
@@ -878,6 +911,13 @@ class UnionType(GenericType):
         self.type_args = args
         self.exact_length = True
 
+    def substitute(self, types: Dict['TypeVar', 'PythonType']):
+        new_args = [a.substitute(types) if a else None for a in self.type_args]
+        return UnionType(new_args)
+
+    def contains_type_var(self) -> bool:
+        return any([a.contains_type_var() for a in self.type_args if a])
+
     @property
     def cls(self):
         if self._cls is None:
@@ -925,6 +965,9 @@ class OptionalType(UnionType):
         super().__init__([typ])
         self.type_args = [None, typ]
         self.optional_type = typ
+
+    def substitute(self, types: Dict['TypeVar', 'PythonType']):
+        return OptionalType(self.optional_type.substitute(types))
 
     @property
     def cls(self):

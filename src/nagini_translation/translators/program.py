@@ -39,6 +39,7 @@ from nagini_translation.lib.program_nodes import (
     PythonModule,
     PythonNode,
     PythonVar,
+    TypeVar,
 )
 from nagini_translation.lib.typedefs import (
     Domain,
@@ -442,7 +443,7 @@ class ProgramTranslator(CommonTranslator):
             if (arg.node and arg.node.annotation and
                     not (isStr(arg.node.annotation) or isNameConstant(arg.node.annotation))):
                 type = self.get_target(arg.node.annotation, ctx)
-                if type and not type.python_class.interface:
+                if type and not type.python_class.interface and not type.contains_type_var():
                     definition_deps.add((arg.node.annotation, type.python_class,
                                          method.module))
             if arg.default:
@@ -452,7 +453,7 @@ class ProgramTranslator(CommonTranslator):
         if (method.node and method.node.returns and
                 not (isStr(method.node.returns) or isNameConstant(method.node.returns))):
             type = self.get_target(method.node.returns, ctx)
-            if type and not type.python_class.interface:
+            if type and not type.python_class.interface and not type.contains_type_var():
                 definition_deps.add((method.node.returns, type.python_class,
                                      method.module))
 
@@ -1312,6 +1313,8 @@ class ProgramTranslator(CommonTranslator):
             ctx.current_class = None
             # Translate default args
             for container in containers:
+                if isinstance(container, PythonClass):
+                    ctx.current_class = container
                 for function in container.functions.values():
                     if module is not module.global_module:
                         all_names.append(function.sil_name)
@@ -1324,6 +1327,7 @@ class ProgramTranslator(CommonTranslator):
                     if module is not module.global_module:
                         all_names.append(pred.sil_name)
                     self.translate_default_args(pred, ctx)
+                ctx.current_class = None
 
         for root, classes in static_fields.items():
             functions.append(self.create_static_field_function(root, classes,
