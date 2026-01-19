@@ -784,7 +784,7 @@ class GenericType(PythonType):
         return GenericType(self.cls, [a.substitute(types) for a in self.type_args])
 
     def contains_type_var(self) -> bool:
-        return any([a.contains_type_var() for a in self.type_args])
+        return any([a.contains_type_var() for a in self.type_args if a])
 
     @property
     def python_class(self) -> PythonClass:
