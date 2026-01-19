@@ -1439,6 +1439,10 @@ class Analyzer(ast.NodeVisitor):
                 name = node.id
             elif hasattr(node, 'name'):
                 name = node.name
+            elif isinstance(node, ast.Attribute):
+                name = node.attr
+                if hasattr(node.value, 'id'):
+                    name = node.value.id + "." + name
             msg = 'Unsupported type: {} for node {}'.format(mypy_type.__class__.__name__, name)
             raise UnsupportedException(node, desc=msg)
         return result
