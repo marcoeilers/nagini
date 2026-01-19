@@ -1421,18 +1421,27 @@ class Analyzer(ast.NodeVisitor):
                     type, _ = self.module.get_type(context, node.attr)
                     set_of_types.add(self.convert_type(type, node))
                 return UnionType(list(set_of_types)) if len(set_of_types) > 1 else set_of_types.pop()
+            contexts = []
             if isinstance(receiver, OptionalType):
-                context = [receiver.optional_type.name]
+                contexts.append([receiver.optional_type.name])
+                rec_super = receiver.optional_type.superclass
                 module = receiver.optional_type.module
             else:
-                context = [receiver.name]
+                contexts.append([receiver.name])
+                rec_super = receiver.superclass
                 module = receiver.module
+            while rec_super is not None:
+                contexts.append([rec_super.name])
+                rec_super = rec_super.superclass
             bound_type_vars = None
             if isinstance(receiver, GenericType) or (isinstance(receiver, OptionalType) and isinstance(receiver.optional_type, GenericType)):
                 gt = receiver if isinstance(receiver, GenericType) else receiver.optional_type
                 bound_type_vars = zip(gt.cls.type_vars.keys(), gt.type_args)
                 bound_type_vars = {k: v for (k, v) in bound_type_vars}
-            type, _ = module.get_type(context, node.attr)
+            for context in contexts:
+                type, _ = module.get_type(context, node.attr)
+                if type:
+                    break
             return self.convert_type(type, node, bound_type_vars)
         elif isinstance(node, ast.arg):
             # Special case for cls parameter of classmethods; for those, we

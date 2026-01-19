@@ -826,7 +826,7 @@ class GenericType(PythonType):
             types_set = self.get_types() - {None}
             result = len(types_set) > 0
             for type in types_set:
-                result = result and type.has_function(name)
+                result = result and type.python_class.has_function(name)
             return result
         else:
             return self.cls.has_function(name)
