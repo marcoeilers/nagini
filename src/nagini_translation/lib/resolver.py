@@ -228,6 +228,11 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                         name_list = list(rectype.python_class.type_vars.keys())
                         index = name_list.index(target.type.name)
                         return rectype.type_args[index]
+            if isinstance(node, ast.Attribute) and target.type.contains_type_var():
+                rec_type = _do_get_type(node.value, containers, container)
+                type_subs = rec_type.get_bound_type_vars()
+                subst = target.type.substitute(type_subs)
+                return subst
             return target.type
         if isinstance(target, PythonField):
             result = target.type
