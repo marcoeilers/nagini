@@ -181,6 +181,10 @@ class Analyzer(ast.NodeVisitor):
                     self.add_module(path, abs_path, redefined_name, parse_result)
             elif isinstance(stmt, ast.ImportFrom):
                 module_name = stmt.module
+                if stmt.level > 0:
+                    current_module_name = self.module.full_module_name
+                    module_name_to_add = current_module_name.split(".")[:-stmt.level]
+                    module_name = ".".join(module_name_to_add) + "." + module_name
                 if module_name in IGNORED_IMPORTS:
                     continue
                 if module_name == 'nagini_contracts.io_builtins':
@@ -237,7 +241,10 @@ class Analyzer(ast.NodeVisitor):
                                       type_prefix, self.module.global_module, node,
                                       self.module.sil_names, file)
             self.modules[abs_path] = new_module
+            old_module = self.module
+            self.module = new_module
             self.collect_imports(abs_path)
+            self.module = old_module
         else:
             new_module = self.modules[abs_path]
         into_mod = self.modules[into]
@@ -626,7 +633,12 @@ class Analyzer(ast.NodeVisitor):
             self.analyze_import(name.name)
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
-        self.analyze_import(node.module)
+        module_name = node.module
+        if node.level > 0:
+            current_module_name = self.module.full_module_name
+            module_name_to_add = current_module_name.split(".")[:-node.level]
+            module_name = ".".join(module_name_to_add) + "." + module_name
+        self.analyze_import(module_name)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         if self.current_function:

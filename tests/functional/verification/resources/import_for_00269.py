@@ -1,0 +1,1 @@
+from .other_import_for_00269 import foo

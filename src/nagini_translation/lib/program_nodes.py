@@ -168,6 +168,12 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
         if global_module and type_prefix != '__main__':
             self.add_builtin_vars()
 
+    @property
+    def full_module_name(self) -> str:
+        if self.type_prefix == '__main__':
+            return self.types.module_name
+        return self.type_prefix
+
     def add_builtin_vars(self) -> None:
         """
         Adds builtin variables that are defined in every module.
