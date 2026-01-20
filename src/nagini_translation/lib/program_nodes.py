@@ -179,7 +179,9 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
         if level > 0:
             current_module_name = self.full_module_name
             module_name_to_add = current_module_name.split(".")[:-level]
-            module_name = ".".join(module_name_to_add) + "." + name
+            if module_name is not None:
+                module_name_to_add.append(module_name)
+            module_name = ".".join(module_name_to_add)
         return module_name
 
     def add_builtin_vars(self) -> None:

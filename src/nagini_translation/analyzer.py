@@ -582,6 +582,13 @@ class Analyzer(ast.NodeVisitor):
         if cls.python_class not in cls.superclass.python_class.direct_subclasses:
             cls.superclass.python_class.direct_subclasses.append(cls.python_class)
 
+        for kw in node.keywords:
+            if kw.arg == 'metaclass' and isinstance(kw.value, ast.Name) and kw.value.id == 'ABCMeta':
+                continue
+            if kw.arg == 'metaclass':
+                raise UnsupportedException(kw, "Unsupported metaclass")
+            raise UnsupportedException(kw, "Unsupported keyword argument")
+
         for member in node.body:
             self.visit(member, node)
         self.current_class = None
@@ -1588,7 +1595,7 @@ class Analyzer(ast.NodeVisitor):
         decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
         if self._incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
-        result = 'ContractOnly' in decorators
+        result = 'ContractOnly' in decorators or 'abstractmethod' in decorators
         return result
 
     def is_contract_only(self, func: ast.FunctionDef) -> bool:
