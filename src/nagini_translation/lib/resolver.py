@@ -216,13 +216,19 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         if isinstance(target, PythonVarBase):
             return target.get_specific_type(node)
         if isinstance(target, PythonMethod):
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and target.type.contains_type_var():
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
                 rec_target = get_target(node.func.value, containers, container)
-                if not isinstance(rec_target, PythonModule):
+                if not isinstance(rec_target, PythonModule) and target.generic_type != -1:
                     rectype = get_type(node.func.value, containers, container)
-                    type_subs = rectype.get_bound_type_vars()
-                    subst = target.type.substitute(type_subs)
-                    return subst
+                    if target.generic_type == -2:
+                        return rectype
+                    return rectype.type_args[target.generic_type]
+                if target.type.contains_type_var():
+                    if not isinstance(rec_target, PythonModule):
+                        rectype = get_type(node.func.value, containers, container)
+                        type_subs = rectype.get_bound_type_vars()
+                        subst = target.type.substitute(type_subs)
+                        return subst
             if isinstance(node, ast.Attribute) and target.type.contains_type_var():
                 rec_type = _do_get_type(node.value, containers, container)
                 type_subs = rec_type.get_bound_type_vars()
