@@ -157,11 +157,7 @@ class StatementTranslator(CommonTranslator):
         stmts = []
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
-        imported_module = node.module
-        if node.level > 0:
-            current_module_name = ctx.module.full_module_name
-            module_name_to_add = current_module_name.split(".")[:-node.level]
-            imported_module = ".".join(module_name_to_add) + "." + imported_module
+        imported_module = ctx.module.get_relative_import_name(node.module, node.level)
 
         for imported in ctx.module.from_imports:
             if not isinstance(imported, PythonModule):

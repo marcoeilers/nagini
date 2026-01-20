@@ -174,6 +174,14 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
             return self.types.module_name
         return self.type_prefix
 
+    def get_relative_import_name(self, name: str, level: int) -> str:
+        module_name = name
+        if level > 0:
+            current_module_name = self.full_module_name
+            module_name_to_add = current_module_name.split(".")[:-level]
+            module_name = ".".join(module_name_to_add) + "." + name
+        return module_name
+
     def add_builtin_vars(self) -> None:
         """
         Adds builtin variables that are defined in every module.
