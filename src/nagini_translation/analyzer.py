@@ -1208,7 +1208,9 @@ class Analyzer(ast.NodeVisitor):
                     return
 
                 # Add type info for self in this context, can retrieve the correct type from __init__.self
-                context =  tuple([self.module.type_prefix, self.current_class.name, node.id, 'self'])
+                prefix = self.module.type_prefix.split('.') if self.module.type_prefix else []
+                prefix.extend([self.current_class.name, node.id, 'self'])
+                context = tuple(prefix)
                 self_type, _ = self.module.get_type([self.current_class.name, '__init__'], 'self')
                 self.module.types.all_types[context] = self_type
 
@@ -1452,7 +1454,9 @@ class Analyzer(ast.NodeVisitor):
                 name = node.attr
                 if hasattr(node.value, 'id'):
                     name = node.value.id + "." + name
-            msg = 'Unsupported type: {} for node {}'.format(mypy_type.__class__.__name__, name)
+            elif isinstance(node, ast.arg):
+                name = node.arg
+            msg = 'Unsupported type: {} for node {} of type {}'.format(mypy_type.__class__.__name__, name, type(node))
             raise UnsupportedException(node, desc=msg)
         return result
 
