@@ -182,7 +182,7 @@ class Analyzer(ast.NodeVisitor):
                     path = os.path.abspath(self.types.files[file_name])
                     self.add_module(path, abs_path, redefined_name, parse_result)
             elif isinstance(stmt, ast.ImportFrom):
-                module_name = stmt.module
+                module_name = self.module.get_relative_import_name(stmt.module, stmt.level)
                 if module_name in IGNORED_IMPORTS:
                     continue
                 if module_name == 'nagini_contracts.io_builtins':
@@ -239,7 +239,10 @@ class Analyzer(ast.NodeVisitor):
                                       type_prefix, self.module.global_module, node,
                                       self.module.sil_names, file)
             self.modules[abs_path] = new_module
+            old_module = self.module
+            self.module = new_module
             self.collect_imports(abs_path)
+            self.module = old_module
         else:
             new_module = self.modules[abs_path]
         into_mod = self.modules[into]
@@ -587,10 +590,15 @@ class Analyzer(ast.NodeVisitor):
             cls.dataclass = True
         if self.is_frozen_dataclass(node):
             cls.frozen = True
-            
         if cls.dataclass and not cls.frozen:
             raise UnsupportedException(node, 'Non frozen dataclass currently not supported')
-            
+        for kw in node.keywords:
+            if kw.arg == 'metaclass' and isinstance(kw.value, ast.Name) and kw.value.id == 'ABCMeta':
+                continue
+            if kw.arg == 'metaclass':
+                raise UnsupportedException(kw, "Unsupported metaclass")
+            raise UnsupportedException(kw, "Unsupported keyword argument")
+                    
         for member in node.body.copy():
             self.visit(member, node)
         if cls.dataclass and "__init__" not in cls.methods.keys():
@@ -690,7 +698,8 @@ class Analyzer(ast.NodeVisitor):
             self.analyze_import(name.name)
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
-        self.analyze_import(node.module)
+        module_name = self.module.get_relative_import_name(node.module, node.level)
+        self.analyze_import(module_name)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         if self.current_function:
@@ -1738,6 +1747,7 @@ class Analyzer(ast.NodeVisitor):
         if self._function_incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
         result = 'ContractOnly' in decorators or self.is_abstract_method(func)
+        result = 'ContractOnly' in decorators or 'abstractmethod' in decorators
         return result
 
     def is_contract_only(self, func: ast.FunctionDef) -> bool:

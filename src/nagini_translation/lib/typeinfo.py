@@ -278,6 +278,7 @@ class TypeInfo:
         self.files = {}
         self.type_aliases = {}
         self.type_vars = {}
+        self.module_name = None
 
     def _create_options(self, strict_optional: bool):
         """
@@ -321,6 +322,7 @@ class TypeInfo:
                 elif relpath.endswith('.pyi'):
                     relpath = relpath[:-4]
                 module_name = relpath
+        self.module_name = module_name
         try:
             options_strict = self._create_options(True)
 
