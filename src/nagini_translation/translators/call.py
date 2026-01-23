@@ -548,7 +548,8 @@ class CallTranslator(CommonTranslator):
         bytearray_class = ctx.module.global_module.classes[BYTEARRAY_TYPE]
         res_var = ctx.current_function.create_variable('bytearray', bytearray_class, self.translator)
         targets = [res_var.ref()]
-        result_var = res_var.ref(node, ctx)        
+        result_var = res_var.ref(node, ctx)
+        method_name = None    
 
         # This could potentially be merged using the "display_name" field
         # by extending the general code for selecting a specific __init__ call
