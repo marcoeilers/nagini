@@ -51,6 +51,9 @@ from nagini_translation.translators.obligation.method import (
 from nagini_translation.translators.obligation.obligation_info import (
     PythonMethodObligationInfo,
 )
+from nagini_translation.translators.obligation.types import (
+    must_terminate
+)
 from nagini_translation.translators.obligation.waitlevel import (
     WaitLevelTranslator,
 )
@@ -138,6 +141,10 @@ class ObligationTranslator(CommonTranslator):
         else:
             return self._method_translator.translate_may_invoke(
                 node, ctx)
+
+    def get_must_terminate(self, ctx: Context) -> Expr:
+        obligation_info = self._method_translator._get_obligation_info(ctx)
+        return must_terminate._create_predicate_access(obligation_info.current_thread_var)
 
     def is_wait_level_comparison(self, node: ast.Compare,
                                  ctx: Context) -> bool:

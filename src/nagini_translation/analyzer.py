@@ -102,7 +102,7 @@ class Analyzer(ast.NodeVisitor):
         self.selected = selected
         self.deferred_tasks = []
         self.has_all_low = False
-        self.enable_obligations = False
+        self.enable_obligations = True
 
     def initialize_io_analyzer(self) -> None:
         self.io_operation_analyzer = IOOperationAnalyzer(
