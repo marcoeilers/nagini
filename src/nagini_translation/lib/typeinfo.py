@@ -398,14 +398,15 @@ class TypeInfo:
 
             sources = [BuildSource(filename, module_name, base_dir=base_dir)]
 
-            fscache = PreprocessingFileSystemCache()
-            res_strict = mypy.build.build(sources, options_strict, fscache=fscache)
+            # fscache = PreprocessingFileSystemCache()
+            # Ignoring preprocessing for now
+            res_strict = mypy.build.build(sources, options_strict)
 
             if res_strict.errors:
                 # Run mypy a second time with strict optional checking disabled,
                 # s.t. we don't get overapproximated none-related errors.
                 options_non_strict = self._create_options(False)
-                res_non_strict = mypy.build.build(sources, options_non_strict, fscache=fscache)
+                res_non_strict = mypy.build.build(sources, options_non_strict)
                 if res_non_strict.errors:
                     report_errors(res_non_strict.errors)
             relevant_files = [next(iter(res_strict.graph))]
