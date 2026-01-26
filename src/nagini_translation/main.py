@@ -95,10 +95,7 @@ def parse_sil_file(sil_path: str, bv_path: str, bv_size: int, jvm, float_option:
 def load_sil_files(jvm: JVM, bv_size: int, sif: bool = False, float_option: str = None):
     current_path = os.path.dirname(inspect.stack()[0][1])
     default_path = os.path.join(current_path, 'resources')
-    if sif:
-        resources_path = os.path.join(current_path, 'sif', 'resources')
-    else:
-        resources_path = default_path
+    resources_path = default_path
     return parse_sil_file(os.path.join(resources_path, 'all.sil'), os.path.join(default_path, 'intbv.sil'), bv_size, jvm, float_option)
 
 
@@ -113,10 +110,7 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
     path = os.path.abspath(path)
     error_manager.clear()
     current_path = os.path.dirname(inspect.stack()[0][1])
-    if sif:
-        builtins_index_path = os.path.join(current_path, 'sif', 'resources')
-    else:
-        builtins_index_path = os.path.join(current_path, 'resources')
+    builtins_index_path = os.path.join(current_path, 'resources')
 
     if sif:
         viper_ast = ViperASTExtended(jvm, jvm.java, jvm.scala, jvm.viper, path)
