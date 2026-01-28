@@ -1737,9 +1737,7 @@ class Analyzer(ast.NodeVisitor):
                 (('property' in decorators) and not(len(decorators) == 1 or (len(decorators) == 2 and 'ContractOnly' in decorators))) or
                 (('AllLow' in decorators) and ('PreservesLow' in decorators)) or
                 ((('AllLow' in decorators) or ('PreservesLow' in decorators)) and (
-                    ('Predicate' in decorators) or ('Pure' in decorators))) or
-                (('abstractmethod' in decorators) and # Python actually allows this, but only in the correct order
-                    (('staticmethod' in decorators) or ('classmethod' in decorators)))
+                    ('Predicate' in decorators) or ('Pure' in decorators)))
                )
 
     def is_declared_contract_only(self, func: ast.FunctionDef) -> bool:
@@ -1750,7 +1748,6 @@ class Analyzer(ast.NodeVisitor):
         decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
         if self._function_incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
-        result = 'ContractOnly' in decorators or self.is_abstract_method(func)
         result = 'ContractOnly' in decorators or 'abstractmethod' in decorators
         return result
 
@@ -1832,9 +1829,6 @@ class Analyzer(ast.NodeVisitor):
 
     def is_class_method(self, func: ast.FunctionDef) -> bool:
         return self.function_has_decorator(func, 'classmethod')
-
-    def is_abstract_method(self, func: ast.FunctionDef) -> bool:
-        return self.function_has_decorator(func, 'abstractmethod')
     
     def is_io_operation(self, func: ast.FunctionDef) -> bool:
         return self.function_has_decorator(func, 'IOOperation')
