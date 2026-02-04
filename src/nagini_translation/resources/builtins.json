@@ -1136,6 +1136,11 @@
             "args": ["list"],
             "type": "list",
             "MustTerminate": true
+        },
+        "hash": {
+            "args": ["object"],
+            "type": "int",
+            "MustTerminate": true
         }
     }
 }

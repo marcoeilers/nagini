@@ -264,9 +264,11 @@ LEGAL_MAGIC_METHODS = {
     '__enter__',
     '__exit__',
     '__str__',
+    '__repr__',
     '__len__',
     '__bool__',
     '__format__',
+    '__hash__',
 
     '__getitem__',
     '__setitem__',

@@ -463,7 +463,7 @@ function int___byte_bounds__(value: Int): Bool
     decreases _
 {
     0 <= value < 256
-}    
+}
 
 domain __ObjectEquality {
     function object___eq__(Ref, Ref): Bool
@@ -534,6 +534,8 @@ method sorted(r: Ref) returns (rs: Ref)
     ensures list___len__(r) > 1 ==> forall i: Int :: { r.list_acc[i] } i >= 0 && i < list___len__(r) ==> int___unbox__(list___getitem__(r, __prim__int___box__(i))) >= int___unbox__(list___getitem__(rs, __prim__int___box__(0)))
     ensures list___len__(r) > 1 ==> forall i: Int :: { r.list_acc[i] } i >= 0 && i < list___len__(r) ==> int___unbox__(list___getitem__(r, __prim__int___box__(i))) <= int___unbox__(list___getitem__(rs, __prim__int___box__(list___len__(r) - 1)))
 
+method hash(r: Ref) returns (h: Ref)
+    ensures issubtype(typeof(h), int()) 
 
 function sum(r: Ref): Int
     requires issubtype(typeof(r), list(int()))
