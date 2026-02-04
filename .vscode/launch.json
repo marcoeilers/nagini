@@ -65,7 +65,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/src/nagini_translation/main.py",
             "args": [
-                "--base-dir=${fileDirname}",
+                "--base-dir=${fileDirname}/..",
                 "${file}"
             ],
             "cwd": "${workspaceFolder}",
