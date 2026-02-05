@@ -1,6 +1,7 @@
 # Any copyright is dedicated to the Public Domain.
 # http://creativecommons.org/publicdomain/zero/1.0/
 
+from typing import List
 from nagini_contracts.contracts import *
 
 
@@ -78,3 +79,12 @@ def test_bytearray_bounds(b_array: bytearray) -> None:
     
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert seq[1] >= 256
+    
+def test_list_interop(b_array: bytearray) -> None:
+    Requires(bytearray_pred(b_array))
+    l = list(b_array)
+    
+    byteseq_direct = ToByteSeq(b_array)
+    byteseq = ToByteSeq(l)
+    
+    assert byteseq_direct == byteseq
