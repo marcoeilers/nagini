@@ -45,11 +45,13 @@ function PByteSeq_take(self: Ref, no: Int): Ref
     decreases _
     requires issubtype(typeof(self), PByteSeq())
     ensures result == PByteSeq___create__(PByteSeq___val__(self)[..no])
+    ensures no == PByteSeq___len__(self) ==> result == self
 
 function PByteSeq_drop(self: Ref, no: Int): Ref
     decreases _
     requires issubtype(typeof(self), PByteSeq())
     ensures result == PByteSeq___create__(PByteSeq___val__(self)[no..])
+    ensures no == 0 ==> result == self
 
 function PByteSeq_update(self: Ref, index: Int, val: Int): Ref
     decreases _
