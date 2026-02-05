@@ -20,6 +20,7 @@ import traceback
 from jpype._jexception import JException
 from nagini_translation.analyzer import Analyzer
 from nagini_translation.ghost.ghost_checker import GhostChecker
+from nagini_translation.ghost.extraction import ProgramExtractor
 from nagini_translation.lib.context import Context
 from nagini_translation.sif_translator import SIFTranslator
 from nagini_translation.lib import config
@@ -107,7 +108,7 @@ def load_sil_files(jvm: JVM, bv_size: int, sif: bool = False, float_option: str 
 def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), base_dir: str = None,
               sif: bool = False, arp: bool = False, ignore_global: bool = False,
               reload_resources: bool = False, verbose: bool = False, skip_verification: bool = False,
-              check_consistency: bool = False, float_encoding: str = None,
+              extraction: bool = False, check_consistency: bool = False, float_encoding: str = None,
               counterexample: bool = False) -> Tuple[List['PythonModule'], Program]:
     """
     Translates the Python module at the given path to a Viper program
@@ -159,6 +160,13 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
     ghost_ctx.current_function = None
     ghost_ctx.module = modules[1]
     ghost_checker.check(ghost_ctx)
+
+    if extraction:
+        program_extractor = ProgramExtractor(modules)
+        extr_prog = program_extractor.process()
+        as_text = astunparse.unparse(extr_prog)
+        print(as_text)
+
     prog = translator.translate_program(modules, sil_programs, selected,
                                         arp=arp, ignore_global=ignore_global, sif=sif, float_encoding=float_encoding)
     if skip_verification:
@@ -372,6 +380,12 @@ def main() -> None:
         action='store_true',
         default=False
     )
+    parser.add_argument(
+        '--extraction',
+        help='Extract the python program without Nagini code.',
+        action='store_true',
+        default=False
+    )
     args = parser.parse_args()
 
     config.classpath = args.viper_jar_path
@@ -437,7 +451,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
         selected = set(args.select.split(',')) if args.select else set()
         modules, prog = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif, base_dir=base_dir,
                                   ignore_global=args.ignore_global, arp=arp, verbose=args.verbose, skip_verification=args.skip_verification,
-                                  counterexample=args.counterexample, float_encoding=args.float_encoding)
+                                  extraction=args.extraction, counterexample=args.counterexample, float_encoding=args.float_encoding)
         if args.print_viper:
             if args.verbose:
                 print('Result:')

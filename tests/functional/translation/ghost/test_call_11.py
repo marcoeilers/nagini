@@ -6,15 +6,9 @@ from nagini_contracts.contracts import *
 GInt = int
 MarkGhost(GInt)
 
-@Ghost
-def ghost_calls(gi: int) -> None:
+def reg_calls(gi: GInt) -> None:
     #:: ExpectedOutput(invalid.program:invalid.ghost.call)
-    glst = [1, 2, ghost(impure_reg(gi)), 4]
+    reg(i=0, k=gi, gh=0)
 
-@Ghost
-def ghost(gi: int) -> int:
-    return gi
-
-def impure_reg(gi: GInt) -> GInt:
-    # Do something with potential side-effects
-    return gi+1
+def reg(i: int, gh: GInt, k: int) -> None:
+    pass

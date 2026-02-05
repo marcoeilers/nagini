@@ -9,10 +9,11 @@ MarkGhost(GInt)
 
 def reg_calls(gi: GInt) -> None:
     i = reg(0, gi)
+    i = reg(0, gi=gi)
     gi = ghost(0)
-    gi = ghost(reg(0, 0))
+    gi = ghost(pure_reg(0))
     gi = reg_but_ghost_return()
-    gi = ghost_lst([0, 1, ghost(reg(2,2)), 3])
+    gi = ghost_lst([0, 1, ghost(pure_reg(2)), 3])
     
     gk: GInt = 0
     r, (gi, gk) = reg_mixed_return()
@@ -27,7 +28,7 @@ def reg_calls(gi: GInt) -> None:
 @Ghost
 def ghost_calls(lst: List[int]) -> None:
     gi = ghost(0)
-    gi = ghost_lst([0, 1, ghost(2), 3])
+    gi = ghost_lst([0, 1, ghost(pure_reg(2)), 3])
     
     g_lst = [pure_ghost(e) for e in lst]
 

@@ -36,6 +36,10 @@ CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'ResultT', 'Implies', 'Fo
                   'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',
                   'LowExit', 'Refute', 'isNaN', 'Reveal', 'MarkGhost'] + GHOST_BUILTINS
 
+CONTRACT_DECORATORS = ['Pure', 'Opaque', 'Predicate', 'Inline', 'Ghost', 'ContractOnly', 'GhostReturns']
+
+SPECIAL_PREDICATES = ['list_pred', 'dict_pred', 'set_pred']
+
 T = TypeVar('T')
 V = TypeVar('V')
 U = TypeVar('U')

@@ -56,6 +56,8 @@ IO_FUNCS = [
     'IOExists15',
 ]
 
+IO_DECORATORS = ['IOOperation']
+
 T = TypeVar('T')
 T1 = TypeVar('T1')
 T2 = TypeVar('T2')

@@ -12,6 +12,7 @@ global_var: int = 0
 
 def bar(i: int, gi: GInt) -> Tuple[int, GInt]: # OK
     res: GInt = gi + i  # OK
+    (i, j) = k = 0,0
     j = i + 2           # OK
     gi += 1             # OK
     i, gi = i+1, gi+1   # OK
@@ -42,7 +43,10 @@ def reg_call() -> Tuple[Tuple[int, int], Tuple[GInt, GInt]]: # OK
     gk: GInt = 0
     # (gi,gj), (gk,i) = ghost_return()  # Throw invalid.ghost.assign
 
-    gi = ghost_simple(simple3())        # OK
+    # gi = ghost_simple(simple3())      # Throw invalid.ghost.call
+
+    # i = simple(gi=0, i=gi)            # Throw invalid.ghost.call
+    i = simple(gi=gi, i=0)              # OK
 
     return (i,1), (gi, gj)
 
@@ -279,3 +283,20 @@ def imports2(b:GBool) -> imp_test.GBool:
 def imported_func() -> None:
     gi = 0
     loc = ghost_func(gi)      # OK
+
+
+# --Test Extractions--
+def small_mixed_tuple() -> Tuple[int, GInt]:
+    return 0,1
+
+def extraction() -> None:
+    # i = simple(*small_mixed_tuple())          # Throw invalid.ghost.starred
+    # glst: List[GInt] = [*small_mixed_tuple()] # Throw invalid.ghost.starred
+
+    ga: GInt = 0
+    gb: GInt = 0
+    ga, gb = small_mixed_tuple()
+    # i = simple(0, simple3())                  # Throw invalid.ghost.call
+    i = simple(0, ga)
+    i = simple(gi=gb, i=0)
+    pass
