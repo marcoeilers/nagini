@@ -632,7 +632,8 @@ class Converter:
 
     def convert_PByteSeq_value(self, val, name):
         sequence = self.get_func_value(UNBOX_PBYTESEQ, (UNIT, val))
-        sequence_info = self.convert_sequence_value(sequence, type(int), name)
+        int_type = self.modules[0].global_module.classes['int']
+        sequence_info = self.convert_sequence_value(sequence, int_type, name)
         return 'Sequence: {{ {} }}'.format(', '.join(['{} -> {}'.format(k, v) for k, v in sequence_info.items()]))
 
     def convert_int_value(self, val):

@@ -44,7 +44,7 @@ def test_byteseq_bounds_high(b: PByteSeq) -> None:
 
 def test_range() -> None:
     ints = PByteSeq(1,3,5,6,8)
-    r = ints.range(1, 3)
+    r = ints.drop(1).take(2)
 
     assert len(ints) == 5
     assert len(r) == 2
