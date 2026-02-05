@@ -216,28 +216,31 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         if isinstance(target, PythonMethod):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
                 rec_target = get_target(node.func.value, containers, container)
-                if not isinstance(rec_target, PythonModule):
+                if not isinstance(rec_target, PythonModule) and target.generic_type != -1:
                     rectype = get_type(node.func.value, containers, container)
-                    if target.generic_type != -1:
-                        if target.generic_type == -2:
-                            return rectype
-                        return rectype.type_args[target.generic_type]
-                    if isinstance(target.type, TypeVar):
-                        while rectype.python_class is not target.cls:
-                            rectype = rectype.superclass
-                        name_list = list(rectype.python_class.type_vars.keys())
-                        index = name_list.index(target.type.name)
-                        return rectype.type_args[index]
+                    if target.generic_type == -2:
+                        return rectype
+                    return rectype.type_args[target.generic_type]
+                if target.type.contains_type_var():
+                    if not isinstance(rec_target, PythonModule):
+                        rectype = get_type(node.func.value, containers, container)
+                        type_subs = rectype.get_bound_type_vars()
+                        subst = target.type.substitute(type_subs)
+                        return subst
+            if isinstance(node, ast.Attribute) and target.type.contains_type_var():
+                rec_type = _do_get_type(node.value, containers, container)
+                type_subs = rec_type.get_bound_type_vars()
+                subst = target.type.substitute(type_subs)
+                return subst
             return target.type
         if isinstance(target, PythonField):
             result = target.type
-            if isinstance(result, TypeVar):
+            if result.contains_type_var():
                 assert isinstance(node, ast.Attribute)
                 rec_type = _do_get_type(node.value, containers, container)
-                while (rec_type.python_class is not
-                        result.target_type.python_class):
-                    rec_type = rec_type.superclass
-                result = rec_type.type_args[result.index]
+                type_subs = rec_type.get_bound_type_vars()
+                subst = result.substitute(type_subs)
+                return subst
             return result
         if isinstance(target, PythonIOOperation):
             return module.global_module.classes[BOOL_TYPE]

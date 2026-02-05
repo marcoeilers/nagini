@@ -226,7 +226,7 @@ class CallTranslator(CommonTranslator):
         assert all(args), "Some args are None: {}".format(args)
         pos = self.to_position(node, ctx)
 
-        if target_class.is_adt:
+        if target_class.python_class.is_adt:
             return arg_stmts, self.translate_adt_cons(target_class, args, pos, ctx)
 
         res_var = ctx.current_function.create_variable(target_class.name +
@@ -252,7 +252,7 @@ class CallTranslator(CommonTranslator):
                     ctx.bound_type_vars[key] = literal
             current_type = current_type.superclass
 
-        fields = list(target_class.all_fields)
+        fields = list(target_class.python_class.all_fields)
         may_set_inhales = [self.viper.Inhale(self.get_may_set_predicate(res_var.ref(),
                                                                         f, ctx),
                                              pos, self.no_info(ctx))
@@ -703,7 +703,7 @@ class CallTranslator(CommonTranslator):
         """
         # Get target
         called_func = self.get_target(node.func, ctx)
-        if isinstance(called_func, PythonClass):
+        if isinstance(called_func, PythonType):
             # constructor
             return True
         # If normal
@@ -736,7 +736,7 @@ class CallTranslator(CommonTranslator):
                              ctx: Context) -> Tuple[List[Stmt], List[Expr],
                                               List[PythonType]]:
         target = self._get_call_target(node, ctx)
-        if isinstance(target, PythonClass):
+        if isinstance(target, PythonType):
             constr = target.get_method('__init__')
             target = constr
         return self.translate_args(target, node.args, node.keywords, node, ctx)
@@ -1130,7 +1130,7 @@ class CallTranslator(CommonTranslator):
             if ctx.actual_function.method_type == MethodType.class_method:
                 msg += ' or indirect call of classmethod argument'
             raise UnsupportedException(node, msg + '.')
-        if isinstance(target, PythonClass):
+        if isinstance(target, PythonType):
             return self.translate_constructor_call(target, node, args,
                                                    arg_stmts, ctx)
         return self.translate_normal_call(target, arg_stmts, args, arg_types, node, ctx,

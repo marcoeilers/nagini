@@ -169,6 +169,22 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
         if global_module and type_prefix != '__main__':
             self.add_builtin_vars()
 
+    @property
+    def full_module_name(self) -> str:
+        if self.type_prefix == '__main__':
+            return self.types.module_name
+        return self.type_prefix
+
+    def get_relative_import_name(self, name: str, level: int) -> str:
+        module_name = name
+        if level > 0:
+            current_module_name = self.full_module_name
+            module_name_to_add = current_module_name.split(".")[:-level]
+            if module_name is not None:
+                module_name_to_add.append(module_name)
+            module_name = ".".join(module_name_to_add)
+        return module_name
+
     def add_builtin_vars(self) -> None:
         """
         Adds builtin variables that are defined in every module.
@@ -309,6 +325,15 @@ class PythonType(metaclass=ABCMeta):
         # By default, just return self. Subclasses can override.
         return self
 
+    def contains_type_var(self) -> bool:
+        return False
+
+    def substitute(self, types: Dict['TypeVar', 'PythonType']):
+        return self
+
+    def get_bound_type_vars(self) -> Dict['TypeVar', 'PythonType']:
+        return {}
+
 
 class SilverType(PythonType):
     """
@@ -349,6 +374,14 @@ class TypeVar(PythonType, ContainerInterface):
     def python_class(self) -> 'PythonClass':
         return self.bound
 
+    def contains_type_var(self) -> bool:
+        return True
+
+    def substitute(self, types: Dict['TypeVar', 'PythonType']):
+        if self in types:
+            return types[self]
+        return self
+
 
 class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
     """
@@ -386,6 +419,11 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         # defining an algebraic data type or one of its constructors.
         # This flag is set transitively across subclasses.
         self.is_ghost = False # infer
+
+    def get_bound_type_vars(self) -> Dict['TypeVar', 'PythonType']:
+        if self.superclass:
+            return self.superclass.get_bound_type_vars()
+        return {}
 
     @property
     def is_defining_adt(self) -> bool:
@@ -490,11 +528,12 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
                   type: 'PythonType') -> 'PythonField':
         """
         Adds a field with the given name and type if it doesn't exist yet in
-        this class.
+        this class or a superclass.
         """
         if name in self.fields:
             field = self.fields[name]
-            assert self.types_match(field.type.try_box(), type.try_box())
+            if not isinstance(field.type, TypeVar):
+                assert self.types_match(field.type.try_box(), type.try_box())
         elif name in self.static_fields:
             field = self.static_fields[name]
         else:
@@ -692,7 +731,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         used by get_target). If 'only_top' is true, returns only top level
         elements that can be accessed without a receiver.
         """
-        dicts = [self.static_methods, self.static_fields]
+        dicts = [self.static_methods, self.static_fields, self.type_vars]
         if not only_top:
             dicts.extend([self.functions, self.fields, self.methods,
                           self.predicates])
@@ -746,6 +785,17 @@ class GenericType(PythonType):
         self.type_args = args
         self.exact_length = True
 
+    def get_bound_type_vars(self) -> Dict['TypeVar', 'PythonType']:
+        res = {k: v for (k, v) in zip(self.cls.type_vars.values(), self.type_args)}
+        res.update(self.superclass.get_bound_type_vars())
+        return res
+
+    def substitute(self, types: Dict['TypeVar', 'PythonType']):
+        return GenericType(self.cls, [a.substitute(types) for a in self.type_args])
+
+    def contains_type_var(self) -> bool:
+        return any([a.contains_type_var() for a in self.type_args if a])
+
     @property
     def python_class(self) -> PythonClass:
         return self.cls
@@ -794,7 +844,7 @@ class GenericType(PythonType):
             types_set = self.get_types() - {None}
             result = len(types_set) > 0
             for type in types_set:
-                result = result and type.has_function(name)
+                result = result and type.python_class.has_function(name)
             return result
         else:
             return self.cls.has_function(name)
@@ -867,19 +917,26 @@ class UnionType(GenericType):
     def __init__(self, args: List[PythonType]) -> None:
         self.name = 'Union'
         self._cls = None
-        self.module = args[0].module
+        self.module = next(x for x in args if x is not None).module
         self.type_args = args
         self.exact_length = True
+
+    def substitute(self, types: Dict['TypeVar', 'PythonType']):
+        new_args = [a.substitute(types) if a else None for a in self.type_args]
+        return UnionType(new_args)
+
+    def contains_type_var(self) -> bool:
+        return any([a.contains_type_var() for a in self.type_args if a])
 
     @property
     def cls(self):
         if self._cls is None:
             # Get common supertype of all types in the union.
             args = self.type_args
-            cls = args[0]
+            cls = next(x for x in args if x is not None)
             if isinstance(cls, GenericType):
                 cls = cls.cls
-            for type_option in args[1:]:
+            for type_option in args:
                 if type_option:
                     if isinstance(type_option, GenericType):
                         type_option = type_option.cls
@@ -918,6 +975,9 @@ class OptionalType(UnionType):
         super().__init__([typ])
         self.type_args = [None, typ]
         self.optional_type = typ
+
+    def substitute(self, types: Dict['TypeVar', 'PythonType']):
+        return OptionalType(self.optional_type.substitute(types))
 
     @property
     def cls(self):
@@ -1803,7 +1863,7 @@ class PythonField(PythonNode):
         translation; this function will return the field that is actually used.
         """
         result = self
-        while result.inherited is not None:
+        while isinstance(result, PythonField) and result.inherited is not None:
             result = result.inherited
         return result
 

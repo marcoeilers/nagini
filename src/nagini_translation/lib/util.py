@@ -123,6 +123,8 @@ def get_func_name(stmt: ast.AST) -> Optional[str]:
         return call.func.attr
     elif isinstance(call.func, ast.Call):
         return get_func_name(call.func)
+    elif isinstance(call.func, ast.Subscript):
+        return None
     else:
         raise UnsupportedException(stmt)
 

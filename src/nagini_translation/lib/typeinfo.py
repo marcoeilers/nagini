@@ -55,7 +55,7 @@ class TypeVisitor(TraverserVisitor):
 
     def _is_result_call(self, node: mypy.nodes.Node) -> bool:
         """Checks if call is either ``Result`` or ``RaisedException``."""
-        if isinstance(node, mypy.nodes.CallExpr):
+        if isinstance(node, mypy.nodes.CallExpr) and isinstance(node.callee, mypy.nodes.NameExpr):
             if node.callee.name == 'Result':
                 return True
             if node.callee.name == 'RaisedException':
@@ -251,7 +251,7 @@ class TypeVisitor(TraverserVisitor):
             if key in self.all_types:
                 return self.all_types[key]
         elif isinstance(node, mypy.nodes.CallExpr):
-            if node.callee.name == 'Result':
+            if isinstance(node.callee, mypy.nodes.NameExpr) and node.callee.name == 'Result':
                 key = tuple(self.prefix)
                 for i in range(len(key)):
                     if key[i].startswith('lambda'):
@@ -296,6 +296,7 @@ class TypeInfo:
         self.type_aliases = {}
         self.type_vars = {}
         self.ghost_names = {}
+        self.module_name = None
 
     def _create_options(self, strict_optional: bool):
         """
@@ -339,6 +340,7 @@ class TypeInfo:
                 elif relpath.endswith('.pyi'):
                     relpath = relpath[:-4]
                 module_name = relpath
+        self.module_name = module_name
         try:
             options_strict = self._create_options(True)
 

@@ -180,7 +180,7 @@ class Analyzer(ast.NodeVisitor):
                     path = os.path.abspath(self.types.files[file_name])
                     self.add_module(path, abs_path, redefined_name, parse_result)
             elif isinstance(stmt, ast.ImportFrom):
-                module_name = stmt.module
+                module_name = self.module.get_relative_import_name(stmt.module, stmt.level)
                 if module_name in IGNORED_IMPORTS:
                     continue
                 if module_name == 'nagini_contracts.io_builtins':
@@ -237,7 +237,10 @@ class Analyzer(ast.NodeVisitor):
                                       type_prefix, self.module.global_module, node,
                                       self.module.sil_names, file)
             self.modules[abs_path] = new_module
+            old_module = self.module
+            self.module = new_module
             self.collect_imports(abs_path)
+            self.module = old_module
         else:
             new_module = self.modules[abs_path]
         into_mod = self.modules[into]
@@ -620,6 +623,13 @@ class Analyzer(ast.NodeVisitor):
         if cls.python_class not in cls.superclass.python_class.direct_subclasses:
             cls.superclass.python_class.direct_subclasses.append(cls.python_class)
 
+        for kw in node.keywords:
+            if kw.arg == 'metaclass' and isinstance(kw.value, ast.Name) and kw.value.id == 'ABCMeta':
+                continue
+            if kw.arg == 'metaclass':
+                raise UnsupportedException(kw, "Unsupported metaclass")
+            raise UnsupportedException(kw, "Unsupported keyword argument")
+
         for member in node.body:
             self.visit(member, node)
         self.current_class = None
@@ -667,7 +677,9 @@ class Analyzer(ast.NodeVisitor):
             self.analyze_import(name.name)
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
-        if node.module in IGNORED_IMPORTS:
+        module_name = self.module.get_relative_import_name(node.module, node.level)
+
+        if module_name in IGNORED_IMPORTS:
             return
         for mod in self.modules.values():
             if mod.type_prefix == node.module:
@@ -685,7 +697,7 @@ class Analyzer(ast.NodeVisitor):
                 new_ghost_name = name.asname if name.asname is not None else name.name
                 self.module.ghost_names.add(new_ghost_name)
                 
-        self.analyze_import(node.module)
+        self.analyze_import(module_name)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         if self.current_function:
@@ -1319,7 +1331,7 @@ class Analyzer(ast.NodeVisitor):
     def visit_Nonlocal(self, node: ast.Nonlocal) -> None:
         raise UnsupportedException(node)
 
-    def convert_type(self, mypy_type, node) -> PythonType:
+    def convert_type(self, mypy_type, node, bound_type_vars: Dict[str, PythonType] = None) -> PythonType:
         """
         Converts an internal mypy type to a PythonType.
         """
@@ -1361,9 +1373,9 @@ class Analyzer(ast.NodeVisitor):
             result = GenericType(self.module.global_module.classes[TUPLE_TYPE],
                                  args)
         elif self.types.is_union_type(mypy_type):
-            return self._convert_union_type(mypy_type, node)
+            return self._convert_union_type(mypy_type, node, bound_type_vars)
         elif self.types.is_type_var(mypy_type):
-            return self._convert_type_var(mypy_type, node)
+            return self._convert_type_var(mypy_type, node, bound_type_vars)
         elif self.types.is_type_type(mypy_type):
             return self._convert_type_type(mypy_type, node)
         elif self.types.is_callable_type(mypy_type):
@@ -1406,8 +1418,8 @@ class Analyzer(ast.NodeVisitor):
     def _convert_callable_type(self, mypy_type, node) -> PythonType:
         return self.find_or_create_class(CALLABLE_TYPE, module=self.module.global_module)
 
-    def _convert_union_type(self, mypy_type, node) -> PythonType:
-        args = [self.convert_type(arg_type, node)
+    def _convert_union_type(self, mypy_type, node, bound_type_vars: Dict[str, PythonType] = None) -> PythonType:
+        args = [self.convert_type(arg_type, node, bound_type_vars)
                 for arg_type in mypy_type.items
                 if not self.types.is_any_type_from_error(arg_type)]
         optional = False
@@ -1423,8 +1435,10 @@ class Analyzer(ast.NodeVisitor):
             result = OptionalType(result)
         return result
 
-    def _convert_type_var(self, mypy_type, node) -> PythonType:
+    def _convert_type_var(self, mypy_type, node, bound_type_vars: Dict[str, PythonType] = None) -> PythonType:
         name = mypy_type.name
+        if bound_type_vars and name in bound_type_vars:
+            return bound_type_vars[name]
         assert name in self.module.type_vars
         if (self.current_class and name in self.current_class.type_vars):
             return self.current_class.type_vars[name]
@@ -1488,6 +1502,8 @@ class Analyzer(ast.NodeVisitor):
             return self.convert_type(type, node)
         elif isinstance(node, ast.Attribute):
             receiver = self.typeof(node.value)
+            if isinstance(receiver, OptionalType):
+                receiver = receiver.optional_type
             if isinstance(receiver, UnionType) and not isinstance(receiver, OptionalType):
                 set_of_types = set()
                 for type_in_union in receiver.get_types() - {None}:
@@ -1498,14 +1514,28 @@ class Analyzer(ast.NodeVisitor):
                     type, _ = self.module.get_type(context, node.attr)
                     set_of_types.add(self.convert_type(type, node))
                 return UnionType(list(set_of_types)) if len(set_of_types) > 1 else set_of_types.pop()
+            contexts = []
             if isinstance(receiver, OptionalType):
-                context = [receiver.optional_type.name]
+                contexts.append([receiver.optional_type.name])
+                rec_super = receiver.optional_type.superclass
                 module = receiver.optional_type.module
             else:
-                context = [receiver.name]
+                contexts.append([receiver.name])
+                rec_super = receiver.superclass
                 module = receiver.module
-            type, _ = module.get_type(context, node.attr)
-            return self.convert_type(type, node)
+            while rec_super is not None:
+                contexts.append([rec_super.name])
+                rec_super = rec_super.superclass
+            bound_type_vars = None
+            if isinstance(receiver, GenericType) or (isinstance(receiver, OptionalType) and isinstance(receiver.optional_type, GenericType)):
+                gt = receiver if isinstance(receiver, GenericType) else receiver.optional_type
+                bound_type_vars = zip(gt.cls.type_vars.keys(), gt.type_args)
+                bound_type_vars = {k: v for (k, v) in bound_type_vars}
+            for context in contexts:
+                type, _ = module.get_type(context, node.attr)
+                if type:
+                    break
+            return self.convert_type(type, node, bound_type_vars)
         elif isinstance(node, ast.arg):
             # Special case for cls parameter of classmethods; for those, we
             # return the type 'type[C]', where C is the class the method
@@ -1537,12 +1567,21 @@ class Analyzer(ast.NodeVisitor):
                 f = self.module.get_func_or_method(node.func.id)
                 if f is not None:
                     return f.type
+                cls = self.get_target(node.func, self.module)
+                if isinstance(cls, PythonType):
+                    return cls
                 raise UnsupportedException(node)
         elif isinstance(node, ast.Call) and isinstance(node.func,
                                                        ast.Attribute):
             receiver = self.typeof(node.func.value)
             method = receiver.get_func_or_method(node.func.attr)
             return method.type
+        elif isinstance(node, ast.Call) and isinstance(node.func,
+                                                       ast.Subscript):
+            cls = self.get_target(node.func, self.module)
+            if isinstance(cls, PythonType):
+                return cls
+            raise UnsupportedException(node)
         else:
             raise UnsupportedException(node)
 
@@ -1638,7 +1677,7 @@ class Analyzer(ast.NodeVisitor):
         decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
         if self._incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
-        result = 'ContractOnly' in decorators
+        result = 'ContractOnly' in decorators or 'abstractmethod' in decorators
         return result
 
     def is_contract_only(self, func: ast.FunctionDef) -> bool:
