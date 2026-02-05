@@ -136,8 +136,8 @@ class TypeVisitor(TraverserVisitor):
                 is_alias = True
                 break
         if (node.name not in LITERALS and not is_alias):
-            name_type = self.type_of(node)
-            if not isinstance(name_type, mypy.types.CallableType):
+            name_type = self.type_of_option(node)
+            if name_type and not isinstance(name_type, mypy.types.CallableType):
                 self.set_type(self.prefix + [node.name], name_type,
                               node.line, col(node))
 
@@ -221,7 +221,7 @@ class TypeVisitor(TraverserVisitor):
             self.visit(a)
         self.visit(node.callee)
 
-    def type_of(self, node):
+    def type_of_option(self, node):
         if hasattr(node, 'node') and isinstance(node.node, mypy.nodes.MypyFile):
             return node.fullname
         if hasattr(node, 'node') and isinstance(node.node, mypy.nodes.TypeInfo):
@@ -253,12 +253,17 @@ class TypeVisitor(TraverserVisitor):
             if tuple(fullname) in self.type_vars:
                 result = self.type_vars[tuple(fullname)]
                 return result
-        msg = self.path + ':' + str(node.get_line()) + ': error: '
-        if isinstance(node, mypy.nodes.FuncDef):
-            msg += 'Encountered Any type. Type annotation missing?'
-        else:
-            msg += 'dead.code'
-        raise TypeException([msg])
+
+    def type_of(self, node):
+        res = self.type_of_option(node)
+        if res is None:
+            msg = self.path + ':' + str(node.get_line()) + ': error: '
+            if isinstance(node, mypy.nodes.FuncDef):
+                msg += 'Encountered Any type. Type annotation missing?'
+            else:
+                msg += 'dead.code'
+            raise TypeException([msg])
+        return res
 
     def visit_comparison_expr(self, o: mypy.nodes.ComparisonExpr):
         # Weird things seem to happen with is-comparisons, so we ignore those.
