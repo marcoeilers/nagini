@@ -428,8 +428,17 @@ class Analyzer(ast.NodeVisitor):
         name = aliases.get(name, name)
         if self.current_class and name in self.current_class.type_vars:
             return self.current_class.type_vars[name]
-        if not module:
+        if module and module != self.module:
+            superscope = module
+        else:
+            superscope = self.current_class or self.module
             module = self.module
+        class_scope = superscope
+        while isinstance(class_scope, PythonClass):
+            if class_scope.name == name:
+                return class_scope
+            class_scope = class_scope.superscope
+
         # Check all imported modules for the class.
         for visible_module in module.get_included_modules((), True):
             if name in visible_module.classes:
@@ -438,10 +447,10 @@ class Analyzer(ast.NodeVisitor):
         else:
             # Class doesn't exist yet, create it.
             superclass = self.global_module.classes[OBJECT_TYPE] if name != OBJECT_TYPE else None
-            cls = self.node_factory.create_python_class(name, module,
+            cls = self.node_factory.create_python_class(name, superscope,
                                                         self.node_factory,
                                                         superclass=superclass)
-            module.classes[name] = cls
+            superscope.classes[name] = cls
         return cls
 
     def find_or_create_target_class(self, node: ast.AST) -> PythonClass:
@@ -538,13 +547,15 @@ class Analyzer(ast.NodeVisitor):
         return actual_bases
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
-        if self.current_function or self.current_class:
+        if self.current_function:
             raise InvalidProgramException(node, 'nested.class.declaration')
         name = node.name
-        self.define_new(self.module, name, node)
+        container = self.module if self.current_class is None else self.current_class
+        self.define_new(container, name, node)
         cls = self.find_or_create_class(name)
         cls.defined = True
         cls.node = node
+        old_class = self.current_class
         self.current_class = cls
         actual_bases = []
         current_index = 0
@@ -591,7 +602,7 @@ class Analyzer(ast.NodeVisitor):
 
         for member in node.body:
             self.visit(member, node)
-        self.current_class = None
+        self.current_class = old_class
 
     def _is_illegal_magic_method_name(self, name: str) -> bool:
         """
@@ -1311,7 +1322,10 @@ class Analyzer(ast.NodeVisitor):
                 msg = f'Type could not be fully inferred (this usually means that a type argument is unknown)'
             raise InvalidProgramException(node, 'partial.type', message=msg)
         else:
-            msg = 'Unsupported type: {}'.format(mypy_type.__class__.__name__)
+            if mypy_type is None:
+                msg = 'Internal error: Could not determine type.'
+            else:
+                msg = 'Unsupported type: {}'.format(mypy_type.__class__.__name__)
             raise UnsupportedException(node, desc=msg)
         return result
 
@@ -1408,8 +1422,8 @@ class Analyzer(ast.NodeVisitor):
             if node.id in self.module.classes:
                 return self.module.classes[node.id]
             context = []
-            if self.current_class is not None:
-                context.append(self.current_class.name)
+            if self.current_class:
+                context.extend(self.current_class.full_name)
             if self.current_function is not None:
                 context.append(self.current_function.name)
             context.extend(self.current_scopes)
@@ -1434,15 +1448,15 @@ class Analyzer(ast.NodeVisitor):
                 return UnionType(list(set_of_types)) if len(set_of_types) > 1 else set_of_types.pop()
             contexts = []
             if isinstance(receiver, OptionalType):
-                contexts.append([receiver.optional_type.name])
+                contexts.append(receiver.optional_type.full_name)
                 rec_super = receiver.optional_type.superclass
                 module = receiver.optional_type.module
             else:
-                contexts.append([receiver.name])
+                contexts.append(receiver.full_name)
                 rec_super = receiver.superclass
                 module = receiver.module
             while rec_super is not None:
-                contexts.append([rec_super.name])
+                contexts.append(rec_super.full_name)
                 rec_super = rec_super.superclass
             bound_type_vars = None
             if isinstance(receiver, GenericType) or (isinstance(receiver, OptionalType) and isinstance(receiver.optional_type, GenericType)):
@@ -1464,8 +1478,8 @@ class Analyzer(ast.NodeVisitor):
                     cls = self.module.global_module.classes['type']
                     return GenericType(cls, [self.current_class])
             context = []
-            if self.current_class is not None:
-                context.append(self.current_class.name)
+            if self.current_class:
+                context.extend(self.current_class.full_name)
             context.append(self.current_function.name)
             context.extend(self.current_scopes)
             type, _ = self.module.get_type(context, node.arg)

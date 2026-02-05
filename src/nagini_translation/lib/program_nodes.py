@@ -408,6 +408,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self.predicates = OrderedDict()
         self.fields = OrderedDict()
         self.static_fields = OrderedDict()
+        self.classes = OrderedDict()
         self.type = None  # infer, domain type
         self.interface = interface
         self.defined = False
@@ -766,6 +767,14 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
     @property
     def python_class(self) -> 'PythonClass':
         return self
+
+    @property
+    def full_name(self) -> List[str]:
+        result = []
+        if isinstance(self.superscope, PythonClass):
+            result.extend(self.superscope.full_name)
+        result.append(self.name)
+        return result
 
 
 class GenericType(PythonType):
