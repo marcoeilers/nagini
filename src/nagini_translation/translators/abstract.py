@@ -315,6 +315,10 @@ class AbstractTranslator(metaclass=ABCMeta):
         return translator.create_method_fork(ctx, targets, thread, position, info,
                                              target_node)
 
+    def get_must_terminate(self, ctx: Context) -> Expr:
+        translator = self.config.obligation_translator
+        return translator.get_must_terminate(ctx)
+
     def enter_loop_translation(
             self, node: Union[ast.While, ast.For], ctx: Context,
             err_var: PythonVar = None) -> None:

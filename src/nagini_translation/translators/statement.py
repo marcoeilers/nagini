@@ -19,7 +19,7 @@ from nagini_translation.lib.constants import (
     MAY_SET_PRED,
     NAME_QUANTIFIER_VAR,
     NAME_DOMAIN,
-    OBJECT_TYPE,
+    PRIMITIVE_BOOL_TYPE,
     PRIMITIVES,
     RANGE_TYPE,
     SET_TYPE,
@@ -81,7 +81,48 @@ class StatementTranslator(CommonTranslator):
         """
         method = 'translate_stmt_' + node.__class__.__name__
         visitor = getattr(self, method, self.translate_generic)
-        return visitor(node, ctx)
+
+        # Replace this with actual code: should we start a terminating section here? Should a terminating section end after this?
+        start_terminating_block = isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name) and node.targets[0].id == "start"
+        end_terminating_block = isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name) and node.targets[0].id == "end"
+
+        res = []
+
+        if start_terminating_block:
+            bool_type = ctx.module.global_module.classes[PRIMITIVE_BOOL_TYPE]
+            added_obl_var = ctx.current_function.create_variable('added_term_obl', bool_type, self.translator)
+            pos = self.no_position(ctx)
+            info = self.no_info(ctx)
+            term_pred = self.get_must_terminate(ctx).translate(self, ctx, pos, info)
+            cur_perm = self.viper.CurrentPerm(term_pred, pos, info)
+            any_cur_perm = self.viper.PermGtCmp(cur_perm, self.viper.NoPerm(pos, info), pos, info)
+            obl_var_assign = self.viper.LocalVarAssign(added_obl_var.ref(ctx=ctx), any_cur_perm, pos, info)
+            cond_perm = self.viper.Implies(self.viper.Not(added_obl_var.ref(ctx=ctx), pos, info),
+                                           self.viper.PredicateAccessPredicate(term_pred,
+                                                                               self.viper.FullPerm(pos, info),
+                                                                               pos, info),
+                                           pos, info)
+            cond_inhale = self.viper.Inhale(cond_perm, pos, info)
+            res.extend([obl_var_assign, cond_inhale])
+            ctx.terminating_block_var = added_obl_var
+
+        res.extend(visitor(node, ctx))
+
+        if end_terminating_block:
+            pos = self.no_position(ctx)
+            info = self.no_info(ctx)
+            term_pred = self.get_must_terminate(ctx).translate(self, ctx, pos, info)
+            added_obl_var = ctx.terminating_block_var
+            cond_perm = self.viper.Implies(self.viper.Not(added_obl_var.ref(ctx=ctx), pos, info),
+                                           self.viper.PredicateAccessPredicate(term_pred,
+                                                                               self.viper.FullPerm(pos, info),
+                                                                               pos, info),
+                                           pos, info)
+            cond_exhale = self.viper.Exhale(cond_perm, pos, info)
+            res.append(cond_exhale)
+            ctx.terminating_block_var = None
+
+        return res
 
     def _execute_module_statements(self, module: PythonModule, import_stmt: ast.AST,
                                    ctx: Context) -> Stmt:
