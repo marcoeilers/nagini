@@ -5,8 +5,6 @@ GInt = int
 MarkGhost(GInt)
 GintList = List[GInt]
 MarkGhost(GintList)
-# GintTuple = Tuple[GInt, GInt] # TODO: Get this to work :/
-# MarkGhost(GintTuple)
 
 global_var: int = 0
 
@@ -15,7 +13,7 @@ def bar(i: int, gi: GInt) -> Tuple[int, GInt]: # OK
     (i, j) = k = 0,0
     j = i + 2           # OK
     gi += 1             # OK
-    i, gi = i+1, gi+1   # OK
+    # i, gi = i+1, gi+1 # Throw invalid.ghost.assign
     # j += gi           # Throw invalid.ghost.assign
 
     return j, res       # OK
@@ -64,7 +62,11 @@ def unpacking(i: int) -> None:
 
     gk: GInt = 0
     r, (gi,gk) = reg_call()                 # OK
-    i, gi = r                               # OK
+    # (i, gi), gtuple = reg_call()          # Throw invalid.ghost.assign
+
+    i, j = r                                # OK
+    gi, gk = r                              # OK
+    # i, gi = r                             # Throw invalid.ghost.assign
 
     d: Dict[str,int] = {'i': 0, 'gi': 1}
     glist: GintList = [0, 1]                # OK

@@ -46,6 +46,9 @@ IGNORE_REG_CALLS = ['TypeVar']
 
 PURE_REG_CALLS = ['len', 'isinstance']
 
+# Functions with the following decorators are assumed valid or are verified later
+IGNORE_DECORATORS = ['ContractOnly', 'IOOperation', 'Predicate']
+
 NAGINI_IMPORT = 'nagini_contracts'
 
 class GhostChecker(ast.NodeVisitor):
@@ -97,8 +100,6 @@ class GhostChecker(ast.NodeVisitor):
         self.set_contains_ghost(node, current_class.is_ghost, *node.body)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        # Functions with the following decorators are assumed valid or are verified later, so we just proceed
-        IGNORE_DECORATORS = ['ContractOnly', 'IOOperation', 'Predicate']
         decorators = {d.id for d in node.decorator_list if isinstance(d, ast.Name)}
         if any([dec in IGNORE_DECORATORS for dec in decorators]):
             is_func_ghost = 'Ghost' in decorators
@@ -106,7 +107,7 @@ class GhostChecker(ast.NodeVisitor):
             node.contains_ghost = True
             return
         
-        # Resolve created function
+        # Resolve defined function
         if 'property' in decorators:
             if not isinstance(self.ctx.current_class, PythonClass):
                 raise InvalidProgramException(node, 'invalid.property', "Property outside of class.")
@@ -217,13 +218,15 @@ class GhostChecker(ast.NodeVisitor):
             node.is_ghost = False
             self.set_contains_ghost(node, contains_ghost)
 
-    def visit_Delete(self, node: ast.Delete): #TODO: Add constraint: Each del may target elems of same ghost type
+    def visit_Delete(self, node: ast.Delete):
+        if self.has_mixed_elems(node.targets):
+            raise InvalidProgramException(node, 'invalid.ghost.delete')
         if self.in_ghost_ctx:
             for target in node.targets:
                 if not self.is_ghost(target):
                     raise InvalidProgramException(node, 'invalid.ghost.delete')
         
-        is_node_ghost = all([self.is_ghost(target) for target in node.targets])
+        is_node_ghost = self.is_ghost(node.targets[0])
         node.is_ghost = is_node_ghost
         self.set_contains_ghost(node, is_node_ghost, *node.targets)
 
@@ -299,31 +302,23 @@ class GhostChecker(ast.NodeVisitor):
         node.is_ghost = is_node_ghost
         self.set_contains_ghost(node, is_node_ghost, node.value, node.target)
 
-    def check_assign(self, value: Union[ast.expr, bool], target: ast.expr) -> None:        
+    def check_assign(self, value: Union[ast.expr, bool], target: ast.expr, allow_conversion: bool =True) -> None:        
         if isinstance(target, (ast.Name, ast.Attribute)):
-            if not self.is_assignable(value, target):
+            if not self.is_assignable(value, target, allow_conversion):
                 raise InvalidProgramException(target, 'invalid.ghost.assign')
         else:
             assert isinstance(target, ast.Subscript), f"Unexpected type of {type(target)}"
             # The subscript of a ghost element may only be read
-            if self.is_ghost(target) or self.is_ghost(value):
+            if self.is_ghost(target) or self.is_ghost(value) or self.in_ghost_ctx:
                 raise InvalidProgramException(target, 'invalid.ghost.assign')
 
     def check_unpacking(self, value: Union[ast.expr, bool], target: Union[ast.List, ast.Tuple]) -> None:
         unpacked = target.elts
 
-        if isinstance(value, ast.Name):
-            # simple variable unpacking
-            is_var_ghost = self.is_ghost(value)
-            for sub_target in unpacked:
-                if not self.is_assignable(is_var_ghost, sub_target):
-                    raise InvalidProgramException(sub_target, 'invalid.ghost.assign')
-            is_target_ghost = all([self.is_ghost(sub_target) for sub_target in unpacked])
-            target.is_ghost = is_target_ghost
-            self.set_contains_ghost(target, is_target_ghost, *unpacked)
-            return
-        elif isinstance(value, (ast.Tuple, ast.List)):
-            values = value.elts
+        # Resolve value to multiple values
+        if isinstance(value, (ast.Tuple, ast.List, ast.Name)):
+            # Variable, Tuple or List unpacking
+            values = [self.is_ghost(value)] * len(unpacked)
         elif isinstance(value, ast.Subscript):
             # Tuple/List annotation from call 
             values = value.slice.elts
@@ -344,15 +339,20 @@ class GhostChecker(ast.NodeVisitor):
             items = unpacked + values
             for item in items:
                 if self.is_ghost(item):
-                    raise InvalidProgramException(item, 'invalid.ghost.unpacking')
+                    raise InvalidProgramException(item, 'invalid.ghost.assign')
             target.is_ghost = False
             self.set_contains_ghost(target, False, *items)
         else:
+            # For simplicity during extraction, we allow no conversion (assign
+            # reg element to ghost element) during unpacking of mixed targets
+            allow_conversion = not self.has_mixed_elems(unpacked)
+            
             for sub_target, sub_value in zip(unpacked, values):
                 if isinstance(sub_target, (ast.List, ast.Tuple)):
                     self.check_unpacking(sub_value, sub_target)
                 else:
-                    self.check_assign(sub_value, sub_target)
+                    self.check_assign(sub_value, sub_target, allow_conversion)
+                    
             is_target_ghost = all([self.is_ghost(sub_target) for sub_target in unpacked])
             target.is_ghost = is_target_ghost
             self.set_contains_ghost(target, is_target_ghost, *unpacked)
@@ -579,7 +579,7 @@ class GhostChecker(ast.NodeVisitor):
                 call.contains_ghost = True
                 call.is_pure = True
                 return True, None
-            if isinstance(called_type, UnionType):
+            elif isinstance(called_type, UnionType):
                 types = called_type.get_types()
                 funcs = [t.get_func_or_method(func_name) for t in types]
                 if None in funcs:
@@ -618,24 +618,15 @@ class GhostChecker(ast.NodeVisitor):
         is_func_pure = called_func.pure
         call.is_pure = is_func_pure
 
-        # We cannot call a regular function in a ghost context
+        # We cannot call an impure regular function in a ghost context
         if self.in_ghost_ctx:
             if not is_func_ghost and not is_func_pure:
                 raise InvalidProgramException(call, 'invalid.ghost.call')
             # The function is either already ghost or is pure and now used as ghost
             is_func_ghost = True
 
-        # Ghost func calls accept all arguments and have no (informative) return
-        # However, we still need to check that there is no impure regular function in its arguments
         if is_func_ghost:
-            old_ctx = self.in_ghost_ctx
-            self.in_ghost_ctx = True
-            self.check_for_call(call)
-            self.in_ghost_ctx = old_ctx
-
-            call.is_ghost = True
-            call.contains_ghost = True
-            return True, None
+            return self._check_ghost_func(call)
         
         contains_ghost = False
 
@@ -672,7 +663,12 @@ class GhostChecker(ast.NodeVisitor):
                 old_ctx = self.in_ghost_ctx
                 self.in_ghost_ctx = True
             if not self.is_assignable(arg, param):
-                raise InvalidProgramException(call, 'invalid.ghost.call')
+                # Reg input was expected but got ghost input. 
+                # If func is pure, we use it as ghost. Otherwise, the call is invalid
+                if is_func_pure:
+                    return self._check_ghost_func(call)
+                else:
+                    raise InvalidProgramException(call, 'invalid.ghost.call')
             if is_param_ghost:
                 self.in_ghost_ctx = old_ctx
                 contains_ghost = True
@@ -689,7 +685,12 @@ class GhostChecker(ast.NodeVisitor):
                 old_ctx = self.in_ghost_ctx
                 self.in_ghost_ctx = True
             if not self.is_assignable(kw.value, param):
-                raise InvalidProgramException(call, 'invalid.ghost.call')
+                # Reg input was expected but got ghost input. 
+                # If func is pure, we use it as ghost. Otherwise, the call is invalid
+                if is_func_pure:
+                    return self._check_ghost_func(call)
+                else:
+                    raise InvalidProgramException(call, 'invalid.ghost.call')
             if is_param_ghost:
                 self.in_ghost_ctx = old_ctx
                 contains_ghost = True
@@ -716,23 +717,39 @@ class GhostChecker(ast.NodeVisitor):
             #TODO: Return types
         return True
 
-    def is_assignable(self, e1, e2) -> bool:
+    def _check_ghost_func(self, call: ast.Call) -> Tuple[bool, Optional[annotation_t]]:
+        # Ghost func calls accept all arguments and have no (informative) return.
+        # However, we still need to check that there are no impure regular function calls in its arguments.
+        old_ctx = self.in_ghost_ctx
+        self.in_ghost_ctx = True
+        self.check_for_call(call)
+        self.in_ghost_ctx = old_ctx
+
+        call.is_ghost = True
+        call.contains_ghost = True
+        return True, None
+
+    def is_assignable(self, e1, e2, allow_conversion: bool = True) -> bool:
         """
         Returns whether e1 may be assigned to e2 in regards to ghost information.
         You may pass a boolean for either e1 or e2 instead when you already know whether they are ghost.
 
-        If e1 is an AST node, we also update the is_ghost and contains_ghost flags if e1 is regular but
-        assigned to a ghost element. The exception to this is if e1 is an impure function call.
+        If a regular element e1 is assigned to a ghost e2, we call this conversion. 
+        Whether this should be considered valid can be configured via the allow_conversion boolean.
+
+        If e1 is an AST node, we also update the is_ghost and contains_ghost flags during conversion.
+        The exception to this is if e1 is an impure function call.
         """
         is_e1_ghost = self.is_ghost(e1)
         is_e2_ghost = self.is_ghost(e2)
 
+        is_conversion = not is_e1_ghost and is_e2_ghost
         is_e1_impure_call = isinstance(e1, ast.Call) and not e1.is_pure
-        if not is_e1_ghost and is_e2_ghost and isinstance(e1, ast.AST) and not is_e1_impure_call:
+        if allow_conversion and is_conversion and isinstance(e1, ast.AST) and not is_e1_impure_call:
             e1.is_ghost = True
             e1.contains_ghost = True
 
-        may_assign = is_e2_ghost or (not is_e1_ghost)
+        may_assign = (allow_conversion and is_conversion) or (is_e1_ghost == is_e2_ghost)
         in_this_ctx = (not self.in_ghost_ctx) or is_e2_ghost
         return may_assign and in_this_ctx
     
@@ -873,6 +890,16 @@ class GhostChecker(ast.NodeVisitor):
         node.contains_ghost = is_node_ghost or any(
             [sub_expr.contains_ghost for sub_expr in sub_exprs if isinstance(sub_expr, ast.AST)]
             )
+
+    def has_mixed_elems(self, elems: List[ast.expr]) -> bool:
+        if len(elems) < 2:
+            return False
+
+        is_fst_ghost = self.is_ghost(elems[0])
+        for e in elems:
+            if self.is_ghost(e) != is_fst_ghost:
+                return True
+        return False
 
     def get_subscript_name(self, sub: ast.Subscript) -> Optional[str]:
         return sub.value.id if isinstance(sub.value, ast.Name) else None

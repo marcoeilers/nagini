@@ -23,6 +23,10 @@ def without_optional() -> Union[GInt, None]:
     gi: GInt = 0
     return gi
 
+def start_with_None() -> Union[None, GInt]:
+    gi: GInt = 0
+    return gi
+
 def futureRef() -> 'GStr':
     s: GStr = 'future'
     return s

@@ -361,9 +361,11 @@ class Analyzer(ast.NodeVisitor):
         in_ghost_func = self.current_function is not None and self.current_function.is_ghost
 
         if isinstance(node, ast.ClassDef):
-            return "Ghost" in {d.id for d in node.decorator_list if isinstance(d, ast.Name)}
+            decorators = {d.id for d in node.decorator_list if isinstance(d, ast.Name)}
+            return "Ghost" in decorators or 'Predicate' in decorators
         elif isinstance(node, ast.FunctionDef):
-            return in_ghost_class or "Ghost" in {d.id for d in node.decorator_list if isinstance(d, ast.Name)}
+            decorators = {d.id for d in node.decorator_list if isinstance(d, ast.Name)}
+            return in_ghost_class or "Ghost" in decorators or 'Predicate' in decorators
         elif isinstance(node, (ast.arg, ast.AnnAssign)):
             ann_as_ghost = self.is_ghost_annotation(node.annotation)
             return in_ghost_class or in_ghost_func or ann_as_ghost

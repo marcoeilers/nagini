@@ -7,14 +7,5 @@ GInt = int
 MarkGhost(GInt)
 
 def main(i: int, gi: GInt) -> None:
-    res: GInt = gi + i
-    j = i + 2 
-    i += 1 
-    gi += 1
-
-    t = (0, 1)
-    i, j = t
-    gi, res = t
-
-    lst = [0, 1, 2, 3, 4]
-    i, *s, j = lst
+    #:: ExpectedOutput(invalid.program:invalid.ghost.assign)
+    i, gi = i+1, gi+1

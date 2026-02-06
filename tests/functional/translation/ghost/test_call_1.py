@@ -10,10 +10,13 @@ MarkGhost(GInt)
 def reg_calls(gi: GInt) -> None:
     i = reg(0, gi)
     i = reg(0, gi=gi)
+
     gi = ghost(0)
+    gi = pure_reg(gi)
     gi = ghost(pure_reg(0))
-    gi = reg_but_ghost_return()
     gi = ghost_lst([0, 1, ghost(pure_reg(2)), 3])
+
+    gi = reg_but_ghost_return()
     
     gk: GInt = 0
     r, (gi, gk) = reg_mixed_return()

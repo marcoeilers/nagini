@@ -123,11 +123,7 @@ class ProgramExtractor:
                 new_targets.append(new_target)
 
         new_value = self.extract(node.value)
-
-        #----Temporary----
-        if new_value is None:
-            new_value = node.value
-        #-----------------
+        assert new_value is not None, "Value was ghost when statement is regular"
 
         if len(new_targets) == 0:
             # Since targets are all ghost but stmt is regular, value must be an impure call
@@ -138,8 +134,7 @@ class ProgramExtractor:
     def extract_AnnAssign(self, node: ast.AnnAssign) -> ast.AST:
         new_target = self.extract(node.target)
         new_value = self.extract(node.value)
-        if new_value is None:
-            new_value = node.value #TODO: Change. Maybe throw error?
+        assert new_value is not None, "Value was ghost when statement is regular"
 
         if new_target is None:
             # Since target is ghost but stmt is regular, value must be an impure call
@@ -208,8 +203,6 @@ class ProgramExtractor:
             if new_kw_val is not None:
                 new_kw = ast.keyword(kw.arg, new_kw_val)
                 new_keywords.append(new_kw)
-        
-        # TODO: starargs and kwargs?
 
         return ast.Call(node.func, new_args, new_keywords)
     
