@@ -878,7 +878,7 @@ class ExpressionTranslator(CommonTranslator):
         else:
             # If the receiver is an ADT, attribute access is translated as deconstruction
             recv_type = self.get_type(node.value, ctx)
-            if isinstance(recv_type.python_class, PythonClass) and recv_type.python_class.is_adt:
+            if isinstance(recv_type, PythonType) and recv_type.python_class.is_adt:
                 return self.translate_adt_decons(recv_type.python_class, node, position, ctx)
 
             stmt, receiver = self.translate_expr(node.value, ctx,

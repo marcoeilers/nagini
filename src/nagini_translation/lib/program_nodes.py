@@ -174,11 +174,20 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
             return self.types.module_name
         return self.type_prefix
 
+    @property
+    def full_name(self) -> List[str]:
+        if self.type_prefix is None:
+            return []  # ????
+        return self.type_prefix.split(".")
+
     def get_relative_import_name(self, name: str, level: int) -> str:
         module_name = name
         if level > 0:
             current_module_name = self.full_module_name
-            module_name_to_add = current_module_name.split(".")[:-level]
+            actual_level = level if not (self.module.file.endswith('__init__.py') or self.module.file.endswith('__init__.pyi')) else level - 1
+            module_name_to_add = current_module_name.split(".")
+            if actual_level != 0:
+                module_name_to_add = module_name_to_add[:-actual_level]
             if module_name is not None:
                 module_name_to_add.append(module_name)
             module_name = ".".join(module_name_to_add)
@@ -222,6 +231,14 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
     def scope_prefix(self) -> List[str]:
         return []
 
+    @property
+    def all_classes(self) -> OrderedDict[str, 'PythonClass']:
+        res = OrderedDict()
+        for cls_name, cls in self.classes.items():
+            if cls_name == cls.name:
+                res.update(cls.all_classes)
+        return res
+
     def get_func_or_method(self, name: str) -> 'PythonMethod':
         for module in [self] + self.from_imports + [self.global_module]:
             if not isinstance(module, PythonModule):
@@ -245,6 +262,11 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
         """
         if self in previous:
             return None, None
+
+        local_type, local_alts = self.types.get_type(prefixes, name)
+        if local_type is not None:
+            return local_type, local_alts
+
         actual_prefix = self.type_prefix.split('.') if self.type_prefix else []
         actual_prefix.extend(prefixes)
         local_type, local_alts = self.types.get_type(actual_prefix, name)
@@ -408,6 +430,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self.predicates = OrderedDict()
         self.fields = OrderedDict()
         self.static_fields = OrderedDict()
+        self.classes = OrderedDict()
         self.type = None  # infer, domain type
         self.interface = interface
         self.defined = False
@@ -422,6 +445,14 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         if self.superclass:
             return self.superclass.get_bound_type_vars()
         return {}
+
+    @property
+    def all_classes(self) -> OrderedDict[str, 'PythonClass']:
+        res = OrderedDict()
+        res[".".join(self.full_name)] = self
+        for cls_name, cls in self.classes.items():
+            res.update(cls.all_classes)
+        return res
 
     @property
     def is_defining_adt(self) -> bool:
@@ -670,6 +701,9 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         of them.
         """
         self.sil_name = sil_name
+        for name, cls in self.classes.items():
+            cls_name = self.name + '_' + name
+            cls.process(self.get_fresh_name(cls_name), translator)
         for name, function in self.functions.items():
             func_name = self.name + '_' + name
             function.process(self.get_fresh_name(func_name), translator)
@@ -729,7 +763,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         used by get_target). If 'only_top' is true, returns only top level
         elements that can be accessed without a receiver.
         """
-        dicts = [self.static_methods, self.static_fields, self.type_vars]
+        dicts = [self.static_methods, self.static_fields, self.type_vars, self.classes]
         if not only_top:
             dicts.extend([self.functions, self.fields, self.methods,
                           self.predicates])
@@ -766,6 +800,13 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
     @property
     def python_class(self) -> 'PythonClass':
         return self
+
+    @property
+    def full_name(self) -> List[str]:
+        result = []
+        result.extend(self.superscope.full_name)
+        result.append(self.name)
+        return result
 
 
 class GenericType(PythonType):

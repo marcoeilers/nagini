@@ -1208,8 +1208,8 @@ class ProgramTranslator(CommonTranslator):
         for module in modules:
             ctx.module = module
             containers = [module]
-            for class_name, cls in module.classes.items():
-                if class_name in PRIMITIVES or class_name != cls.name:
+            for class_name, cls in module.all_classes.items():
+                if class_name in PRIMITIVES:
                     # Skip primitives or entries for type variables.
                     continue
                 if cls.is_adt:
@@ -1273,8 +1273,8 @@ class ProgramTranslator(CommonTranslator):
             for pred in module.predicates.values():
                 predicates.append(self.translate_predicate(pred, ctx))
                 self.track_dependencies(selected_names, selected, pred, ctx)
-            for class_name, cls in module.classes.items():
-                if class_name in PRIMITIVES or class_name != cls.name:
+            for class_name, cls in module.all_classes.items():
+                if class_name in PRIMITIVES:
                     # Skip primitives and type variable entries.
                     continue
                 if cls.is_adt and cls.is_defining_adt:
