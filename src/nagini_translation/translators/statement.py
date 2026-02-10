@@ -74,6 +74,7 @@ class StatementTranslator(CommonTranslator):
         # Keep track of the end and after labels of loops we are currently in.
         self.loops = {}
         self.imported_modules = set()
+        self.in_terminating_block = False
 
     def translate_stmt(self, node: ast.AST, ctx: Context) -> List[Stmt]:
         """
@@ -82,13 +83,15 @@ class StatementTranslator(CommonTranslator):
         method = 'translate_stmt_' + node.__class__.__name__
         visitor = getattr(self, method, self.translate_generic)
 
-        # Replace this with actual code: should we start a terminating section here? Should a terminating section end after this?
-        start_terminating_block = isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name) and node.targets[0].id == "start"
-        end_terminating_block = isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name) and node.targets[0].id == "end"
+        # We add a terminating section on every ghost statement. 
+        # For statements containing blocks of code (e.g. if), we do not add more terminating sections within
+        start_terminating_block = node.is_ghost and not self.in_terminating_block
+        end_terminating_block = node.is_ghost and not self.in_terminating_block
 
         res = []
 
         if start_terminating_block:
+            self.in_terminating_block = True
             bool_type = ctx.module.global_module.classes[PRIMITIVE_BOOL_TYPE]
             added_obl_var = ctx.current_function.create_variable('added_term_obl', bool_type, self.translator)
             pos = self.no_position(ctx)
@@ -109,6 +112,7 @@ class StatementTranslator(CommonTranslator):
         res.extend(visitor(node, ctx))
 
         if end_terminating_block:
+            self.in_terminating_block = False
             pos = self.no_position(ctx)
             info = self.no_info(ctx)
             term_pred = self.get_must_terminate(ctx).translate(self, ctx, pos, info)

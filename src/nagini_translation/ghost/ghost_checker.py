@@ -15,6 +15,7 @@ from nagini_contracts.io_contracts import (
     BUILTIN_IO_OPERATIONS, IO_CONTRACT_FUNCS, 
     IO_OPERATION_PROPERTY_FUNCS, IO_FUNCS, IO_DECORATORS
     )
+from nagini_contracts.obligations import OBLIGATION_CONTRACT_FUNCS
 from nagini_translation.lib.constants import OBJECT_TYPE, THREADING
 from nagini_translation.lib.program_nodes import (
     PythonModule, PythonType, PythonMethod, PythonIOOperation, 
@@ -35,7 +36,9 @@ annotation_t = Union[ast.Name, ast.Constant, ast.Attribute, ast.Subscript]
 
 ALL_CONTRACT_ELEMS = (CONTRACT_FUNCS + CONTRACT_WRAPPER_FUNCS + THREADING +
                         IO_CONTRACT_FUNCS + IO_OPERATION_PROPERTY_FUNCS +
-                        list(BUILTIN_IO_OPERATIONS) + IO_FUNCS + SPECIAL_PREDICATES)
+                        list(BUILTIN_IO_OPERATIONS) + IO_FUNCS + SPECIAL_PREDICATES +
+                        OBLIGATION_CONTRACT_FUNCS
+                        )
 
 NAGINI_DECORATORS = CONTRACT_DECORATORS + IO_DECORATORS
 
