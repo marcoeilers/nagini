@@ -174,11 +174,20 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
             return self.types.module_name
         return self.type_prefix
 
+    @property
+    def full_name(self) -> List[str]:
+        if self.type_prefix is None:
+            return []  # ????
+        return self.type_prefix.split(".")
+
     def get_relative_import_name(self, name: str, level: int) -> str:
         module_name = name
         if level > 0:
             current_module_name = self.full_module_name
-            module_name_to_add = current_module_name.split(".")[:-level]
+            actual_level = level if not (self.module.file.endswith('__init__.py') or self.module.file.endswith('__init__.pyi')) else level - 1
+            module_name_to_add = current_module_name.split(".")
+            if actual_level != 0:
+                module_name_to_add = module_name_to_add[:-actual_level]
             if module_name is not None:
                 module_name_to_add.append(module_name)
             module_name = ".".join(module_name_to_add)
@@ -245,6 +254,11 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
         """
         if self in previous:
             return None, None
+
+        local_type, local_alts = self.types.get_type(prefixes, name)
+        if local_type is not None:
+            return local_type, local_alts
+
         actual_prefix = self.type_prefix.split('.') if self.type_prefix else []
         actual_prefix.extend(prefixes)
         local_type, local_alts = self.types.get_type(actual_prefix, name)
@@ -766,6 +780,13 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
     @property
     def python_class(self) -> 'PythonClass':
         return self
+
+    @property
+    def full_name(self) -> List[str]:
+        result = []
+        result.extend(self.superscope.full_name)
+        result.append(self.name)
+        return result
 
 
 class GenericType(PythonType):

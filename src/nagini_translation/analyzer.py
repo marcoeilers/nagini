@@ -1324,11 +1324,15 @@ class Analyzer(ast.NodeVisitor):
             name = 'list'
         if prefix.endswith('.' + name):
             prefix = prefix[:-(len(name) + 1)]
-        target_module = self.module
         for module in self.modules.values():
-            if module.type_prefix == prefix:
+            if module.full_module_name == prefix or module.type_prefix == prefix:
                 target_module = module
                 break
+        else:
+            if prefix in IGNORED_IMPORTS:
+                target_module = self.module.global_module
+            else:
+                raise Exception("Internal error: Could not find module for type.")
         result = self.find_or_create_class(name,
                                            module=target_module)
         return result
@@ -1434,15 +1438,15 @@ class Analyzer(ast.NodeVisitor):
                 return UnionType(list(set_of_types)) if len(set_of_types) > 1 else set_of_types.pop()
             contexts = []
             if isinstance(receiver, OptionalType):
-                contexts.append([receiver.optional_type.name])
+                contexts.append(receiver.optional_type.python_class.full_name)
                 rec_super = receiver.optional_type.superclass
                 module = receiver.optional_type.module
             else:
-                contexts.append([receiver.name])
+                contexts.append(receiver.python_class.full_name)
                 rec_super = receiver.superclass
                 module = receiver.module
             while rec_super is not None:
-                contexts.append([rec_super.name])
+                contexts.append(rec_super.python_class.full_name)
                 rec_super = rec_super.superclass
             bound_type_vars = None
             if isinstance(receiver, GenericType) or (isinstance(receiver, OptionalType) and isinstance(receiver.optional_type, GenericType)):
