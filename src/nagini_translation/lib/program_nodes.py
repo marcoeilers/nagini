@@ -235,7 +235,8 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
     def all_classes(self) -> OrderedDict[str, 'PythonClass']:
         res = OrderedDict()
         for cls_name, cls in self.classes.items():
-            res.update(cls.all_classes)
+            if cls_name == cls.name:
+                res.update(cls.all_classes)
         return res
 
     def get_func_or_method(self, name: str) -> 'PythonMethod':
