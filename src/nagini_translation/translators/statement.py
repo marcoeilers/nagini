@@ -308,7 +308,8 @@ class StatementTranslator(CommonTranslator):
         """
         assert self.is_main_method(ctx)
         # static field definitions
-        cls = ctx.module.classes[node.name]
+        container = ctx.current_class or ctx.module
+        cls = container.classes[node.name]
         stmts = []
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)

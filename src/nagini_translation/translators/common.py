@@ -307,8 +307,9 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
         module_set = module.names_var[1]
-        decl_id = self.viper.IntLit(self._get_string_value(declaration.name), pos,
-                                    info)
+        string_value = self._get_string_value(declaration.name)
+        decl_id = self.viper.IntLit(string_value, pos, info)
+        print("setting defined: " + declaration.name + ", " + str(string_value))
         return self._set_global_defined(decl_id, module_set, pos, info)
 
     def _set_global_defined(self, decl_int: Expr, module_var: Expr, pos: Position,
@@ -904,8 +905,10 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
     def get_target(self, node: ast.AST, ctx: Context) -> PythonModule:
         container = ctx.actual_function if ctx.actual_function else ctx.module
         containers = [ctx]
-        if ctx.current_class:
-            containers.append(ctx.current_class)
+        current_class = ctx.current_class
+        while current_class:
+            containers.insert(1, current_class)
+            current_class = current_class.superscope if isinstance(current_class.superscope, PythonClass) else None
         if isinstance(container, (PythonMethod, PythonIOOperation)):
             containers.append(container)
             containers.extend(container.module.get_included_modules())

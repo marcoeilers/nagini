@@ -233,6 +233,9 @@ class TypeVisitor(TraverserVisitor):
             key = (node.name,)
             if key in self.all_types:
                 return self.all_types[key]
+            full_key = tuple(self.prefix) + key
+            if full_key in self.all_types:
+                return self.all_types[full_key]
         elif isinstance(node, mypy.nodes.CallExpr):
             if isinstance(node.callee, mypy.nodes.NameExpr) and node.callee.name == 'Result':
                 key = tuple(self.prefix)
