@@ -32,6 +32,8 @@ def common_use_of_ADTs()-> None:
 
     assert cast(Leaf, t_3.left).elem == 5
     assert cast(Leaf, t_3.right).elem == 6
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert False
 
 
 def check_type_is_known(l: Leaf) -> int:

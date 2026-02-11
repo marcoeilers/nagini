@@ -51,6 +51,8 @@ def common_use_of_ADTs()-> None:
 
     Assert(type(cast(Node, polymorphic_tree).right) is Leaf)
     Assert(type(cast(Leaf, cast(Node, polymorphic_tree).right).fruit) is Grape)
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    Assert(False)
 
 # Ordinary class
 class Property:
