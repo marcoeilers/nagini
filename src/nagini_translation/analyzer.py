@@ -583,6 +583,8 @@ class Analyzer(ast.NodeVisitor):
             cls.superclass = self.find_or_create_class(OBJECT_TYPE)
         if cls.python_class not in cls.superclass.python_class.direct_subclasses:
             cls.superclass.python_class.direct_subclasses.append(cls.python_class)
+        if cls.superclass.python_class.enum:
+            raise InvalidProgramException(node, 'Cannot extend enumeration')
         if cls.superclass.name == "IntEnum":
             cls.enum = True
             cls.enum_type = INT_TYPE

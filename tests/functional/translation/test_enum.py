@@ -7,3 +7,7 @@ from enum import IntEnum
 class flag(IntEnum):
     success = 0
     failure = 1
+
+#:: ExpectedOutput(type.error:Cannot extend enumeration)
+class sub_flag(flag):
+    unknown = 3
