@@ -1177,18 +1177,24 @@ class ExpressionTranslator(CommonTranslator):
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
 
-        # TODO add handling for IntEnum
+        if isinstance(node.ops[0], ast.Is):
+            return (stmts, self.viper.EqCmp(left, right, position, info))
+        elif isinstance(node.ops[0], ast.IsNot):
+            return (stmts, self.viper.NeCmp(left, right, position, info))
+
+        # Unbox IntEnum to int
+        if left_type.python_class.enum and left_type.python_class.enum_type == INT_TYPE:
+            left = self.to_int(left, ctx, left_type)
+            left_type = ctx.module.global_module.classes[INT_TYPE]
+        if right_type.python_class.enum and right_type.python_class.enum_type == INT_TYPE:
+            right = self.to_int(right, ctx, right_type)
+            right_type = ctx.module.global_module.classes[INT_TYPE]
 
         if self._is_primitive_operation(node.ops[0], left_type, right_type):
             result = self._translate_primitive_operation(left, right, left_type,
                                                          node.ops[0], position,
                                                          ctx)
             return stmts, result
-
-        if isinstance(node.ops[0], ast.Is):
-            return (stmts, self.viper.EqCmp(left, right, position, info))
-        elif isinstance(node.ops[0], ast.IsNot):
-            return (stmts, self.viper.NeCmp(left, right, position, info))
         elif isinstance(node.ops[0], (ast.In, ast.NotIn)):
             contains_stmts, contains_expr = self._translate_contains(
                 left, right, left_type, right_type, node, ctx)

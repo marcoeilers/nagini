@@ -829,6 +829,9 @@ class TypeDomainFactory:
             just_part = self.subtype_check(type_func, type.cls, position, ctx,
                                            concrete=concrete)
             return self.viper.Or(none_part, just_part, position, info)
+        # Enums cannot be subclassed, so we can use exact type equality
+        if type.python_class.enum:
+            concrete = True
         return self.subtype_check(type_func, type, position, ctx,
                                   concrete=concrete)
 

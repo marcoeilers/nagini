@@ -188,11 +188,13 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                             position=e.pos())
         return result
 
-    def to_int(self, e: Expr, ctx: Context) -> Expr:
+    def to_int(self, e: Expr, ctx: Context,
+              python_type: 'PythonType' = None) -> Expr:
         """
         Converts the given expression to an expression of the Silver type Int
         if it isn't already, either by unboxing a reference or undoing a
-        previous boxing operation.
+        previous boxing operation. When python_type is an enum, uses the
+        enum-specific unbox function to preserve value range information.
         """
         # Avoid wrapping non-pure expressions (leads to errors within Silver's
         # Consistency object)
@@ -206,10 +208,16 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                     e.funcname() == '__prim__int___box__'):
             return e.args().head()
         result = e
-        int_type = ctx.module.global_module.classes[INT_TYPE]
-        result = self.get_function_call(int_type, '__unbox__',
-                                        [result], [None], None, ctx,
-                                        position=e.pos())
+        if python_type and python_type.python_class.enum and python_type.python_class.enum_type == INT_TYPE:
+            unbox_name = python_type.sil_name + '__unbox__'
+            result = self.viper.FuncApp(unbox_name, [result],
+                                        e.pos(), self.no_info(ctx),
+                                        self.viper.Int)
+        else:
+            int_type = ctx.module.global_module.classes[INT_TYPE]
+            result = self.get_function_call(int_type, '__unbox__',
+                                            [result], [None], None, ctx,
+                                            position=e.pos())
         return result
 
     def unwrap(self, e: Expr) -> Expr:

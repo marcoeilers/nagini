@@ -1217,6 +1217,16 @@ class ProgramTranslator(CommonTranslator):
         
         preconds.append(self.type_factory.type_check(ref_use, enum, pos, ctx, True))
         
+        # Add postcondition constraining the result to valid enum values
+        enum_value_postcond = self.viper.FalseLit(pos, info)
+        for field_name in enum.static_fields:
+            field = enum.get_static_field(field_name)
+            if field and field.value:
+                _, enum_value_expr = self.translate_expr(field.value, ctx, self.viper.Int)
+                value_check = self.viper.EqCmp(result, enum_value_expr, pos, info)
+                enum_value_postcond = self.viper.Or(enum_value_postcond, value_check, pos, info)
+        postconds.append(enum_value_postcond)
+
         # Add forall postcondition
         i_var_use = self.viper.LocalVar('i', self.viper.Ref, pos, info)
         i_var_decl = self.viper.LocalVarDecl('i', self.viper.Ref, pos, info)
