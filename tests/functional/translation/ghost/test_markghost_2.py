@@ -2,11 +2,12 @@
 # http://creativecommons.org/publicdomain/zero/1.0/
 
 from nagini_contracts.contracts import *
+from typing import List
 
-GInt = int
-MarkGhost(GInt)
+GBoolList = List[GBool]
+MarkGhost(GBoolList)
 #:: ExpectedOutput(type.error:MarkGhost may only define ghost names once.)
-MarkGhost(GInt)
+MarkGhost(GBoolList)
 
-def main(gi: GInt) -> None:
-    gi += 1
+def main() -> None:
+    glst: GBoolList = [True]

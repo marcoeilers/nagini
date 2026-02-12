@@ -4,8 +4,6 @@
 from nagini_contracts.contracts import *
 from typing import List, Tuple, Optional, Union
 
-GInt = int
-MarkGhost(GInt)
 
 def foo() -> List[Tuple[List[int], int]]:
     pass
@@ -27,13 +25,13 @@ def start_with_None() -> Union[None, GInt]:
     gi: GInt = 0
     return gi
 
-def futureRef() -> 'GStr':
-    s: GStr = 'future'
-    return s
+# def futureRef() -> 'GStrList':
+#     s: GStrList = ['future']
+#     return s
 
 @Ghost
 def ghost() -> Union[int, GInt, None, bool]:
     pass
 
-GStr = str
-MarkGhost(GStr)
+# GStrList = List[GStr]
+# MarkGhost(GStrList)

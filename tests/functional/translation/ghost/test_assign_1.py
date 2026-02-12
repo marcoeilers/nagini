@@ -3,13 +3,12 @@
 
 from nagini_contracts.contracts import *
 
-GInt = int
-MarkGhost(GInt)
 
 def main(i: int, gi: GInt) -> None:
-    res: GInt = gi + i
     j = i + 2 
     i += 1 
+
+    res: GInt = gi + i
     gi += 1
 
     t = (0, 1)

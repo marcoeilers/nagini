@@ -4,8 +4,6 @@
 from nagini_contracts.contracts import *
 from typing import Union
 
-GInt = int
-MarkGhost(GInt)
 
 class A:
     def method(self) -> None:   # Regular Method

@@ -3,8 +3,6 @@
 
 from nagini_contracts.contracts import *
 
-GInt = int
-MarkGhost(GInt)
 
 def main() -> None:
     t = (0, 1)

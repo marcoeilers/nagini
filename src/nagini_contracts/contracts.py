@@ -27,7 +27,7 @@ GHOST_PREFIX = "_gh_"
 
 CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant', 'Decreases']
 
-GHOST_BUILTINS = ['PSeq', 'PSet', 'PMultiset']
+GHOST_BUILTINS = ['PSeq', 'PSet', 'PMultiset', 'GInt', 'GFloat', 'GComplex', 'GBool', 'GStr']
 
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'ResultT', 'Implies', 'Forall', 'IOForall', 'Forall2', 'Forall3', 'Forall6',
                   'Exists', 'Low', 'LowVal', 'LowEvent', 'Declassify', 'TerminatesSif',
@@ -46,6 +46,12 @@ U = TypeVar('U')
 U2 = TypeVar('U2')
 U3 = TypeVar('U3')
 U4 = TypeVar('U4')
+
+GInt = int
+GFloat = float
+GComplex = complex
+GBool = bool
+GStr = str
 
 def MarkGhost(t: Type[T]) -> None:
     pass
@@ -611,5 +617,10 @@ __all__ = [
         'MaySet',
         'MayCreate',
         'isNaN',
-        'MarkGhost'
+        'MarkGhost',
+        'GInt', 
+        'GFloat', 
+        'GComplex', 
+        'GBool', 
+        'GStr'
         ]

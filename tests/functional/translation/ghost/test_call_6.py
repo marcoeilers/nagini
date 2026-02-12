@@ -4,8 +4,6 @@
 from nagini_contracts.contracts import *
 from typing import List
 
-GInt = int
-MarkGhost(GInt)
 
 @Ghost
 def ghost_calls() -> None:

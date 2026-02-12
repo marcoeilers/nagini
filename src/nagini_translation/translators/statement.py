@@ -85,8 +85,9 @@ class StatementTranslator(CommonTranslator):
 
         # We add a terminating section on every ghost statement. 
         # For statements containing blocks of code (e.g. if), we do not add more terminating sections within
-        start_terminating_block = node.is_ghost and not self.in_terminating_block
-        end_terminating_block = node.is_ghost and not self.in_terminating_block
+        is_node_ghost = node.is_ghost if hasattr(node, 'is_ghost') else False
+        start_terminating_block = is_node_ghost and not self.in_terminating_block
+        end_terminating_block = is_node_ghost and not self.in_terminating_block
 
         res = []
 

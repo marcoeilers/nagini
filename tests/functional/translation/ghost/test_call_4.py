@@ -4,8 +4,6 @@
 from nagini_contracts.contracts import *
 from typing import Tuple
 
-GInt = int
-MarkGhost(GInt)
 
 def reg_calls(gi: GInt) -> None:
     #:: ExpectedOutput(invalid.program:invalid.ghost.assign)

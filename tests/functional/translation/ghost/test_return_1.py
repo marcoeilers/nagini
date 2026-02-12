@@ -4,8 +4,6 @@
 from nagini_contracts.contracts import *
 from typing import Tuple
 
-GInt = int
-MarkGhost(GInt)
 
 def foo(i: int, gi: GInt) -> Tuple[int, GInt]:
     return i, gi

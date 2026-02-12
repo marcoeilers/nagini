@@ -105,7 +105,7 @@ class GhostChecker(ast.NodeVisitor):
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         decorators = {d.id for d in node.decorator_list if isinstance(d, ast.Name)}
         if any([dec in IGNORE_DECORATORS for dec in decorators]):
-            is_func_ghost = 'Ghost' in decorators
+            is_func_ghost = 'Ghost' in decorators or 'Predicate' in decorators
             node.is_ghost = is_func_ghost
             node.contains_ghost = True
             return
@@ -149,6 +149,11 @@ class GhostChecker(ast.NodeVisitor):
                 else:
                     arg.is_ghost = False
             
+            # Each default value must be an allowed assignment
+            for param in current_function.args.values():
+                if param.default is not None and not self.is_assignable(param.default, param):
+                    raise InvalidProgramException(node, 'invalid.ghost.default')
+
             # Variadic arguments must be regular
             for arg in [node.args.vararg, node.args.kwarg]:
                 if arg is not None and arg.annotation is not None and self.check_annotation(arg.annotation):
@@ -278,7 +283,7 @@ class GhostChecker(ast.NodeVisitor):
         if is_node_definitively_ghost:
             self.in_ghost_ctx = old_ctx
 
-        is_node_ghost = is_node_definitively_ghost or (is_target_ghost and node.value.is_pure)
+        is_node_ghost = is_node_definitively_ghost or (is_target_ghost and self.is_ghost(node.value))
         node.is_ghost = is_node_ghost
         self.set_contains_ghost(node, is_node_ghost, node.value, node.target)
 
@@ -301,7 +306,7 @@ class GhostChecker(ast.NodeVisitor):
         if is_node_definitively_ghost:
             self.in_ghost_ctx = old_ctx
 
-        is_node_ghost = is_node_definitively_ghost or (is_target_ghost and node.value.is_pure)
+        is_node_ghost = is_node_definitively_ghost or (is_target_ghost and self.is_ghost(node.value))
         node.is_ghost = is_node_ghost
         self.set_contains_ghost(node, is_node_ghost, node.value, node.target)
 
@@ -594,9 +599,16 @@ class GhostChecker(ast.NodeVisitor):
         if called_func is None:
             called_func = self.get_target(call.func, self.ctx)
 
-        if isinstance(called_func, PythonClass):
-            # Instantiation of the class: We resolve it as a call to __init__
-            curr_cls = called_func
+        if isinstance(called_func, (PythonClass, PythonVarBase)):
+            if isinstance(called_func, PythonVarBase):
+                # Function stored in var is called. 
+                # Currently, this should only be calling classmethod's cls element
+                curr_cls = self.ctx.current_class
+            else:
+                # Instantiation of the class
+                curr_cls = called_func
+
+            # We resolve this as a call to __init__
             while curr_cls is not None:
                 if curr_cls.name == OBJECT_TYPE:
                     # Empty object init
@@ -611,8 +623,6 @@ class GhostChecker(ast.NodeVisitor):
                 else:
                     called_func = init
                     break
-        elif isinstance(called_func, PythonVarBase):
-            pass #TODO: Function stored in var is called, e.g. calling classmethod's cls element
 
         if not isinstance(called_func, PythonMethod):
             raise InvalidProgramException(call, 'invalid.ghost.call', f"Couldn't correctly resolve function {func_name}")
@@ -710,14 +720,26 @@ class GhostChecker(ast.NodeVisitor):
             return True
         fst = funcs[0]
         is_fst_ghost = self.is_ghost(fst)
-        # is_fst_return_ghost = is_fst_ghost or self.check_annotation(fst.node.returns)
-        for idx in range(1, len(funcs)):
-            next_func = funcs[idx]
+        fst_returns = fst.node.returns
+        is_fst_return_ghost = is_fst_ghost or self.check_annotation(fst_returns)
+        for next_func in funcs[1:]:
+            # Compare ghost type and args of funcs
             if is_fst_ghost != self.is_ghost(next_func) or len(fst.args) != len(next_func.args):
                 return False
             for fst_arg, next_arg in zip(fst.args, next_func.args):
-                pass #TODO
-            #TODO: Return types
+                if self.is_ghost(fst_arg) != self.is_ghost(next_arg):
+                    return False
+            
+            # Compare returns of funcs
+            next_returns = next_func.node.returns
+            if not is_fst_ghost:
+                if isinstance(fst_returns, ast.Tuple) and len(fst_returns.elts) == 2:
+                    for fst_ret, next_ret in zip(fst_returns.elts, next_returns.elts):
+                        if self.check_annotation(fst_ret) != self.check_annotation(next_ret):
+                            return False
+                elif (is_fst_return_ghost != self.check_annotation(next_returns)):
+                    return False
+
         return True
 
     def _check_ghost_func(self, call: ast.Call) -> Tuple[bool, Optional[annotation_t]]:
@@ -791,6 +813,11 @@ class GhostChecker(ast.NodeVisitor):
             items = [expr.operand]
             res = self.is_ghost(expr.operand)
         elif isinstance(expr, ast.Lambda):
+            old_ctx = self.in_ghost_ctx
+            self.in_ghost_ctx = True
+            self.check_for_call(expr.value)
+            self.in_ghost_ctx = old_ctx
+
             items = []
             res = True        
         elif isinstance(expr, ast.IfExp):
@@ -899,7 +926,7 @@ class GhostChecker(ast.NodeVisitor):
             return False
 
         is_fst_ghost = self.is_ghost(elems[0])
-        for e in elems:
+        for e in elems[1:]:
             if self.is_ghost(e) != is_fst_ghost:
                 return True
         return False

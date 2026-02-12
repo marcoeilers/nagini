@@ -5,7 +5,7 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 import ast
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from nagini_translation.lib.program_nodes import PythonModule
 from nagini_translation.ghost.ghost_checker import TRANSPARENT_CALLS, NAGINI_DECORATORS
@@ -66,23 +66,14 @@ class ProgramExtractor:
         
         # Remove ghost args
         args = node.args
-        new_posonly: list[ast.arg] = []
-        for posonly in args.posonlyargs:
-            if not posonly.is_ghost:
-                new_posonly.append(posonly)
+        new_posonly = self._extract_args_or_defaults(args.posonlyargs)
+        new_args = self._extract_args_or_defaults(args.args)
+        new_kwonly = self._extract_args_or_defaults(args.kwonlyargs)
+        new_kw_defaults = self._extract_args_or_defaults(args.kw_defaults)
+        new_defaults = self._extract_args_or_defaults(args.defaults)
 
-        new_args: list[ast.arg] = []
-        for arg in args.args:
-            if not arg.is_ghost:
-                new_args.append(arg)
-
-        new_kwonly: list[ast.arg] = []
-        for kwonly in args.kwonlyargs:
-            if not kwonly.is_ghost:
-                new_kwonly.append(kwonly)
-
-        new_args = ast.arguments(new_posonly, new_args, args.vararg, new_kwonly, 
-                                 args.kw_defaults, args.kwarg, args.defaults) #TODO: Defaults
+        new_arguments = ast.arguments(new_posonly, new_args, args.vararg, new_kwonly, 
+                                 new_kw_defaults, args.kwarg, new_defaults)
 
         # Extract each stmt
         new_body = self._extract_body(node.body, ast.Pass())
@@ -98,7 +89,7 @@ class ProgramExtractor:
         else:
             new_returns = node.returns
         
-        return ast.FunctionDef(node.name, new_args, new_body, new_decorator_list, new_returns)
+        return ast.FunctionDef(node.name, new_arguments, new_body, new_decorator_list, new_returns)
 
     def extract_Assign(self, node: ast.Assign) -> ast.AST:
         new_targets: List[ast.expr] = []
@@ -220,3 +211,10 @@ class ProgramExtractor:
     
     def _extract_decorators(self, decorator_list: List[ast.expr]) -> List[ast.expr]:
         return [d for d in decorator_list if not (isinstance(d, ast.Name) and d.id in NAGINI_DECORATORS)]
+    
+    def _extract_args_or_defaults(self, args: List[Union[ast.arg, ast.expr]]) -> List[Union[ast.arg, ast.expr]]:
+        new_args: list[ast.arg | ast.expr] = []
+        for arg in args:
+            if not arg.is_ghost:
+                new_args.append(arg)
+        return new_args

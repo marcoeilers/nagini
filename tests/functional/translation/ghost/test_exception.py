@@ -3,10 +3,7 @@
 
 from nagini_contracts.contracts import *
 
-GInt = int
-MarkGhost(GInt)
 
-@Ghost
 def main(gi: GInt) -> None:
     if gi < 0:
         #:: ExpectedOutput(invalid.program:invalid.ghost.raise)

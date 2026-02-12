@@ -3,8 +3,6 @@
 
 from nagini_contracts.contracts import *
 
-GInt = int
-MarkGhost(GInt)
 
 def reg_calls(gi: GInt) -> None:
     #:: ExpectedOutput(invalid.program:invalid.ghost.call)

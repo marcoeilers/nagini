@@ -4,8 +4,6 @@
 from nagini_contracts.contracts import *
 from typing import List
 
-GInt = int
-MarkGhost(GInt)
 
 def main(gi: GInt, g_lst: List[GInt]) -> None:
     #:: ExpectedOutput(invalid.program:invalid.ghost.assign)

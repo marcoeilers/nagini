@@ -3,8 +3,6 @@
 
 from nagini_contracts.contracts import *
 
-GInt = int
-MarkGhost(GInt)
 
 #:: ExpectedOutput(invalid.program:invalid.ghost.annotation)
 def main(i: int, gi: GInt, *args: GInt) -> None:

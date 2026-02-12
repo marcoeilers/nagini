@@ -3,8 +3,6 @@
 
 from nagini_contracts.contracts import *
 
-GInt = int
-MarkGhost(GInt)
 
 @Ghost
 def ghost_calls(gi: int) -> None:

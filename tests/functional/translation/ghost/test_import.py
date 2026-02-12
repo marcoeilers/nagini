@@ -3,17 +3,15 @@
 
 from nagini_contracts.contracts import *
 
-from resources.test_ghost_import_file import GBool as ImportedGBool, ghost_func
+from resources.test_ghost_import_file import GBoolList as ImportedGBoolList, ghost_func
 import resources.test_ghost_import_file as ghost_import
 
-GBool = bool
-MarkGhost(GBool)
 
-def imported_alias(b: GBool) -> ImportedGBool:
-    return b
+def imported_alias(b: GBool) -> ImportedGBoolList:
+    return [b]
 
-def other_alias_import(b: GBool) -> ghost_import.GBool:
-    return b
+def other_alias_import(b: GBool) -> ghost_import.GBoolList:
+    return [b]
 
 @Ghost
 def imported_func() -> None:

@@ -4,8 +4,6 @@
 from nagini_contracts.contracts import *
 from typing import Union, Optional
 
-GStr = str
-MarkGhost(GStr)
 
 #:: ExpectedOutput(invalid.program:invalid.ghost.annotation)
 def main() -> Union[Optional[GStr], Union[int, str]]:

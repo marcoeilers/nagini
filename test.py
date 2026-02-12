@@ -1,8 +1,6 @@
 from typing import Tuple, Union, Optional, List, Dict
 from nagini_contracts.contracts import *
 
-GInt = int
-MarkGhost(GInt)
 GintList = List[GInt]
 MarkGhost(GintList)
 
@@ -111,12 +109,12 @@ class RegClass:         # OK
         
         strlst = "one two".split(" ")   # OK
 
-def futureRef() -> 'GStr':
-    gstr: GStr = "Valid"
+def futureRef() -> 'GStrList':
+    gstr: GStrList = ["Valid"]
     return gstr         # OK
 
-GStr = str
-MarkGhost(GStr)
+GStrList = List[str]
+MarkGhost(GStrList)
 
 # def returnAnn() -> Union[Optional[GStr], Union[int, str]]: # Throw invalid.ghost.annotation
     # return 0
@@ -210,6 +208,9 @@ def comprehensions(lst: List[int]) -> None:
 
     # newLst = [ghost_simple3(item) for item in lst]    # Throw invalid.ghost.assign
 
+def defaults(i: int, j: int = 1, gi: GInt = 2, *, kw: str = 'reg') -> None:
+    pass
+
 @Ghost
 def foo(gi: int) -> int:                # OK
     gh_cls = GhostClass()
@@ -269,17 +270,15 @@ class SubClass(GhostClass):
 
 # --Test Importing--
 
-from z_import_test.import_test import GBool as ImportedGBool, ghost_func
+from z_import_test.import_test import GBoolList as ImportedGBoolList, ghost_func
 import z_import_test.import_test as imp_test
 
-GBool = bool
-MarkGhost(GBool)
 
-def imports(b:GBool) -> ImportedGBool:
-    return b        # OK
+def imported_alias(b: GBool) -> ImportedGBoolList:
+    return [b]          # OK
 
-def imports2(b:GBool) -> imp_test.GBool:
-    return b          # OK
+def other_alias_import(b: GBool) -> imp_test.GBoolList:
+    return [b]          # OK
 
 @Ghost
 def imported_func() -> None:

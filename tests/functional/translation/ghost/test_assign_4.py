@@ -4,14 +4,11 @@
 from nagini_contracts.contracts import *
 from typing import List, Tuple
 
-GInt = int
-MarkGhost(GInt)
 
 def main(g_lst: List[GInt]) -> None:
     gi: GInt = 0
-    gk: GInt = 0
     #:: ExpectedOutput(invalid.program:invalid.ghost.assign)
-    (i, g_lst[0]), (gi,gk) = reg_mixed_return()
+    (i, j), (gi, g_lst[0]) = reg_mixed_return()
 
 def reg_mixed_return() -> Tuple[Tuple[int, int], Tuple[GInt, GInt]]:
     pass
