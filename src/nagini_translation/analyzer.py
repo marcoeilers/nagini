@@ -1235,8 +1235,8 @@ class Analyzer(ast.NodeVisitor):
                     raise UnsupportedException(assign, msg)
                 
                 if assign.value != None:
-                    if not isinstance(assign.value, ast.Constant):
-                        raise UnsupportedException(assign, 'Only constants allowed for datafield default value')
+                    if not isinstance(assign.value, (ast.Constant, ast.Attribute)):
+                        raise UnsupportedException(assign, 'Illegal default value for datafield creation')
                     
                     # Temporarily set value, because it will be used as default
                     self.current_class.fields[node.id].result = assign.value

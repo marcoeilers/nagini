@@ -1,6 +1,7 @@
 # Any copyright is dedicated to the Public Domain.
 # http://creativecommons.org/publicdomain/zero/1.0/
 
+from enum import IntEnum
 from nagini_contracts.contracts import *
 from dataclasses import dataclass
 
@@ -13,7 +14,17 @@ class A:
 class B:
     num: int
     my_field: int = 5
-    
+
+class Color_Enum(IntEnum):
+    red = 0
+    green = 1
+    blue = 2
+    yellow = 3
+
+@dataclass(frozen=True)
+class C:
+    color: Color_Enum = Color_Enum.green
+
 def test_default_vals1() -> None:
     a = A()
     
@@ -33,3 +44,14 @@ def test_default_vals2(val: int) -> None:
     
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert b2.my_field == 5
+
+def test_default_val_enum() -> None:
+    c = C()
+
+    assert c.color == Color_Enum.green
+    
+    c2 = C(Color_Enum.yellow)
+    assert c2.color == Color_Enum.yellow
+
+    # :: ExpectedOutput(assert.failed:assertion.false)
+    assert c.color == c2.color
