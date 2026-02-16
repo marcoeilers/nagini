@@ -88,3 +88,14 @@ def test_list_interop(b_array: bytearray) -> None:
     byteseq = ToByteSeq(l)
     
     assert byteseq_direct == byteseq
+
+def test_list_interop2(b_list: List[int]) -> None:
+    Requires(list_pred(b_list))
+    Requires(Forall(b_list, lambda el: 0 <= el and el < 256))
+
+    byteseq_direct = ToByteSeq(b_list)
+
+    b_array = bytearray(b_list)
+    byteseq = ToByteSeq(b_array)
+
+    assert byteseq_direct == byteseq
