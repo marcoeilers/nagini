@@ -49,6 +49,9 @@ def test_contraints(f: flag) -> None:
     assert 0 <= f
     assert f <= 1
 
+    assert 0 <= int(f)
+    assert int(f) <= 1
+
 def test_contraints2(f: flag2) -> None:
     assert f == 0 or f == 2
 

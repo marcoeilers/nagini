@@ -142,6 +142,10 @@ class CallTranslator(CommonTranslator):
         assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
         arg_type = self.get_type(node.args[0], ctx)
+        if arg_type.enum and arg_type.enum_type == INT_TYPE:
+            unboxed = self.to_int(target, ctx, arg_type)
+            boxed = self.to_ref(unboxed, ctx)
+            return stmt, boxed
         str_stmt, str_val = self.get_func_or_method_call(arg_type, '__int__', [target],
                                                          [None], node, ctx)
         return stmt + str_stmt, str_val
