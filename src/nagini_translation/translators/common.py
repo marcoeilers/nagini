@@ -193,8 +193,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         """
         Converts the given expression to an expression of the Silver type Int
         if it isn't already, either by unboxing a reference or undoing a
-        previous boxing operation. When python_type is an enum, uses the
-        enum-specific unbox function to preserve value range information.
+        previous boxing operation.
         """
         # Avoid wrapping non-pure expressions (leads to errors within Silver's
         # Consistency object)
