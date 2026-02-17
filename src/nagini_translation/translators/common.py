@@ -208,7 +208,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return e.args().head()
         result = e
         if python_type and python_type.python_class.enum and python_type.python_class.enum_type == INT_TYPE:
-            unbox_name = python_type.sil_name + '__unbox__'
+            unbox_name = python_type.python_class.functions['__int__'].sil_name
             result = self.viper.FuncApp(unbox_name, [result],
                                         e.pos(), self.no_info(ctx),
                                         self.viper.Int)

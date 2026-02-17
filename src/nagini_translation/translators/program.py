@@ -24,6 +24,7 @@ from nagini_translation.lib.constants import (
     MAY_SET_PRED,
     METHOD_ID_DOMAIN,
     NAME_DOMAIN,
+    PRIMITIVE_INT_TYPE,
     PRIMITIVES,
     RESULT_NAME,
     THREAD_DOMAIN,
@@ -1170,15 +1171,31 @@ class ProgramTranslator(CommonTranslator):
 
         return domains, functions
 
+    def _register_enum_int_function(self, enum: PythonClass, ctx: Context, suffix: str) -> PythonMethod:
+        """Register __int__ as an interface function on the enum class."""
+        int_func = enum.node_factory.create_python_method(
+            suffix, None, enum, enum, True, False, enum.node_factory,
+            interface=True, interface_dict={'args': [enum.name], 'type': PRIMITIVE_INT_TYPE})
+        arg = enum.node_factory.create_python_var('self', None, enum)
+        int_func.add_arg('self', arg)
+        int_func.type = ctx.module.global_module.classes[PRIMITIVE_INT_TYPE]
+        sil_name = enum.get_fresh_name(enum.name + suffix)
+        int_func.process(sil_name, self.translator)
+        enum.functions[suffix] = int_func
+        return int_func
+
     def _create_enum_func_box_and_unbox(self, enum: PythonClass, ctx: Context) -> list[Function]:
-        """Create __box__ and __unbox__ functions for IntEnum. Other enum types currently not supported."""
-        
+        """Create __box__ and __int__ functions for IntEnum. Other enum types currently not supported."""
+
         pos = self.to_position(enum, ctx)
         info = self.no_info(ctx)
         terminates_wildcard = self.viper.DecreasesWildcard(None, pos, info)
-        
-        box_func_name = enum.sil_name + '__box__'
-        unbox_func_name = enum.sil_name + '__unbox__'
+
+        box_func_suffix = '__box__'
+        box_func_name = enum.sil_name + box_func_suffix
+        unbox_func_suffix = '__int__'
+        int_func = self._register_enum_int_function(enum, ctx, unbox_func_suffix)
+        unbox_func_name = int_func.sil_name
 
         # Create box function (Int -> Ref)
         int_val_use = self.viper.LocalVar('value', self.viper.Int, pos, info)
