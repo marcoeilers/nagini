@@ -590,10 +590,10 @@ class Analyzer(ast.NodeVisitor):
             cls.enum_type = INT_TYPE
         if self.is_dataclass(node):
             cls.dataclass = True
-        if self.is_frozen_dataclass(node):
-            cls.frozen = True
-        if cls.dataclass and not cls.frozen:
-            raise UnsupportedException(node, 'Non frozen dataclass currently not supported')
+            if self.is_frozen_dataclass(node):
+                cls.frozen = True
+            else:
+                raise UnsupportedException(node, 'Non frozen dataclass currently not supported')
         for kw in node.keywords:
             if kw.arg == 'metaclass' and isinstance(kw.value, ast.Name) and kw.value.id == 'ABCMeta':
                 continue
@@ -1729,9 +1729,6 @@ class Analyzer(ast.NodeVisitor):
                 (('dataclass' not in decorators) and (len(decorators) > 0))
                 )
 
-    def _class_unsupported_decorator_keywords(self, decorator: str, keyword: str) -> bool:
-        return ((('dataclass' == decorator) and (keyword != 'frozen')))
-
     def _function_incompatible_decorators(self, decorators) -> bool:
         return ((('Predicate' in decorators) and ('Pure' in decorators)) or
                 (('Opaque' in decorators) and ('Pure' not in decorators)) or
@@ -1790,10 +1787,7 @@ class Analyzer(ast.NodeVisitor):
     def __decorator_has_keyword_value(self, decorator_list: list[ast.expr], decorator: str, keyword: str, value) -> bool:
         for d in decorator_list:
             if isinstance(d, ast.Call) and isinstance(d.func, ast.Name) and d.func.id == decorator:
-                for k in d.keywords:
-                    if self._class_unsupported_decorator_keywords(decorator, k.arg):
-                        raise UnsupportedException(d, "keyword unsupported")
-                    
+                for k in d.keywords:                    
                     if k.arg == keyword and isinstance(k.value, ast.Constant):
                         return k.value.value == value
         return False
@@ -1805,8 +1799,20 @@ class Analyzer(ast.NodeVisitor):
         return decorator in decorators
 
     def is_dataclass(self, cls: ast.ClassDef) -> bool:
-        return self.class_has_decorator(cls, 'dataclass')
+        is_dataclass = self.class_has_decorator(cls, 'dataclass')
+        if is_dataclass:
+            self._dataclass_check_unsupported_keywords(cls)
+        return is_dataclass
     
+    def _dataclass_check_unsupported_keywords(self, cls: ast.ClassDef) -> None:
+        decorator = [d for d in cls.decorator_list if self.__resolve_decorator(d)[1] == 'dataclass'][0]
+        assert isinstance(decorator, ast.Call) and isinstance(decorator.func, ast.Name)
+        supported_keywords = ["frozen"]
+
+        for k in decorator.keywords:
+            if not k.arg in supported_keywords:
+                raise UnsupportedException(decorator, "keyword unsupported")
+
     def is_frozen_dataclass(self, cls: ast.ClassDef) -> bool:
         return self.__decorator_has_keyword_value(cls.decorator_list, 'dataclass', 'frozen', True)
 
