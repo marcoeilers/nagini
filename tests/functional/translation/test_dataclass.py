@@ -18,6 +18,10 @@ class A:
 class B:
     num: int = 2
 
+@dataclass() #:: ExpectedOutput(unsupported:Non frozen dataclass currently not supported)
+class NonFrozen:
+    data: int
+
 def test_cons() -> None:
     f1 = foo(1, "hello", [])
 
