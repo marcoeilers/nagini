@@ -409,6 +409,27 @@ class CallTranslator(CommonTranslator):
             stmts.append(self.viper.Inhale(seq_equal, position, info))
         return stmts, result_var
 
+    def _translate_default_factory(self, arg, node: ast.AST,
+                                   ctx: Context) -> Tuple[List, Expr, PythonType]:
+        """Translates a default_factory for a dataclass field argument."""
+        if arg.default_factory == 'list':
+            list_class = ctx.module.global_module.classes[LIST_TYPE]
+            res_var = ctx.current_function.create_variable('list',
+                                                           list_class,
+                                                           self.translator)
+            targets = [res_var.ref()]
+            constr_call = self.get_method_call(list_class, '__init__', [],
+                                               [], targets, node, ctx)
+            stmts = list(constr_call)
+            position = self.to_position(node, ctx)
+            result = res_var.ref(node, ctx)
+            stmts.append(self.viper.Inhale(
+                self.type_check(result, arg.type, position, ctx),
+                position, self.no_info(ctx)))
+            return stmts, result, arg.type
+        raise UnsupportedException(node,
+            'Unsupported default_factory: ' + str(arg.default_factory))
+
     def _translate_set(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         contents = None
         stmts = []
@@ -916,9 +937,16 @@ class CallTranslator(CommonTranslator):
         for index, (arg, key) in enumerate(zip(args, keys)):
             if arg is False:
                 # Not set yet, need default
-                args[index] = target.args[key].default_expr
-                assert args[index], '{} arg={}'.format(target.name, key)
-                arg_types[index] = self.get_type(target.args[key].default, ctx)
+                if target.args[key].default_factory:
+                    factory_stmts, factory_expr, factory_type = \
+                        self._translate_default_factory(target.args[key], node, ctx)
+                    arg_stmts += factory_stmts
+                    args[index] = factory_expr
+                    arg_types[index] = factory_type
+                else:
+                    args[index] = target.args[key].default_expr
+                    assert args[index], '{} arg={}'.format(target.name, key)
+                    arg_types[index] = self.get_type(target.args[key].default, ctx)
 
         if target.var_arg:
             var_arg_list = self.create_tuple(var_args, var_arg_types, node, ctx)

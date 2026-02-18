@@ -615,31 +615,38 @@ class Analyzer(ast.NodeVisitor):
         args: list[ast.arg] = []
         defaults: list[ast.expr] = []
         stmts: list[ast.stmt] = []
-        
+
         # Parse fields, add implicit args and post conditions
         args.append(self._create_arg_ast(node, 'self', None))
         for name, field in self.current_class.fields.items():
             args.append(self._create_arg_ast(node, name, field.type.name))
-            stmts.append(self._create_comp_postcondition(node, 
-                            ast.Attribute(self._create_name_ast('self', node), name, ast.Load(), lineno=node.lineno, col_offset=0), 
+            stmts.append(self._create_comp_postcondition(node,
+                            ast.Attribute(self._create_name_ast('self', node), name, ast.Load(), lineno=node.lineno, col_offset=0),
                             self._create_name_ast(name, node), ast.Is()))
             if field.result != None:
                 defaults.append(field.result)
                 field.result = None
-            
+
         ast_arguments = ast.arguments([], args, None, [], [], None, defaults)
 
         # Could add implicit field assignments for non-frozen dataclass
-        
+
         # Add decorators
         decorator_list: list[ast.expr] = [self._create_name_ast('ContractOnly', node)]
-        
+
         function_def = ast.FunctionDef('__init__', ast_arguments, stmts, decorator_list, returns=None, lineno=node.lineno, col_offset=0)
         self.visit(function_def, node)
+
+        # Propagate default_factory info to the method args
+        method = self.current_class.methods['__init__']
+        for name, field in self.current_class.fields.items():
+            if getattr(field, 'default_factory', None):
+                method.args[name].default_factory = field.default_factory
+
         node.body.append(function_def)
         self.current_class.implicit_init = True
         return
-        
+
     def _create_arg_ast(self, node, arg: str, type_name: Optional[str] = None) -> ast.arg:
         name_node = None
         if type_name != None:
@@ -1209,6 +1216,25 @@ class Analyzer(ast.NodeVisitor):
                 if isinstance(node.ctx, ast.Load):
                     return
 
+                assign = node._parent
+                if isinstance(assign, ast.Assign):
+                    if not len(assign.targets) == 1:
+                        raise UnsupportedException(assign,
+                            'only simple assignments allowed for dataclass fields')
+                    if (isinstance(assign.value, ast.Call)
+                            and isinstance(assign.value.func, ast.Name)
+                            and assign.value.func.id == 'field'):
+                        raise UnsupportedException(assign,
+                            'field() requires a type annotation')
+                    # Infer type from value
+                    annotation = self._create_name_ast(self.typeof(node).name, node)
+                elif isinstance(assign, ast.AnnAssign) and assign.simple == 1:
+                    annotation = assign.annotation
+                else:
+                    msg = ('only simple assignments and reads allowed for '
+                            'dataclass fields')
+                    raise UnsupportedException(assign, msg)
+
                 # Add type info for self in this context, can retrieve the correct type from __init__.self
                 prefix = self.module.type_prefix.split('.') if self.module.type_prefix else []
                 prefix.extend([self.current_class.name, node.id, 'self'])
@@ -1220,27 +1246,37 @@ class Analyzer(ast.NodeVisitor):
                 ast_arguments = ast.arguments([], [self._create_arg_ast(node, 'self', None)], None, [], [], None, [])
                 stmts = [ast.Expr(ast.Call(self._create_name_ast('Decreases', node), [ast.Constant(None)], []))]
                 decorator_list: list[ast.expr] = [ast.Name('property'), ast.Name('ContractOnly')]
-                function_def = ast.FunctionDef(node.id, ast_arguments, stmts, decorator_list, returns=node._parent.annotation, lineno=node.lineno, col_offset=0)
+                function_def = ast.FunctionDef(node.id, ast_arguments, stmts, decorator_list, returns=annotation, lineno=node.lineno, col_offset=0)
                 self.visit(function_def, self.current_class.node)
-                
+
                 # Adjust the class body
-                assign = node._parent
                 self.current_class.node.body.remove(assign)
                 self.current_class.node.body.append(function_def)
-                
-                if not ((isinstance(assign, ast.Assign) and len(assign.targets) == 1) or
-                        (isinstance(assign, ast.AnnAssign) and assign.simple == 1)):
-                    msg = ('only simple assignments and reads allowed for '
-                            'dataclass fields')
-                    raise UnsupportedException(assign, msg)
-                
-                if assign.value != None:
-                    if not isinstance(assign.value, (ast.Constant, ast.Attribute)):
-                        raise UnsupportedException(assign, 'Illegal default value for datafield creation')
-                    
-                    # Temporarily set value, because it will be used as default
-                    self.current_class.fields[node.id].result = assign.value
 
+                if assign.value != None:
+                    field_obj = self.current_class.fields[node.id]
+                    if (isinstance(assign.value, ast.Call)
+                            and isinstance(assign.value.func, ast.Name)
+                            and assign.value.func.id == 'field'):
+                        # Handle dataclasses.field(default_factory=...)
+                        factory = None
+                        for kw in assign.value.keywords:
+                            if kw.arg == 'default_factory':
+                                factory = kw.value
+                            else:
+                                raise UnsupportedException(assign, 'unsupported keyword')
+                        if factory is None:
+                            raise UnsupportedException(assign,
+                                'field() without default_factory not supported')
+                        # Use None as sentinel default
+                        field_obj.result = ast.Constant(None,
+                            lineno=node.lineno, col_offset=0)
+                        field_obj.default_factory = factory.id
+                    elif not isinstance(assign.value, (ast.Constant, ast.Attribute)):
+                        raise UnsupportedException(assign, 'Illegal default value for datafield creation')
+                    else:
+                        # Temporarily set value, because it will be used as default
+                        field_obj.result = assign.value
                 return
             elif self.current_class.superclass.name == "IntEnum":
                 # Node is an enum member. Basically a static field that returns an instance of the enum instead

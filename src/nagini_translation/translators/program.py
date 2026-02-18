@@ -447,7 +447,7 @@ class ProgramTranslator(CommonTranslator):
                 if type and not type.python_class.interface and not type.contains_type_var():
                     definition_deps.add((arg.node.annotation, type.python_class,
                                          method.module))
-            if arg.default:
+            if arg.default and not arg.default_factory:
                 stmt, expr = self.translate_expr(arg.default, ctx)
                 if not stmt and expr:
                     arg.default_expr = expr

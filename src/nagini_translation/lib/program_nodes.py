@@ -1601,6 +1601,7 @@ class PythonVarBase(PythonNode):
         self.alt_types = {}
         self.default = None
         self.default_expr = None
+        self.default_factory = None
         self.show_in_ce = True
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
