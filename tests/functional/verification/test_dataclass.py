@@ -2,7 +2,7 @@
 # http://creativecommons.org/publicdomain/zero/1.0/
 
 from nagini_contracts.contracts import *
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 @dataclass(frozen=True)
 class A:
@@ -35,6 +35,10 @@ class D:
     value: int
     length: int
     text: str
+
+@dataclass(frozen=True)
+class ListClass:
+    arr: list[int] = field(default_factory=list)
 
 def test_1(val: int) -> None:
     a = A(val)
@@ -91,3 +95,20 @@ def test_eq_2(a1: A, a2: A) -> None:
     else:
         #:: ExpectedOutput(assert.failed:assertion.false)
         assert b1 == b3
+
+def test_list_ref() -> None:
+    l = [1,2,3]
+    f = ListClass(l)
+
+    l.append(4)
+    assert len(f.arr) == 4
+    assert ToSeq(f.arr) == PSeq(1,2,3,4)
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert f.arr[0] == 5
+
+def test_list_conditions(l: list[int]) -> None:
+    Requires(list_pred(l))
+    Requires(Forall(l, lambda i: 0 <= i and i < 10))
+
+    f = ListClass(l)
+    assert Forall(f.arr, lambda i: 0 <= i and i < 10)
