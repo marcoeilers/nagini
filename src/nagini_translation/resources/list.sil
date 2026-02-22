@@ -144,7 +144,16 @@ function list___eq__(self: Ref, other: Ref): Bool
     requires issubtype(typeof(other), list(list_arg(typeof(other), 0)))
     requires acc(self.list_acc, wildcard)
     requires acc(other.list_acc, wildcard)
-    ensures result == (self.list_acc == other.list_acc)
+    ensures result <==>
+            (list___len__(self) == list___len__(other) &&
+             (forall i: Int :: {self.list_acc[i]} {other.list_acc[i]}
+                               i >= 0 && i < list___len__(self)
+                                ==> object___eq__(self.list_acc[i], other.list_acc[i])))
+    ensures result <==>
+            (list___len__(self) == list___len__(other) &&
+             (forall i: Ref :: {list___getitem__(self, i)} {list___getitem__(other, i)}
+                               issubtype(typeof(i), int()) && int___unbox__(i) >= 0 && int___unbox__(i) < list___len__(self)
+                                ==> object___eq__(list___getitem__(self, i), list___getitem__(other, i))))
 
 function list___sil_seq__(self: Ref): Seq[Ref]
     decreases _

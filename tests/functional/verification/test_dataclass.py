@@ -112,3 +112,21 @@ def test_list_conditions(l: list[int]) -> None:
 
     f = ListClass(l)
     assert Forall(f.arr, lambda i: 0 <= i and i < 10)
+
+def test_list_eq(left: ListClass, right: ListClass) -> None:
+    Requires(list_pred(left.arr))
+    Requires(list_pred(right.arr))
+    Requires(len(left.arr) == len(right.arr))
+
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert left.arr == right.arr
+
+def test_list_eq_elements(left: ListClass, right: ListClass) -> None:
+    Requires(list_pred(left.arr))
+    Requires(list_pred(right.arr))
+    Requires(len(left.arr) == len(right.arr))
+    Requires(Forall(int, lambda i: Implies(0 <= i and i < len(left.arr), left.arr[i] == right.arr[i])))
+
+    assert left.arr == right.arr
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert left.arr is right.arr
