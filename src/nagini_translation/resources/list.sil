@@ -138,6 +138,14 @@ method list___iter__(self: Ref) returns (_res: Ref)
   inhale false
 }
 
+function list___eq__(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires issubtype(typeof(other), list(list_arg(typeof(other), 0)))
+    requires acc(self.list_acc, wildcard)
+    requires acc(other.list_acc, wildcard)
+    ensures result == (self.list_acc == other.list_acc)
+
 function list___sil_seq__(self: Ref): Seq[Ref]
     decreases _
     requires acc(self.list_acc, wildcard)

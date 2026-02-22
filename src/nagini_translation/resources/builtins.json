@@ -103,6 +103,10 @@
         "__sil_seq__": {
             "args": ["list"],
             "type": "__prim__Seq"
+        },
+        "__eq__": {
+            "args": ["list", "object"],
+            "type": "__prim__bool"
         }
     },
     "type_vars": 1,

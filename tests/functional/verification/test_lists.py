@@ -152,3 +152,22 @@ def test_mul() -> None:
     assert newlist[5] is super2
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert mylist[1] is super1
+
+def test_eq1() -> None:
+    l1: list[int] = [1,2,3]
+    l2: list[int] = [1,2,3]
+
+    assert l1 == l2
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert l1 is l2
+
+def test_eq2() -> None:
+    l1: list[int] = [1,2]
+    l2: list[int] = [1,2,3]
+
+    assert l1 != l2
+    l1.append(3)
+    assert l1 == l2
+    l2.append(4)
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert l1 == l2
