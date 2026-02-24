@@ -667,7 +667,7 @@ class ContractTranslator(CommonTranslator):
             result = self.type_check(ref_var, dom_target, pos, ctx, False)
             # Not recommended as a trigger, since it's very broad and will get triggered
             # a lot.
-            return [], result, False
+            return [], result, result, False
         dom_stmt, domain = self.translate_expr(domain_node, ctx)
         dom_type = self.get_type(domain_node, ctx)
         result_trigger, result_lhs = self.get_quantifier_lhs(ref_var, dom_type, domain, domain_node, ctx, pos,
@@ -984,7 +984,7 @@ class ContractTranslator(CommonTranslator):
             raise InvalidProgramException(node, 'purity.violated')
 
 
-        dom_stmt, lhs, always_use = self._create_quantifier_contains_expr(var.ref(),
+        dom_stmt, lhs, _, always_use = self._create_quantifier_contains_expr(var.ref(),
                                                                           domain_node,
                                                                           ctx)
         if dom_stmt:
