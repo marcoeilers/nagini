@@ -649,6 +649,9 @@ class ContractTranslator(CommonTranslator):
         """
         Creates the left hand side of the implication in a quantifier
         expression, which says that e is an element of the given domain.
+        The two expressions are 1) a version of the contains expression well-suited
+        to be a trigger, and 2) one well-suited to be the left hand side of
+        a body implication (see https://github.com/marcoeilers/nagini/pull/289).
         The last return value specifies if the returned expression is
         recommended to be used as a trigger.
         """

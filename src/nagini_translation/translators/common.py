@@ -565,7 +565,9 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         forall x: <quantifier_lhs> ==> e
         Defaults to in_expr in type___sil_seq__, but used simpler expressions for known
         types to improve performance/triggering.
-        Returns (trigger_lhs, body_lhs).
+        Returns two expressions (trigger_lhs, body_lhs), where trigger_lhs is well-suited
+        to be a trigger and body_lhs is well suited to be the the lhs of an implication
+        inside a quantifier (see https://github.com/marcoeilers/nagini/pull/289).
         """
         position = position if position else self.to_position(node, ctx)
         info = self.no_info(ctx)
@@ -608,6 +610,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         Returns a sequence (Viper type Seq[Ref]) representing the contents of arg.
         Defaults to type___sil_seq__, but used simpler expressions for known types
         to improve performance/triggering.
+        Returns two versions, one well-suited for use in a trigger, one just a
+        standard expression (see https://github.com/marcoeilers/nagini/pull/289).
         """
         position = position if position else self.to_position(node, ctx)
         info = self.no_info(ctx)
