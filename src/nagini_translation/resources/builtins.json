@@ -313,7 +313,8 @@
             "type": "int"
         }
     },
-    "extends": "float"
+    "extends": "float",
+    "ghost_alias": "GInt"
 },
 "float": {
     "functions": {
@@ -414,7 +415,8 @@
             "type": "__prim__bool"
         }
     },
-    "extends": "object"
+    "extends": "object",
+    "ghost_alias": "GFloat"
 },
 "bool": {
     "functions": {
@@ -443,7 +445,8 @@
             "type": "__prim__bool"
         }
     },
-    "extends": "int"
+    "extends": "int",
+    "ghost_alias": "GBool"
 },
 "NoneType": {
     "functions": {
@@ -505,7 +508,8 @@
             "MustTerminate": true
         }
     },
-    "extends": "object"
+    "extends": "object",
+    "ghost_alias": "GStr"
 },
 "bytes": {
     "functions": {

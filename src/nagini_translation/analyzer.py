@@ -306,6 +306,9 @@ class Analyzer(ast.NodeVisitor):
                     if_cls['extends'], module=self.module.global_module)
                 cls.superclass = superclass
                 superclass.direct_subclasses.append(cls)
+            if 'ghost_alias' in if_cls:
+                alias_name = if_cls['ghost_alias']
+                cls.module.classes[alias_name] = cls
 
         for method_name in if_cls.get('methods', []):
             if_method = if_cls['methods'][method_name]
