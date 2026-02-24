@@ -934,9 +934,13 @@ class ContractTranslator(CommonTranslator):
             try:
                 # Depending on the collection expression, this doesn't always
                 # work (malformed trigger); in that case, we just don't do it.
-                lhs_trigger = self.viper.Trigger(trigger_exprs, self.no_position(ctx),
+                trigger = self.viper.Trigger(trigger_exprs, self.no_position(ctx),
                                                  self.no_info(ctx))
-                triggers = [lhs_trigger] + triggers
+                triggers = [trigger] + triggers
+                if trigger_exprs != lhs_exprs:
+                    trigger = self.viper.Trigger(lhs_exprs, self.no_position(ctx),
+                                                 self.no_info(ctx))
+                    triggers = [trigger] + triggers
             except Exception:
                 pass
         var_type_check = self.type_check(var.ref(), var.type,
@@ -1007,9 +1011,13 @@ class ContractTranslator(CommonTranslator):
             try:
                 # Depending on the collection expression, this doesn't always
                 # work (malformed trigger); in that case, we just don't do it.
-                lhs_trigger = self.viper.Trigger([lhs_trigger], self.no_position(ctx),
+                trigger = self.viper.Trigger([lhs_trigger], self.no_position(ctx),
                                                  self.no_info(ctx))
-                triggers = [lhs_trigger] + triggers
+                triggers = [trigger] + triggers
+                if lhs_trigger != lhs_expr:
+                    trigger = self.viper.Trigger([lhs_expr], self.no_position(ctx),
+                                                 self.no_info(ctx))
+                    triggers = [trigger] + triggers
             except Exception:
                 pass
         var_type_check = self.type_check(var.ref(), var.type,
