@@ -984,15 +984,16 @@ class ContractTranslator(CommonTranslator):
             raise InvalidProgramException(node, 'purity.violated')
 
 
-        dom_stmt, lhs, _, always_use = self._create_quantifier_contains_expr(var.ref(),
+        dom_stmt, lhs_trigger, lhs_expr, always_use = self._create_quantifier_contains_expr(var.ref(),
                                                                           domain_node,
                                                                           ctx)
         if dom_stmt:
             raise InvalidProgramException(domain_node,
                                           'purity.violated')
-        lhs = self.unwrap(lhs)
+        lhs_expr = self.unwrap(lhs_expr)
+        lhs_trigger = self.unwrap(lhs_trigger)
 
-        implication = self.viper.And(lhs, rhs, self.to_position(node, ctx),
+        implication = self.viper.And(lhs_expr, rhs, self.to_position(node, ctx),
                                      self.no_info(ctx))
         if always_use or not triggers:
             # Add lhs of the implication, which the user cannot write directly
@@ -1003,7 +1004,7 @@ class ContractTranslator(CommonTranslator):
             try:
                 # Depending on the collection expression, this doesn't always
                 # work (malformed trigger); in that case, we just don't do it.
-                lhs_trigger = self.viper.Trigger([lhs], self.no_position(ctx),
+                lhs_trigger = self.viper.Trigger([lhs_trigger], self.no_position(ctx),
                                                  self.no_info(ctx))
                 triggers = [lhs_trigger] + triggers
             except Exception:
