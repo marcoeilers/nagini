@@ -482,6 +482,13 @@
         "__mod__": {
             "args": ["str", "tuple"],
             "type": "str"
+        }
+    },
+    "methods": {
+        "split": {
+            "args": ["str"],
+            "type": "list",
+            "MustTerminate": true
         },
         "format": {
             "args": ["str", "object", "object"],
@@ -490,13 +497,7 @@
         },
         "__format__": {
             "args": ["str", "str"],
-            "type": "str"
-        }
-    },
-    "methods": {
-        "split": {
-            "args": ["str"],
-            "type": "list",
+            "type": "str",
             "MustTerminate": true
         }
     },
@@ -767,12 +768,6 @@
             "args": ["PSeq", "__prim__int"],
             "type": "PSeq",
             "generic_type": -2
-        },
-        "range": {
-            "args": ["PSeq", "__prim__int", "__prim__int"],
-            "type": "PSeq",
-            "generic_type": -2,
-            "requires": ["__sil_seq__", "__create__"]
         },
         "update": {
             "args": ["PSeq", "__prim__int", "object"],

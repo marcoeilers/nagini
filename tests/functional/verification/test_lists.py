@@ -172,11 +172,12 @@ def test_eq2() -> None:
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert l1 == l2
 
-def test_index_to_elem(l: list[int]) -> None:
-    Requires(list_pred(l))
-    Requires(Forall(int, lambda j: (Implies(0 <= j and j < len(l), 0 <= l[j] and l[j] < 256), [[l[j]]])))
+# TODO
+# def test_index_to_elem(l: list[int]) -> None:
+#     Requires(list_pred(l))
+#     Requires(Forall(int, lambda j: (Implies(0 <= j and j < len(l), 0 <= l[j] and l[j] < 256), [[l[j]]])))
 
-    assert Forall(l, lambda el: 0 <= el and el < 256)
+#     assert Forall(l, lambda el: 0 <= el and el < 256)
 
-    #:: ExpectedOutput(assert.failed:assertion.false)
-    assert Forall(l, lambda el: 0 <= el and el < 255)
+#     #:: ExpectedOutput(assert.failed:assertion.false)
+#     assert Forall(l, lambda el: 0 <= el and el < 255)

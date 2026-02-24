@@ -530,20 +530,22 @@
         "__mod__": {
             "args": ["str", "tuple"],
             "type": "str"
-        },
-        "format": {
-            "args": ["str", "object", "object"],
-            "type": "str"
-        },
-        "__format__": {
-            "args": ["str", "str"],
-            "type": "str"
         }
     },
     "methods": {
         "split": {
             "args": ["str"],
             "type": "list",
+            "MustTerminate": true
+        },
+        "format": {
+            "args": ["str", "object", "object"],
+            "type": "str",
+            "MustTerminate": true
+        },
+        "__format__": {
+            "args": ["str", "str"],
+            "type": "str",
             "MustTerminate": true
         }
     },
