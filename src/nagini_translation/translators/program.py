@@ -1439,8 +1439,6 @@ class ProgramTranslator(CommonTranslator):
                                   methods, self.no_position(ctx),
                                   self.no_info(ctx))
 
-        print(prog)
-
         chopped_prog = self.viper.chopper.chop(prog, self.viper.to_set(all_used_names))
 
         if chopped_prog.isEmpty():
