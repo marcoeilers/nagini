@@ -20,13 +20,12 @@ function PSeq___contains__(self: Ref, item: Ref): Bool
     ensures result == (item in PSeq___sil_seq__(self))
     ensures result ==> issubtype(typeof(item), PSeq_arg(typeof(self), 0))
 
-function PSeq___getitem__(self: Ref, index: Ref): Ref
+function PSeq___getitem__(self: Ref, index: Int): Ref
     decreases _
     requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
-    requires issubtype(typeof(index), int())
     requires @error("Index may be out of bounds.")(let ln == (PSeq___len__(self)) in
-                @error("Index may be out of bounds.")((int___unbox__(index) < 0 ==> int___unbox__(index) >= -ln) && (int___unbox__(index) >= 0 ==> int___unbox__(index) < ln)))
-    ensures result == (int___unbox__(index) >= 0 ? PSeq___sil_seq__(self)[int___unbox__(index)] : PSeq___sil_seq__(self)[PSeq___len__(self) + int___unbox__(index)])
+                @error("Index may be out of bounds.")(((index) < 0 ==> (index) >= -ln) && ((index) >= 0 ==> (index) < ln)))
+    ensures result == ((index) >= 0 ? PSeq___sil_seq__(self)[(index)] : PSeq___sil_seq__(self)[PSeq___len__(self) + (index)])
     ensures issubtype(typeof(result), PSeq_arg(typeof(self), 0))
 
 function PSeq___len__(self: Ref): Int
@@ -64,6 +63,8 @@ function PSeq___eq__(self: Ref, other: Ref): Bool
     requires PSeq_arg(typeof(self), 0) == PSeq_arg(typeof(other), 0)
     ensures result == (PSeq___sil_seq__(self) == PSeq___sil_seq__(other))
     ensures result ==> self == other // extensionality
+    ensures ((|PSeq___sil_seq__(self)| == |PSeq___sil_seq__(other)|) &&
+           (forall i: Int :: {PSeq___getitem__(self, i)} 0 <= i < |PSeq___sil_seq__(self)| ==> PSeq___getitem__(self, i) == PSeq___getitem__(other, i))) ==> result
     ensures result == object___eq__(self, other)
 
 
