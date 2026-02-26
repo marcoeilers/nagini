@@ -6,6 +6,9 @@
  */
 
 
- function object___str__(self: Ref) : Ref
+method object___str__(self: Ref) returns (res: Ref)
+    ensures issubtype(typeof(res), str())
+    ensures str___val__(res) == object___str_val__(self)
+
+function object___str_val__(self: Ref): Seq[Int]
     decreases _
-    ensures issubtype(typeof(result), str())

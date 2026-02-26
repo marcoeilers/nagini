@@ -33,6 +33,6 @@ def sorted_test(l1: List[int], l2: List[int]) -> None:
     Requires(list_pred(l1) and list_pred(l2))
     l3 = sorted(l1)
     Assert(l3 is not l2)
-    Assert(Forall(int, lambda i: Implies(i >= 0 and i < len(l3) - 1, l3[i] <= l3[i + 1])))
+    Assert(Forall(int, lambda i: (Implies(i >= 0 and i < len(l3) - 1, l3[i] <= l3[i + 1]), [[l3[i]]])))
     #:: ExpectedOutput(assert.failed:assertion.false)
-    Assert(Forall(int, lambda i: Implies(i >= 0 and i < len(l3) - 1, l3[i] < l3[i + 1])))
+    Assert(Forall(int, lambda i: (Implies(i >= 0 and i < len(l3) - 1, l3[i] < l3[i + 1]), [[l3[i]]])))
