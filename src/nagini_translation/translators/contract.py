@@ -622,7 +622,7 @@ class ContractTranslator(CommonTranslator):
                         # also use for the domain of the forall quantifier.
                         assert len(inner.comparators) == 1
                         lhs_stmt, lhs = self.translate_expr(inner.left, ctx)
-                        part_stmt, part, valid = self._create_quantifier_contains_expr(
+                        part_stmt, part, _, valid = self._create_quantifier_contains_expr(
                             lhs, inner.comparators[0], ctx)
                         if part_stmt:
                             raise InvalidProgramException(inner,
@@ -645,10 +645,13 @@ class ContractTranslator(CommonTranslator):
     def _create_quantifier_contains_expr(self, e: Expr,
                                          domain_node: ast.AST,
                                          ctx: Context,
-                                         trigger=False) -> Tuple[List[Stmt], Expr, bool]:
+                                         trigger=False) -> Tuple[List[Stmt], Expr, Expr, bool]:
         """
         Creates the left hand side of the implication in a quantifier
         expression, which says that e is an element of the given domain.
+        The two expressions are 1) a version of the contains expression well-suited
+        to be a trigger, and 2) one well-suited to be the left hand side of
+        a body implication (see https://github.com/marcoeilers/nagini/pull/289).
         The last return value specifies if the returned expression is
         recommended to be used as a trigger.
         """
@@ -667,21 +670,22 @@ class ContractTranslator(CommonTranslator):
             result = self.type_check(ref_var, dom_target, pos, ctx, False)
             # Not recommended as a trigger, since it's very broad and will get triggered
             # a lot.
-            return [], result, False
+            return [], result, result, False
         dom_stmt, domain = self.translate_expr(domain_node, ctx)
         dom_type = self.get_type(domain_node, ctx)
-        result = self.get_quantifier_lhs(ref_var, dom_type, domain, domain_node, ctx, pos,
+        result_trigger, result_lhs = self.get_quantifier_lhs(ref_var, dom_type, domain, domain_node, ctx, pos,
                                          trigger)
         if domain_old:
-            result = self.viper.Old(result, pos, info)
-        return dom_stmt, result, True
+            result_trigger = self.viper.Old(result_trigger, pos, info)
+            result_lhs = self.viper.Old(result_lhs, pos, info)
+        return dom_stmt, result_trigger, result_lhs, True
 
     def translate_to_multiset(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         coll_type = self.get_type(node.args[0], ctx)
         stmt, arg = self.translate_expr(node.args[0], ctx)
         # Use the same sequence conversion as for iterating over the
         # iterable (which gives no information about order for unordered types).
-        seq_call = self.get_sequence(coll_type, arg, None, node, ctx)
+        seq_call, _ = self.get_sequence(coll_type, arg, None, node, ctx)
         ms_class = ctx.module.global_module.classes[PMSET_TYPE]
         if coll_type.name == RANGE_TYPE:
             type_arg = ctx.module.global_module.classes[INT_TYPE]
@@ -705,7 +709,7 @@ class ContractTranslator(CommonTranslator):
         stmt, arg = self.translate_expr(node.args[0], ctx)
         # Use the same sequence conversion as for iterating over the
         # iterable (which gives no information about order for unordered types).
-        seq_call = self.get_sequence(coll_type, arg, None, node, ctx)
+        seq_call, _ = self.get_sequence(coll_type, arg, None, node, ctx)
         seq_class = ctx.module.global_module.classes[PSEQ_TYPE]
         if coll_type.name == RANGE_TYPE:
             type_arg = ctx.module.global_module.classes[INT_TYPE]
@@ -905,16 +909,19 @@ class ContractTranslator(CommonTranslator):
         lhs = None
 
         lhs_exprs = []
+        trigger_exprs = []
         for i, domain_node in enumerate(domain_nodes):
-            dom_stmt, cur_lhs, always_use = self._create_quantifier_contains_expr(vrs[i].ref(),
+            dom_stmt, cur_lhs_trigger, cur_lhs_expr, always_use = self._create_quantifier_contains_expr(vrs[i].ref(),
                                                                                   domain_node,
                                                                                   ctx)
             if dom_stmt:
                 raise InvalidProgramException(domain_node,
                                               'purity.violated')
-            cur_lhs = self.unwrap(cur_lhs)
-            lhs = cur_lhs if lhs is None else self.viper.And(lhs, cur_lhs, self.no_position(ctx), self.no_info(ctx))
-            lhs_exprs.append(cur_lhs)
+            cur_lhs_expr = self.unwrap(cur_lhs_expr)
+            cur_lhs_trigger = self.unwrap(cur_lhs_trigger)
+            lhs = cur_lhs_expr if lhs is None else self.viper.And(lhs, cur_lhs_expr, self.no_position(ctx), self.no_info(ctx))
+            lhs_exprs.append(cur_lhs_expr)
+            trigger_exprs.append(cur_lhs_trigger)
 
         implication = self.viper.Implies(lhs, rhs, self.to_position(node, ctx),
                                          self.no_info(ctx))
@@ -927,9 +934,13 @@ class ContractTranslator(CommonTranslator):
             try:
                 # Depending on the collection expression, this doesn't always
                 # work (malformed trigger); in that case, we just don't do it.
-                lhs_trigger = self.viper.Trigger(lhs_exprs, self.no_position(ctx),
+                trigger = self.viper.Trigger(trigger_exprs, self.no_position(ctx),
                                                  self.no_info(ctx))
-                triggers = [lhs_trigger] + triggers
+                triggers = [trigger] + triggers
+                if trigger_exprs != lhs_exprs:
+                    trigger = self.viper.Trigger(lhs_exprs, self.no_position(ctx),
+                                                 self.no_info(ctx))
+                    triggers = [trigger] + triggers
             except Exception:
                 pass
         var_type_check = self.type_check(var.ref(), var.type,
@@ -980,15 +991,16 @@ class ContractTranslator(CommonTranslator):
             raise InvalidProgramException(node, 'purity.violated')
 
 
-        dom_stmt, lhs, always_use = self._create_quantifier_contains_expr(var.ref(),
+        dom_stmt, lhs_trigger, lhs_expr, always_use = self._create_quantifier_contains_expr(var.ref(),
                                                                           domain_node,
                                                                           ctx)
         if dom_stmt:
             raise InvalidProgramException(domain_node,
                                           'purity.violated')
-        lhs = self.unwrap(lhs)
+        lhs_expr = self.unwrap(lhs_expr)
+        lhs_trigger = self.unwrap(lhs_trigger)
 
-        implication = self.viper.And(lhs, rhs, self.to_position(node, ctx),
+        implication = self.viper.And(lhs_expr, rhs, self.to_position(node, ctx),
                                      self.no_info(ctx))
         if always_use or not triggers:
             # Add lhs of the implication, which the user cannot write directly
@@ -999,9 +1011,13 @@ class ContractTranslator(CommonTranslator):
             try:
                 # Depending on the collection expression, this doesn't always
                 # work (malformed trigger); in that case, we just don't do it.
-                lhs_trigger = self.viper.Trigger([lhs], self.no_position(ctx),
+                trigger = self.viper.Trigger([lhs_trigger], self.no_position(ctx),
                                                  self.no_info(ctx))
-                triggers = [lhs_trigger] + triggers
+                triggers = [trigger] + triggers
+                if lhs_trigger != lhs_expr:
+                    trigger = self.viper.Trigger([lhs_expr], self.no_position(ctx),
+                                                 self.no_info(ctx))
+                    triggers = [trigger] + triggers
             except Exception:
                 pass
         var_type_check = self.type_check(var.ref(), var.type,

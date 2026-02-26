@@ -212,7 +212,7 @@ class ExpressionTranslator(CommonTranslator):
                                             [None], node, ctx)
         iter_stmt, iter = self.translate_expr(node.generators[0].iter, ctx)
         iter_type = self.get_type(node.generators[0].iter, ctx)
-        sil_seq = self.get_sequence(iter_type.python_class, iter, None, node, ctx,
+        sil_seq, _ = self.get_sequence(iter_type.python_class, iter, None, node, ctx,
                                     position)
         seq_len = self.viper.SeqLength(sil_seq, position, info)
         len_equal = self.viper.EqCmp(self.to_int(result_len, ctx), seq_len, position,
