@@ -564,7 +564,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
 
     def get_quantifier_lhs(self, in_expr: Expr, dom_type: PythonType, dom_arg: Expr,
                            node: ast.AST, ctx: Context, position: Position,
-                           force_trigger=False) -> Expr:
+                           force_trigger=False) -> (Expr, Expr):
         """
         Returns a contains-expression representing whether in_expr is in dom_arg.
         To be used on the left hand side of quantifiers (and in the corresponding
@@ -574,75 +574,72 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         forall x: <quantifier_lhs> ==> e
         Defaults to in_expr in type___sil_seq__, but used simpler expressions for known
         types to improve performance/triggering.
+        Returns two expressions (trigger_lhs, body_lhs), where trigger_lhs is well-suited
+        to be a trigger and body_lhs is well suited to be the the lhs of an implication
+        inside a quantifier (see https://github.com/marcoeilers/nagini/pull/289).
         """
         position = position if position else self.to_position(node, ctx)
         info = self.no_info(ctx)
-        res = None
+        res_trigger = None
+        res_contains = None
         if not (isinstance(dom_type, UnionType) or isinstance(dom_type, OptionalType)):
             if dom_type.name in (DICT_TYPE, SET_TYPE, PSEQ_TYPE, PSET_TYPE):
-                contains_constructor = self.viper.AnySetContains
+                contains_constructor_trigger = self.viper.AnySetContains
                 if dom_type.name == DICT_TYPE:
-                    contains_constructor = self.viper.MapContains
+                    contains_constructor_trigger = self.viper.MapContains
                     map_ref_ref = self.viper.MapType(self.viper.Ref, self.viper.Ref)
                     field = self.viper.Field('dict_acc', map_ref_ref, position, info)
-                    res = self.viper.FieldAccess(dom_arg, field, position, info)
+                    res_trigger = self.viper.FieldAccess(dom_arg, field, position, info)
                 elif dom_type.name == SET_TYPE:
                     set_ref = self.viper.SetType(self.viper.Ref)
                     field = self.viper.Field('set_acc', set_ref, position, info)
-                    res = self.viper.FieldAccess(dom_arg, field, position, info)
+                    res_trigger = self.viper.FieldAccess(dom_arg, field, position, info)
                 elif dom_type.name == PSET_TYPE:
-                    res = self.get_function_call(dom_type, '__unbox__', [dom_arg],
+                    res_trigger = self.get_function_call(dom_type, '__unbox__', [dom_arg],
                                                  [None], node, ctx, position)
                 else:
                     # PSEQ_TYPE
-                    contains_constructor = self.viper.SeqContains
-                    res = self.get_function_call(dom_type, '__sil_seq__', [dom_arg],
+                    contains_constructor_trigger = self.viper.SeqContains
+                    res_trigger = self.get_function_call(dom_type, '__sil_seq__', [dom_arg],
                                                  [None], node, ctx, position)
-            if False and (dom_type.name == RANGE_TYPE and isinstance(node.func, ast.Name) and
-                        node.func.id == 'range'):
-                left = node.args[0]
-                right = node.args[1]
-                _, left_expr = self.translate_expr(left, ctx)
-                _, right_expr = self.translate_expr(right, ctx)
-                int_class = ctx.module.global_module.classes[INT_TYPE]
-                left_bound = self.get_function_call(int_class, '__ge__',
-                                                    [in_expr, left], [None, None],
-                                                    node, ctx, position)
-                right_bound = self.get_function_call(int_class, '__lt__',
-                                                    [in_expr, right], [None, None],
-                                                    node, ctx, position)
-                if force_trigger:
-                    return None
-                else:
-                    return self.viper.And(left_bound, right_bound, position, info)
-        if res is None:
-            contains_constructor = self.viper.SeqContains
-            res = self.get_sequence(dom_type, dom_arg, None, node, ctx, position)
-        return contains_constructor(in_expr, res, position, info)
+        contains_constructor = self.viper.SeqContains
+        res_contains_trigger, res_contains_lhs = self.get_sequence(dom_type, dom_arg, None, node, ctx, position)
+
+        body_result = contains_constructor(in_expr, res_contains_lhs, position, info)
+        if res_trigger:
+            trigger_result = contains_constructor_trigger(in_expr, res_trigger, position, info)
+        else:
+            trigger_result = contains_constructor(in_expr, res_contains_trigger, position, info)
+        return (trigger_result, body_result)
 
     def get_sequence(self, receiver: PythonType, arg: Expr, arg_type: PythonType,
                      node: ast.AST, ctx: Context,
-                     position: Position = None) -> Expr:
+                     position: Position = None) -> (Expr, Expr):
         """
         Returns a sequence (Viper type Seq[Ref]) representing the contents of arg.
         Defaults to type___sil_seq__, but used simpler expressions for known types
         to improve performance/triggering.
+        Returns two versions, one well-suited for use in a trigger, one just a
+        standard expression (see https://github.com/marcoeilers/nagini/pull/289).
         """
         position = position if position else self.to_position(node, ctx)
         info = self.no_info(ctx)
+        res_trigger = None
         if not isinstance(receiver, UnionType) or isinstance(receiver, OptionalType):
             if receiver.name == LIST_TYPE:
                 seq_ref = self.viper.SeqType(self.viper.Ref)
                 field = self.viper.Field('list_acc', seq_ref, position, info)
-                res = self.viper.FieldAccess(arg, field, position, info)
-                return res
+                res_trigger = self.viper.FieldAccess(arg, field, position, info)
             if receiver.name == PSEQ_TYPE:
                 if (isinstance(arg, self.viper.ast.FuncApp) and
                             arg.funcname() == 'PSeq___create__'):
                     args = self.viper.to_list(arg.args())
-                    return args[0]
-        return self.get_function_call(receiver, '__sil_seq__', [arg], [arg_type],
+                    return args[0], args[0]
+        res = self.get_function_call(receiver, '__sil_seq__', [arg], [arg_type],
                                       node, ctx, position)
+        if not res_trigger:
+            res_trigger = res
+        return res_trigger, res
 
     def get_int_sequence(self, receiver: PythonType, arg: Expr,
                      node: ast.AST, ctx: Context,
