@@ -38,6 +38,4 @@ jobs:
     - name: Run all examples
       run: |
         cd HumanEval
-        cd public
-        cd scripts
-        ./test-all.sh
+        ./public/scripts/test-all.sh
