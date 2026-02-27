@@ -247,6 +247,8 @@ class TypeVisitor(TraverserVisitor):
         if node in self.type_map:
             result = self.type_map[node]
             return result
+        if hasattr(node, 'node') and isinstance(node.node, mypy.nodes.TypeAlias):
+            return node.fullname
         elif hasattr(node, 'fullname'):
             fullname = node.fullname.split('.')
             if self.real_path is not None:
