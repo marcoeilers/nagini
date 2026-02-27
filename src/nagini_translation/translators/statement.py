@@ -461,7 +461,7 @@ class StatementTranslator(CommonTranslator):
         set_ref = self.viper.SetType(self.viper.Ref)
         map_ref_ref = self.viper.MapType(self.viper.Ref, self.viper.Ref)
 
-        iter_seq = self.get_sequence(iterable_type, iterable, None, node, ctx, pos)
+        iter_seq, _ = self.get_sequence(iterable_type, iterable, None, node, ctx, pos)
         full_perm = self.viper.FullPerm(pos, info)
 
         invariant = []
@@ -764,7 +764,7 @@ class StatementTranslator(CommonTranslator):
         seq_temp_var = ctx.current_function.create_variable('seqtmp', seq_ref_type,
                                                             self.translator)
 
-        iter_seq = self.get_sequence(iterable_type, iterable, None, node, ctx, position)
+        iter_seq, _ = self.get_sequence(iterable_type, iterable, None, node, ctx, position)
 
         seq_temp_assign = self.viper.LocalVarAssign(seq_temp_var.ref(), iter_seq,
                                                     position, info)
@@ -1278,7 +1278,7 @@ class StatementTranslator(CommonTranslator):
                                               list_type, position, ctx),
                               position, info))
         # Set list contents to segment of rhs from rhs_index until rhs_end
-        seq = self.get_sequence(rhs_type, rhs, None, node, ctx, position)
+        seq, _ = self.get_sequence(rhs_type, rhs, None, node, ctx, position)
 
         seq_until = self.viper.SeqTake(seq, rhs_end, position, info)
         seq_from = self.viper.SeqDrop(seq_until, rhs_lit, position, info)

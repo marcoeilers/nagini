@@ -11,6 +11,7 @@ import inspect
 import json
 import logging
 import os
+import signal
 import sys
 import re
 import time
@@ -95,10 +96,7 @@ def parse_sil_file(sil_path: str, bv_path: str, bv_size: int, jvm, float_option:
 def load_sil_files(jvm: JVM, bv_size: int, sif: bool = False, float_option: str = None):
     current_path = os.path.dirname(inspect.stack()[0][1])
     default_path = os.path.join(current_path, 'resources')
-    if sif:
-        resources_path = os.path.join(current_path, 'sif', 'resources')
-    else:
-        resources_path = default_path
+    resources_path = default_path
     return parse_sil_file(os.path.join(resources_path, 'all.sil'), os.path.join(default_path, 'intbv.sil'), bv_size, jvm, float_option)
 
 
@@ -113,10 +111,7 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
     path = os.path.abspath(path)
     error_manager.clear()
     current_path = os.path.dirname(inspect.stack()[0][1])
-    if sif:
-        builtins_index_path = os.path.join(current_path, 'sif', 'resources')
-    else:
-        builtins_index_path = os.path.join(current_path, 'resources')
+    builtins_index_path = os.path.join(current_path, 'resources')
 
     if sif:
         viper_ast = ViperASTExtended(jvm, jvm.java, jvm.scala, jvm.viper, path)
@@ -304,6 +299,11 @@ def main() -> None:
               'performance'),
         default=-1)
     parser.add_argument(
+        '--benchmark-timeout',
+        type=int,
+        help='timeout in seconds for each benchmark run',
+        default=-1)
+    parser.add_argument(
         '--ide-mode',
         action='store_true',
         help='Output errors in IDE format')
@@ -455,12 +455,28 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
             print("Run, Total, Start, End, Time".format())
             for i in range(args.benchmark):
                 start = time.time()
-                modules, prog = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif, arp=arp, base_dir=base_dir,
-                                          ignore_global=args.ignore_global, float_encoding=args.float_encoding)
-                vresult = verify(modules, prog, python_file, jvm, viper_args, backend=backend, arp=arp)
+                timed_out = False
+                if args.benchmark_timeout > 0:
+                    def _timeout_handler(signum, frame):
+                        raise TimeoutError()
+                    signal.signal(signal.SIGALRM, _timeout_handler)
+                    signal.alarm(args.benchmark_timeout)
+                try:
+                    modules, prog = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif, arp=arp, base_dir=base_dir,
+                                              ignore_global=args.ignore_global, float_encoding=args.float_encoding)
+                    vresult = verify(modules, prog, python_file, jvm, viper_args, backend=backend, arp=arp)
+                except TimeoutError:
+                    timed_out = True
+                finally:
+                    if args.benchmark_timeout > 0:
+                        signal.alarm(0)
                 end = time.time()
-                print("{}, {}, {}, {}, {}".format(
-                    i, args.benchmark, start, end, end - start))
+                if timed_out:
+                    print("{}, {}, {}, {}, TIMEOUT".format(
+                        i, args.benchmark, start, end))
+                else:
+                    print("{}, {}, {}, {}, {}".format(
+                        i, args.benchmark, start, end, end - start))
         else:
             submitter = None
             if args.submit_for_evaluation:
@@ -473,12 +489,14 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
             if submitter is not None:
                 submitter.setSuccess(vresult.__bool__())
                 submitter.submit()
-        if args.verbose:
-            print("Verification completed.")
-        print(vresult.to_string(args.ide_mode, args.show_viper_errors))
-        duration = '{:.2f}'.format(time.time() - start)
-        print('Verification took ' + duration + ' seconds.')
-        return isinstance(vresult, verifier.Success)
+        if args.benchmark < 1:
+            if args.verbose:
+                print("Verification completed.")
+            print(vresult.to_string(args.ide_mode, args.show_viper_errors))
+            duration = '{:.2f}'.format(time.time() - start)
+            print('Verification took ' + duration + ' seconds.')
+            return isinstance(vresult, verifier.Success)
+        return True
     except (TypeException, InvalidProgramException, UnsupportedException) as e:
         print("Translation failed")
         if isinstance(e, (InvalidProgramException, UnsupportedException)):

@@ -9,8 +9,9 @@ function object___bool__(self: Ref) : Bool
     decreases _
     ensures self == null ==> !result
     // We can't actually say that the result is true if self is not None, because
-    // this is not the case for collections.
-    ensures self != null ==> (let t == (typeof(self)) in ((!issubtype(t, list(list_arg(t, 0))) &&
+    // this is not the case for collections and some other types.
+    ensures self != null ==> (let t == (typeof(self)) in ((!issubtype(t, float()) &&
+                                                           !issubtype(t, list(list_arg(t, 0))) &&
                                                            !issubtype(t, set(set_arg(t, 0))) &&
                                                            !issubtype(t, dict(dict_arg(t, 0), dict_arg(t, 1))) &&
                                                            !issubtype(t, bytearray())) ==> result))
@@ -545,6 +546,7 @@ function __seq_ref_to_seq_int(sr: Seq[Ref]): Seq[Int]
     ensures sr == Seq() ==> result == Seq()
     ensures forall r: Ref :: {__seq_ref_to_seq_int(Seq(r))} issubtype(typeof(r), int()) ==> __seq_ref_to_seq_int(Seq(r)) == Seq(int___unbox__(r))
     ensures forall sr1: Seq[Ref], sr2: Seq[Ref] :: {__seq_ref_to_seq_int(sr1 ++ sr2)} __seq_ref_to_seq_int(sr1 ++ sr2) == __seq_ref_to_seq_int(sr1) ++ __seq_ref_to_seq_int(sr2)
+    ensures forall i: Int :: {(i in result)} (i in result) ==> (exists j: Int :: 0 <= j < |sr| && typeof(sr[j]) == int() && i == int___unbox__(sr[j]) && sr[j] == __prim__int___box__(i) && (sr[j] in sr))
     ensures forall i: Int :: {(i in result)} (i in result) ==> (exists j: Int :: 0 <= j && j < |sr| && issubtype(typeof(sr[j]), int()) && i == int___unbox__(sr[j]) && (sr[j] in sr))
     decreases _
 

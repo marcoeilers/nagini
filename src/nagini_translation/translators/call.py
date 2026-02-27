@@ -403,8 +403,8 @@ class CallTranslator(CommonTranslator):
             stmts.append(self.viper.FieldAssign(content_field, havoc_var.ref(), position,
                                                 info))
             arg_type = self.get_type(node.args[0], ctx)
-            arg_seq = self.get_sequence(arg_type, contents, None, node, ctx, position)
-            res_seq = self.get_sequence(list_type, result_var, None, node, ctx, position)
+            arg_seq, _ = self.get_sequence(arg_type, contents, None, node, ctx, position)
+            res_seq, _ = self.get_sequence(list_type, result_var, None, node, ctx, position)
             seq_equal = self.viper.EqCmp(arg_seq, res_seq, position, info)
             stmts.append(self.viper.Inhale(seq_equal, position, info))
         return stmts, result_var
@@ -524,7 +524,7 @@ class CallTranslator(CommonTranslator):
         result_type = self.get_type(node, ctx)
         arg_type = self.get_type(node.args[0], ctx)
         arg_stmt, arg = self.translate_expr(node.args[0], ctx)
-        arg_contents = self.get_sequence(arg_type, arg, None, node.args[0], ctx)
+        arg_contents, _ = self.get_sequence(arg_type, arg, None, node.args[0], ctx)
         new_list = ctx.current_function.create_variable('enumerate_res', result_type,
                                                        self.translator)
         sil_ref_seq = self.viper.SeqType(self.viper.Ref)

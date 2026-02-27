@@ -2,7 +2,7 @@
 # http://creativecommons.org/publicdomain/zero/1.0/
 
 from nagini_contracts.contracts import *
-from typing import TypeVar, Generic, Dict
+from typing import TypeVar, Generic, Dict, Optional, List, cast
 
 
 def test_range() -> None:
@@ -86,3 +86,11 @@ def test_type_quantification_n_fail(d: Dict[str, str], s: str) -> None:
     r = [l1, [4, 5, 6]]
     #:: ExpectedOutput(assert.failed:assertion.false)
     Assert(Forall2(int, int, lambda i, j: (Implies(i >= 0 and i < len(r) and j >= 0 and j < 3, r[i][j] > 3), [[r[i][j]]])))
+
+
+def foo(l: Optional[List[int]]) -> None:
+    Requires(l is not None)
+    Requires(list_pred(l))
+    Requires(Forall(l, lambda el: el > 5))
+
+    Assert(Forall(cast(List[int], l), lambda el: el > 5))
