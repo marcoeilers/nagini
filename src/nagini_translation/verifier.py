@@ -148,7 +148,10 @@ class Silicon:
 
     def __del__(self):
         if hasattr(self, 'silicon') and self.silicon:
-            self.silicon.stop()
+            try:
+                self.silicon.stop()
+            except Exception:
+                pass
 
 
 class Carbon:
