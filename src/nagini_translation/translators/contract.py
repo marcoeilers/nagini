@@ -990,8 +990,11 @@ class ContractTranslator(CommonTranslator):
                     triggers = [trigger] + triggers
             except Exception:
                 pass
-        var_type_check = self.type_check(var.ref(), var.type,
-                                         self.no_position(ctx), ctx, False)
+        if var.type.name in PRIMITIVES:
+            var_type_check = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
+        else:
+            var_type_check = self.type_check(var.ref(), var.type,
+                                             self.no_position(ctx), ctx, False)
         implication = self.viper.Implies(var_type_check, implication,
                                          self.to_position(node, ctx),
                                          self.no_info(ctx))
@@ -1067,8 +1070,11 @@ class ContractTranslator(CommonTranslator):
                     triggers = [trigger] + triggers
             except Exception:
                 pass
-        var_type_check = self.type_check(var.ref(), var.type,
-                                         self.no_position(ctx), ctx, False)
+        if var.type.name in PRIMITIVES:
+            var_type_check = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
+        else:
+            var_type_check = self.type_check(var.ref(), var.type,
+                                             self.no_position(ctx), ctx, False)
         implication = self.viper.And(var_type_check, implication,
                                      self.to_position(node, ctx),
                                      self.no_info(ctx))

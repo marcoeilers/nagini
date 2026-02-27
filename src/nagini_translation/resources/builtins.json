@@ -824,7 +824,7 @@
             "type": "__prim__bool"
         },
         "__getitem__": {
-            "args": ["PSeq", "int"],
+            "args": ["PSeq", "__prim__int"],
             "type": "object"
         },
         "__sil_seq__": {
