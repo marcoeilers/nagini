@@ -1048,7 +1048,7 @@ class ProgramTranslator(CommonTranslator):
                          self.type_factory.type_type(), pos, info,
                          self.type_factory.type_domain)
             typeof_eq = self.viper.EqCmp(typeof_call, const_call, pos, info)
-            postconds.append(self.viper.Implies(is_cons_call, typeof_eq, pos, info))
+            postconds.append(self.viper.EqCmp(is_cons_call, typeof_eq, pos, info))
             other_object = self.viper.FuncApp(box_func_name, [adt_other_use], pos, info,
                                               self.viper.Ref, [adt_other_decl])
             other_is_result = self.viper.EqCmp(self.viper.Result(self.viper.Ref, pos, info),

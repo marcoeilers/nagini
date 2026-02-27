@@ -1229,6 +1229,8 @@ class Analyzer(ast.NodeVisitor):
                     self.track_access(node, real_target)
             else:
                 receiver = self.typeof(node.value)
+                if isinstance(receiver, PythonClass) and receiver.is_adt:
+                    return
                 if (isinstance(receiver, UnionType) and
                         not isinstance(receiver, OptionalType)):
                     for type in receiver.get_types() - {None}:
