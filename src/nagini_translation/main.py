@@ -454,19 +454,23 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
             raise ValueError('Unknown verifier specified: ' + args.verifier)
         viper_args = [] if args.viper_arg is None else args.viper_arg.split(",")
         if args.benchmark >= 1:
-            print("Run, Total, Start, End, Time".format())
+            print("Run, Total, Start, End, Time, Result")
+            n_success = 0
+            n_failure = 0
+            n_timeout = 0
             for i in range(args.benchmark):
                 start = time.time()
                 timed_out = False
 
                 verifier_ref = [None]
-                def _run_iteration(holder=verifier_ref):
+                result_ref = [None]
+                def _run_iteration(vholder=verifier_ref, rholder=result_ref):
                     try:
                         modules_local, prog_local = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif,
                                 arp=arp, base_dir=base_dir, ignore_global=args.ignore_global, float_encoding=args.float_encoding)
                         verifier = get_verifier(python_file, jvm, viper_args, backend)
-                        holder[0] = verifier
-                        verifier.verify(modules_local, prog_local, arp=arp)
+                        vholder[0] = verifier
+                        rholder[0] = verifier.verify(modules_local, prog_local, arp=arp)
                     except Exception:
                         pass
 
@@ -482,11 +486,20 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                     thread.join(timeout=10)
                 end = time.time()
                 if timed_out:
-                    print("{}, {}, {}, {}, TIMEOUT".format(
+                    n_timeout += 1
+                    print("{}, {}, {}, {}, TIMEOUT, TIMEOUT".format(
                         i, args.benchmark, start, end))
                 else:
-                    print("{}, {}, {}, {}, {}".format(
-                        i, args.benchmark, start, end, end - start))
+                    vresult = result_ref[0]
+                    result_str = "SUCCESS" if isinstance(vresult, verifier.Success) else "FAILURE"
+                    if isinstance(vresult, verifier.Success):
+                        n_success += 1
+                    else:
+                        n_failure += 1
+                    print("{}, {}, {}, {}, {}, {}".format(
+                        i, args.benchmark, start, end, end - start, result_str))
+            print("Results: {} success, {} failure, {} timeout out of {} runs".format(
+                n_success, n_failure, n_timeout, args.benchmark))
         else:
             submitter = None
             if args.submit_for_evaluation:
