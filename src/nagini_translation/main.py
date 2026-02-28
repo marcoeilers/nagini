@@ -468,9 +468,9 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                     try:
                         modules_local, prog_local = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif,
                                 arp=arp, base_dir=base_dir, ignore_global=args.ignore_global, float_encoding=args.float_encoding)
-                        verifier = get_verifier(python_file, jvm, viper_args, backend)
-                        vholder[0] = verifier
-                        rholder[0] = verifier.verify(modules_local, prog_local, arp=arp)
+                        ver = get_verifier(python_file, jvm, viper_args, backend)
+                        vholder[0] = ver
+                        rholder[0] = ver.verify(modules_local, prog_local, arp=arp)
                     except Exception:
                         pass
 
@@ -478,13 +478,15 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                 thread.start()
                 timeout = args.benchmark_timeout if args.benchmark_timeout > 0 else None
                 thread.join(timeout=timeout)
+
                 if thread.is_alive():
                     timed_out = True
-                    verifier = verifier_ref[0]
-                    if verifier is not None:
-                        verifier.stop()
+                    ver = verifier_ref[0]
+                    if ver is not None:
+                        ver.stop()
                     thread.join(timeout=10)
                 end = time.time()
+
                 if timed_out:
                     n_timeout += 1
                     print("{}, {}, {}, {}, TIMEOUT, TIMEOUT".format(
