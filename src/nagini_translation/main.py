@@ -11,8 +11,8 @@ import inspect
 import json
 import logging
 import os
-import signal
 import sys
+import threading
 import re
 import time
 import traceback
@@ -52,7 +52,7 @@ from nagini_translation.verifier import (
     ViperVerifier
 )
 from nagini_translation import verifier
-from typing import List, Set, Tuple
+from typing import List, Set, Tuple, Union
 
 
 TYPE_ERROR_PATTERN = r"^(?P<file>.*):(?P<line>\d+): error: (?P<msg>.*)$"
@@ -196,6 +196,11 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
     for task in analyzer.deferred_tasks:
         task()
 
+def get_verifier(path: str, jvm: JVM, viper_args: List[str], backend=ViperVerifier.silicon, counterexample=False) -> Union[Silicon, Carbon]:
+    if backend == ViperVerifier.silicon:
+        return Silicon(jvm, path, viper_args, counterexample)
+    elif backend == ViperVerifier.carbon:
+        return Carbon(jvm, path, viper_args)
 
 def verify(modules, prog: 'viper.silver.ast.Program', path: str, jvm: JVM, viper_args: List[str],
            backend=ViperVerifier.silicon, arp=False, counterexample=False, sif=False) -> VerificationResult:
@@ -203,10 +208,7 @@ def verify(modules, prog: 'viper.silver.ast.Program', path: str, jvm: JVM, viper
     Verifies the given Viper program
     """
     try:
-        if backend == ViperVerifier.silicon:
-            verifier = Silicon(jvm, path, viper_args, counterexample)
-        elif backend == ViperVerifier.carbon:
-            verifier = Carbon(jvm, path, viper_args)
+        verifier = get_verifier(path, jvm, viper_args, backend, counterexample)
         vresult = verifier.verify(modules, prog, arp=arp, sif=sif)
         return vresult
     except JException as je:
@@ -452,31 +454,52 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
             raise ValueError('Unknown verifier specified: ' + args.verifier)
         viper_args = [] if args.viper_arg is None else args.viper_arg.split(",")
         if args.benchmark >= 1:
-            print("Run, Total, Start, End, Time".format())
+            print("Run, Total, Start, End, Time, Result")
+            n_success = 0
+            n_failure = 0
+            n_timeout = 0
             for i in range(args.benchmark):
                 start = time.time()
                 timed_out = False
-                if args.benchmark_timeout > 0:
-                    def _timeout_handler(signum, frame):
-                        raise TimeoutError()
-                    signal.signal(signal.SIGALRM, _timeout_handler)
-                    signal.alarm(args.benchmark_timeout)
-                try:
-                    modules, prog = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif, arp=arp, base_dir=base_dir,
-                                              ignore_global=args.ignore_global, float_encoding=args.float_encoding)
-                    vresult = verify(modules, prog, python_file, jvm, viper_args, backend=backend, arp=arp)
-                except TimeoutError:
+
+                verifier_ref = [None]
+                result_ref = [None]
+                def _run_iteration(vholder=verifier_ref, rholder=result_ref):
+                    try:
+                        modules_local, prog_local = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif,
+                                arp=arp, base_dir=base_dir, ignore_global=args.ignore_global, float_encoding=args.float_encoding)
+                        verifier = get_verifier(python_file, jvm, viper_args, backend)
+                        vholder[0] = verifier
+                        rholder[0] = verifier.verify(modules_local, prog_local, arp=arp)
+                    except Exception:
+                        pass
+
+                thread = threading.Thread(target=_run_iteration, daemon=True)
+                thread.start()
+                timeout = args.benchmark_timeout if args.benchmark_timeout > 0 else None
+                thread.join(timeout=timeout)
+                if thread.is_alive():
                     timed_out = True
-                finally:
-                    if args.benchmark_timeout > 0:
-                        signal.alarm(0)
+                    verifier = verifier_ref[0]
+                    if verifier is not None:
+                        verifier.stop()
+                    thread.join(timeout=10)
                 end = time.time()
                 if timed_out:
-                    print("{}, {}, {}, {}, TIMEOUT".format(
+                    n_timeout += 1
+                    print("{}, {}, {}, {}, TIMEOUT, TIMEOUT".format(
                         i, args.benchmark, start, end))
                 else:
-                    print("{}, {}, {}, {}, {}".format(
-                        i, args.benchmark, start, end, end - start))
+                    vresult = result_ref[0]
+                    result_str = "SUCCESS" if isinstance(vresult, verifier.Success) else "FAILURE"
+                    if isinstance(vresult, verifier.Success):
+                        n_success += 1
+                    else:
+                        n_failure += 1
+                    print("{}, {}, {}, {}, {}, {}".format(
+                        i, args.benchmark, start, end, end - start, result_str))
+            print("Results: {} success, {} failure, {} timeout out of {} runs".format(
+                n_success, n_failure, n_timeout, args.benchmark))
         else:
             submitter = None
             if args.submit_for_evaluation:
@@ -489,7 +512,6 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
             if submitter is not None:
                 submitter.setSuccess(vresult.__bool__())
                 submitter.submit()
-        if args.benchmark < 1:
             if args.verbose:
                 print("Verification completed.")
             print(vresult.to_string(args.ide_mode, args.show_viper_errors))
