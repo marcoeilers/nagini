@@ -36,7 +36,7 @@ CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'ResultT', 'Implies', 'Fo
                   'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',
                   'LowExit', 'Refute', 'isNaN', 'Reveal', 'MarkGhost'] + GHOST_BUILTINS
 
-CONTRACT_DECORATORS = ['Pure', 'Opaque', 'Predicate', 'Inline', 'Ghost', 'ContractOnly', 'GhostReturns']
+CONTRACT_DECORATORS = ['Pure', 'Opaque', 'Predicate', 'Inline', 'Ghost', 'ContractOnly']
 
 SPECIAL_PREDICATES = ['list_pred', 'dict_pred', 'set_pred']
 
@@ -515,22 +515,6 @@ def ContractOnly(func: T) -> T:
     return func
 
 
-def GhostReturns(start_index: int) -> Callable[[T], T]:
-    """
-    Decorator for functions which specifies which return values are ghost
-    returns, starting at index 0. It's a no-op.
-    If a function returns an n-tuple, @GhostReturns(k) means that
-    elements 0 to k-1 are normal return values, elements k to n-1 are ghost
-    return values. k must be less than n. If the function returns a value
-    that is not a tuple, start_index can only be 0 (meaning that the only value
-    that is returned is a ghost value). Using this decorator on functions which
-    do not return anything is not allowed.
-    """
-    def wrap(func: T) -> T:
-        return func
-    return wrap
-
-
 def list_pred(l: object) -> bool:
     """
     Special, predefined predicate that represents the permissions belonging
@@ -605,7 +589,6 @@ __all__ = [
         'Inline',
         'Ghost',
         'ContractOnly',
-        'GhostReturns',
         'list_pred',
         'dict_pred',
         'set_pred',

@@ -23,40 +23,6 @@ contract_keywords = frozenset(["Requires", "Ensures", "Exsures",
                                "Ghost",])
 
 
-class GhostCollector(ast.NodeVisitor):
-    """
-    AST visitor to collect ghost variables and functions.
-    """
-    def __init__(self):
-        self.ghost_vars = set()
-        self.ghost_funcs = set()
-
-    @classmethod
-    def collect(cls, tree):
-        """
-        Collects and returns two sets containing the names of ghost variables
-        and functions.
-        :param tree: The AST of the program.
-        :return: Tuple of sets (ghost_vars, ghost_funcs).
-        """
-        collector = cls()
-        collector.visit(tree)
-        return collector.ghost_vars, collector.ghost_funcs
-
-    def visit_Name(self, node):
-        if node.id.startswith(GHOST_PREFIX):
-            self.ghost_vars.add(node.id)
-
-    def visit_Attribute(self, node):
-        if node.attr.startswith(GHOST_PREFIX):
-            self.ghost_vars.add(node.attr)
-
-    def visit_FunctionDef(self, node):
-        decorator_list = [dec.id for dec in node.decorator_list]
-        if "Ghost" in decorator_list:
-            self.ghost_funcs.add(node.name)
-
-
 class NoOpCollector(ast.NodeVisitor):
     """
     AST visitor that collects @pure, @predicate and @ghost annotations.

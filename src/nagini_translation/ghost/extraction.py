@@ -50,7 +50,7 @@ class ProgramExtractor:
             return visitor(node)
     
     def generic_extract(self, node: ast.AST) -> ast.AST:
-        print(f"Unhandled node of type {type(node)}")
+        print(f"WARNING: regular node of type {type(node)} contains unextracted ghost elements")
         return node
     
     def extract_ClassDef(self, node: ast.ClassDef) -> ast.AST:

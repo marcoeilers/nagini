@@ -83,12 +83,12 @@ class GhostChecker(ast.NodeVisitor):
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         current_class: PythonClass = self.modules[1].classes[node.name]
         self.ctx.current_class = current_class
-        old_ghost_ctx = self.in_ghost_ctx # TODO: Do we need to define classes within ghost context? 
+        old_ghost_ctx = self.in_ghost_ctx #TODO: Do we need to define classes within ghost context? 
         self.in_ghost_ctx = current_class.is_ghost
 
         # Classes may only have explicit bases of the same ghost type, 
         # i.e. ghost classes only have explicit ghost bases (and the implicit object base).
-        OBJECT_NAME = ast.Name(OBJECT_TYPE, None) #TODO: Does a cleaner solution exist?
+        OBJECT_NAME = ast.Name(OBJECT_TYPE, None)
         object_class = self.get_target(OBJECT_NAME, self.ctx)
         superclass = current_class.superclass
         if not (superclass == object_class or superclass.is_ghost == current_class.is_ghost):
@@ -520,7 +520,7 @@ class GhostChecker(ast.NodeVisitor):
             return ann.attr in mod.ghost_names
         else: 
             assert isinstance(ann, ast.Subscript), f"Unexpected type of {type(ann)}"
-            if isinstance(ann.slice, (ast.Name, ast.Constant, ast.Subscript)): #TODO: Find cleaner way to deal with subscripts?
+            if isinstance(ann.slice, (ast.Name, ast.Constant, ast.Subscript)):
                 return self.check_annotation(ann.slice)
             assert isinstance(ann.slice, (ast.Tuple, ast.List)), f"Unexpected type of {type(ann.slice)}"
             sub_anns = ann.slice.elts
@@ -659,7 +659,8 @@ class GhostChecker(ast.NodeVisitor):
         for arg in call.args:
             if isinstance(arg, ast.Starred):
                 if isinstance(arg.value, ast.Name):
-                    var: PythonVarBase = self.get_target(arg.value, self.ctx) #TODO
+                    #TODO: We currently assume the starred object to be a variable. This is not necessarily true
+                    var: PythonVarBase = self.get_target(arg.value, self.ctx)
                     assert var.type.name in ['tuple', 'list']
                     is_var_ghost = self.is_ghost(var)
                     for _ in range(len(var.type.type_args)):
@@ -800,7 +801,7 @@ class GhostChecker(ast.NodeVisitor):
         elif isinstance(elem, ast.expr):
             return self._is_expr_ghost(elem)
         elif isinstance(elem, GenericType):
-            return False #TODO: Maybe need to determine dynamically
+            return False #TODO: May not always be regular
         elif isinstance(elem, bool):
             return elem
         raise UnsupportedException(elem, f"Unsupported Ghost resolution of type {type(elem)}")
