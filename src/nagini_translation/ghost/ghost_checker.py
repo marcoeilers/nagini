@@ -34,7 +34,7 @@ from nagini_translation.lib.util import (
 
 annotation_t = Union[ast.Name, ast.Constant, ast.Attribute, ast.Subscript]
 
-ALL_CONTRACT_ELEMS = (CONTRACT_FUNCS + CONTRACT_WRAPPER_FUNCS + THREADING +
+ALL_CONTRACT_ELEMS = (CONTRACT_FUNCS + CONTRACT_WRAPPER_FUNCS +
                         IO_CONTRACT_FUNCS + IO_OPERATION_PROPERTY_FUNCS +
                         list(BUILTIN_IO_OPERATIONS) + IO_FUNCS + SPECIAL_PREDICATES +
                         OBLIGATION_CONTRACT_FUNCS
@@ -224,7 +224,7 @@ class GhostChecker(ast.NodeVisitor):
                 contains_ghost = expect_type
         
             node.is_ghost = False
-            self.set_contains_ghost(node, contains_ghost)
+            self.set_contains_ghost(node, contains_ghost, node.value)
 
     def visit_Delete(self, node: ast.Delete):
         if self.has_mixed_elems(node.targets):
@@ -300,15 +300,15 @@ class GhostChecker(ast.NodeVisitor):
             is_node_ghost = self.is_ghost(node.target)
             node.is_ghost = is_node_ghost
             self.set_contains_ghost(node, is_node_ghost, node.target)
-            return
-        self.check_assign(node.value, node.target)
+        else:
+            self.check_assign(node.value, node.target)
 
+            is_node_ghost = is_node_definitively_ghost or (is_target_ghost and self.is_ghost(node.value))
+            node.is_ghost = is_node_ghost
+            self.set_contains_ghost(node, is_node_ghost, node.value, node.target)
+        
         if is_node_definitively_ghost:
-            self.in_ghost_ctx = old_ctx
-
-        is_node_ghost = is_node_definitively_ghost or (is_target_ghost and self.is_ghost(node.value))
-        node.is_ghost = is_node_ghost
-        self.set_contains_ghost(node, is_node_ghost, node.value, node.target)
+                self.in_ghost_ctx = old_ctx
 
     def check_assign(self, value: Union[ast.expr, bool], target: ast.expr, allow_conversion: bool =True) -> None:        
         if isinstance(target, (ast.Name, ast.Attribute)):
@@ -520,7 +520,7 @@ class GhostChecker(ast.NodeVisitor):
             return ann.attr in mod.ghost_names
         else: 
             assert isinstance(ann, ast.Subscript), f"Unexpected type of {type(ann)}"
-            if isinstance(ann.slice, (ast.Name, ast.Subscript)): #TODO: Find cleaner way to deal with subscripts?
+            if isinstance(ann.slice, (ast.Name, ast.Constant, ast.Subscript)): #TODO: Find cleaner way to deal with subscripts?
                 return self.check_annotation(ann.slice)
             assert isinstance(ann.slice, (ast.Tuple, ast.List)), f"Unexpected type of {type(ann.slice)}"
             sub_anns = ann.slice.elts
@@ -553,7 +553,7 @@ class GhostChecker(ast.NodeVisitor):
         func_name = get_func_name(call)
         if func_name in TRANSPARENT_CALLS:
             idx = TRANSPARENT_CALLS[func_name]
-            res = self.is_ghost(call.args[idx]) #TODO: Should support keyword version
+            res = self.is_ghost(call.args[idx]) #TODO: Should probably support keyword version
             call.is_ghost = res
             call.contains_ghost = True
             call.is_pure = True
@@ -582,11 +582,11 @@ class GhostChecker(ast.NodeVisitor):
         called_func = None
         if isinstance(call.func, ast.Attribute):
             called_type = self.get_type(call.func.value, self.ctx)
-            if isinstance(called_type, PythonClass) and called_type.name in THREADING: #TODO: Thread should not be (automatically) ghost
-                call.is_ghost = True
+            if isinstance(called_type, PythonClass) and called_type.name in THREADING:
+                call.is_ghost = False
                 call.contains_ghost = True
-                call.is_pure = True
-                return True, None
+                call.is_pure = False
+                return False, None
             elif isinstance(called_type, UnionType):
                 types = called_type.get_types()
                 funcs = [t.get_func_or_method(func_name) for t in types]
@@ -649,6 +649,10 @@ class GhostChecker(ast.NodeVisitor):
             # class function: ignore self argument
             params = OrderedDict(params)
             params.popitem(last=False)
+        if len(called_func.special_args) > 0:
+            # Function has variadic parameters
+            # TODO: Support
+            raise UnsupportedException(call, "Unsupported calling of function with variadic parameters")
         
         # Get actual arguments
         args: list[ast.expr | bool] = []
@@ -664,6 +668,7 @@ class GhostChecker(ast.NodeVisitor):
                     arg.contains_ghost = is_var_ghost
                 elif isinstance(arg.value, ast.Call):
                     raise InvalidProgramException(arg, 'invalid.ghost.starred', "Do not use a star to unpack calls. Use an assignment instead.")
+                    #TODO: Allow reg only and maybe ghost only returns to be unpacked with *
                 else:
                     raise UnsupportedException(arg, f"Starred argument of type {type(arg)}")
             else:
@@ -887,7 +892,7 @@ class GhostChecker(ast.NodeVisitor):
                 items = [expr.slice]
                 res = self.is_ghost(expr.slice)
             else:
-                assert isinstance(expr.value, ast.Name), f"Unexpected type of {type(expr.value)}"
+                assert isinstance(expr.value, (ast.Name, ast.Attribute, ast.Call)), f"Unexpected type of {type(expr.value)}"
                 items = [expr.value]
                 res = self.is_ghost(expr.value)
         elif isinstance(expr, ast.Starred):

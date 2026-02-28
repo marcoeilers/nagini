@@ -49,7 +49,7 @@ def reg_call() -> Tuple[Tuple[int, int], Tuple[GInt, GInt]]: # OK
 # def mixed_return() -> Tuple[GInt, int]: #Throw invalid.ghost.annotation
 #     pass
 
-# def variadic(pos: int, *args: int, kw: str) -> int: # TODO: Properly support
+# def variadic(pos: int, *args: int, kw: str, **kwargs: str) -> int: # TODO: Properly support
 #     return 0
 
 def unpacking(i: int) -> None:
@@ -77,7 +77,7 @@ def unpacking(i: int) -> None:
 
     # (i, glist[0]), (gi,gk) = reg_call()   # Throw invalid.ghost.assign
 
-    # i = variadic(0, kw="")
+    # i = variadic(0, 0, gi, kw="", a="")
 
 
 # def pos_kw_only(pos1: int, pos2:int, /, any: int, *, kw: int) -> None:

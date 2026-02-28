@@ -386,6 +386,9 @@ class Analyzer(ast.NodeVisitor):
         elif isinstance(ann, ast.Name):
             return ann.id in self.module.ghost_names or ann.id in GHOST_BUILTINS
         elif isinstance(ann, ast.Subscript):
+            if isinstance(ann.value, ast.Name) and ann.value.id in GHOST_BUILTINS:
+                # Nagini Generic, e.g. PSeq
+                return True
             if isinstance(ann.slice, (ast.Name, ast.Subscript)): 
                 return self.is_ghost_annotation(ann.slice)
             else:

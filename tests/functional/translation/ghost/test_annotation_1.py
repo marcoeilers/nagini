@@ -25,13 +25,13 @@ def start_with_None() -> Union[None, GInt]:
     gi: GInt = 0
     return gi
 
-# def futureRef() -> 'GStrList':
-#     s: GStrList = ['future']
-#     return s
+def futureRef() -> 'GStrList':
+    s: GStrList = ['future']
+    return s
 
 @Ghost
 def ghost() -> Union[int, GInt, None, bool]:
     pass
 
-# GStrList = List[GStr]
-# MarkGhost(GStrList)
+GStrList = List[GStr]
+MarkGhost(GStrList)
