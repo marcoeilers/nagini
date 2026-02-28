@@ -146,12 +146,15 @@ class Silicon:
         else:
             return Success()
 
-    def __del__(self):
+    def stop(self):
         if hasattr(self, 'silicon') and self.silicon:
             try:
                 self.silicon.stop()
             except Exception:
                 pass
+
+    def __del__(self):
+        self.stop()
 
 
 class Carbon:
@@ -197,3 +200,10 @@ class Carbon:
             return Failure(errors, self.jvm, modules, sif)
         else:
             return Success()
+
+    def stop(self):
+        if hasattr(self, 'carbon') and self.carbon:
+            try:
+                self.carbon.stop()
+            except Exception:
+                pass
