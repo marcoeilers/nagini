@@ -850,7 +850,7 @@ class ContractTranslator(CommonTranslator):
         arg = lambda_.args.args[0]
         var = ctx.actual_function.get_variable(lambda_prefix + arg.arg)
 
-        exp_stmt, exp_val = self.translate_expr(node.args[0], ctx)
+        exp_stmt, exp_val = self.translate_expr(node.args[0], ctx, target_type=var.decl.typ())
 
         ctx.set_alias(arg.arg, var, None)
 
