@@ -6,7 +6,7 @@ from typing import List
 from nagini_contracts.contracts import *
 from dataclasses import dataclass, field
 
-@dataclass(frozen=True)
+@dataclass
 class A:
     num: int = 2
     num2: int = 10
@@ -33,7 +33,7 @@ class Color_Enum(IntEnum):
     blue = 2
     yellow = 3
 
-@dataclass(frozen=True)
+@dataclass
 class C:
     color: Color_Enum = Color_Enum.green
 

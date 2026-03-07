@@ -11,6 +11,10 @@ class Color_Enum(IntEnum):
     blue = 2
     yellow = 3
 
-@dataclass(frozen=True)
+@dataclass
 class MyClass():
+    color: Color_Enum = Color_Enum.red
+
+@dataclass(frozen=True)
+class MyClassF():
     color: Color_Enum = Color_Enum.red
