@@ -592,8 +592,6 @@ class Analyzer(ast.NodeVisitor):
             cls.dataclass = True
             if self.is_frozen_dataclass(node):
                 cls.frozen = True
-            else:
-                raise UnsupportedException(node, 'Non frozen dataclass currently not supported')
         for kw in node.keywords:
             if kw.arg == 'metaclass' and isinstance(kw.value, ast.Name) and kw.value.id == 'ABCMeta':
                 continue
@@ -614,16 +612,19 @@ class Analyzer(ast.NodeVisitor):
 
         args: list[ast.arg] = []
         defaults: list[ast.expr] = []
-        stmts: list[ast.stmt] = []
+        postconditions: list[ast.stmt] = []
 
         # Parse fields, add implicit args and post conditions
         args.append(self._create_arg_ast(node, 'self', None))
         for name, field in self.current_class.fields.items():
             args.append(self._create_arg_ast(node, name, field.type.name))
-            stmts.append(self._create_comp_postcondition(node,
+            self_attr = ast.Attribute(self._create_name_ast('self', node), name, ast.Load(), lineno=node.lineno, col_offset=0)
+            if not self.current_class.frozen:
+                postconditions.append(self._create_acc_postcondition(node, self_attr))
+            postconditions.append(self._create_comp_postcondition(node,
                             ast.Attribute(self._create_name_ast('self', node), name, ast.Load(), lineno=node.lineno, col_offset=0),
                             self._create_name_ast(name, node), ast.Is()))
-            if field.result != None:
+            if getattr(field, 'result', None) is not None:
                 defaults.append(field.result)
                 field.result = None
 
@@ -634,6 +635,7 @@ class Analyzer(ast.NodeVisitor):
         # Add decorators
         decorator_list: list[ast.expr] = [self._create_name_ast('ContractOnly', node)]
 
+        stmts = postconditions
         function_def = ast.FunctionDef('__init__', ast_arguments, stmts, decorator_list, returns=None, lineno=node.lineno, col_offset=0)
         self.visit(function_def, node)
 
@@ -654,12 +656,14 @@ class Analyzer(ast.NodeVisitor):
         return ast.arg(arg, name_node, lineno=node.lineno, col_offset=0)
 
     def _create_comp_postcondition(self, node, left: ast.expr, right: ast.expr, op: ast.cmpop) -> ast.stmt:
-        compare = ast.Compare(
-                    left,
-                    ops=[op],
-                    comparators=[right],
-                    lineno=node.lineno, col_offset=0)
+        compare = ast.Compare(left, ops=[op], comparators=[right],
+                            lineno=node.lineno, col_offset=0)
         return ast.Expr(ast.Call(self._create_name_ast('Ensures', node), [compare], [], lineno=node.lineno, col_offset=0))
+
+    def _create_acc_postcondition(self, node, attr: ast.expr) -> ast.stmt:
+        acc_call = ast.Call(self._create_name_ast('Acc', node), [attr], [], 
+                            lineno=node.lineno, col_offset=0)
+        return ast.Expr(ast.Call(self._create_name_ast('Ensures', node), [acc_call], [], lineno=node.lineno, col_offset=0))
 
     def _create_name_ast(self, id: str, node) -> ast.Name:
         return ast.Name(id, ast.Load(), lineno=node.lineno, col_offset=0)
@@ -942,9 +946,8 @@ class Analyzer(ast.NodeVisitor):
                     arg.arg, arg, arg_type)
                 self._aliases[arg.arg] = var
             else:
-                arg_type = self.typeof(arg).try_unbox()
                 var = self.node_factory.create_python_var(
-                    arg.arg, arg, arg_type)
+                    arg.arg, arg, self.typeof(arg))
             alts = self.get_alt_types(node)
             var.alt_types = alts
             local_name = name + '$' + arg.arg
@@ -1212,8 +1215,8 @@ class Analyzer(ast.NodeVisitor):
                         self.track_access(node, var)
                 self.deferred_tasks.append(todo)
                 return
-            elif self.current_class.dataclass and self.current_class.frozen:
-                # Node is a field of a frozen dataclass
+            elif self.current_class.dataclass:
+                # Node is a field of a dataclass
                 if isinstance(node.ctx, ast.Load):
                     return
 
@@ -1243,16 +1246,20 @@ class Analyzer(ast.NodeVisitor):
                 self_type, _ = self.module.get_type([self.current_class.name, '__init__'], 'self')
                 self.module.types.all_types[context] = self_type
 
-                # Create a property for this field
-                ast_arguments = ast.arguments([], [self._create_arg_ast(node, 'self', None)], None, [], [], None, [])
-                stmts = [ast.Expr(ast.Call(self._create_name_ast('Decreases', node), [ast.Constant(None)], []))]
-                decorator_list: list[ast.expr] = [ast.Name('property'), ast.Name('ContractOnly')]
-                function_def = ast.FunctionDef(node.id, ast_arguments, stmts, decorator_list, returns=annotation, lineno=node.lineno, col_offset=0)
-                self.visit(function_def, self.current_class.node)
+                # Create a property for frozen fields, or a normal field for non-frozen
+                if self.current_class.frozen:
+                    ast_arguments = ast.arguments([], [self._create_arg_ast(node, 'self', None)], None, [], [], None, [])
+                    stmts = [ast.Expr(ast.Call(self._create_name_ast('Decreases', node), [ast.Constant(None)], []))]
+                    decorator_list: list[ast.expr] = [ast.Name('property'), ast.Name('ContractOnly')]
+                    function_def = ast.FunctionDef(node.id, ast_arguments, stmts, decorator_list, returns=annotation, lineno=node.lineno, col_offset=0)
+                    self.visit(function_def, self.current_class.node)
+                else:
+                    self.current_class.add_field(node.id, node, self.typeof(node))
 
                 # Adjust the class body
                 self.current_class.node.body.remove(assign)
-                self.current_class.node.body.append(function_def)
+                if self.current_class.frozen:
+                    self.current_class.node.body.append(function_def)
 
                 if assign.value != None:
                     field_obj = self.current_class.fields[node.id]
@@ -1843,6 +1850,8 @@ class Analyzer(ast.NodeVisitor):
     
     def _dataclass_check_unsupported_keywords(self, cls: ast.ClassDef) -> None:
         decorator = [d for d in cls.decorator_list if self.__resolve_decorator(d)[1] == 'dataclass'][0]
+        if isinstance(decorator, ast.Name):
+            return
         assert isinstance(decorator, ast.Call) and isinstance(decorator.func, ast.Name)
         supported_keywords = ["frozen"]
 

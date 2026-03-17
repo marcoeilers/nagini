@@ -20,12 +20,12 @@ class B:
     num: int = 2
     direct = 3
 
-@dataclass(frozen=True)
+@dataclass
 class FactoryClass:
     arr: List[int] = field(default_factory=list)
 
-@dataclass() #:: ExpectedOutput(unsupported:Non frozen dataclass currently not supported)
-class NonFrozen:
+@dataclass(frozen=False)
+class NonFrozenKeyword:
     data: int
 
 def test_cons() -> None:
