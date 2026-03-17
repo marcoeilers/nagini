@@ -946,9 +946,8 @@ class Analyzer(ast.NodeVisitor):
                     arg.arg, arg, arg_type)
                 self._aliases[arg.arg] = var
             else:
-                arg_type = self.typeof(arg).try_unbox()
                 var = self.node_factory.create_python_var(
-                    arg.arg, arg, arg_type)
+                    arg.arg, arg, self.typeof(arg))
             alts = self.get_alt_types(node)
             var.alt_types = alts
             local_name = name + '$' + arg.arg
