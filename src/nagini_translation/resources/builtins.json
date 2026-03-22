@@ -18,6 +18,10 @@
         "__str__": {
             "args": ["object"],
             "type": "str"
+        },
+        "__repr__": {
+            "args": ["object"],
+            "type": "str"
         }
     }
 },
@@ -99,6 +103,10 @@
         "__sil_seq__": {
             "args": ["list"],
             "type": "__prim__Seq"
+        },
+        "__eq__": {
+            "args": ["list", "object"],
+            "type": "__prim__bool"
         }
     },
     "type_vars": 1,
@@ -313,6 +321,30 @@
         "__rxor__": {
             "args": ["int", "int"],
             "type": "int"
+        },
+        "__lshift__": {
+            "args": ["int", "int"],
+            "type": "int"
+        },
+        "__rlshift__": {
+            "args": ["int", "int"],
+            "type": "int"
+        },
+        "__rshift__": {
+            "args": ["int", "int"],
+            "type": "int"
+        },
+        "__rrshift__": {
+            "args": ["int", "int"],
+            "type": "int"
+        },
+        "bit_length": {
+            "args": ["int"],
+            "type": "__prim__int"      
+        },
+        "__byte_bounds__": {
+            "args": ["__prim__int"],
+            "type": "__prim__bool"
         }
     },
     "extends": "float"
@@ -505,6 +537,16 @@
             "args": ["str"],
             "type": "list",
             "MustTerminate": true
+        },
+        "format": {
+            "args": ["str", "object", "object"],
+            "type": "str",
+            "MustTerminate": true
+        },
+        "__format__": {
+            "args": ["str", "str"],
+            "type": "str",
+            "MustTerminate": true
         }
     },
     "extends": "object"
@@ -555,6 +597,92 @@
         "join": {
             "args": ["bytes", "list"],
             "type": "bytes"
+        }
+    },
+    "extends": "object"
+},
+"bytearray": {
+    "methods": {
+        "__init__": {
+            "args": [],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__initFromInt__": {
+            "args": ["int"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__initFromList__": {
+            "args": ["list"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__initFromBytearray__": {
+            "args": ["bytearray"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "append": {
+            "args": ["bytearray", "int"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "extend": {
+            "args": ["bytearray", "bytearray"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "reverse": {
+            "args": ["bytearray"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__setitem__": {
+            "args": ["bytearray", "__prim__int", "int"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__iter__": {
+            "args": ["bytearray"],
+            "type": "Iterator",
+            "MustTerminate": true
+        },
+        "__getitem_slice__": {
+            "args": ["bytearray", "slice"],
+            "type": "bytearray",
+            "display_name": "__getitem__",
+            "MustTerminate": true
+        }
+    },
+    "functions": {
+        "hex": {
+            "args": ["bytearray"],
+            "type": "str"
+        },
+        "__len__": {
+            "args": ["bytearray"],
+            "type": "__prim__int"
+        },
+        "__getitem__": {
+            "args": ["bytearray", "int"],
+            "type": "__prim__int"
+        },
+        "__contains__": {
+            "args": ["bytearray", "int"],
+            "type": "__prim__bool"
+        },
+        "__bool__": {
+            "args": ["bytearray"],
+            "type": "__prim__bool"
+        },
+        "__eq__": {
+            "args": ["bytearray", "object"],
+            "type": "__prim__bool"
+        },
+        "__sil_seq__": {
+            "args": ["bytearray"],
+            "type": "__prim__Seq"
         }
     },
     "extends": "object"
@@ -643,6 +771,22 @@
         "__box__": {
             "args": ["__prim__int"],
             "type": "int"
+        },
+        "__lshift__": {
+            "args": ["__prim__int", "__prim__int"],
+            "type": "__prim__int"
+        },
+        "__rlshift__": {
+            "args": ["__prim__int", "__prim__int"],
+            "type": "__prim__int"
+        },
+        "__rshift__": {
+            "args": ["__prim__int", "__prim__int"],
+            "type": "__prim__int"
+        },
+        "__rrshift__": {
+            "args": ["__prim__int", "__prim__int"],
+            "type": "__prim__int"
         }
     }
 },
@@ -715,6 +859,67 @@
         }
     },
     "type_vars": 1,
+    "extends": "object"
+},
+"PByteSeq": {
+    "functions": {
+        "__create__": {
+            "args": ["__prim__Seq"],
+            "type": "PByteSeq"
+        },
+        "__from_bytes__": {
+            "args": ["__prim__Seq"],
+            "type": "PByteSeq"
+        },
+        "__unbox__": {
+            "args": ["PByteSeq"],
+            "type": "__prim__Seq"
+        },
+        "__contains__": {
+            "args": ["PByteSeq", "__prim__int"],
+            "type": "__prim__bool"
+        },
+        "__getitem__": {
+            "args": ["PByteSeq", "int"],
+            "type": "__prim__int"
+        },
+        "__sil_seq__": {
+            "args": ["PByteSeq"],
+            "type": "__prim__Seq"
+        },
+        "__seq_ref_to_seq_int__": {
+            "args": ["__prim__Seq"],
+            "type": "__prim__Seq"
+        },
+        "__val__": {
+            "args": ["PByteSeq"],
+            "type": "__prim__Seq"
+        },
+        "__len__": {
+            "args": ["PByteSeq"],
+            "type": "__prim__int"
+        },
+        "take": {
+            "args": ["PByteSeq", "__prim__int"],
+            "type": "PByteSeq"
+        },
+        "drop": {
+            "args": ["PByteSeq", "__prim__int"],
+            "type": "PByteSeq"
+        },
+        "update": {
+            "args": ["PByteSeq", "__prim__int", "__prim__int"],
+            "type": "PByteSeq"
+        },
+        "__add__": {
+            "args": ["PByteSeq", "PByteSeq"],
+            "type": "PByteSeq"
+        },
+        "__eq__": {
+            "args": ["PByteSeq", "PByteSeq"],
+            "type": "__prim__bool"
+        }
+    },
     "extends": "object"
 },
 "PSet": {
@@ -911,6 +1116,9 @@
     },
     "extends": "object"
 },
+"IntEnum": {
+    "extends": "int"
+},
 "global": {
     "functions": {
         "max": {
@@ -939,6 +1147,11 @@
         "sorted": {
             "args": ["list"],
             "type": "list",
+            "MustTerminate": true
+        },
+        "hash": {
+            "args": ["object"],
+            "type": "int",
             "MustTerminate": true
         }
     }

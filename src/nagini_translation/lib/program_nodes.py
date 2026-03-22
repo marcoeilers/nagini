@@ -26,6 +26,7 @@ from nagini_translation.lib.constants import (
     PRIMITIVE_SET_TYPE,
     PRIMITIVES,
     PSEQ_TYPE,
+    PBYTESEQ_TYPE,
     PSET_TYPE,
     RESULT_NAME,
     STRING_TYPE,
@@ -410,6 +411,11 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self.static_fields = OrderedDict()
         self.type = None  # infer, domain type
         self.interface = interface
+        self.dataclass = False
+        self.implicit_init = False
+        self.frozen = False
+        self.enum = False
+        self.enum_type = None
         self.defined = False
         self._has_classmethod = False
         self.type_vars = OrderedDict()
@@ -750,6 +756,8 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
                 boxed_name = PMSET_TYPE
             if boxed_name == 'Seq':
                 boxed_name = PSEQ_TYPE
+            if boxed_name == 'PByteSeq':
+                boxed_name = PBYTESEQ_TYPE
             return self.module.classes[boxed_name]
         return self
 
@@ -1593,6 +1601,7 @@ class PythonVarBase(PythonNode):
         self.alt_types = {}
         self.default = None
         self.default_expr = None
+        self.default_factory = None
         self.show_in_ce = True
 
     def process(self, sil_name: str, translator: 'Translator') -> None:

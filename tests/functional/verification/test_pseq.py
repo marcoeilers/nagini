@@ -35,7 +35,6 @@ def test_seq() -> None:
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert False
 
-
 def test_list_ToSeq() -> None:
     a = [1,2,3]
     assert ToSeq(a) == PSeq(1,2,3)

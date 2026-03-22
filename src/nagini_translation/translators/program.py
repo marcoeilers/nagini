@@ -24,6 +24,7 @@ from nagini_translation.lib.constants import (
     MAY_SET_PRED,
     METHOD_ID_DOMAIN,
     NAME_DOMAIN,
+    PRIMITIVE_INT_TYPE,
     PRIMITIVES,
     RESULT_NAME,
     THREAD_DOMAIN,
@@ -146,7 +147,11 @@ class ProgramTranslator(CommonTranslator):
             ctx.current_class = field.cls
             ctx.module = field.cls.module
             # Compute the field value
-            stmt, value = self.translate_expr(field.value, ctx)
+            if cls.enum:
+                stmt, value = self.translate_expr(field.value, ctx, self.viper.Int)
+                value = self.viper.FuncApp(cls.name + '__box__', [value], position, info, self.viper.Ref)
+            else:
+                stmt, value = self.translate_expr(field.value, ctx)
             if stmt:
                 raise InvalidProgramException('purity.violated', field.node)
             field_position = self.to_position(field.node, ctx)
@@ -442,7 +447,7 @@ class ProgramTranslator(CommonTranslator):
                 if type and not type.python_class.interface and not type.contains_type_var():
                     definition_deps.add((arg.node.annotation, type.python_class,
                                          method.module))
-            if arg.default:
+            if arg.default and not arg.default_factory:
                 stmt, expr = self.translate_expr(arg.default, ctx)
                 if not stmt and expr:
                     arg.default_expr = expr
@@ -483,6 +488,10 @@ class ProgramTranslator(CommonTranslator):
                                        self.no_info(ctx)))
         fields.append(self.viper.Field('dict_acc',
                                        self.viper.MapType(self.viper.Ref, self.viper.Ref),
+                                       self.no_position(ctx),
+                                       self.no_info(ctx)))
+        fields.append(self.viper.Field('bytearray_acc',
+                                       self.viper.SeqType(self.viper.Int),
                                        self.no_position(ctx),
                                        self.no_info(ctx)))
         fields.append(self.viper.Field('Measure$acc',
@@ -1162,6 +1171,98 @@ class ProgramTranslator(CommonTranslator):
 
         return domains, functions
 
+    def _register_enum_int_function(self, enum: PythonClass, ctx: Context, suffix: str) -> PythonMethod:
+        """Register __int__ as an interface function on the enum class."""
+        int_func = enum.node_factory.create_python_method(
+            suffix, None, enum, enum, True, False, enum.node_factory,
+            interface=True, interface_dict={'args': [enum.name], 'type': PRIMITIVE_INT_TYPE})
+        arg = enum.node_factory.create_python_var('self', None, enum)
+        int_func.add_arg('self', arg)
+        int_func.type = ctx.module.global_module.classes[PRIMITIVE_INT_TYPE]
+        sil_name = enum.get_fresh_name(enum.name + suffix)
+        int_func.process(sil_name, self.translator)
+        enum.functions[suffix] = int_func
+        return int_func
+
+    def _create_enum_func_box_and_unbox(self, enum: PythonClass, ctx: Context) -> list[Function]:
+        """Create __box__ and __int__ functions for IntEnum. Other enum types currently not supported."""
+
+        pos = self.to_position(enum, ctx)
+        info = self.no_info(ctx)
+        terminates_wildcard = self.viper.DecreasesWildcard(None, pos, info)
+
+        box_func_suffix = '__box__'
+        box_func_name = enum.sil_name + box_func_suffix
+        unbox_func_suffix = '__int__'
+        int_func = self._register_enum_int_function(enum, ctx, unbox_func_suffix)
+        unbox_func_name = int_func.sil_name
+
+        # Create box function (Int -> Ref)
+        int_val_use = self.viper.LocalVar('value', self.viper.Int, pos, info)
+        int_val_decl = self.viper.LocalVarDecl('value', self.viper.Int, pos, info)
+        result = self.viper.Result(self.viper.Ref, pos, info)
+        preconds = [terminates_wildcard]
+        
+        # Add precondition for allowed values
+        enum_value_precond = self.viper.FalseLit(pos, info)
+        for field_name in enum.static_fields:
+            field = enum.get_static_field(field_name)
+            if field and field.value:
+                _, enum_value_expr = self.translate_expr(field.value, ctx, self.viper.Int)
+                value_check = self.viper.EqCmp(int_val_use, enum_value_expr, pos, info)                
+                enum_value_precond = self.viper.Or(enum_value_precond, value_check, pos, info)
+        preconds.append(enum_value_precond)            
+        
+        postconds = []        
+        postconds.append(self.type_factory.type_check(result, enum, pos, ctx, True))
+        
+        unbox_func = self.viper.FuncApp(unbox_func_name, [result], pos, info, self.viper.Int)
+        postconds.append(self.viper.EqCmp(unbox_func, int_val_use, pos, info))
+        int_unbox_func = self.viper.FuncApp('int___unbox__', [result], pos, info, self.viper.Int)
+        postconds.append(self.viper.EqCmp(int_unbox_func, int_val_use, pos, info))
+        
+        yield self.viper.Function(box_func_name,
+                                [int_val_decl], self.viper.Ref, preconds, postconds,
+                                None, pos, info)
+
+        # Create unbox function (Ref -> Int)
+        ref_use = self.viper.LocalVar('box', self.viper.Ref, pos, info)
+        ref_decl = self.viper.LocalVarDecl('box', self.viper.Ref, pos, info)
+        result = self.viper.Result(self.viper.Int, pos, info)
+        preconds = [terminates_wildcard]
+        postconds = []
+        
+        preconds.append(self.type_factory.type_check(ref_use, enum, pos, ctx, True))
+        
+        # Add postcondition constraining the result to valid enum values
+        enum_value_postcond = self.viper.FalseLit(pos, info)
+        for field_name in enum.static_fields:
+            field = enum.get_static_field(field_name)
+            if field and field.value:
+                _, enum_value_expr = self.translate_expr(field.value, ctx, self.viper.Int)
+                value_check = self.viper.EqCmp(result, enum_value_expr, pos, info)
+                enum_value_postcond = self.viper.Or(enum_value_postcond, value_check, pos, info)
+        postconds.append(enum_value_postcond)
+
+        # Add forall postcondition
+        i_var_use = self.viper.LocalVar('i', self.viper.Ref, pos, info)
+        i_var_decl = self.viper.LocalVarDecl('i', self.viper.Ref, pos, info)
+        obj_eq_check = self.viper.DomainFuncApp('object___eq__', [ref_use, i_var_use], self.viper.Bool, pos, info, '__ObjectEquality')
+        type_check = self.type_factory.type_check(i_var_use, enum, pos, ctx, True)
+        condition = self.viper.And(obj_eq_check, type_check, pos, info)  
+        unbox_apply = self.viper.FuncApp(unbox_func_name, [i_var_use], pos, info, self.viper.Int)
+        unbox_eq = self.viper.EqCmp(unbox_apply, result, pos, info)
+        implication = self.viper.Implies(condition, unbox_eq, pos, info)
+        
+        trigger = self.viper.Trigger([obj_eq_check, unbox_apply], pos, info)
+        forall_postcond = self.viper.Forall([i_var_decl], [trigger], implication, pos, info)
+        postconds.append(forall_postcond)
+        
+        yield self.viper.Function(unbox_func_name,
+                                [ref_decl], self.viper.Int, preconds, postconds,
+                                None, pos, info)
+
+
     def translate_program(self, modules: List[PythonModule], sil_progs: Program,
                           ctx: Context, selected: Set[str] = None,
                           ignore_global: bool = False) -> Program:
@@ -1229,6 +1330,12 @@ class ProgramTranslator(CommonTranslator):
                     while current_field.overrides:
                         current_field = current_field.overrides
                     static_fields.setdefault(current_field, []).append(cls)
+                if cls.enum:
+                    enum_functions = list(self._create_enum_func_box_and_unbox(cls, ctx))
+                    functions.extend(enum_functions)
+                    if module is not module.global_module:
+                        for function in enum_functions:
+                            all_names.append(function.name())
 
             ctx.current_class = None
             # Translate default args
@@ -1292,7 +1399,7 @@ class ProgramTranslator(CommonTranslator):
                     self.track_dependencies(selected_names, selected, func, ctx)
                     functions.append(self.translate_function(func, ctx))
                     func_constants.append(self.translate_function_constant(func, ctx))
-                    if func.overrides and not ((func_name in ('__str__', '__bool__') and
+                    if func.overrides and not ((func_name in ('__str__', '__bool__', '__eq__') and
                                                 func.overrides.cls.name == 'object') or
                                                (func_name in ('__getitem__',) and func.overrides.cls.name == 'dict')):
                         # We allow overriding certain methods, since the basic versions
@@ -1350,6 +1457,7 @@ class ProgramTranslator(CommonTranslator):
                         predicate_families[cpred].append(pred)
                     else:
                         predicate_families[cpred] = [pred]
+
                 ctx.current_class = old_class
 
         if not ignore_global:

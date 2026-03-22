@@ -329,16 +329,18 @@ class MethodTranslator(CommonTranslator):
             check = self.type_check(result, func.type, res_type_pos, ctx)
             posts = [check] + posts
 
-        statements = func.node.body
-        start, end = get_body_indices(statements)
-        # Translate body
-        actual_body = statements[start:end]
-        if (func.contract_only or
-                (len(actual_body) == 1 and isinstance(actual_body[0], ast.Expr) and
-                 isEllipsis(actual_body[0].value))):
+        if func.contract_only:
             body = None
         else:
-            body = self.translate_exprs(actual_body, func, ctx)
+            statements = func.node.body
+            start, end = get_body_indices(statements)
+            # Translate body
+            actual_body = statements[start:end]
+            if ((len(actual_body) == 1 and isinstance(actual_body[0], ast.Expr) and
+                    isEllipsis(actual_body[0].value))):
+                body = None
+            else:
+                body = self.translate_exprs(actual_body, func, ctx)
         ctx.current_function = old_function
         name = func.sil_name
 

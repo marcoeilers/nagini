@@ -324,6 +324,16 @@ test_config = file_config.test_config
 Test configuration.
 """
 
+enable_preprocessing = False
+"""
+Enable Preprocessing of files.
+"""
+
+comment_pattern = ""
+"""
+Comment pattern to preprocess.
+"""
+
 
 __all__ = (
     'classpath',
@@ -333,4 +343,6 @@ __all__ = (
     'mypy_dir',
     'obligation_config',
     'set_verifier',
+    'enable_preprocessing',
+    'comment_pattern'
 )

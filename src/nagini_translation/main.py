@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import sys
+import threading
 import re
 import time
 import traceback
@@ -51,7 +52,7 @@ from nagini_translation.verifier import (
     ViperVerifier
 )
 from nagini_translation import verifier
-from typing import List, Set, Tuple
+from typing import List, Set, Tuple, Union
 
 
 TYPE_ERROR_PATTERN = r"^(?P<file>.*):(?P<line>\d+): error: (?P<msg>.*)$"
@@ -65,8 +66,8 @@ def parse_sil_file(sil_path: str, bv_path: str, bv_size: int, jvm, float_option:
     with open(sil_path, 'r') as file:
         text = file.read()
     with open(bv_path, 'r') as file:
-        int_min = -(2 ** (bv_size - 1))
-        int_max = 2 ** (bv_size - 1) - 1
+        int_min = -(2 ** (bv_size))
+        int_max = 2 ** (bv_size) - 1
         text += "\n" + file.read().replace("NBITS", str(bv_size)).replace("INT_MIN_VAL", str(int_min)).replace("INT_MAX_VAL", str(int_max))
     if float_option == "real":
         text = text.replace("float.sil", "float_real.sil")
@@ -120,12 +121,14 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
         raise Exception('Viper not found on classpath.')
     if sif and not viper_ast.is_extension_available():
         raise Exception('Viper AST SIF extension not found on classpath.')
+    
     types = TypeInfo()
     type_correct = types.check(path, base_dir)
     if not type_correct:
         return None
 
     analyzer = Analyzer(types, path, selected)
+    analyzer.comment_pattern = config.comment_pattern  
     main_module = analyzer.module
     with open(os.path.join(builtins_index_path, 'builtins.json'), 'r') as file:
         analyzer.add_native_silver_builtins(json.loads(file.read()))
@@ -193,6 +196,11 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
     for task in analyzer.deferred_tasks:
         task()
 
+def get_verifier(path: str, jvm: JVM, viper_args: List[str], backend=ViperVerifier.silicon, counterexample=False) -> Union[Silicon, Carbon]:
+    if backend == ViperVerifier.silicon:
+        return Silicon(jvm, path, viper_args, counterexample)
+    elif backend == ViperVerifier.carbon:
+        return Carbon(jvm, path, viper_args)
 
 def verify(modules, prog: 'viper.silver.ast.Program', path: str, jvm: JVM, viper_args: List[str],
            backend=ViperVerifier.silicon, arp=False, counterexample=False, sif=False) -> VerificationResult:
@@ -200,10 +208,7 @@ def verify(modules, prog: 'viper.silver.ast.Program', path: str, jvm: JVM, viper
     Verifies the given Viper program
     """
     try:
-        if backend == ViperVerifier.silicon:
-            verifier = Silicon(jvm, path, viper_args, counterexample)
-        elif backend == ViperVerifier.carbon:
-            verifier = Carbon(jvm, path, viper_args)
+        verifier = get_verifier(path, jvm, viper_args, backend, counterexample)
         vresult = verifier.verify(modules, prog, arp=arp, sif=sif)
         return vresult
     except JException as je:
@@ -296,6 +301,11 @@ def main() -> None:
               'performance'),
         default=-1)
     parser.add_argument(
+        '--benchmark-timeout',
+        type=int,
+        help='timeout in seconds for each benchmark run',
+        default=-1)
+    parser.add_argument(
         '--ide-mode',
         action='store_true',
         help='Output errors in IDE format')
@@ -350,6 +360,17 @@ def main() -> None:
         type=int,
         default=8
     )
+    parser.add_argument(
+        '--comment-pattern',
+        help='Preprocess comments with pattern',
+        type=str,
+        default="#@nagini"
+    )
+    parser.add_argument(
+        '--preprocess',
+        action='store_true',
+        help='Enable preprocessing',
+    )
     args = parser.parse_args()
 
     config.classpath = args.viper_jar_path
@@ -357,6 +378,8 @@ def main() -> None:
     config.z3_path = args.z3
     config.mypy_path = args.mypy_path
     config.set_verifier(args.verifier)
+    config.enable_preprocessing = args.preprocess
+    config.comment_pattern = args.comment_pattern
     if args.ignore_obligations:
         if args.force_obligations:
             parser.error('incompatible arguments: --ignore-obligations and --force-obligations')
@@ -431,15 +454,54 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
             raise ValueError('Unknown verifier specified: ' + args.verifier)
         viper_args = [] if args.viper_arg is None else args.viper_arg.split(",")
         if args.benchmark >= 1:
-            print("Run, Total, Start, End, Time".format())
+            print("Run, Total, Start, End, Time, Result")
+            n_success = 0
+            n_failure = 0
+            n_timeout = 0
             for i in range(args.benchmark):
                 start = time.time()
-                modules, prog = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif, arp=arp, base_dir=base_dir,
-                                          ignore_global=args.ignore_global, float_encoding=args.float_encoding)
-                vresult = verify(modules, prog, python_file, jvm, viper_args, backend=backend, arp=arp)
+                timed_out = False
+
+                verifier_ref = [None]
+                result_ref = [None]
+                def _run_iteration(vholder=verifier_ref, rholder=result_ref):
+                    try:
+                        modules_local, prog_local = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif,
+                                arp=arp, base_dir=base_dir, ignore_global=args.ignore_global, float_encoding=args.float_encoding)
+                        ver = get_verifier(python_file, jvm, viper_args, backend)
+                        vholder[0] = ver
+                        rholder[0] = ver.verify(modules_local, prog_local, arp=arp)
+                    except Exception:
+                        pass
+
+                thread = threading.Thread(target=_run_iteration, daemon=True)
+                thread.start()
+                timeout = args.benchmark_timeout if args.benchmark_timeout > 0 else None
+                thread.join(timeout=timeout)
+
+                if thread.is_alive():
+                    timed_out = True
+                    ver = verifier_ref[0]
+                    if ver is not None:
+                        ver.stop()
+                    thread.join(timeout=10)
                 end = time.time()
-                print("{}, {}, {}, {}, {}".format(
-                    i, args.benchmark, start, end, end - start))
+
+                if timed_out:
+                    n_timeout += 1
+                    print("{}, {}, {}, {}, TIMEOUT, TIMEOUT".format(
+                        i, args.benchmark, start, end))
+                else:
+                    vresult = result_ref[0]
+                    result_str = "SUCCESS" if isinstance(vresult, verifier.Success) else "FAILURE"
+                    if isinstance(vresult, verifier.Success):
+                        n_success += 1
+                    else:
+                        n_failure += 1
+                    print("{}, {}, {}, {}, {}, {}".format(
+                        i, args.benchmark, start, end, end - start, result_str))
+            print("Results: {} success, {} failure, {} timeout out of {} runs".format(
+                n_success, n_failure, n_timeout, args.benchmark))
         else:
             submitter = None
             if args.submit_for_evaluation:
@@ -452,12 +514,13 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
             if submitter is not None:
                 submitter.setSuccess(vresult.__bool__())
                 submitter.submit()
-        if args.verbose:
-            print("Verification completed.")
-        print(vresult.to_string(args.ide_mode, args.show_viper_errors))
-        duration = '{:.2f}'.format(time.time() - start)
-        print('Verification took ' + duration + ' seconds.')
-        return isinstance(vresult, verifier.Success)
+            if args.verbose:
+                print("Verification completed.")
+            print(vresult.to_string(args.ide_mode, args.show_viper_errors))
+            duration = '{:.2f}'.format(time.time() - start)
+            print('Verification took ' + duration + ' seconds.')
+            return isinstance(vresult, verifier.Success)
+        return True
     except (TypeException, InvalidProgramException, UnsupportedException) as e:
         print("Translation failed")
         if isinstance(e, (InvalidProgramException, UnsupportedException)):
@@ -471,11 +534,13 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                 issue = 'Not supported: '
                 if e.args[0]:
                     issue += e.args[0]
-                else:
+                elif e.node != None:
                     issue += astunparse.unparse(e.node)
-            line = str(e.node.lineno)
-            col = str(e.node.col_offset)
-            print(issue + ' (' + python_file + '@' + line + '.' + col + ')')
+            if e.node != None:
+                line = str(e.node.lineno)
+                col = str(e.node.col_offset)
+                print(issue + ' (' + python_file + '@' + line + '.' + col + ')')
+            traceback.print_exc()
         if isinstance(e, TypeException):
             for msg in e.messages:
                 parts = TYPE_ERROR_MATCHER.match(msg)
@@ -487,6 +552,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                     msg = parts['msg']
                     line = parts['line']
                     print('Type error: ' + msg + ' (' + file + '@' + line + '.0)')
+                    traceback.print_exc()
                 else:
                     print(msg)
         return False

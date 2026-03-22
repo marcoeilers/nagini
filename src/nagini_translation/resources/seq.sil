@@ -38,11 +38,13 @@ function PSeq_take(self: Ref, no: Int): Ref
     decreases _
     requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
     ensures result == PSeq___create__(PSeq___sil_seq__(self)[..no], PSeq_arg(typeof(self), 0))
+    ensures no == PSeq___len__(self) ==> result == self
 
 function PSeq_drop(self: Ref, no: Int): Ref
     decreases _
     requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
     ensures result == PSeq___create__(PSeq___sil_seq__(self)[no..], PSeq_arg(typeof(self), 0))
+    ensures no == 0 ==> result == self
 
 function PSeq_update(self: Ref, index: Int, val: Ref): Ref
     decreases _

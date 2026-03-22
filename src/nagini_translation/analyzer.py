@@ -10,7 +10,6 @@ import logging
 import os
 import nagini_contracts.io_builtins
 import nagini_contracts.lock
-import tokenize
 
 from collections import OrderedDict
 from nagini_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
@@ -27,6 +26,7 @@ from nagini_translation.lib.constants import (
     EXTENDABLE_BUILTINS,
     IGNORED_IMPORTS,
     INT_TYPE,
+    PRIMITIVE_INT_TYPE,
     LEGAL_MAGIC_METHODS,
     LITERALS,
     MYPY_SUPERCLASSES,
@@ -64,6 +64,7 @@ from nagini_translation.lib.util import (
     InvalidProgramException,
     is_io_existential,
     isStr,
+    read_source_file,
     UnsupportedException,
 )
 from nagini_translation.lib.views import PythonModuleView
@@ -103,6 +104,7 @@ class Analyzer(ast.NodeVisitor):
         self.deferred_tasks = []
         self.has_all_low = False
         self.enable_obligations = False
+        self.comment_pattern = "#@nagini"
 
     def initialize_io_analyzer(self) -> None:
         self.io_operation_analyzer = IOOperationAnalyzer(
@@ -154,8 +156,8 @@ class Analyzer(ast.NodeVisitor):
             # This is a module that corresponds to a directory, so it has no
             # contents of its own.
             return
-        with tokenize.open(abs_path) as file:
-            text = file.read()
+        
+        text = read_source_file(abs_path)        
         parse_result = ast.parse(text)
         try:
             mark_text_ranges(parse_result, text)
@@ -581,17 +583,90 @@ class Analyzer(ast.NodeVisitor):
             cls.superclass = self.find_or_create_class(OBJECT_TYPE)
         if cls.python_class not in cls.superclass.python_class.direct_subclasses:
             cls.superclass.python_class.direct_subclasses.append(cls.python_class)
-
+        if cls.superclass.python_class.enum:
+            raise InvalidProgramException(node, 'Cannot extend enumeration')
+        if cls.superclass.name == "IntEnum":
+            cls.enum = True
+            cls.enum_type = INT_TYPE
+        if self.is_dataclass(node):
+            cls.dataclass = True
+            if self.is_frozen_dataclass(node):
+                cls.frozen = True
         for kw in node.keywords:
             if kw.arg == 'metaclass' and isinstance(kw.value, ast.Name) and kw.value.id == 'ABCMeta':
                 continue
             if kw.arg == 'metaclass':
                 raise UnsupportedException(kw, "Unsupported metaclass")
             raise UnsupportedException(kw, "Unsupported keyword argument")
-
-        for member in node.body:
+                    
+        for member in node.body.copy():
             self.visit(member, node)
+        if cls.dataclass and "__init__" not in cls.methods.keys():
+            self._add_dataclass_init_method(node)
+            
         self.current_class = None
+
+    def _add_dataclass_init_method(self, node: ast.ClassDef) -> None:
+        """Adds the implicit __init__ method for dataclasses"""
+        assert self.current_class != None
+
+        args: list[ast.arg] = []
+        defaults: list[ast.expr] = []
+        postconditions: list[ast.stmt] = []
+
+        # Parse fields, add implicit args and post conditions
+        args.append(self._create_arg_ast(node, 'self', None))
+        for name, field in self.current_class.fields.items():
+            args.append(self._create_arg_ast(node, name, field.type.name))
+            self_attr = ast.Attribute(self._create_name_ast('self', node), name, ast.Load(), lineno=node.lineno, col_offset=0)
+            if not self.current_class.frozen:
+                postconditions.append(self._create_acc_postcondition(node, self_attr))
+            postconditions.append(self._create_comp_postcondition(node,
+                            ast.Attribute(self._create_name_ast('self', node), name, ast.Load(), lineno=node.lineno, col_offset=0),
+                            self._create_name_ast(name, node), ast.Is()))
+            if getattr(field, 'result', None) is not None:
+                defaults.append(field.result)
+                field.result = None
+
+        ast_arguments = ast.arguments([], args, None, [], [], None, defaults)
+
+        # Could add implicit field assignments for non-frozen dataclass
+
+        # Add decorators
+        decorator_list: list[ast.expr] = [self._create_name_ast('ContractOnly', node)]
+
+        stmts = postconditions
+        function_def = ast.FunctionDef('__init__', ast_arguments, stmts, decorator_list, returns=None, lineno=node.lineno, col_offset=0)
+        self.visit(function_def, node)
+
+        # Propagate default_factory info to the method args
+        method = self.current_class.methods['__init__']
+        for name, field in self.current_class.fields.items():
+            if getattr(field, 'default_factory', None):
+                method.args[name].default_factory = field.default_factory
+
+        node.body.append(function_def)
+        self.current_class.implicit_init = True
+        return
+
+    def _create_arg_ast(self, node, arg: str, type_name: Optional[str] = None) -> ast.arg:
+        name_node = None
+        if type_name != None:
+            name_node = self._create_name_ast(type_name, node)
+        return ast.arg(arg, name_node, lineno=node.lineno, col_offset=0)
+
+    def _create_comp_postcondition(self, node, left: ast.expr, right: ast.expr, op: ast.cmpop) -> ast.stmt:
+        compare = ast.Compare(left, ops=[op], comparators=[right],
+                            lineno=node.lineno, col_offset=0)
+        return ast.Expr(ast.Call(self._create_name_ast('Ensures', node), [compare], [], lineno=node.lineno, col_offset=0))
+
+    def _create_acc_postcondition(self, node, attr: ast.expr) -> ast.stmt:
+        acc_call = ast.Call(self._create_name_ast('Acc', node), [attr], [], 
+                            lineno=node.lineno, col_offset=0)
+        return ast.Expr(ast.Call(self._create_name_ast('Ensures', node), [acc_call], [], lineno=node.lineno, col_offset=0))
+
+    def _create_name_ast(self, id: str, node) -> ast.Name:
+        return ast.Name(id, ast.Load(), lineno=node.lineno, col_offset=0)
 
     def _is_illegal_magic_method_name(self, name: str) -> bool:
         """
@@ -889,6 +964,14 @@ class Analyzer(ast.NodeVisitor):
     def visit_arg(self, node: ast.arg) -> None:
         assert self.current_function is not None
         node_type = self.typeof(node)
+        if isinstance(node.annotation, ast.Name) and node.annotation.id in ('PInt', 'PBool'):
+            if node.annotation.id == 'PInt':
+                assert node_type.name == 'int'
+                node_type = node_type.module.classes['__prim__int']
+            elif node.annotation.id == 'PBool':
+                assert node_type.name == 'bool'
+                node_type = node_type.module.classes['__prim__bool']
+
         self.current_function.args[node.arg] = \
             self.node_factory.create_python_var(node.arg, node, node_type)
         # If we just introduced new type variables, create the expression that
@@ -1132,30 +1215,108 @@ class Analyzer(ast.NodeVisitor):
                         self.track_access(node, var)
                 self.deferred_tasks.append(todo)
                 return
-            else:
-                # Node is a static field.
+            elif self.current_class.dataclass:
+                # Node is a field of a dataclass
                 if isinstance(node.ctx, ast.Load):
                     return
-                cls = self.typeof(node)
-                self.define_new(self.current_class, node.id, node)
-                var = self.node_factory.create_static_field(node.id, node, cls,
-                                                            self.module,
-                                                            self.current_class)
+
+                assign = node._parent
+                if isinstance(assign, ast.Assign):
+                    if not len(assign.targets) == 1:
+                        raise UnsupportedException(assign,
+                            'only simple assignments allowed for dataclass fields')
+                    if (isinstance(assign.value, ast.Call)
+                            and isinstance(assign.value.func, ast.Name)
+                            and assign.value.func.id == 'field'):
+                        raise UnsupportedException(assign,
+                            'field() requires a type annotation')
+                    # Infer type from value
+                    annotation = self._create_name_ast(self.typeof(node).name, node)
+                elif isinstance(assign, ast.AnnAssign) and assign.simple == 1:
+                    annotation = assign.annotation
+                else:
+                    msg = ('only simple assignments and reads allowed for '
+                            'dataclass fields')
+                    raise UnsupportedException(assign, msg)
+
+                # Add type info for self in this context, can retrieve the correct type from __init__.self
+                prefix = self.module.type_prefix.split('.') if self.module.type_prefix else []
+                prefix.extend([self.current_class.name, node.id, 'self'])
+                context = tuple(prefix)
+                self_type, _ = self.module.get_type([self.current_class.name, '__init__'], 'self')
+                self.module.types.all_types[context] = self_type
+
+                # Create a property for frozen fields, or a normal field for non-frozen
+                if self.current_class.frozen:
+                    ast_arguments = ast.arguments([], [self._create_arg_ast(node, 'self', None)], None, [], [], None, [])
+                    stmts = [ast.Expr(ast.Call(self._create_name_ast('Decreases', node), [ast.Constant(None)], []))]
+                    decorator_list: list[ast.expr] = [ast.Name('property'), ast.Name('ContractOnly')]
+                    function_def = ast.FunctionDef(node.id, ast_arguments, stmts, decorator_list, returns=annotation, lineno=node.lineno, col_offset=0)
+                    self.visit(function_def, self.current_class.node)
+                else:
+                    self.current_class.add_field(node.id, node, self.typeof(node))
+
+                # Adjust the class body
+                self.current_class.node.body.remove(assign)
+                if self.current_class.frozen:
+                    self.current_class.node.body.append(function_def)
+
+                if assign.value != None:
+                    field_obj = self.current_class.fields[node.id]
+                    if (isinstance(assign.value, ast.Call)
+                            and isinstance(assign.value.func, ast.Name)
+                            and assign.value.func.id == 'field'):
+                        # Handle dataclasses.field(default_factory=...)
+                        factory = None
+                        for kw in assign.value.keywords:
+                            if kw.arg == 'default_factory':
+                                factory = kw.value
+                            else:
+                                raise UnsupportedException(assign, 'unsupported keyword')
+                        if factory is None:
+                            raise UnsupportedException(assign,
+                                'field() without default_factory not supported')
+                        # Use None as sentinel default
+                        field_obj.result = ast.Constant(None,
+                            lineno=node.lineno, col_offset=0)
+                        field_obj.default_factory = factory.id
+                    elif not isinstance(assign.value, (ast.Constant, ast.Attribute)):
+                        raise UnsupportedException(assign, 'Illegal default value for datafield creation')
+                    else:
+                        # Temporarily set value, because it will be used as default
+                        field_obj.result = assign.value
+                return
+            elif self.current_class.superclass.name == "IntEnum":
+                # Node is an enum member. Basically a static field that returns an instance of the enum instead
+                if isinstance(node.ctx, ast.Load):
+                    return
+                
+                node_type = self.typeof(node)
+                if node_type.name != INT_TYPE:
+                    raise InvalidProgramException(node, 'invalid literal for int() with base 10')
+                
                 assign = node._parent
                 if (not isinstance(assign, ast.Assign)
                         or len(assign.targets) != 1):
                     msg = ('only simple assignments and reads allowed for '
-                           'static fields')
+                            'enum members')
                     raise UnsupportedException(assign, msg)
-                var.value = assign.value
-                self.current_class.static_fields[node.id] = var
-                if node.id in self.current_class.fields:
-                    # It's possible that we encountered a read of this field
-                    # before seeing the definition, assumed it's a normal
-                    # (non-static) field, and created the field. We remove it
-                    # again now that we now it's actually static.
-                    del self.current_class.fields[node.id]
-                self.track_access(node, var)
+                self.create_static_field(node, self.current_class, assign.value)
+                return
+            else:
+                # Node is a static field.
+                if isinstance(node.ctx, ast.Load):
+                    return
+                
+                assign = node._parent
+                if (not isinstance(assign, ast.Assign)
+                        or len(assign.targets) != 1):
+                    msg = ('only simple assignments and reads allowed for '
+                            'static fields')
+                    raise UnsupportedException(assign, msg)
+                
+                cls = self.typeof(node)
+                self.create_static_field(node, cls, assign.value)
                 return
         # We're in a function
         if isinstance(node.ctx, ast.Store):
@@ -1207,6 +1368,23 @@ class Analyzer(ast.NodeVisitor):
 
             self.track_access(node, var)
 
+    def create_static_field(self, node: ast.Name, type_: PythonType, val: ast.expr) -> None:
+        assert self.current_class != None
+        
+        self.define_new(self.current_class, node.id, node)
+        var = self.node_factory.create_static_field(node.id, node, type_,
+                                                    self.module,
+                                                    self.current_class)
+        var.value = val
+        self.current_class.static_fields[node.id] = var
+        if node.id in self.current_class.fields:
+            # It's possible that we encountered a read of this field
+            # before seeing the definition, assumed it's a normal
+            # (non-static) field, and created the field. We remove it
+            # again now that we now it's actually static.
+            del self.current_class.fields[node.id]
+        self.track_access(node, var)
+
     def visit_Attribute(self, node: ast.Attribute) -> None:
         """
         Tracks field accesses to find out which fields exist.
@@ -1255,6 +1433,8 @@ class Analyzer(ast.NodeVisitor):
         """
         Converts an internal mypy type to a PythonType.
         """
+        if (self.types.is_literal_type(mypy_type)):
+            mypy_type = mypy_type.fallback
         if (self.types.is_void_type(mypy_type) or
                 self.types.is_none_type(mypy_type)):
             result = None
@@ -1313,7 +1493,18 @@ class Analyzer(ast.NodeVisitor):
                 msg = f'Type could not be fully inferred (this usually means that a type argument is unknown)'
             raise InvalidProgramException(node, 'partial.type', message=msg)
         else:
-            msg = 'Unsupported type: {}'.format(mypy_type.__class__.__name__)
+            name = ""
+            if hasattr(node, 'id'):
+                name = node.id
+            elif hasattr(node, 'name'):
+                name = node.name
+            elif isinstance(node, ast.Attribute):
+                name = node.attr
+                if hasattr(node.value, 'id'):
+                    name = node.value.id + "." + name
+            elif isinstance(node, ast.arg):
+                name = node.arg
+            msg = 'Unsupported type: {} for node {} of type {}'.format(mypy_type.__class__.__name__, name, type(node))
             raise UnsupportedException(node, desc=msg)
         return result
 
@@ -1577,13 +1768,18 @@ class Analyzer(ast.NodeVisitor):
             self.stmt_container.labels.append(finally_name)
         self.visit_default(node)
 
-    def _incompatible_decorators(self, decorators) -> bool:
+    def _class_incompatible_decorators(self, decorators: set[str]) -> bool:
+        return ((('dataclass' in decorators) and (len(decorators) != 1)) or
+                (('dataclass' not in decorators) and (len(decorators) > 0))
+                )
+
+    def _function_incompatible_decorators(self, decorators) -> bool:
         return ((('Predicate' in decorators) and ('Pure' in decorators)) or
                 (('Opaque' in decorators) and ('Pure' not in decorators)) or
                 (('Predicate' in decorators) and ('Inline' in decorators)) or
                 (('Inline' in decorators) and ('Pure' in decorators)) or
                 (('IOOperation' in decorators) and (len(decorators) != 1)) or
-                (('property' in decorators) and (len(decorators) != 1)) or
+                (('property' in decorators) and not(len(decorators) == 1 or (len(decorators) == 2 and 'ContractOnly' in decorators))) or
                 (('AllLow' in decorators) and ('PreservesLow' in decorators)) or
                 ((('AllLow' in decorators) or ('PreservesLow' in decorators)) and (
                     ('Predicate' in decorators) or ('Pure' in decorators)))
@@ -1595,7 +1791,7 @@ class Analyzer(ast.NodeVisitor):
         respective decorator.
         """
         decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
-        if self._incompatible_decorators(decorators):
+        if self._function_incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
         result = 'ContractOnly' in decorators or 'abstractmethod' in decorators
         return result
@@ -1622,35 +1818,79 @@ class Analyzer(ast.NodeVisitor):
             result = result or (not selected)
         return result
 
-    def has_decorator(self, func: ast.FunctionDef, decorator: str) -> bool:
+    def __resolve_decorator(self, decorator: ast.expr) -> Tuple[bool, str]:
+        if isinstance(decorator, ast.Name):
+            return (True, decorator.id)
+        elif isinstance(decorator, ast.Call):
+            return self.__resolve_decorator(decorator.func)
+        return (False, "")
+    
+    def __get_decorators(self, decorator_list: list[ast.expr]) -> set[str]:
+        return {res[1] for d in decorator_list if (res := self.__resolve_decorator(d))[0]}
+
+    def __decorator_has_keyword_value(self, decorator_list: list[ast.expr], decorator: str, keyword: str, value) -> bool:
+        for d in decorator_list:
+            if isinstance(d, ast.Call) and isinstance(d.func, ast.Name) and d.func.id == decorator:
+                for k in d.keywords:                    
+                    if k.arg == keyword and isinstance(k.value, ast.Constant):
+                        return k.value.value == value
+        return False
+
+    def class_has_decorator(self, cls: ast.ClassDef, decorator: str) -> bool:
+        decorators = self.__get_decorators(cls.decorator_list)
+        if self._class_incompatible_decorators(decorators):
+            raise InvalidProgramException(cls, "decorators.incompatible")
+        return decorator in decorators
+
+    def is_dataclass(self, cls: ast.ClassDef) -> bool:
+        is_dataclass = self.class_has_decorator(cls, 'dataclass')
+        if is_dataclass:
+            self._dataclass_check_unsupported_keywords(cls)
+        return is_dataclass
+    
+    def _dataclass_check_unsupported_keywords(self, cls: ast.ClassDef) -> None:
+        decorator = [d for d in cls.decorator_list if self.__resolve_decorator(d)[1] == 'dataclass'][0]
+        if isinstance(decorator, ast.Name):
+            return
+        assert isinstance(decorator, ast.Call) and isinstance(decorator.func, ast.Name)
+        supported_keywords = ["frozen"]
+
+        for k in decorator.keywords:
+            if not k.arg in supported_keywords:
+                raise UnsupportedException(decorator, "keyword unsupported")
+
+    def is_frozen_dataclass(self, cls: ast.ClassDef) -> bool:
+        return self.__decorator_has_keyword_value(cls.decorator_list, 'dataclass', 'frozen', True)
+
+    def function_has_decorator(self, func: ast.FunctionDef, decorator: str) -> bool:
         decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
-        if self._incompatible_decorators(decorators):
+        if self._function_incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
         return decorator in decorators
 
     def is_pure(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'Pure')
+        return self.function_has_decorator(func, 'Pure')
 
     def is_opaque(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'Opaque')
+        return self.function_has_decorator(func, 'Opaque')
 
     def is_predicate(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'Predicate')
+        return self.function_has_decorator(func, 'Predicate')
 
     def is_inline_method(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'Inline')
+        return self.function_has_decorator(func, 'Inline')
 
     def is_static_method(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'staticmethod')
+        return self.function_has_decorator(func, 'staticmethod')
 
     def is_class_method(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'classmethod')
-
+        return self.function_has_decorator(func, 'classmethod')
+    
     def is_io_operation(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'IOOperation')
+        return self.function_has_decorator(func, 'IOOperation')
 
     def is_property_getter(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'property')
+        return self.function_has_decorator(func, 'property')
 
     def is_property_setter(self, func: ast.FunctionDef) -> bool:
         setter_decorator = [d for d in func.decorator_list
@@ -1662,7 +1902,7 @@ class Analyzer(ast.NodeVisitor):
         return self.current_class.fields[setter_decorator[0].value.id]
 
     def is_all_low(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'AllLow')
+        return self.function_has_decorator(func, 'AllLow')
 
     def preserves_low(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'PreservesLow')
+        return self.function_has_decorator(func, 'PreservesLow')

@@ -22,8 +22,11 @@ from nagini_translation.lib.constants import (
     PMSET_TYPE,
     PRIMITIVES,
     PSEQ_TYPE,
+    PBYTESEQ_TYPE,
     PSET_TYPE,
     RANGE_TYPE,
+    BYTEARRAY_TYPE,
+    BYTES_TYPE,
     THREAD_DOMAIN,
     THREAD_POST_PRED,
     THREAD_START_PRED,
@@ -134,6 +137,7 @@ class ContractTranslator(CommonTranslator):
     def translate_builtin_predicate(self, node: ast.Call, perm: Expr,
                                     args: List[Expr], ctx: Context) -> Expr:
         name = node.func.id
+        seq_int = self.viper.SeqType(self.viper.Int)
         seq_ref = self.viper.SeqType(self.viper.Ref)
         set_ref = self.viper.SetType(self.viper.Ref)
         map_ref_ref = self.viper.MapType(self.viper.Ref, self.viper.Ref)
@@ -146,6 +150,8 @@ class ContractTranslator(CommonTranslator):
             return self._get_field_perm('set_acc', set_ref, perm, args[0], pos, ctx)
         elif name == 'dict_pred':
             return self._get_field_perm('dict_acc', map_ref_ref, perm, args[0], pos, ctx)
+        elif name == 'bytearray_pred':
+            return self._get_field_perm('bytearray_acc', seq_int, perm, args[0], pos, ctx)
         elif name == 'MayStart':
             return self.translate_may_start(node, args, perm, ctx)
         elif name == 'ThreadPost':
@@ -711,7 +717,7 @@ class ContractTranslator(CommonTranslator):
         # iterable (which gives no information about order for unordered types).
         seq_call, _ = self.get_sequence(coll_type, arg, None, node, ctx)
         seq_class = ctx.module.global_module.classes[PSEQ_TYPE]
-        if coll_type.name == RANGE_TYPE:
+        if coll_type.name == RANGE_TYPE or coll_type.name == BYTEARRAY_TYPE:
             type_arg = ctx.module.global_module.classes[INT_TYPE]
         else:
             type_arg = coll_type.type_args[0]
@@ -720,6 +726,22 @@ class ContractTranslator(CommonTranslator):
                                                             ctx)
         result = self.get_function_call(seq_class, '__create__',
                                         [seq_call, type_lit], [None, None],
+                                        node, ctx)
+        return stmt, result
+    
+    def translate_to_int_sequence(self, node: ast.Call,
+                              ctx: Context) -> StmtsAndExpr:
+        coll_type = self.get_type(node.args[0], ctx)
+        stmt, arg = self.translate_expr(node.args[0], ctx)
+        
+        seq_call = self.get_int_sequence(coll_type, arg, node, ctx)
+        seq_class = ctx.module.global_module.classes[PBYTESEQ_TYPE]
+        if coll_type.name == BYTEARRAY_TYPE:
+            call_name = '__from_bytes__'
+        else:
+            call_name = '__create__'
+        result = self.get_function_call(seq_class, call_name,
+                                        [seq_call], [None],
                                         node, ctx)
         return stmt, result
 
@@ -748,6 +770,31 @@ class ContractTranslator(CommonTranslator):
                                                             ctx)
         result = self.get_function_call(seq_type.cls, '__create__',
                                         [result, type_lit], [None, None], node,
+                                        ctx)
+        return val_stmts, result
+    
+    def translate_int_sequence(self, node: ast.Call,
+                           ctx: Context) -> StmtsAndExpr:
+        intseq_class = ctx.module.global_module.classes[PBYTESEQ_TYPE]
+        viper_type = self.viper.Int
+        val_stmts = []
+        if node.args:
+            vals = []
+            for arg in node.args:
+                arg_stmt, arg_val = self.translate_expr(arg, ctx,
+                    target_type=viper_type)
+                val_stmts += arg_stmt
+                vals.append(arg_val)
+            result = self.viper.ExplicitSeq(vals, self.to_position(node,
+                                                                   ctx),
+                                            self.no_info(ctx))
+        else:
+            result = self.viper.EmptySeq(viper_type,
+                                         self.to_position(node, ctx),
+                                         self.no_info(ctx))
+
+        result = self.get_function_call(intseq_class, '__create__',
+                                        [result], [None], node,
                                         ctx)
         return val_stmts, result
 
@@ -850,7 +897,7 @@ class ContractTranslator(CommonTranslator):
         arg = lambda_.args.args[0]
         var = ctx.actual_function.get_variable(lambda_prefix + arg.arg)
 
-        exp_stmt, exp_val = self.translate_expr(node.args[0], ctx)
+        exp_stmt, exp_val = self.translate_expr(node.args[0], ctx, target_type=var.decl.typ())
 
         ctx.set_alias(arg.arg, var, None)
 
@@ -1151,12 +1198,16 @@ class ContractTranslator(CommonTranslator):
             return self.translate_let(node, ctx, impure)
         elif func_name == PSEQ_TYPE:
             return self.translate_sequence(node, ctx)
+        elif func_name == PBYTESEQ_TYPE:
+            return self.translate_int_sequence(node, ctx)
         elif func_name == PSET_TYPE:
             return self.translate_pset(node, ctx)
         elif func_name == PMSET_TYPE:
             return self.translate_mset(node, ctx)
         elif func_name == 'ToSeq':
             return self.translate_to_sequence(node, ctx)
+        elif func_name == 'ToByteSeq':
+            return self.translate_to_int_sequence(node, ctx)
         elif func_name == 'ToMS':
             return self.translate_to_multiset(node, ctx)
         elif func_name == 'Joinable':
@@ -1172,4 +1223,4 @@ class ContractTranslator(CommonTranslator):
         elif func_name == 'arg':
             raise InvalidProgramException(node, 'invalid.arg.use')
         else:
-            raise UnsupportedException(node)
+            raise UnsupportedException(node, func_name)

@@ -12,6 +12,7 @@ import mypy.build
 import os
 
 from mypy.build import BuildSource
+from mypy.fscache import FileSystemCache
 from nagini_translation.lib import config
 from nagini_translation.lib.constants import IGNORED_IMPORTS, LITERALS
 from nagini_translation.mypy_patches.visitor import TraverserVisitor
@@ -19,6 +20,7 @@ from nagini_translation.mypy_patches.visitor import TraverserVisitor
 
 from nagini_translation.lib.util import (
     construct_lambda_prefix,
+    read_source_file,
 )
 from typing import List, Optional
 
@@ -267,6 +269,37 @@ class TypeVisitor(TraverserVisitor):
         if 'is' not in o.operators and 'is not' not in o.operators:
             super().visit_comparison_expr(o)
 
+class PreprocessingFileSystemCache(FileSystemCache):
+    """
+    Slightly adjusted FileSystemCache that invokes the custom read_source_file
+    to read file data.
+    """
+    def read(self, path: str) -> bytes:
+        if path in self.read_cache:
+            return self.read_cache[path]
+        if path in self.read_error_cache:
+            raise self.read_error_cache[path]
+
+        # Need to stat first so that the contents of file are from no
+        # earlier instant than the mtime reported by self.stat().
+        self.stat(path)
+
+        dirname, basename = os.path.split(path)
+        dirname = os.path.normpath(dirname)
+        # Check the fake cache.
+        if basename == '__init__.py' and dirname in self.fake_package_cache:
+            data = b''
+        else:
+            try:
+                text = read_source_file(path)
+                data = text.encode()
+            except OSError as err:
+                self.read_error_cache[path] = err
+                raise
+
+        self.read_cache[path] = data
+        self.hash_cache[path] = mypy.util.hash_digest(data)
+        return data
 
 class TypeInfo:
     """
@@ -303,10 +336,10 @@ class TypeInfo:
         result.cache_dir = '.mypy_cache_strict' if strict_optional else '.mypy_cache_nonstrict'
         return result
 
-    def check(self, filename: str, base_dir: str = None) -> bool:
+    def check(self, filename: str, base_dir: str = None, text: Optional[str] = None) -> bool:
         """
         Typechecks the given file and collects all type information needed for
-        the translation to Viper
+        the translation to Viper. Optionally pass preprocessed text content.
         """
 
         def report_errors(errors: List[str]) -> None:
@@ -365,18 +398,17 @@ class TypeInfo:
                 # In Python 3.9 or newer, we use the incremental mode, and we have to monkey-patch mypy.
                 mypy.build.find_cache_meta = my_find_cache_meta
 
-            sources = [BuildSource(filename, module_name, None, base_dir=base_dir)]
+            sources = [BuildSource(filename, module_name, base_dir=base_dir)]
 
+            # fscache = PreprocessingFileSystemCache()
+            # Ignoring preprocessing for now
             res_strict = mypy.build.build(sources, options_strict)
 
             if res_strict.errors:
                 # Run mypy a second time with strict optional checking disabled,
                 # s.t. we don't get overapproximated none-related errors.
                 options_non_strict = self._create_options(False)
-                res_non_strict = mypy.build.build(
-                    [BuildSource(filename, module_name, None, base_dir=base_dir)],
-                    options_non_strict
-                )
+                res_non_strict = mypy.build.build(sources, options_non_strict)
                 if res_non_strict.errors:
                     report_errors(res_non_strict.errors)
             relevant_files = [next(iter(res_strict.graph))]
@@ -462,6 +494,9 @@ class TypeInfo:
 
     def is_instance_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.Instance)
+
+    def is_literal_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.LiteralType)
 
     def is_tuple_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.TupleType)

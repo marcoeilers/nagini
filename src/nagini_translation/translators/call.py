@@ -42,6 +42,7 @@ from nagini_translation.lib.constants import (
     THREAD_POST_PRED,
     THREAD_START_PRED,
     TUPLE_TYPE,
+    BYTEARRAY_TYPE,
 )
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
@@ -208,6 +209,21 @@ class CallTranslator(CommonTranslator):
 
         return box_func
 
+    def translate_enum_cons(self, enum: PythonClass, args: List[FuncApp],
+                           pos: Position, ctx: Context) -> Expr:
+        """
+        Cosntruct Enums via a sequence of constructor calls and
+        boxing/unboxing calls.
+        """
+        assert len(args) == 1
+
+        info = self.no_info(ctx)
+        args[0] = self.to_type(args[0], self.viper.Int, ctx) 
+        box_func_name = enum.sil_name + '__box__'
+        box_func = self.viper.FuncApp(box_func_name, args, pos, info, self.viper.Ref)
+        return box_func
+
+
     def _is_lock_subtype(self, cls: PythonClass) -> bool:
         if cls is None:
             return False
@@ -228,6 +244,9 @@ class CallTranslator(CommonTranslator):
 
         if target_class.python_class.is_adt:
             return arg_stmts, self.translate_adt_cons(target_class, args, pos, ctx)
+
+        if target_class.python_class.enum:
+            return arg_stmts, self.translate_enum_cons(target_class, args, pos, ctx)
 
         res_var = ctx.current_function.create_variable(target_class.name +
                                                        '_res',
@@ -317,21 +336,34 @@ class CallTranslator(CommonTranslator):
 
 
         if target:
-            target_class = target.cls
-            targets = []
-            if target.declared_exceptions:
-                error_var = self.get_error_var(node, ctx)
-                targets.append(error_var)
-            method_name = target_class.get_method('__init__').sil_name
-            init = self.create_method_call_node(
-                ctx, method_name, args, targets, self.to_position(node, ctx),
-                self.no_info(ctx), target_method=target, target_node=node)
-            stmts.extend(init)
-            if target.declared_exceptions:
-                catchers = self.create_exception_catchers(error_var,
-                    ctx.actual_function.try_blocks, node, ctx)
-                stmts = stmts + catchers
+            init_stmts = self._translate_init_call(target, args, node, ctx)
+            stmts.extend(init_stmts)
+
+        # If the init method was created implicitly, we have to check for __post_init__ 
+        if target_class.python_class.dataclass and target_class.python_class.implicit_init:
+            target = target_class.get_method('__post_init__')
+            if target:
+                post_init_stmts = self._translate_init_call(target, [res_var.ref()], node, ctx, '__post_init__')
+                stmts.extend(post_init_stmts)
+
         return arg_stmts + defined_check + stmts, res_var.ref()
+
+    def _translate_init_call(self, target: PythonMethod, args: list, node: ast.Call, ctx: Context, name = '__init__') -> list:
+        target_class = target.cls
+        targets = []
+
+        if target.declared_exceptions:
+            error_var = self.get_error_var(node, ctx)
+            targets.append(error_var)
+        method_name = target_class.get_method(name).sil_name
+        stmts = self.create_method_call_node(
+            ctx, method_name, args, targets, self.to_position(node, ctx),
+            self.no_info(ctx), target_method=target, target_node=node)
+        if target.declared_exceptions:
+            catchers = self.create_exception_catchers(error_var,
+                ctx.actual_function.try_blocks, node, ctx)
+            stmts = stmts + catchers
+        return stmts
 
     def _translate_list(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         contents = None
@@ -376,6 +408,27 @@ class CallTranslator(CommonTranslator):
             seq_equal = self.viper.EqCmp(arg_seq, res_seq, position, info)
             stmts.append(self.viper.Inhale(seq_equal, position, info))
         return stmts, result_var
+
+    def _translate_default_factory(self, arg, node: ast.AST,
+                                   ctx: Context) -> Tuple[List, Expr, PythonType]:
+        """Translates a default_factory for a dataclass field argument."""
+        if arg.default_factory == 'list':
+            list_class = ctx.module.global_module.classes[LIST_TYPE]
+            res_var = ctx.current_function.create_variable('list',
+                                                           list_class,
+                                                           self.translator)
+            targets = [res_var.ref()]
+            constr_call = self.get_method_call(list_class, '__init__', [],
+                                               [], targets, node, ctx)
+            stmts = list(constr_call)
+            position = self.to_position(node, ctx)
+            result = res_var.ref(node, ctx)
+            stmts.append(self.viper.Inhale(
+                self.type_check(result, arg.type, position, ctx),
+                position, self.no_info(ctx)))
+            return stmts, result, arg.type
+        raise UnsupportedException(node,
+            'Unsupported default_factory: ' + str(arg.default_factory))
 
     def _translate_set(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         contents = None
@@ -509,6 +562,43 @@ class CallTranslator(CommonTranslator):
         return arg_stmt + [new_stmt, type_inhale, contents_inhale], new_list.ref(node,
                                                                                  ctx)
 
+    def _translate_bytearray(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to bytearray()
+        """
+        bytearray_class = ctx.module.global_module.classes[BYTEARRAY_TYPE]
+        res_var = ctx.current_function.create_variable('bytearray', bytearray_class, self.translator)
+        targets = [res_var.ref()]
+        result_var = res_var.ref(node, ctx)
+        method_name = None    
+
+        # This could potentially be merged using the "display_name" field
+        # by extending the general code for selecting a specific __init__ call
+        if len(node.args) == 0:
+            call = self.get_method_call(bytearray_class, '__init__', [], [], targets, node, ctx)
+            return call, result_var
+
+        elif len(node.args) == 1:
+            arg_type = self.get_type(node.args[0], ctx)
+
+            if arg_type.name == BYTEARRAY_TYPE:
+                method_name = '__initFromBytearray__'
+
+            if arg_type.name == LIST_TYPE:
+                method_name = '__initFromList__'
+                
+            if arg_type.name == INT_TYPE:
+                method_name = '__initFromInt__'
+            
+        if method_name:
+            target_method = bytearray_class.get_method(method_name)
+            arg_stmts, arg_vals, arg_types = self.translate_args(target_method, node.args, node.keywords, node, ctx)
+            constr_call = self.get_method_call(bytearray_class, method_name, arg_vals, arg_types, targets, node, ctx)
+            return arg_stmts + constr_call, res_var.ref(node, ctx)
+
+        raise UnsupportedException(node, 'Unsupported variant of bytearray().')
+
+
     def _translate_builtin_func(self, node: ast.Call,
                                 ctx: Context) -> StmtsAndExpr:
         """
@@ -541,6 +631,8 @@ class CallTranslator(CommonTranslator):
             return self._translate_type_func(node, ctx)
         elif func_name == 'cast':
             return self._translate_cast_func(node, ctx)
+        elif func_name == 'bytearray':
+            return self._translate_bytearray(node, ctx)
         else:
             raise UnsupportedException(node)
 
@@ -800,11 +892,11 @@ class CallTranslator(CommonTranslator):
             # are just set to null.
             if keywords:
                 raise UnsupportedException(node, desc='Keyword arguments in call to '
-                                                      'builtin function.')
+                                                      'builtin function: ' + target.name)
             diff = target.nargs - len(unpacked_args)
             if diff < 0:
                 raise UnsupportedException(node, 'Unsupported version of builtin '
-                                                 'function.')
+                                                 'function: ' + target.name)
             if diff > 0:
                 null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
                 unpacked_args += [null] * diff
@@ -845,9 +937,16 @@ class CallTranslator(CommonTranslator):
         for index, (arg, key) in enumerate(zip(args, keys)):
             if arg is False:
                 # Not set yet, need default
-                args[index] = target.args[key].default_expr
-                assert args[index], '{} arg={}'.format(target.name, key)
-                arg_types[index] = self.get_type(target.args[key].default, ctx)
+                if target.args[key].default_factory:
+                    factory_stmts, factory_expr, factory_type = \
+                        self._translate_default_factory(target.args[key], node, ctx)
+                    arg_stmts += factory_stmts
+                    args[index] = factory_expr
+                    arg_types[index] = factory_type
+                else:
+                    args[index] = target.args[key].default_expr
+                    assert args[index], '{} arg={}'.format(target.name, key)
+                    arg_types[index] = self.get_type(target.args[key].default, ctx)
 
         if target.var_arg:
             var_arg_list = self.create_tuple(var_args, var_arg_types, node, ctx)
