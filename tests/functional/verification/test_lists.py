@@ -103,6 +103,26 @@ def test_append() -> None:
     #:: ExpectedOutput(assert.failed:assertion.false)
     Assert(mylist[0] == super4)
 
+def test_insert() -> None:
+    super1 = Super()
+    super2 = Super()
+    super3 = Super()
+    mylist = [super1, super2]
+    Assert(len(mylist) == 2)
+    super4 = Super()
+    mylist.insert(1, super4)
+    Assert(len(mylist) == 3)
+    Assert(mylist[0] == super1)
+    Assert(mylist[1] == super4)
+    Assert(mylist[2] == super2)
+    mylist.insert(0, super3)
+    Assert(len(mylist) == 4)
+    Assert(mylist[0] == super3)
+    Assert(mylist[1] == super1)
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    Assert(mylist[0] == super1)
+
+
 def test_extend() -> None:
     super1 = Super()
     super2 = Super()
