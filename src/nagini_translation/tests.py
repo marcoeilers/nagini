@@ -582,7 +582,7 @@ class VerificationTest(AnnotatedTest):
     def test_file(
             self, path: str, base: str, jvm: jvmaccess.JVM, verifier: ViperVerifier,
             sif: bool, reload_resources: bool, arp: bool, ignore_obligations: bool, store_viper: bool,
-            float_encoding: Optional[str], selection: Set[str]):
+            float_encoding: Optional[str], selection: Set[str], strict_int: bool = False):
         """Test specific Python file."""
         config.obligation_config.disable_all = ignore_obligations
         annotation_manager = self.get_annotation_manager(path, verifier.name)
@@ -593,7 +593,7 @@ class VerificationTest(AnnotatedTest):
         abspath = os.path.abspath(path)
         absbase = os.path.abspath(base)
         modules, prog = translate(abspath, jvm, 8, base_dir=absbase, sif=sif, arp=arp, reload_resources=reload_resources,
-                                  float_encoding=float_encoding, selected=selection)
+                                  float_encoding=float_encoding, selected=selection, strict_int=strict_int)
         assert prog is not None
         if store_viper:
             import string
@@ -643,17 +643,18 @@ class VerificationTest(AnnotatedTest):
 _VERIFICATION_TESTER = VerificationTest()
 
 
-def test_verification(path, base, verifier, sif, reload_resources, arp, ignore_obligations, print, float_encoding, selection):
+def test_verification(path, base, verifier, sif, reload_resources, arp, ignore_obligations, print, float_encoding, selection, strict_int):
     """Execute provided verification test."""
     _VERIFICATION_TESTER.test_file(path, base, _JVM, verifier, sif, reload_resources, arp, ignore_obligations,
-                                   print, float_encoding, selection)
+                                   print, float_encoding, selection, strict_int)
 
 
 class TranslationTest(AnnotatedTest):
     """Test for testing translation errors."""
 
     def test_file(self, path: str, base: str, jvm: jvmaccess.JVM, sif: bool,
-                  reload_resources: bool, arp: bool, float_encoding: Optional[str]):
+                  reload_resources: bool, arp: bool, float_encoding: Optional[str],
+                  strict_int: bool = False):
         """Test specific Python file."""
         annotation_manager = self.get_annotation_manager(path, _BACKEND_ANY)
         if annotation_manager.ignore_file():
@@ -662,7 +663,7 @@ class TranslationTest(AnnotatedTest):
         base = os.path.abspath(base)
         try:
             translate(path, jvm, 8, base_dir=base, sif=sif, arp=arp, reload_resources=reload_resources,
-                      float_encoding=float_encoding)
+                      float_encoding=float_encoding, strict_int=strict_int)
             actual_errors = []
         except InvalidProgramException as exp1:
             actual_errors = [InvalidProgramError(exp1)]
@@ -680,6 +681,6 @@ class TranslationTest(AnnotatedTest):
 _TRANSLATION_TESTER = TranslationTest()
 
 
-def test_translation(path, base, sif, reload_resources, arp, float_encoding):
+def test_translation(path, base, sif, reload_resources, arp, strict_int, float_encoding):
     """Execute provided translation test."""
-    _TRANSLATION_TESTER.test_file(path, base, _JVM, sif, reload_resources, arp, float_encoding)
+    _TRANSLATION_TESTER.test_file(path, base, _JVM, sif, reload_resources, arp, float_encoding, strict_int)
