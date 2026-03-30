@@ -103,7 +103,7 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
               sif: bool = False, arp: bool = False, ignore_global: bool = False,
               reload_resources: bool = False, verbose: bool = False,
               check_consistency: bool = False, float_encoding: str = None,
-              counterexample: bool = False) -> Tuple[List['PythonModule'], Program]:
+              counterexample: bool = False, strict_int: bool = False) -> Tuple[List['PythonModule'], Program]:
     """
     Translates the Python module at the given path to a Viper program
     """
@@ -146,7 +146,8 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
         sil_programs = load_sil_files(jvm, bv_size, sif, float_encoding)
     modules = [main_module.global_module] + list(analyzer.modules.values())
     prog = translator.translate_program(modules, sil_programs, selected,
-                                        arp=arp, ignore_global=ignore_global, sif=sif, float_encoding=float_encoding)
+                                        arp=arp, ignore_global=ignore_global, sif=sif, float_encoding=float_encoding,
+                                        strict_int=strict_int)
     if sif:
         set_all_low_methods(jvm, viper_ast.all_low_methods)
         set_preserves_low_methods(jvm, viper_ast.preserves_low_methods)
@@ -350,6 +351,11 @@ def main() -> None:
         type=int,
         default=8
     )
+    parser.add_argument(
+        '--strict-int',
+        action='store_true',
+        help='Require exact int type (type(x) == int) rather than subtype (isinstance(x, int)) in many places.'
+    )
     args = parser.parse_args()
 
     config.classpath = args.viper_jar_path
@@ -415,7 +421,8 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
         selected = set(args.select.split(',')) if args.select else set()
         modules, prog = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif, base_dir=base_dir,
                                   ignore_global=args.ignore_global, arp=arp, verbose=args.verbose,
-                                  counterexample=args.counterexample, float_encoding=args.float_encoding)
+                                  counterexample=args.counterexample, float_encoding=args.float_encoding,
+                                  strict_int=args.strict_int)
         if args.print_viper:
             if args.verbose:
                 print('Result:')
