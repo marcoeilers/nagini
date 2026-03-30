@@ -819,6 +819,10 @@ class TypeDomainFactory:
         is a subtype of (or, if ``concrete`` is true, equivalent to) the given
         ``type``.
         """
+        if (ctx.strict_int
+                and isinstance(type, PythonClass)
+                and type.name == 'int'):
+            concrete = True
         info = self.no_info(ctx)
         type_func = self.typeof(lhs, ctx)
         if isinstance(type, OptionalType):
