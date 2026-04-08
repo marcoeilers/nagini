@@ -1,0 +1,51 @@
+# Copyright (c) 2023 ETH Zurich
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nagini"
+version = "1.2.0"
+dependencies = [
+    "mypy==0.900",
+    "typed-ast==1.5.4",
+    "toposort==1.5",
+    "jpype1==1.5.0",
+    "astunparse==1.6.2",
+    "pytest==7.0.0",
+    "z3-solver==4.8.7.0"
+]
+authors = [{"name" = "Viper Team", "email" = "viper@inf.ethz.ch"}]
+description = "Static verifier for Python 3, based on Viper"
+readme = "README.rst"
+license = "MPL-2.0"
+license-files = ["LICENSE.txt"]
+classifiers=[
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development",
+]
+
+[project.urls]
+Homepage = "http://www.pm.inf.ethz.ch/research/nagini.html"
+
+[project.scripts]
+nagini = "nagini_translation.main:main"
+nagini_client = "nagini_translation.client:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"*" = ["*.sil", "*.json", "*.typed"]
+"nagini_translation.resources" = ["backends/*.jar"]
