@@ -33,6 +33,7 @@ _SIF_PROB_TESTS_DIR = 'tests/sif-prob/'
 _IO_TESTS_DIR = 'tests/io/'
 _OBLIGATIONS_TESTS_DIR = 'tests/obligations/'
 _ARP_TESTS_DIR = 'tests/arp/'
+_STRICT_INT_TESTS_DIR = 'tests/strict-int/'
 
 
 class PyTestConfig:
@@ -77,6 +78,8 @@ class PyTestConfig:
             self._add_test_dir(_OBLIGATIONS_TESTS_DIR)
         elif test == 'arp':
             self._add_test_dir(_ARP_TESTS_DIR)
+        elif test == 'strict-int':
+            self._add_test_dir(_STRICT_INT_TESTS_DIR)
         elif test == _TRANSLATION_TESTS_SUFFIX:
             self._add_test_mode(_TRANSLATION_TESTS_SUFFIX)
         elif test == _VERIFICATION_TESTS_SUFFIX:
@@ -151,6 +154,7 @@ def pytest_addoption(parser: 'pytest.config.Parser'):
     parser.addoption('--io', dest='io', action='store_true')
     parser.addoption('--obligations', dest='obligations', action='store_true')
     parser.addoption('--arp', dest='arp', action='store_true')
+    parser.addoption('--strict-int-tests', dest='strict_int_tests', action='store_true')
     parser.addoption('--all-verifiers', dest='all_verifiers',
                      action='store_true')
     parser.addoption('--silicon', dest='silicon', action='store_true')
@@ -165,7 +169,7 @@ def pytest_configure(config: 'pytest.config.Config'):
     # Setup tests.
     tests = []
     if config.option.all_tests:
-        tests = ['functional', 'sif-true', 'sif-poss', 'sif-prob', 'io', 'obligations', 'arp']
+        tests = ['functional', 'sif-true', 'sif-poss', 'sif-prob', 'io', 'obligations', 'arp', 'strict-int']
     else:
         if config.option.functional:
             tests.append('functional')
@@ -183,6 +187,8 @@ def pytest_configure(config: 'pytest.config.Config'):
             tests.append('obligations')
         if config.option.arp:
             tests.append('arp')
+        if config.option.strict_int_tests:
+            tests.append('strict-int')
         if config.option.translation:
             tests.append('translation')
         if config.option.verification:
@@ -270,9 +276,10 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
                     sif = False
                 reload_resources = file in reload_triggers
                 arp = 'arp' in file
+                strict_int = 'strict-int' in file
                 base = file.partition('translation')[0] + 'translation'
-                params.append((file, base, sif, reload_resources, arp, float_encoding))
-        metafunc.parametrize('path,base,sif,reload_resources,arp,float_encoding', params)
+                params.append((file, base, sif, reload_resources, arp, strict_int, float_encoding))
+        metafunc.parametrize('path,base,sif,reload_resources,arp,strict_int,float_encoding', params)
     elif func_name == _VERIFICATION_TEST_FUNCTION_NAME:
         if not _pytest_config.selected_modes or 'verification' in _pytest_config.selected_modes:
             for test_dir in _pytest_config.verification_test_dirs:
@@ -308,12 +315,13 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
                 reload_resources = (file in reload_triggers) or (new_float_encoding != float_encoding)
                 float_encoding = new_float_encoding
                 arp = 'arp' in file
+                strict_int = 'strict-int' in file
                 base = file.partition('verification')[0] + 'verification'
                 params.extend([(file, base, verifier, sif, reload_resources, arp,
                                 ignore_obligations or (None if verifier == 'silicon' else False),
-                                _pytest_config.store_viper, float_encoding, select) for verifier
+                                _pytest_config.store_viper, float_encoding, select, strict_int) for verifier
                                in _pytest_config.verifiers])
-        metafunc.parametrize('path,base,verifier,sif,reload_resources,arp,ignore_obligations,print,float_encoding,selection', params)
+        metafunc.parametrize('path,base,verifier,sif,reload_resources,arp,ignore_obligations,print,float_encoding,selection,strict_int', params)
     else:
         pytest.exit('Unrecognized test function.')
 
