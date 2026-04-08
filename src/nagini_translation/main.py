@@ -7,6 +7,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import argparse
 import astunparse
+import copy
 import inspect
 import json
 import logging
@@ -397,13 +398,22 @@ def main() -> None:
         sil_programs = load_sil_files(jvm, args.int_bitops_size, args.sif, args.float_encoding)
 
         while True:
-            file = socket.recv_string()
+            message = socket.recv_string()
             response = ['']
+
+            request = json.loads(message)
+            file = request['python_file']
+
+            # Build per-request args: start from server args, apply client overrides
+            req_args = copy.copy(args)
+            for key, value in request.items():
+                if key != 'python_file':
+                    setattr(req_args, key, value)
 
             def add_response(part):
                 response[0] = response[0] + '\n' + part
 
-            translate_and_verify(file, jvm, args, add_response, arp=args.arp, base_dir=args.base_dir)
+            translate_and_verify(file, jvm, req_args, add_response, arp=req_args.arp, base_dir=req_args.base_dir)
             socket.send_string(response[0])
     else:
         success = translate_and_verify(args.python_file, jvm, args, arp=args.arp, base_dir=args.base_dir)
