@@ -102,12 +102,15 @@ class Error:
                  vias: List[Any] = None, inputs: List[Any] = None) -> None:
 
         # Translate error id.
-        viper_reason = error.reason()
-        error_id = error.id()
-        reason_id = viper_reason.id()
-        key = error_id, reason_id
-        if key in rules:
-            error_id, reason_id = rules[key]
+        viper_reason = error.reason() if hasattr(error, 'reason') else None
+        error_id = error.id() if hasattr(error, 'id') else error.getClass().getSimpleName()
+        if viper_reason is not None:
+            reason_id = viper_reason.id()
+            key = error_id, reason_id
+            if key in rules:
+                error_id, reason_id = rules[key]
+        else:
+            reason_id = None
 
         # Construct object.
         self._error = error
@@ -115,12 +118,14 @@ class Error:
         self._vias = vias
         self._inputs = inputs
         self.identifier = error_id
-        if reason_item:
+        if viper_reason is not None and reason_item:
             self.reason = Reason(
                 reason_id, viper_reason, reason_item.node,
                 reason_item.vias, reason_item.reason_string)
-        else:
+        elif viper_reason is not None:
             self.reason = Reason(reason_id, viper_reason)
+        else:
+            self.reason = None
         self.position = Position(error.pos())
 
     def pos(self) -> 'ast.AbstractSourcePosition':
@@ -181,6 +186,10 @@ class Error:
         The second parameter determines if the message may show Viper-level error
         explanations if no Python-level explanation is available.
         """
+        if self.reason is None:
+            if 'Timeout' in self._error.getClass().getSimpleName():
+                return 'Verification timed out'
+            return self._error.readableMessage()
         if ide_mode:
             return '{0}:{1}:{2}:{3}:{4}: error: {5} {6}'.format(
                 self.position.file_name,
