@@ -355,6 +355,7 @@ def main() -> None:
     parser.add_argument(
         '--strict-int',
         action='store_true',
+        default=True,
         help='Require exact int type (type(x) == int) rather than subtype (isinstance(x, int)) in many places.'
     )
     args = parser.parse_args()
@@ -413,8 +414,8 @@ def main() -> None:
             def add_response(part):
                 response[0] = response[0] + '\n' + part
 
-            translate_and_verify(file, jvm, req_args, add_response, arp=req_args.arp, base_dir=req_args.base_dir)
-            socket.send_string(response[0])
+            success = translate_and_verify(file, jvm, req_args, add_response, arp=req_args.arp, base_dir=req_args.base_dir)
+            socket.send_string(json.dumps({'output': response[0], 'success': success}))
     else:
         success = translate_and_verify(args.python_file, jvm, args, arp=args.arp, base_dir=args.base_dir)
         sys.exit(0 if success else 1)

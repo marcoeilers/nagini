@@ -7,6 +7,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import argparse
 import json
+import sys
 import zmq
 
 from nagini_translation.lib.constants import DEFAULT_CLIENT_SOCKET
@@ -59,9 +60,10 @@ def main():
                         request[key] = value
 
         socket.send_string(json.dumps(request))
-        response = socket.recv_string()
+        response = json.loads(socket.recv_string())
 
-        print(response)
+        print(response['output'])
+        sys.exit(0 if response['success'] else 1)
 
 if __name__ == '__main__':
     main()
