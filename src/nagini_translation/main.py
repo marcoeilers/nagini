@@ -402,19 +402,24 @@ def main() -> None:
             message = socket.recv_string()
             response = ['']
 
-            request = json.loads(message)
-            file = request['python_file']
-
-            # Build per-request args: start from server args, apply client overrides
-            req_args = copy.copy(args)
-            for key, value in request.items():
-                if key != 'python_file':
-                    setattr(req_args, key, value)
-
             def add_response(part):
                 response[0] = response[0] + '\n' + part
 
-            success = translate_and_verify(file, jvm, req_args, add_response, arp=req_args.arp, base_dir=req_args.base_dir)
+            try:
+                request = json.loads(message)
+                file = request['python_file']
+
+                # Build per-request args: start from server args, apply client overrides
+                req_args = copy.copy(args)
+                for key, value in request.items():
+                    if key != 'python_file':
+                        setattr(req_args, key, value)
+
+                success = translate_and_verify(file, jvm, req_args, add_response, arp=req_args.arp, base_dir=req_args.base_dir)
+            except Exception:
+                add_response("Server error while handling request:")
+                add_response(traceback.format_exc())
+                success = False
             socket.send_string(json.dumps({'output': response[0], 'success': success}))
     else:
         success = translate_and_verify(args.python_file, jvm, args, arp=args.arp, base_dir=args.base_dir)
@@ -466,7 +471,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
 
             vresult = verify(modules, prog, python_file, jvm, viper_args,
                              backend=backend, arp=arp, counterexample=args.counterexample, sif=args.sif)
-            
+
             if submitter is not None:
                 submitter.setSuccess(vresult.__bool__())
                 submitter.submit()
