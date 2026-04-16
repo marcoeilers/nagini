@@ -115,15 +115,17 @@ class ErrorManager:
     def _convert_error(
             self, original_error: 'AbstractVerificationError',
             jvm: JVM, modules, sif) -> Error:
+        if 'Timeout' in original_error.getClass().getSimpleName():
+            return Error(original_error, {}, None)
         error = self.transformError(original_error)
-        reason_pos = error.reason().offendingNode().pos()
-        reason_item = self._get_item(reason_pos)
+        viper_reason = error.reason() if hasattr(error, 'reason') else None
+        reason_item = self._get_item(viper_reason.offendingNode().pos()) if viper_reason is not None else None
         position = error.pos()
         rules = self._try_get_rules_workaround(
             error.offendingNode(), jvm)
-        if rules is None:
+        if rules is None and viper_reason is not None:
             rules = self._try_get_rules_workaround(
-                error.reason().offendingNode(), jvm)
+                viper_reason.offendingNode(), jvm)
         if rules is None:
             rules = {}
         error_item = self._get_item(position)

@@ -42,6 +42,11 @@
             "type": null,
             "MustTerminate": true
         },
+        "insert": {
+            "args": ["list", "__prim__int", "object"],
+            "type": null,
+            "MustTerminate": true
+        },
         "extend": {
             "args": ["list", "list"],
             "type": null,

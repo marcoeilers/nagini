@@ -55,6 +55,8 @@ class UnsupportedException(Exception):
 
     def __init__(self, ast_element: ast.AST, desc=""):
         self.node = ast_element
+        if not desc:
+            desc = type(ast_element).__name__
         self.desc = desc
         super().__init__(desc)
 
