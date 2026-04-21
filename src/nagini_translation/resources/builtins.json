@@ -57,6 +57,11 @@
             "type": "list",
             "MustTerminate": true
         },
+        "copy": {
+            "args": ["list"],
+            "type": "list",
+            "MustTerminate": true
+        },
         "__setitem__": {
             "args": ["list", "__prim__int", "object"],
             "type": null,

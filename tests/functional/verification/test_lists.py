@@ -191,3 +191,23 @@ def test_mul() -> None:
     assert newlist[5] is super2
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert mylist[1] is super1
+
+
+def test_copy() -> None:
+    super1 = Super()
+    super2 = Super()
+    super3 = Super()
+    mylist = [super1, super2, super3]
+    mylist2 = mylist.copy()
+    assert len(mylist2) == 3
+    assert mylist2[0] is super1
+    assert mylist2[1] is super2
+    assert mylist2[2] is super3
+    mylist.append(super1)
+    assert len(mylist) == 4
+    assert len(mylist2) == 3
+    mylist2[0] = super3
+    assert mylist[0] is super1
+    assert mylist2[0] is super3
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert mylist2[1] is super3
