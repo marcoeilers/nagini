@@ -211,3 +211,28 @@ def test_copy() -> None:
     assert mylist2[0] is super3
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert mylist2[1] is super3
+
+
+def test_remove() -> None:
+    super1 = Super()
+    super2 = Super()
+    super3 = Super()
+    mylist = [super1, super2, super3]
+    mylist.remove(super2)
+    assert len(mylist) == 2
+    assert mylist[0] is super1
+    assert mylist[1] is super3
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert mylist[0] is super2
+
+
+def test_index() -> None:
+    super1 = Super()
+    super2 = Super()
+    super3 = Super()
+    mylist = [super1, super2, super3, super1]
+    assert mylist.index(super1) == 0
+    assert mylist.index(super2) == 1
+    assert mylist.index(super3) == 2
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert mylist.index(super1) == 3

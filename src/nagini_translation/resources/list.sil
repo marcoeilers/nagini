@@ -145,6 +145,28 @@ method list_copy(self: Ref) returns (res: Ref)
     ensures acc(res.list_acc)
     ensures res.list_acc == self.list_acc
 
+method list_remove(self: Ref, item: Ref) returns ()
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires acc(self.list_acc)
+    requires issubtype(typeof(item), list_arg(typeof(self), 0))
+    requires @error("Item may not be in list.")(item in self.list_acc)
+    ensures acc(self.list_acc)
+    ensures |self.list_acc| == |old(self.list_acc)| - 1
+    ensures exists i: Int :: 0 <= i && i < |old(self.list_acc)|
+                          && old(self.list_acc)[i] == item
+                          && (forall j: Int :: 0 <= j && j < i ==> old(self.list_acc)[j] != item)
+                          && self.list_acc == old(self.list_acc)[..i] ++ old(self.list_acc)[i+1..]
+
+function list_index(self: Ref, item: Ref): Int
+    decreases _
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires acc(self.list_acc, wildcard)
+    requires @error("Item may not be in list.")(item in self.list_acc)
+    ensures result >= 0
+    ensures result < |self.list_acc|
+    ensures self.list_acc[result] == item
+    ensures forall j: Int :: {self.list_acc[j]} 0 <= j && j < result ==> self.list_acc[j] != item
+
 method list___iter__(self: Ref) returns (_res: Ref)
   requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
   requires acc(self.list_acc, 1 / 10)
