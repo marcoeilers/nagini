@@ -148,7 +148,7 @@ class CallTranslator(CommonTranslator):
     def _translate_float(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
         if isStr(node.args[0]):
-            string_val = node.args[0].s
+            string_val = node.args[0].value
             try:
                 float_val = float(string_val)
                 return [], self.translate_float_literal(float_val, node, ctx)

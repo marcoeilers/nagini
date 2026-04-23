@@ -17,9 +17,8 @@ def foo_1() -> int:
 
 
 def foo_2() -> int:
-    global b, a
-    #:: ExpectedOutput(assignment.failed:insufficient.permission)
-    tmp = a
+    #:: ExpectedOutput(type.error:Name "a" is used before definition  [used-before-def])
+    tmp = a  # noqa: F823
     a = 0  # b[0]
     b = [34]
     return a

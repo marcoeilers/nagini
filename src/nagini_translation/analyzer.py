@@ -1312,6 +1312,10 @@ class Analyzer(ast.NodeVisitor):
             else:
                 msg = f'Type could not be fully inferred (this usually means that a type argument is unknown)'
             raise InvalidProgramException(node, 'partial.type', message=msg)
+        elif self.types.is_literal_type(mypy_type):
+            return self.convert_type(mypy_type.fallback, node, bound_type_vars)
+        elif self.types.is_any_type(mypy_type):
+            result = self.find_or_create_class(OBJECT_TYPE, module=self.module.global_module)
         else:
             msg = 'Unsupported type: {}'.format(mypy_type.__class__.__name__)
             raise UnsupportedException(node, desc=msg)
@@ -1370,7 +1374,6 @@ class Analyzer(ast.NodeVisitor):
         return type_var
 
     def _convert_type_type(self, mypy_type, node) -> PythonType:
-        name = 'type'
         type_class = self.module.global_module.classes['type']
         args = [self.convert_type(mypy_type.item, node)]
         return GenericType(type_class, args)

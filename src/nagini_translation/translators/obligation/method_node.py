@@ -319,11 +319,15 @@ class ObligationMethodNodeConstructor:
         a dummy node with the correct name.
         """
         if self._python_method.node is None:
-            node = ast.FunctionDef()
-            if self._python_method.interface_name is not None:
-                node.name = self._python_method.interface_name
-            else:
-                node.name = self._python_method.name
+            node = ast.FunctionDef(
+                name=(
+                    self._python_method.interface_name
+                    if self._python_method.interface_name is not None
+                    else self._python_method.name),
+                args=ast.arguments(
+                    posonlyargs=[], args=[], vararg=None, kwonlyargs=[],
+                    kw_defaults=[], kwarg=None, defaults=[])
+            )
             node.lineno = 0
             node.col_offset = 0
         else:

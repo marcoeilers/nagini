@@ -25,5 +25,5 @@ def read_int_io2(
 
 
 def test(t1: Place) -> None:
-    #:: ExpectedOutput(type.error:"Open" does not return a value)
+    #:: ExpectedOutput(type.error:"Open" does not return a value (it only ever returns None)  [func-returns-value])
     a = Open(read_int_io2(t1))
