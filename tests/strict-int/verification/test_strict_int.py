@@ -5,6 +5,7 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 from nagini_contracts.contracts import *
+from typing import List
 
 
 def takes_int(x: int) -> None:
@@ -27,3 +28,30 @@ def returns_bool_as_int() -> int:
 
 def test_forall_int_verifies() -> None:
     Assert(Forall(int, lambda k: (k is not True and k is not False, [])))
+
+
+def sum_int_list(lst: List[int]) -> int:
+    Requires(Acc(list_pred(lst), 1 / 2))
+    Ensures(Acc(list_pred(lst), 1 / 2))
+    total = 0
+    for x in lst:
+        Invariant(Acc(list_pred(lst), 1 / 4))
+        takes_int(x)
+        total = total + x
+    return total
+
+
+def test_append_int_accepted() -> None:
+    lst = [1, 2, 3]
+    lst.append(4)
+    assert lst[3] == 4
+
+
+def append_bool_breaks_list_pred(lst: List[int]) -> None:
+    # Appending a bool to a List[int] verifies (list_append only requires
+    # issubtype), but the bool then poisons the element-type invariant, so
+    # list_pred cannot be re-established at the postcondition.
+    Requires(Acc(list_pred(lst)))
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(Acc(list_pred(lst)))
+    lst.append(True)
