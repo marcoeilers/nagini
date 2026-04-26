@@ -13,9 +13,8 @@ version = "1.2.0"
 dependencies = [
     "mypy==0.900",
     "typed-ast==1.5.4",
-    "toposort==1.5",
-    "jpype1==1.5.0",
-    "astunparse==1.6.2",
+    "toposort==1.10",
+    "jpype1==1.7.0",
     "pytest==7.0.0",
     "z3-solver==4.8.7.0"
 ]
