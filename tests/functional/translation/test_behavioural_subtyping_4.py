@@ -29,6 +29,6 @@ class SuperF:
 
 
 class SubF1(SuperF):
-    #:: ExpectedOutput(type.error:Signature of "some_method" incompatible with supertype "SuperF")
+    #:: ExpectedOutput(type.error:Signature of "some_method" incompatible with supertype "SuperF"  [override])
     def some_method(self, b: SubA, a: SubSubA, c: SuperA) -> SubA:
         return a

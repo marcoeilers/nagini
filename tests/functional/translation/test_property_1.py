@@ -18,5 +18,5 @@ class A:
 
 def invalid_write(a: A) -> None:
     Requires(Acc(a.v))
-    #:: ExpectedOutput(type.error:Property "vtt" defined in "A" is read-only)
+    #:: ExpectedOutput(type.error:Property "vtt" defined in "A" is read-only  [misc])
     a.vtt = 12

@@ -94,7 +94,12 @@ class TypeVisitor(TraverserVisitor):
                 if isinstance(t, mypy.types.TypeType):
                     continue
                 if not hasattr(t, 'type'):
-                    t = t.partial_fallback   # 'TupleType' object has no attribute 'type'
+                    if hasattr(t, 'partial_fallback'):
+                        t = t.partial_fallback
+                    elif hasattr(t, 'fallback'):
+                        t = t.fallback
+                    else:
+                        continue
                 if isinstance(t, mypy.types.Instance) and t.type.fullname.startswith('builtins.'):
                     continue
                 self.set_type(t.type.fullname.split('.') + [node.name],
@@ -113,16 +118,13 @@ class TypeVisitor(TraverserVisitor):
         super().visit_try_stmt(node)
 
     def visit_assignment_stmt(self, node: mypy.nodes.AssignmentStmt):
-        if (isinstance(node.rvalue, mypy.nodes.IndexExpr) and
-                isinstance(node.rvalue.analyzed, mypy.nodes.TypeAliasExpr)):
-            # If it's a type alias, process it as such.
+        analyzed = getattr(node.rvalue, "analyzed", None)
+        if isinstance(analyzed, mypy.nodes.TypeAliasExpr):
             key = tuple(self.prefix + [node.lvalues[0].name])
-            self.type_aliases[key] = node.rvalue.analyzed.type
-        elif (isinstance(node.rvalue, mypy.nodes.CallExpr) and
-                isinstance(node.rvalue.analyzed, mypy.nodes.TypeVarExpr)):
-            key = tuple(self.prefix + [node.rvalue.analyzed._name])
-            self.type_vars[key] = (node.rvalue.analyzed.upper_bound,
-                                   node.rvalue.analyzed.values)
+            self.type_aliases[key] = analyzed.node.target
+        elif isinstance(analyzed, mypy.nodes.TypeVarExpr):
+            key = tuple(self.prefix + [analyzed.name])
+            self.type_vars[key] = (analyzed.upper_bound, analyzed.values)
         else:
             super().visit_assignment_stmt(node)
 
@@ -255,7 +257,7 @@ class TypeVisitor(TraverserVisitor):
             if tuple(fullname) in self.type_vars:
                 result = self.type_vars[tuple(fullname)]
                 return result
-        msg = self.path + ':' + str(node.get_line()) + ': error: '
+        msg = self.path + ':' + str(node.line) + ': error: '
         if isinstance(node, mypy.nodes.FuncDef):
             msg += 'Encountered Any type. Type annotation missing?'
         else:
@@ -291,7 +293,6 @@ class TypeInfo:
         """
         result = mypy.options.Options()
         result.strict_optional = strict_optional
-        result.show_none_errors = strict_optional
         result.show_traceback = True
         result.export_types = True
         result.preserve_asts = True
@@ -497,3 +498,6 @@ class TypeInfo:
 
     def is_none_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.NoneTyp)
+
+    def is_literal_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.LiteralType)

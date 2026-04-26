@@ -110,7 +110,7 @@ def loop3() -> None:
     n = 10
     while i < n:
         Invariant(MustTerminate(n-i+1))
-        #:: ExpectedOutput(call.precondition:assertion.false)|ExpectedOutput(carbon)(leak_check.failed:caller.has_unsatisfied_obligations)
+        #:: ExpectedOutput(call.precondition:assertion.false)||ExpectedOutput(carbon)(leak_check.failed:caller.has_unsatisfied_obligations)
         i_time(i)
         i = i + 1
 

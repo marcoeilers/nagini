@@ -408,7 +408,7 @@ class ExpressionTranslator(CommonTranslator):
                                       node, ctx)
         return call
 
-    def translate_Ellipsis(self, node: ast.Ellipsis, ctx: Context) -> StmtsAndExpr:
+    def translate_Ellipsis(self, node: ast.Constant, ctx: Context) -> StmtsAndExpr:
         ellipsis_class = ctx.module.global_module.classes[ELLIPSIS_TYPE]
         func_name = '__create__'
         call = self.get_function_call(ellipsis_class, func_name, [], [], node, ctx)

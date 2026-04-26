@@ -15,5 +15,5 @@ def read_int_io(
         result: int = Result(),
         t_post: Place = Result(),
         ) -> bool:
-    #:: ExpectedOutput(type.error:"Terminates" does not return a value)
+    #:: ExpectedOutput(type.error:"Terminates" does not return a value  [func-returns-value])
     foo(Terminates(result > 0))

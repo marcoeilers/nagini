@@ -23,7 +23,7 @@ def test(t1: Place) -> bool:
     IOExists1(int)(
         lambda value: (
         Requires(
-            #:: ExpectedOutput(type.error:Argument 2 to "do_io" has incompatible type "int"; expected "bool")
+            #:: ExpectedOutput(type.error:Argument 2 to "do_io" has incompatible type "int"; expected "bool"  [arg-type])
             do_io(t1, value)
         ),
         Ensures(
