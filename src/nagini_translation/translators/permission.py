@@ -36,7 +36,7 @@ class PermTranslator(CommonTranslator):
         return self.translate_perm_Num(node, ctx)
 
     def translate_perm_Num(self, node: ast.Num, ctx: Context) -> Expr:
-        if node.n == 1:
+        if node.value == 1:
             return self.viper.FullPerm(self.to_position(node, ctx),
                                        self.no_info(ctx))
         raise UnsupportedException(node)

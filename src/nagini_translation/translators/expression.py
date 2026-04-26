@@ -417,7 +417,7 @@ class ExpressionTranslator(CommonTranslator):
 
     def translate_Bytes(self, node: ast.Constant, ctx: Context) -> StmtsAndExpr:
         elems = []
-        for c in node.s:
+        for c in node.value:
             lit = self.viper.IntLit(c, self.to_position(node, ctx),
                                     self.no_info(ctx))
             elems.append(self.to_ref(lit, ctx))
