@@ -1372,7 +1372,6 @@ class Analyzer(ast.NodeVisitor):
         return type_var
 
     def _convert_type_type(self, mypy_type, node) -> PythonType:
-        name = 'type'
         type_class = self.module.global_module.classes['type']
         args = [self.convert_type(mypy_type.item, node)]
         return GenericType(type_class, args)
