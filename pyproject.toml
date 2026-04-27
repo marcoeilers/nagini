@@ -11,12 +11,12 @@ build-backend = "setuptools.build_meta"
 name = "nagini"
 version = "1.2.0"
 dependencies = [
+    "jpype1==1.7.0",
     "mypy==1.5.0",
     "toposort==1.10",
-    "jpype1==1.7.0",
-    "pytest==7.0.0",
     "z3-solver==4.8.7.0"
 ]
+requires-python = ">=3.12"
 authors = [{"name" = "Viper Team", "email" = "viper@inf.ethz.ch"}]
 description = "Static verifier for Python 3, based on Viper"
 readme = "README.rst"
@@ -28,8 +28,14 @@ classifiers=[
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development",
 ]
+
+[project.optional-dependencies]
+server = ["pyzmq==27.1.0"]
+test = ["pytest==9.0.3"]
 
 [project.urls]
 Homepage = "http://www.pm.inf.ethz.ch/research/nagini.html"
@@ -47,3 +53,7 @@ where = ["src"]
 [tool.setuptools.package-data]
 "*" = ["*.sil", "*.json", "*.typed"]
 "nagini_translation.resources" = ["backends/*.jar"]
+
+[tool.pytest]
+minversion = "9.0"
+testpaths = ["tests"]
