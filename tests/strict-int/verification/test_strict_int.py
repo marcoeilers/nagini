@@ -55,3 +55,28 @@ def append_bool_breaks_list_pred(lst: List[int]) -> None:
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Acc(list_pred(lst)))
     lst.append(True)
+
+
+def reads_pseq_int_param(s: PSeq[int]) -> None:
+    Requires(len(s) > 0)
+    takes_int(s[0])
+
+
+def reads_pseq_via_toseq(lst: List[int]) -> None:
+    Requires(Acc(list_pred(lst)))
+    Requires(len(lst) > 0)
+    Ensures(Acc(list_pred(lst)))
+    s = ToSeq(lst)
+    takes_int(s[0])
+
+
+def reads_pseq_int_literal() -> None:
+    s = PSeq(1, 2, 3)
+    takes_int(s[0])
+
+
+def reads_pseq_bool_param_rejected(s: PSeq[bool]) -> None:
+    # PSeq[bool] elements must NOT be promoted to strict int.
+    Requires(len(s) > 0)
+    #:: ExpectedOutput(call.precondition:assertion.false)
+    takes_int(s[0])
