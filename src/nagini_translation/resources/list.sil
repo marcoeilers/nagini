@@ -20,7 +20,8 @@ function list___contains__(self: Ref, item: Ref): Bool
     decreases _
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     requires acc(self.list_acc, wildcard)
-    ensures result == (item in self.list_acc)
+    ensures result == exists i: Ref :: object___eq__(item, i) && i in self.list_acc
+    ensures item in self.list_acc ==> result
 
 function list___bool__(self: Ref) : Bool
     decreases _
@@ -72,6 +73,18 @@ method list___setitem__(self: Ref, key: Int, item: Ref) returns ()
     assume false
 }
 
+method list_insert(self: Ref, index: Int, item: Ref) returns ()
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires acc(self.list_acc)
+    requires issubtype(typeof(item), list_arg(typeof(self), 0))
+    ensures acc(self.list_acc)
+    ensures let resolved == ((index < 0 ? index + |old(self.list_acc)| : index)) in
+        let clamped == ((resolved < 0 ? 0 : (resolved > |old(self.list_acc)| ? |old(self.list_acc)| : resolved))) in
+            self.list_acc == old(self.list_acc)[..clamped] ++ Seq(item) ++ old(self.list_acc)[clamped..]
+{
+    assume false
+}
+
 method list_append(self: Ref, item: Ref) returns ()
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     requires acc(self.list_acc)
@@ -112,7 +125,7 @@ method list___mul__(self: Ref, factor: Int) returns (res: Ref)
     ensures acc(res.list_acc)
     ensures |res.list_acc| == (factor > 0 ? factor : 0) * |self.list_acc|
     ensures factor > 0 ==> (forall i: Int :: {res.list_acc[i]}
-                            i >= 0 && i < |res.list_acc| ==> res.list_acc[i] == self.list_acc[i \ factor])
+                            i >= 0 && i < |res.list_acc| ==> res.list_acc[i] == self.list_acc[i % |self.list_acc|])
 
 method list_reverse(self: Ref) returns (res: Ref)
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
@@ -122,6 +135,37 @@ method list_reverse(self: Ref) returns (res: Ref)
     ensures acc(res.list_acc)
     ensures |res.list_acc| == |self.list_acc|
     ensures forall i: Int :: {res.list_acc[i]} ((i >= 0 && i < |res.list_acc|) ==> (res.list_acc[i] == self.list_acc[|self.list_acc| - 1 - i]))
+
+method list_copy(self: Ref) returns (res: Ref)
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires acc(self.list_acc, 1/100)
+    ensures issubtype(typeof(res), list(list_arg(typeof(self), 0)))
+    ensures res != self
+    ensures acc(self.list_acc, 1/100)
+    ensures acc(res.list_acc)
+    ensures res.list_acc == self.list_acc
+
+method list_remove(self: Ref, item: Ref) returns ()
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires acc(self.list_acc)
+    requires issubtype(typeof(item), list_arg(typeof(self), 0))
+    requires @error("Item may not be in list.")(item in self.list_acc)
+    ensures acc(self.list_acc)
+    ensures |self.list_acc| == |old(self.list_acc)| - 1
+    ensures exists i: Int :: 0 <= i && i < |old(self.list_acc)|
+                          && old(self.list_acc)[i] == item
+                          && (forall j: Int :: 0 <= j && j < i ==> old(self.list_acc)[j] != item)
+                          && self.list_acc == old(self.list_acc)[..i] ++ old(self.list_acc)[i+1..]
+
+function list_index(self: Ref, item: Ref): Int
+    decreases _
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires acc(self.list_acc, wildcard)
+    requires @error("Item may not be in list.")(item in self.list_acc)
+    ensures result >= 0
+    ensures result < |self.list_acc|
+    ensures self.list_acc[result] == item
+    ensures forall j: Int :: {self.list_acc[j]} 0 <= j && j < result ==> self.list_acc[j] != item
 
 method list___iter__(self: Ref) returns (_res: Ref)
   requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))

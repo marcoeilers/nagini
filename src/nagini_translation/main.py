@@ -7,6 +7,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import argparse
 import astunparse
+import copy
 import inspect
 import json
 import logging
@@ -103,7 +104,7 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
               sif: bool = False, arp: bool = False, ignore_global: bool = False,
               reload_resources: bool = False, verbose: bool = False,
               check_consistency: bool = False, float_encoding: str = None,
-              counterexample: bool = False) -> Tuple[List['PythonModule'], Program]:
+              counterexample: bool = False, strict_int: bool = False) -> Tuple[List['PythonModule'], Program]:
     """
     Translates the Python module at the given path to a Viper program
     """
@@ -146,7 +147,8 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
         sil_programs = load_sil_files(jvm, bv_size, sif, float_encoding)
     modules = [main_module.global_module] + list(analyzer.modules.values())
     prog = translator.translate_program(modules, sil_programs, selected,
-                                        arp=arp, ignore_global=ignore_global, sif=sif, float_encoding=float_encoding)
+                                        arp=arp, ignore_global=ignore_global, sif=sif, float_encoding=float_encoding,
+                                        strict_int=strict_int)
     if sif:
         set_all_low_methods(jvm, viper_ast.all_low_methods)
         set_preserves_low_methods(jvm, viper_ast.preserves_low_methods)
@@ -350,6 +352,12 @@ def main() -> None:
         type=int,
         default=8
     )
+    parser.add_argument(
+        '--strict-int',
+        action='store_true',
+        default=True,
+        help='Require exact int type (type(x) == int) rather than subtype (isinstance(x, int)) in many places.'
+    )
     args = parser.parse_args()
 
     config.classpath = args.viper_jar_path
@@ -391,14 +399,28 @@ def main() -> None:
         sil_programs = load_sil_files(jvm, args.int_bitops_size, args.sif, args.float_encoding)
 
         while True:
-            file = socket.recv_string()
+            message = socket.recv_string()
             response = ['']
 
             def add_response(part):
                 response[0] = response[0] + '\n' + part
 
-            translate_and_verify(file, jvm, args, add_response, arp=args.arp, base_dir=args.base_dir)
-            socket.send_string(response[0])
+            try:
+                request = json.loads(message)
+                file = request['python_file']
+
+                # Build per-request args: start from server args, apply client overrides
+                req_args = copy.copy(args)
+                for key, value in request.items():
+                    if key != 'python_file':
+                        setattr(req_args, key, value)
+
+                success = translate_and_verify(file, jvm, req_args, add_response, arp=req_args.arp, base_dir=req_args.base_dir)
+            except Exception:
+                add_response("Server error while handling request:")
+                add_response(traceback.format_exc())
+                success = False
+            socket.send_string(json.dumps({'output': response[0], 'success': success}))
     else:
         success = translate_and_verify(args.python_file, jvm, args, arp=args.arp, base_dir=args.base_dir)
         sys.exit(0 if success else 1)
@@ -415,7 +437,8 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
         selected = set(args.select.split(',')) if args.select else set()
         modules, prog = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif, base_dir=base_dir,
                                   ignore_global=args.ignore_global, arp=arp, verbose=args.verbose,
-                                  counterexample=args.counterexample, float_encoding=args.float_encoding)
+                                  counterexample=args.counterexample, float_encoding=args.float_encoding,
+                                  strict_int=args.strict_int)
         if args.print_viper:
             if args.verbose:
                 print('Result:')
@@ -448,7 +471,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
 
             vresult = verify(modules, prog, python_file, jvm, viper_args,
                              backend=backend, arp=arp, counterexample=args.counterexample, sif=args.sif)
-            
+
             if submitter is not None:
                 submitter.setSuccess(vresult.__bool__())
                 submitter.submit()

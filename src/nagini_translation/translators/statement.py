@@ -597,6 +597,27 @@ class StatementTranslator(CommonTranslator):
         invariant.append(self.viper.Implies(some_error, previous_is_all, pos,
                                             info))
         invariant.append(self.viper.Implies(empty_iterator, some_error, pos, info))
+
+        if ctx.strict_int and target_var.type.name == INT_TYPE:
+            # Carry the strict element-type fact across the loop body. Without
+            # this, __next__'s `issubtype(typeof(_res), int())` postcondition
+            # cannot establish the strict `typeof(target) == int()` that the
+            # target_type invariant above requires in strict-int mode.
+            i_decl = self.viper.LocalVarDecl('__si_i', self.viper.Int, pos, info)
+            i_ref = self.viper.LocalVar('__si_i', self.viper.Int, pos, info)
+            seq_at_i = self.viper.SeqIndex(iter_acc, i_ref, pos, info)
+            bounds = self.viper.And(
+                self.viper.LeCmp(zero, i_ref, pos, info),
+                self.viper.LtCmp(i_ref, iter_list_len, pos, info),
+                pos, info)
+            int_cls = ctx.module.global_module.classes[INT_TYPE]
+            int_lit = self.type_factory.translate_type_literal(int_cls, pos, ctx)
+            typeof_eq = self.viper.EqCmp(self.type_factory.typeof(seq_at_i, ctx),
+                                         int_lit, pos, info)
+            forall_body = self.viper.Implies(bounds, typeof_eq, pos, info)
+            trigger = self.viper.Trigger([seq_at_i], pos, info)
+            invariant.append(self.viper.Forall([i_decl], [trigger], forall_body,
+                                               pos, info))
         return invariant
 
     def _get_iterator(self, iterable: Expr, iterable_type: PythonType,

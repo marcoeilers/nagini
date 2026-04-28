@@ -103,6 +103,45 @@ def test_append() -> None:
     #:: ExpectedOutput(assert.failed:assertion.false)
     Assert(mylist[0] == super4)
 
+def test_insert() -> None:
+    super1 = Super()
+    super2 = Super()
+    super3 = Super()
+    mylist = [super1, super2]
+    Assert(len(mylist) == 2)
+    # Insert in the middle
+    super4 = Super()
+    mylist.insert(1, super4)
+    Assert(len(mylist) == 3)
+    Assert(mylist[0] == super1)
+    Assert(mylist[1] == super4)
+    Assert(mylist[2] == super2)
+    # Insert at the beginning
+    mylist.insert(0, super3)
+    Assert(len(mylist) == 4)
+    Assert(mylist[0] == super3)
+    Assert(mylist[1] == super1)
+    # Insert with negative index (from end)
+    super5 = Super()
+    mylist.insert(-1, super5)
+    Assert(len(mylist) == 5)
+    Assert(mylist[3] == super5)
+    Assert(mylist[4] == super2)
+    # Insert past the end (should append)
+    super6 = Super()
+    mylist.insert(100, super6)
+    Assert(len(mylist) == 6)
+    Assert(mylist[5] == super6)
+    # Insert with negative index past the beginning (should prepend, no wrap)
+    super7 = Super()
+    mylist.insert(-100, super7)
+    Assert(len(mylist) == 7)
+    Assert(mylist[0] == super7)
+    Assert(mylist[1] == super3)
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    Assert(mylist[0] == super1)
+
+
 def test_extend() -> None:
     super1 = Super()
     super2 = Super()
@@ -152,3 +191,48 @@ def test_mul() -> None:
     assert newlist[5] is super2
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert mylist[1] is super1
+
+
+def test_copy() -> None:
+    super1 = Super()
+    super2 = Super()
+    super3 = Super()
+    mylist = [super1, super2, super3]
+    mylist2 = mylist.copy()
+    assert len(mylist2) == 3
+    assert mylist2[0] is super1
+    assert mylist2[1] is super2
+    assert mylist2[2] is super3
+    mylist.append(super1)
+    assert len(mylist) == 4
+    assert len(mylist2) == 3
+    mylist2[0] = super3
+    assert mylist[0] is super1
+    assert mylist2[0] is super3
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert mylist2[1] is super3
+
+
+def test_remove() -> None:
+    super1 = Super()
+    super2 = Super()
+    super3 = Super()
+    mylist = [super1, super2, super3]
+    mylist.remove(super2)
+    assert len(mylist) == 2
+    assert mylist[0] is super1
+    assert mylist[1] is super3
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert mylist[0] is super2
+
+
+def test_index() -> None:
+    super1 = Super()
+    super2 = Super()
+    super3 = Super()
+    mylist = [super1, super2, super3, super1]
+    assert mylist.index(super1) == 0
+    assert mylist.index(super2) == 1
+    assert mylist.index(super3) == 2
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert mylist.index(super1) == 3

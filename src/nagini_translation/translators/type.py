@@ -9,7 +9,9 @@ import ast
 
 from nagini_translation.lib.constants import (
     CALLABLE_TYPE,
+    INT_TYPE,
     PRIMITIVES,
+    PSEQ_TYPE,
 )
 from nagini_translation.lib.program_nodes import (
     PythonClass,
@@ -99,4 +101,45 @@ class TypeTranslator(CommonTranslator):
             return self.viper.TrueLit(position, self.no_info(ctx))
         else:
             result = self.type_factory.type_check(lhs, type, position, ctx)
+            strict_inv = self._strict_int_pseq_invariant(lhs, type, position, ctx)
+            if strict_inv is not None:
+                result = self.viper.And(result, strict_inv, position,
+                                        self.no_info(ctx))
             return result
+
+    def _strict_int_pseq_invariant(self, pseq_ref: Expr, pseq_type: PythonType,
+                                   pos: 'silver.ast.Position',
+                                   ctx: Context) -> Optional[Expr]:
+        # Mirror of _strict_int_list_invariant for PSeq[int]: in strict-int
+        # mode, every element of a PSeq[int] must have exactly type int. Since
+        # PSeq is a value type with no permission to attach the invariant to,
+        # we conjoin it with the type check that establishes
+        # `typeof(s) == PSeq(int())`. Returns None when not applicable.
+        if not ctx.strict_int:
+            return None
+        if pseq_type is None or pseq_type.name != PSEQ_TYPE:
+            return None
+        if not getattr(pseq_type, 'type_args', None):
+            return None
+        if pseq_type.type_args[0].name != INT_TYPE:
+            return None
+        info = self.no_info(ctx)
+        seq_class = ctx.module.global_module.classes[PSEQ_TYPE]
+        sil_seq = self.get_function_call(seq_class, '__sil_seq__',
+                                         [pseq_ref], [None], None, ctx, pos)
+        i_decl = self.viper.LocalVarDecl('i', self.viper.Int, pos, info)
+        i_ref = self.viper.LocalVar('i', self.viper.Int, pos, info)
+        seq_at_i = self.viper.SeqIndex(sil_seq, i_ref, pos, info)
+        zero = self.viper.IntLit(0, pos, info)
+        length = self.viper.SeqLength(sil_seq, pos, info)
+        bounds = self.viper.And(
+            self.viper.LeCmp(zero, i_ref, pos, info),
+            self.viper.LtCmp(i_ref, length, pos, info),
+            pos, info)
+        int_cls = ctx.module.global_module.classes[INT_TYPE]
+        int_lit = self.type_factory.translate_type_literal(int_cls, pos, ctx)
+        typeof_at_i = self.type_factory.typeof(seq_at_i, ctx)
+        eq = self.viper.EqCmp(typeof_at_i, int_lit, pos, info)
+        body = self.viper.Implies(bounds, eq, pos, info)
+        trigger = self.viper.Trigger([seq_at_i], pos, info)
+        return self.viper.Forall([i_decl], [trigger], body, pos, info)
