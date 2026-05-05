@@ -121,6 +121,7 @@ class Silicon:
             '--alternativeFunctionVerificationOrder',
             '--z3ResourcesPerMillisecond=9000',
             '--disableDefaultPlugins',
+            '--enableBranchconditionReporting',
             '--plugin=viper.silver.plugin.standard.refute.RefutePlugin:'
             'viper.silver.plugin.standard.termination.TerminationPlugin:'
             'viper.silver.plugin.standard.predicateinstance.PredicateInstancePlugin',
