@@ -616,7 +616,7 @@ class CallTranslator(CommonTranslator):
             call = call + self.create_exception_catchers(error_var,
                 ctx.actual_function.try_blocks, node, ctx)
         return (defined_check + call,
-                result_var.ref() if result_var else None)
+                result_var.ref(node, ctx) if result_var else None)
 
     def _add_dependencies(self, reference: ast.AST, target: PythonMethod,
                           ctx: Context) -> None:

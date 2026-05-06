@@ -136,10 +136,14 @@ class MethodTranslator(CommonTranslator):
         """
         ctx.obligation_context.is_translating_posts = True
         posts = []
-        no_error = self.viper.EqCmp(err_var,
-                                    self.viper.NullLit(self.no_position(ctx),
-                                                       self.no_info(ctx)),
-                                    self.no_position(ctx), self.no_info(ctx))
+        null_lit = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
+        if method.postcondition:
+            no_err_pos = self.to_position(method.postcondition[0][0], ctx, error_string='(not (exception has been raised))')
+            no_error = self.viper.EqCmp(err_var, null_lit,
+                                        no_err_pos, self.no_info(ctx))
+        else:
+            no_error = self.viper.EqCmp(err_var, null_lit,
+                                        self.no_position(ctx), self.no_info(ctx))
         for post, aliases in method.postcondition:
             with ctx.additional_aliases(aliases):
                 if isinstance(post, ast.Lambda):
@@ -184,8 +188,9 @@ class MethodTranslator(CommonTranslator):
                                            error_type_pos,
                                            ctx, inhale_exhale=False)
             error_type_conds.append(has_type)
-            condition = self.viper.And(error, has_type, self.no_position(ctx),
-                                       self.no_info(ctx))
+            condition_pos = self.to_position(method.declared_exceptions[exception][0][0], ctx,
+                                             error_string='isinstance(RaisedException(), {0})'.format(exception.name))
+            condition = self.viper.And(error, has_type, condition_pos, self.no_info(ctx))
             assert ctx.current_contract_exception is None
             ctx.current_contract_exception = exception
             for post, aliases in method.declared_exceptions[exception]:
@@ -737,10 +742,11 @@ class MethodTranslator(CommonTranslator):
                 err_var = block.get_error_var(self.translator)
                 if err_var.sil_name in ctx.var_aliases:
                     err_var = ctx.var_aliases[err_var.sil_name]
+                condition_pos = self.to_position(handler.node, ctx,
+                                                 error_string='(isinstance(RaisedException(), {0}))'.format(handler.exception.name))
                 condition = self.var_type_check(err_var.sil_name,
                                                 handler.exception,
-                                                self.to_position(handler.node,
-                                                                 ctx),
+                                                condition_pos,
                                                 ctx, inhale_exhale=False)
                 label_name = ctx.get_label_name(handler.name)
                 goto = self.viper.Goto(label_name, pos, info)
@@ -802,10 +808,14 @@ class MethodTranslator(CommonTranslator):
         number_three = self.viper.IntLit(3, pos, info)
         number_four = self.viper.IntLit(4, pos, info)
 
-        is_one = self.viper.EqCmp(finally_var.ref(), number_one, pos, info)
-        is_two = self.viper.EqCmp(finally_var.ref(), number_two, pos, info)
-        is_three = self.viper.EqCmp(finally_var.ref(), number_three, pos, info)
-        is_four = self.viper.EqCmp(finally_var.ref(), number_four, pos, info)
+        is_one_pos = self.to_position(block.node.finalbody[-1], ctx, error_string='(returning after finally)')
+        is_one = self.viper.EqCmp(finally_var.ref(), number_one, is_one_pos, info)
+        is_two_pos = self.to_position(block.node.finalbody[-1], ctx, error_string='(unhandled exception after finally)')
+        is_two = self.viper.EqCmp(finally_var.ref(), number_two, is_two_pos, info)
+        is_three_pos = self.to_position(block.node.finalbody[-1], ctx, error_string='(breaking after finally)')
+        is_three = self.viper.EqCmp(finally_var.ref(), number_three, is_three_pos, info)
+        is_four_pos = self.to_position(block.node.finalbody[-1], ctx, error_string='(continuing after finally)')
+        is_four = self.viper.EqCmp(finally_var.ref(), number_four, is_four_pos, info)
 
         if_return = self.viper.If(is_one, return_block, goto_post, pos,
                                   info)

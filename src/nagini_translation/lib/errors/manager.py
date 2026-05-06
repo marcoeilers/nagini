@@ -151,12 +151,30 @@ class ErrorManager:
                 if isinstance(bc, jvm.viper.silver.ast.Not) and bc_pos == bc.exp().pos():
                     inner = bc.exp()
                     inner_item = self._get_item(inner.pos())
-                    condition = (inner_item.reason_string or pprint(inner_item.node)) if inner_item else "unknown"
-                    py_bcs.append("(not {0}) at {1}".format(condition, str(inner.pos())))
+                    if not inner_item:
+                        continue
+                    condition = (inner_item.reason_string or pprint(inner_item.node))
+                    pos = str(inner.pos())
+                    if '.sil' in pos:
+                        continue
+                    if pos == '<no position>':
+                        pos = ''
+                    else:
+                        pos = ' at ' + pos
+                    py_bcs.append("(not {0}){1}".format(condition, pos))
                 else:
                     bc_item = self._get_item(bc_pos)
-                    condition = (bc_item.reason_string or pprint(bc_item.node)) if bc_item else "unknown"
-                    py_bcs.append("{0} at {1}".format(condition, str(bc_pos)))
+                    if not bc_item:
+                        continue
+                    condition = (bc_item.reason_string or pprint(bc_item.node))
+                    pos = str(bc_pos)
+                    if '.sil' in pos:
+                        continue
+                    if pos == '<no position>':
+                        pos = ''
+                    else:
+                        pos = ' at ' + pos
+                    py_bcs.append("{0}{1}".format(condition, pos))
         if error_item:
             return Error(error, rules, reason_item, error_item.node,
                          error_item.vias, inputs=inputs, bcs=py_bcs)
