@@ -331,7 +331,7 @@ class CallTranslator(CommonTranslator):
                 catchers = self.create_exception_catchers(error_var,
                     ctx.actual_function.try_blocks, node, ctx)
                 stmts = stmts + catchers
-        return arg_stmts + defined_check + stmts, res_var.ref()
+        return arg_stmts + defined_check + stmts, res_var.ref(node, ctx)
 
     def _translate_list(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         contents = None
