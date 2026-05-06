@@ -631,7 +631,8 @@ class MethodTranslator(CommonTranslator):
         null = self.viper.NullLit(pos, info)
         one = self.viper.IntLit(1, pos, info)
         code_var = block.get_finally_var(self.translator)
-        error_cond = self.viper.GtCmp(code_var.ref(), one, pos, info)
+        # This condition would show up as a branch condition if it had a position; we hide it.
+        error_cond = self.viper.GtCmp(code_var.ref(), one, self.no_position(ctx), info)
         error_case = []
         no_error_case = []
         # FIXME: Cannot currently assign None to type variable, because types
@@ -808,13 +809,20 @@ class MethodTranslator(CommonTranslator):
         number_three = self.viper.IntLit(3, pos, info)
         number_four = self.viper.IntLit(4, pos, info)
 
-        is_one_pos = self.to_position(block.node.finalbody[-1], ctx, error_string='(returning after finally)')
+        if isinstance(block.node, ast.Try):
+            final_end_node = block.node.finalbody[-1]
+            loc = ' after finally'
+        else:
+            # ast.With
+            final_end_node = block.node
+            loc = ' after with'
+        is_one_pos = self.to_position(final_end_node, ctx, error_string='(returning{0})'.format(loc))
         is_one = self.viper.EqCmp(finally_var.ref(), number_one, is_one_pos, info)
-        is_two_pos = self.to_position(block.node.finalbody[-1], ctx, error_string='(unhandled exception after finally)')
+        is_two_pos = self.to_position(final_end_node, ctx, error_string='(unhandled exception{0})'.format(loc))
         is_two = self.viper.EqCmp(finally_var.ref(), number_two, is_two_pos, info)
-        is_three_pos = self.to_position(block.node.finalbody[-1], ctx, error_string='(breaking after finally)')
+        is_three_pos = self.to_position(final_end_node, ctx, error_string='(breaking{0})'.format(loc))
         is_three = self.viper.EqCmp(finally_var.ref(), number_three, is_three_pos, info)
-        is_four_pos = self.to_position(block.node.finalbody[-1], ctx, error_string='(continuing after finally)')
+        is_four_pos = self.to_position(final_end_node, ctx, error_string='(continuing{0})'.format(loc))
         is_four = self.viper.EqCmp(finally_var.ref(), number_four, is_four_pos, info)
 
         if_return = self.viper.If(is_one, return_block, goto_post, pos,
