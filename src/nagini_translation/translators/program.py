@@ -24,6 +24,7 @@ from nagini_translation.lib.constants import (
     MAY_SET_PRED,
     METHOD_ID_DOMAIN,
     NAME_DOMAIN,
+    PRIMITIVE_INT_TYPE,
     PRIMITIVES,
     RESULT_NAME,
     THREAD_DOMAIN,
