@@ -7,6 +7,9 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import ast
 import astunparse
+import re
+import tokenize
+from nagini_translation.lib import config
 
 from typing import (
     Any,
