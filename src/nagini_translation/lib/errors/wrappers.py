@@ -196,8 +196,9 @@ class Error:
                 self.message, self.reason)
         else:
             if self._inputs is not None:
-                return '{0} {1} ({2}).\n{3}'.format(
-                    self.message, self.reason.string(show_viper_errors), self.position_string, str(self._inputs))
+                return '{0} {1} ({2}){3}.\n{4}'.format(
+                    self.message, self.reason.string(show_viper_errors), self.position_string, self.bcs_string,
+                    str(self._inputs))
             else:
                 return '{0} {1} ({2}){3}'.format(
                     self.message, self.reason.string(show_viper_errors), self.position_string, self.bcs_string)
