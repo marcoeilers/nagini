@@ -83,8 +83,17 @@ class NotWrapper:
     """
     Represents a negation of the condition cond.
     """
-    def __init__(self, cond):
+    def __init__(self, cond, node):
         self.cond = cond
+        self.node = node
+
+class CondWrapper:
+    """
+    Represents the condition cond.
+    """
+    def __init__(self, cond, node):
+        self.cond = cond
+        self.node = node
 
 
 class BinOpWrapper:
@@ -136,8 +145,8 @@ class PureTranslator(CommonTranslator):
         cond_var = ctx.current_function.create_variable('cond',
             ctx.module.global_module.classes[PRIMITIVE_BOOL_TYPE], self.translator)
         cond_let = AssignWrapper(cond_var.sil_name, conds, cond, node)
-        then_cond = conds + [cond_var.sil_name]
-        else_cond = conds + [NotWrapper(cond_var.sil_name)]
+        then_cond = conds + [CondWrapper(cond_var.sil_name, node.test)]
+        else_cond = conds + [NotWrapper(cond_var.sil_name, node.test)]
         then = [self.translate_pure(then_cond, stmt, ctx) for stmt in node.body]
         then = flatten(then)
         else_ = []
@@ -425,15 +434,26 @@ class PureTranslator(CommonTranslator):
         using the renamings in names.
         """
         previous = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
+        previous_node = None
         for cond in conds:
             if isinstance(cond, NotWrapper):
-                current = self.to_bool(ctx.var_aliases.get(cond.cond).ref(), ctx)
+                current = self.to_bool(ctx.var_aliases.get(cond.cond).ref(cond.node, ctx), ctx)
                 current = self.viper.Not(current, self.no_position(ctx),
                                          self.no_info(ctx))
+                cur_node = ast.UnaryOp(ast.Not(), cond.node, lineno=cond.node.lineno, col_offset=cond.node.col_offset,
+                                       end_lineno=cond.node.end_lineno)
+            elif isinstance(cond, CondWrapper):
+                current = self.to_bool(ctx.var_aliases.get(cond.cond).ref(cond.node, ctx), ctx)
+                cur_node = cond.node
             else:
-                current = ctx.var_aliases.get(cond).ref()
+                raise Exception()
+            if not previous_node:
+                previous_node = cur_node
+            else:
+                previous_node = ast.BoolOp(ast.And(), [previous_node, cur_node], lineno=previous_node.lineno,
+                                           end_lineno=cur_node.end_lineno, col_offset=previous_node.col_offset)
             previous = self.viper.And(self.to_bool(previous, ctx),
                                       self.to_bool(current, ctx),
-                                      self.no_position(ctx),
+                                      self.to_position(previous_node, ctx),
                                       self.no_info(ctx))
         return previous

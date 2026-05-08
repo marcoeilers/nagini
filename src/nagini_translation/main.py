@@ -193,19 +193,21 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
     for task in analyzer.deferred_tasks:
         task()
 
-def get_verifier(path: str, jvm: JVM, viper_args: List[str], backend=ViperVerifier.silicon, counterexample=False) -> Union[Silicon, Carbon]:
+def get_verifier(path: str, jvm: JVM, viper_args: List[str], backend=ViperVerifier.silicon,
+                 counterexample=False, disable_branch_conditions=False) -> Union[Silicon, Carbon]:
     if backend == ViperVerifier.silicon:
-        return Silicon(jvm, path, viper_args, counterexample)
+        return Silicon(jvm, path, viper_args, counterexample, disable_branch_conditions)
     elif backend == ViperVerifier.carbon:
         return Carbon(jvm, path, viper_args)
 
 def verify(modules, prog: 'viper.silver.ast.Program', path: str, jvm: JVM, viper_args: List[str],
-           backend=ViperVerifier.silicon, arp=False, counterexample=False, sif=False) -> VerificationResult:
+           backend=ViperVerifier.silicon, arp=False, counterexample=False,
+           sif=False, disable_branch_conditions=False) -> VerificationResult:
     """
     Verifies the given Viper program
     """
     try:
-        verifier = get_verifier(path, jvm, viper_args, backend, counterexample)
+        verifier = get_verifier(path, jvm, viper_args, backend, counterexample, disable_branch_conditions)
         vresult = verifier.verify(modules, prog, arp=arp, sif=sif)
         return vresult
     except JException as je:
@@ -352,6 +354,12 @@ def main() -> None:
         type=int,
         default=8
     )
+    parser.add_argument(
+        '--disable-branch-conditions',
+        help='Disable reporting of branch conditions for verification errors with the Silicon backend..',
+        action='store_true',
+        default=False,
+    )
     args = parser.parse_args()
 
     config.classpath = args.viper_jar_path
@@ -449,7 +457,8 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                 submitter.setProgram(prog)
 
             vresult = verify(modules, prog, python_file, jvm, viper_args,
-                             backend=backend, arp=arp, counterexample=args.counterexample, sif=args.sif)
+                             backend=backend, arp=arp, counterexample=args.counterexample,
+                             sif=args.sif, disable_branch_conditions=args.disable_branch_conditions)
             
             if submitter is not None:
                 submitter.setSuccess(vresult.__bool__())

@@ -587,8 +587,10 @@ class ExpressionTranslator(CommonTranslator):
 
         for block in relevant_try_blocks:
             for handler in block.handlers:
+                condition_pos = self.to_position(handler.node, ctx,
+                                                 error_string='isinstance(RaisedException(), {0})'.format(handler.exception.name))
                 condition = self.type_check(var, handler.exception,
-                                            self.to_position(handler.node, ctx),
+                                            condition_pos,
                                             ctx, inhale_exhale=False)
                 label_name = ctx.get_label_name(handler.name)
                 goto = self.viper.Goto(label_name,
@@ -613,10 +615,11 @@ class ExpressionTranslator(CommonTranslator):
             error_case = uncaught_option
         else:
             error_case = result
+        some_error_pos = self.to_position(call, ctx, error_string='(exception has been raised)')
         errnotnull = self.viper.NeCmp(var,
                                       self.viper.NullLit(self.no_position(ctx),
                                                          self.no_info(ctx)),
-                                      position, self.no_info(ctx))
+                                      some_error_pos, self.no_info(ctx))
         emptyblock = self.translate_block([], self.no_position(ctx),
                                           self.no_info(ctx))
         errcheck = self.viper.If(errnotnull, error_case, emptyblock,

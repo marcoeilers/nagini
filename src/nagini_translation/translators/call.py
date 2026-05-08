@@ -346,7 +346,7 @@ class CallTranslator(CommonTranslator):
                 post_init_stmts = self._translate_init_call(target, [res_var.ref()], node, ctx, '__post_init__')
                 stmts.extend(post_init_stmts)
 
-        return arg_stmts + defined_check + stmts, res_var.ref()
+        return arg_stmts + defined_check + stmts, res_var.ref(node, ctx)
 
     def _translate_init_call(self, target: PythonMethod, args: list, node: ast.Call, ctx: Context, name = '__init__') -> list:
         target_class = target.cls
@@ -708,7 +708,7 @@ class CallTranslator(CommonTranslator):
             call = call + self.create_exception_catchers(error_var,
                 ctx.actual_function.try_blocks, node, ctx)
         return (defined_check + call,
-                result_var.ref() if result_var else None)
+                result_var.ref(node, ctx) if result_var else None)
 
     def _add_dependencies(self, reference: ast.AST, target: PythonMethod,
                           ctx: Context) -> None:

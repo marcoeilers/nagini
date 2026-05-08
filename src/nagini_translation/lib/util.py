@@ -328,9 +328,7 @@ def pprint(node) -> str:
     if isinstance(node, str):
         return node
     if isinstance(node, ast.FunctionDef):
-        # Mainly for debugging, whenever this happens it's almost certainly
-        # wrong.
-        raise ValueError(node)
+        return "unknown node in function " + node.name
     res = astunparse.unparse(node)
     res = res.replace('\n', '')
     return res

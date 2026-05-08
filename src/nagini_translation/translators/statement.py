@@ -741,10 +741,13 @@ class StatementTranslator(CommonTranslator):
                                                   target_var.ref(),
                                                   None, None, target_type,
                                                   node, ctx)
-
+        cond_node = ast.Compare(node.target, [ast.In()], [node.iter],
+                                lineno=node.target.lineno, col_offset=node.target.col_offset,
+                                end_lineno=node.iter.end_lineno)
+        cond_pos = self.to_position(cond_node, ctx)
         cond = self.viper.EqCmp(err_var.ref(),
                                 self.viper.NullLit(position, info),
-                                position, info)
+                                cond_pos, info)
 
         cond_low = []
         if ctx.sif == 'prob':
@@ -1104,7 +1107,7 @@ class StatementTranslator(CommonTranslator):
                     field = recv_type.get_field(lhs.attr).actual_field
                     field_access = self.viper.FieldAccess(receiver, field.sil_field,
                                                           position, info)
-                    permission = self.create_new_field_permission(field_access, field,
+                    permission = self.create_new_field_permission(field_access, field, node,
                                                                   position, info, ctx)
                     assign_stmt = self.viper.FieldAssign(field_access, rhs, position, info)
                     block = self.translate_block([permission, assign_stmt], position, info)
@@ -1138,7 +1141,7 @@ class StatementTranslator(CommonTranslator):
                 definedness_expr = self.check_var_defined(target, position, info)
         else:
             assignment = self.viper.FieldAssign
-            permission_inhale = self.create_new_field_permission(var, target,
+            permission_inhale = self.create_new_field_permission(var, target, node,
                                                                  position, info, ctx)
             before_assign.append(permission_inhale)
 
@@ -1148,7 +1151,7 @@ class StatementTranslator(CommonTranslator):
         return lhs_stmt + before_assign + [assign_stmt] + after_assign, [assign_val]
 
     def create_new_field_permission(self, field_acc: Expr, target: PythonField,
-                                    position: Position, info: Info, ctx: Context) -> Stmt:
+                                    node: ast.AST, position: Position, info: Info, ctx: Context) -> Stmt:
         """
         Creates a statement that checks if the receiver of the given field access is the
         self-parameter of the current method and there is a permission to create the
@@ -1164,7 +1167,8 @@ class StatementTranslator(CommonTranslator):
         may_set_pred = self.viper.PredicateAccess([receiver, id], MAY_SET_PRED, position,
                                                   info)
         may_set_perm = self.viper.CurrentPerm(may_set_pred, position, info)
-        may_set = self.viper.PermGtCmp(may_set_perm, no_perm, position, info)
+        may_set_pos = self.to_position(node, ctx, error_string='(field "{0}" does not exist)'.format(target.name))
+        may_set = self.viper.PermGtCmp(may_set_perm, no_perm, may_set_pos, info)
         full_perm = self.viper.FullPerm(position, info)
         all_may_set = self.viper.PredicateAccessPredicate(may_set_pred, full_perm,
                                                           position, info)

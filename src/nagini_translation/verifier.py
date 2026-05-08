@@ -106,7 +106,8 @@ class Silicon:
     Provides access to the Silicon verifier
     """
 
-    def __init__(self, jvm: JVM, filename: str, viper_args: List[str], counterexample: bool):
+    def __init__(self, jvm: JVM, filename: str, viper_args: List[str], counterexample: bool,
+                 disable_branch_conditions: bool):
         self.jvm = jvm
         self.silver = jvm.viper.silver
         if not jvm.is_known_class(jvm.viper.silicon, 'Silicon'):
@@ -121,6 +122,7 @@ class Silicon:
             '--alternativeFunctionVerificationOrder',
             '--z3ResourcesPerMillisecond=9000',
             '--disableDefaultPlugins',
+            *(['--enableBranchconditionReporting'] if not disable_branch_conditions else []),
             '--plugin=viper.silver.plugin.standard.refute.RefutePlugin:'
             'viper.silver.plugin.standard.termination.TerminationPlugin:'
             'viper.silver.plugin.standard.predicateinstance.PredicateInstancePlugin',
