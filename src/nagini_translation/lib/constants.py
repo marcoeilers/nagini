@@ -25,18 +25,20 @@ BUILTINS = ['cast',
             'range',
             'type',
             'list',
-            'enumerate']
+            'enumerate',
+            'bytearray']
 
 EXTENDABLE_BUILTINS = [
     'object',
     'Exception',
     'Lock',
-    'int'
+    'int',
+    'IntEnum'
 ]
 
 THREADING = ['Thread']
 
-BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred', 'MayStart', 'ThreadPost']
+BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred', 'bytearray_pred', 'MayStart', 'ThreadPost']
 
 FUNCTION_DOMAIN_NAME = 'Function'
 
@@ -258,11 +260,15 @@ LEGAL_MAGIC_METHODS = {
     '__ror__',
 
     '__init__',
+    '__post_init__',
     '__enter__',
     '__exit__',
     '__str__',
+    '__repr__',
     '__len__',
     '__bool__',
+    '__format__',
+    '__hash__',
 
     '__getitem__',
     '__setitem__',
@@ -294,6 +300,8 @@ RANGE_TYPE = 'range'
 
 PSEQ_TYPE = 'PSeq'
 
+PBYTESEQ_TYPE = 'PByteSeq'
+
 PSET_TYPE = 'PSet'
 
 PMSET_TYPE = 'PMultiset'
@@ -309,6 +317,8 @@ SET_TYPE = 'set'
 STRING_TYPE = 'str'
 
 BYTES_TYPE = 'bytes'
+
+BYTEARRAY_TYPE = 'bytearray'
 
 INT_TYPE = 'int'
 
@@ -361,6 +371,8 @@ EVAL_IO_SIGNATURE = ('eval_io', 'func', 'arg', 'result')
 IGNORED_IMPORTS = {'_importlib_modulespec',
                    'abc',
                    'builtins',
+                   'dataclasses',
+                   'enum',
                    'nagini_contracts',
                    'nagini_contracts.adt',
                    'nagini_contracts.contracts',
@@ -377,6 +389,8 @@ IGNORED_MODULE_NAMES = {
     '_importlib_modulespec': [],
     'abc': [],
     'builtins': [],
+    'dataclasses': [],
+    'enum': [],
     'nagini_contracts': [],
     'nagini_contracts.contracts': [],
     'nagini_contracts.io_contracts': [],
