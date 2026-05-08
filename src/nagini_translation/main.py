@@ -51,7 +51,7 @@ from nagini_translation.verifier import (
     ViperVerifier
 )
 from nagini_translation import verifier
-from typing import List, Set, Tuple
+from typing import List, Set, Tuple, Union
 
 
 TYPE_ERROR_PATTERN = r"^(?P<file>.*):(?P<line>\d+): error: (?P<msg>.*)$"
@@ -65,8 +65,8 @@ def parse_sil_file(sil_path: str, bv_path: str, bv_size: int, jvm, float_option:
     with open(sil_path, 'r') as file:
         text = file.read()
     with open(bv_path, 'r') as file:
-        int_min = -(2 ** (bv_size - 1))
-        int_max = 2 ** (bv_size - 1) - 1
+        int_min = -(2 ** (bv_size))
+        int_max = 2 ** (bv_size) - 1
         text += "\n" + file.read().replace("NBITS", str(bv_size)).replace("INT_MIN_VAL", str(int_min)).replace("INT_MAX_VAL", str(int_max))
     if float_option == "real":
         text = text.replace("float.sil", "float_real.sil")
@@ -193,6 +193,11 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
     for task in analyzer.deferred_tasks:
         task()
 
+def get_verifier(path: str, jvm: JVM, viper_args: List[str], backend=ViperVerifier.silicon, counterexample=False) -> Union[Silicon, Carbon]:
+    if backend == ViperVerifier.silicon:
+        return Silicon(jvm, path, viper_args, counterexample)
+    elif backend == ViperVerifier.carbon:
+        return Carbon(jvm, path, viper_args)
 
 def verify(modules, prog: 'viper.silver.ast.Program', path: str, jvm: JVM, viper_args: List[str],
            backend=ViperVerifier.silicon, arp=False, counterexample=False, sif=False) -> VerificationResult:
@@ -200,10 +205,7 @@ def verify(modules, prog: 'viper.silver.ast.Program', path: str, jvm: JVM, viper
     Verifies the given Viper program
     """
     try:
-        if backend == ViperVerifier.silicon:
-            verifier = Silicon(jvm, path, viper_args, counterexample)
-        elif backend == ViperVerifier.carbon:
-            verifier = Carbon(jvm, path, viper_args)
+        verifier = get_verifier(path, jvm, viper_args, backend, counterexample)
         vresult = verifier.verify(modules, prog, arp=arp, sif=sif)
         return vresult
     except JException as je:
