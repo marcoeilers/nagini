@@ -6,7 +6,7 @@ Our CAV 2018 tool paper describing Nagini can be found `here <http://pm.inf.ethz
 Dependencies (Ubuntu Linux)
 ===================================
 
-1.  Install Java 11 or newer (64 bit) and a Python version between Python 3.9 and 3.12 (64 bit, newer versions *will not work*).
+1.  Install Java 11 or newer (64 bit) and a Python version between Python 3.12 and 3.14 (64 bit).
 
 2.  Install the the required libraries, in particular, python3.x-dev.
 
@@ -15,12 +15,11 @@ Dependencies (Ubuntu Linux)
 Dependencies (Windows)
 ==========================
 
-1.  Install Java 11 or newer (64 bit) and a Python version between Python 3.9 and 3.12 (64 bit, newer versions *will not work*).
+1.  Install Java 11 or newer (64 bit) and a Python version between Python 3.12 and 3.14 (64 bit).
 
 2.  Install the required version of either Visual C++ Build Tools or Visual Studio.
 
 3.  For usage with Viper's verification condition generation backend Carbon, you will also need to install Boogie (version 2.15.9).
-
 
 Getting Started
 ===============
@@ -29,7 +28,7 @@ Execute the following commands (on Windows, you may have to use ``cmd`` and not 
 
 1.  Create a virtual environment::
 
-        virtualenv --python=python3.12 <env>
+        virtualenv --python=python3.14 <env>
         
 2.  Activate it::
 
@@ -44,12 +43,16 @@ Execute the following commands (on Windows, you may have to use ``cmd`` and not 
 3.  Install Nagini::
 
         pip install nagini
+        # or with optional dependencies for server mode and testing:
+        pip install "nagini[server,test]"
 
     Alternatively, to get the most up-to-date version, install from source::
 
         git clone https://github.com/marcoeilers/nagini.git
         cd nagini
         pip install .
+        # or with optional dependencies for server mode and testing:
+        pip install ".[server,test]"
 
 4.  Optionally, try running some tests::
 
@@ -95,6 +98,7 @@ The following command line options are available::
                     as real numbers (i.e., not modeling floating point imprecision), or 'ieee32' to model them
                     as proper IEEE 32 bit floats. The latter option unfortunately usually leads to very long
                     verification times or non-termination.
+    
     --int-bitops-size
                     Bitwise operations on integers (e.g. 12 ^ -5) are supported only for integers which can
                     be proven to be in a specific range, namely the range of n-bit signed integers.
@@ -117,7 +121,6 @@ The following command line options are available::
                         
 To see all possible command line options, invoke ``nagini`` without arguments.
 
-
 Server Mode / Faster Verification Mode
 ======================================
 
@@ -127,7 +130,7 @@ To use it,
 
 0. Install pyzmq::
 
-        pip install pyzmq
+        pip install "nagini[server]"
 
 1. Start a Nagini server::
 
@@ -141,7 +144,6 @@ To use it,
 3. While the server is running, run a client to instruct the server to verify a specific file::
 
         nagini_client path/to/file.py 
-   
 
 Alternative Viper Versions
 ==========================
@@ -150,7 +152,6 @@ To use a more recent or custom version of the Viper infrastructure, follow the
 `instructions here <https://github.com/viperproject/documentation/wiki>`_. Look for
 ``sbt assembly`` to find instructions for packaging the required JAR files. Use the
 parameters mentioned above to instruct Nagini to use your custom Viper version.
-
 
 Troubleshooting
 =======================
@@ -166,4 +167,3 @@ Troubleshooting
 3.  Nagini cannot prove trivial properties about the return values of functions: 
 
     This is likely due to a lack of specifications, see the discussion in the ``General Contracts`` section of the  `wiki <https://github.com/marcoeilers/nagini/wiki>`_.
-
