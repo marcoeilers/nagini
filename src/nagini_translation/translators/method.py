@@ -136,10 +136,14 @@ class MethodTranslator(CommonTranslator):
         """
         ctx.obligation_context.is_translating_posts = True
         posts = []
-        no_error = self.viper.EqCmp(err_var,
-                                    self.viper.NullLit(self.no_position(ctx),
-                                                       self.no_info(ctx)),
-                                    self.no_position(ctx), self.no_info(ctx))
+        null_lit = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
+        if method.postcondition:
+            no_err_pos = self.to_position(method.postcondition[0][0], ctx, error_string='(not (exception has been raised))')
+            no_error = self.viper.EqCmp(err_var, null_lit,
+                                        no_err_pos, self.no_info(ctx))
+        else:
+            no_error = self.viper.EqCmp(err_var, null_lit,
+                                        self.no_position(ctx), self.no_info(ctx))
         for post, aliases in method.postcondition:
             with ctx.additional_aliases(aliases):
                 if isinstance(post, ast.Lambda):
@@ -184,8 +188,9 @@ class MethodTranslator(CommonTranslator):
                                            error_type_pos,
                                            ctx, inhale_exhale=False)
             error_type_conds.append(has_type)
-            condition = self.viper.And(error, has_type, self.no_position(ctx),
-                                       self.no_info(ctx))
+            condition_pos = self.to_position(method.declared_exceptions[exception][0][0], ctx,
+                                             error_string='isinstance(RaisedException(), {0})'.format(exception.name))
+            condition = self.viper.And(error, has_type, condition_pos, self.no_info(ctx))
             assert ctx.current_contract_exception is None
             ctx.current_contract_exception = exception
             for post, aliases in method.declared_exceptions[exception]:
@@ -329,16 +334,18 @@ class MethodTranslator(CommonTranslator):
             check = self.type_check(result, func.type, res_type_pos, ctx)
             posts = [check] + posts
 
-        statements = func.node.body
-        start, end = get_body_indices(statements)
-        # Translate body
-        actual_body = statements[start:end]
-        if (func.contract_only or
-                (len(actual_body) == 1 and isinstance(actual_body[0], ast.Expr) and
-                 isEllipsis(actual_body[0].value))):
+        if func.contract_only:
             body = None
         else:
-            body = self.translate_exprs(actual_body, func, ctx)
+            statements = func.node.body
+            start, end = get_body_indices(statements)
+            # Translate body
+            actual_body = statements[start:end]
+            if ((len(actual_body) == 1 and isinstance(actual_body[0], ast.Expr) and
+                    isEllipsis(actual_body[0].value))):
+                body = None
+            else:
+                body = self.translate_exprs(actual_body, func, ctx)
         ctx.current_function = old_function
         name = func.sil_name
 
@@ -626,7 +633,8 @@ class MethodTranslator(CommonTranslator):
         null = self.viper.NullLit(pos, info)
         one = self.viper.IntLit(1, pos, info)
         code_var = block.get_finally_var(self.translator)
-        error_cond = self.viper.GtCmp(code_var.ref(), one, pos, info)
+        # This condition would show up as a branch condition if it had a position; we hide it.
+        error_cond = self.viper.GtCmp(code_var.ref(), one, self.no_position(ctx), info)
         error_case = []
         no_error_case = []
         # FIXME: Cannot currently assign None to type variable, because types
@@ -737,10 +745,11 @@ class MethodTranslator(CommonTranslator):
                 err_var = block.get_error_var(self.translator)
                 if err_var.sil_name in ctx.var_aliases:
                     err_var = ctx.var_aliases[err_var.sil_name]
+                condition_pos = self.to_position(handler.node, ctx,
+                                                 error_string='(isinstance(RaisedException(), {0}))'.format(handler.exception.name))
                 condition = self.var_type_check(err_var.sil_name,
                                                 handler.exception,
-                                                self.to_position(handler.node,
-                                                                 ctx),
+                                                condition_pos,
                                                 ctx, inhale_exhale=False)
                 label_name = ctx.get_label_name(handler.name)
                 goto = self.viper.Goto(label_name, pos, info)
@@ -802,10 +811,21 @@ class MethodTranslator(CommonTranslator):
         number_three = self.viper.IntLit(3, pos, info)
         number_four = self.viper.IntLit(4, pos, info)
 
-        is_one = self.viper.EqCmp(finally_var.ref(), number_one, pos, info)
-        is_two = self.viper.EqCmp(finally_var.ref(), number_two, pos, info)
-        is_three = self.viper.EqCmp(finally_var.ref(), number_three, pos, info)
-        is_four = self.viper.EqCmp(finally_var.ref(), number_four, pos, info)
+        if isinstance(block.node, ast.Try):
+            final_end_node = block.node.finalbody[-1]
+            loc = ' after finally'
+        else:
+            # ast.With
+            final_end_node = block.node
+            loc = ' after with'
+        is_one_pos = self.to_position(final_end_node, ctx, error_string='(returning{0})'.format(loc))
+        is_one = self.viper.EqCmp(finally_var.ref(), number_one, is_one_pos, info)
+        is_two_pos = self.to_position(final_end_node, ctx, error_string='(unhandled exception{0})'.format(loc))
+        is_two = self.viper.EqCmp(finally_var.ref(), number_two, is_two_pos, info)
+        is_three_pos = self.to_position(final_end_node, ctx, error_string='(breaking{0})'.format(loc))
+        is_three = self.viper.EqCmp(finally_var.ref(), number_three, is_three_pos, info)
+        is_four_pos = self.to_position(final_end_node, ctx, error_string='(continuing{0})'.format(loc))
+        is_four = self.viper.EqCmp(finally_var.ref(), number_four, is_four_pos, info)
 
         if_return = self.viper.If(is_one, return_block, goto_post, pos,
                                   info)

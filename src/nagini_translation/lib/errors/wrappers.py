@@ -99,7 +99,8 @@ class Error:
 
     def __init__(self, error: 'AbstractVerificationError', rules: Rules,
                  reason_item: Any, node: 'ast.Node' = None,
-                 vias: List[Any] = None, inputs: List[Any] = None) -> None:
+                 vias: List[Any] = None, inputs: List[Any] = None,
+                 bcs: List[str] = None) -> None:
 
         # Translate error id.
         viper_reason = error.reason()
@@ -122,6 +123,7 @@ class Error:
         else:
             self.reason = Reason(reason_id, viper_reason)
         self.position = Position(error.pos())
+        self.bcs = bcs
 
     def pos(self) -> 'ast.AbstractSourcePosition':
         """Get position.
@@ -147,6 +149,12 @@ class Error:
     def readable_message(self) -> str:
         """Readable error message."""
         return self._error.readableMessage()
+
+    @property
+    def bcs_string(self) -> str:
+        if not self.bcs:
+            return ""
+        return ".\nBranch conditions: \n  " + "\n  ".join(self.bcs)
 
     @property
     def position_string(self) -> str:
@@ -188,8 +196,9 @@ class Error:
                 self.message, self.reason)
         else:
             if self._inputs is not None:
-                return '{0} {1} ({2}).\n{3}'.format(
-                    self.message, self.reason.string(show_viper_errors), self.position_string, str(self._inputs))
+                return '{0} {1} ({2}){3}.\n{4}'.format(
+                    self.message, self.reason.string(show_viper_errors), self.position_string, self.bcs_string,
+                    str(self._inputs))
             else:
-                return '{0} {1} ({2})'.format(
-                    self.message, self.reason.string(show_viper_errors), self.position_string)
+                return '{0} {1} ({2}){3}'.format(
+                    self.message, self.reason.string(show_viper_errors), self.position_string, self.bcs_string)

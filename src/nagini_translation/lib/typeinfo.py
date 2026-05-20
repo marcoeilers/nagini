@@ -6,16 +6,12 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import logging
-import sys
-
 import mypy.build
 import os
 
 from mypy.build import BuildSource
-from nagini_translation.lib import config
 from nagini_translation.lib.constants import IGNORED_IMPORTS, LITERALS
 from nagini_translation.mypy_patches.visitor import TraverserVisitor
-# from mypy.traverser import TraverserVisitor
 
 from nagini_translation.lib.util import (
     construct_lambda_prefix,
@@ -459,6 +455,9 @@ class TypeInfo:
 
     def is_instance_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.Instance)
+
+    def is_literal_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.LiteralType)
 
     def is_tuple_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.TupleType)

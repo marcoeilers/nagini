@@ -12,6 +12,7 @@ from nagini_translation.lib.constants import (
     BYTES_TYPE,
     COMBINED_NAME_ACCESSOR,
     DICT_TYPE,
+    BYTEARRAY_TYPE,
     END_LABEL,
     IGNORED_IMPORTS,
     IGNORED_MODULE_NAMES,
@@ -457,6 +458,7 @@ class StatementTranslator(CommonTranslator):
         """
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
+        seq_int = self.viper.SeqType(self.viper.Int)
         seq_ref = self.viper.SeqType(self.viper.Ref)
         set_ref = self.viper.SetType(self.viper.Ref)
         map_ref_ref = self.viper.MapType(self.viper.Ref, self.viper.Ref)
@@ -481,6 +483,13 @@ class StatementTranslator(CommonTranslator):
             invariant.append(field_pred)
         elif iterable_type.name == DICT_TYPE:
             acc_field = self.viper.Field('dict_acc', map_ref_ref, pos, info)
+            field_acc = self.viper.FieldAccess(iterable, acc_field, pos, info)
+            field_pred = self.viper.FieldAccessPredicate(field_acc,
+                                                         frac_perm_120, pos,
+                                                         info)
+            invariant.append(field_pred)
+        elif iterable_type.name == BYTEARRAY_TYPE:
+            acc_field = self.viper.Field('bytearray_acc', seq_int, pos, info)
             field_acc = self.viper.FieldAccess(iterable, acc_field, pos, info)
             field_pred = self.viper.FieldAccessPredicate(field_acc,
                                                          frac_perm_120, pos,
@@ -716,7 +725,7 @@ class StatementTranslator(CommonTranslator):
         # Find type of the collection content we're iterating over.
         if iterable_type.name in (LIST_TYPE, DICT_TYPE, SET_TYPE):
             target_type = iterable_type.type_args[0]
-        elif iterable_type.name in (RANGE_TYPE, BYTES_TYPE):
+        elif iterable_type.name in (RANGE_TYPE, BYTES_TYPE, BYTEARRAY_TYPE):
             target_type = ctx.module.global_module.classes[INT_TYPE]
         else:
             raise UnsupportedException(node, 'unknown.iterable')
@@ -734,10 +743,13 @@ class StatementTranslator(CommonTranslator):
                                                   target_var.ref(),
                                                   None, None, target_type,
                                                   node, ctx)
-
+        cond_node = ast.Compare(node.target, [ast.In()], [node.iter],
+                                lineno=node.target.lineno, col_offset=node.target.col_offset,
+                                end_lineno=node.iter.end_lineno)
+        cond_pos = self.to_position(cond_node, ctx)
         cond = self.viper.EqCmp(err_var.ref(),
                                 self.viper.NullLit(position, info),
-                                position, info)
+                                cond_pos, info)
 
         cond_low = []
         if ctx.sif == 'prob':
@@ -1300,7 +1312,7 @@ class StatementTranslator(CommonTranslator):
                     field = recv_type.get_field(lhs.attr).actual_field
                     field_access = self.viper.FieldAccess(receiver, field.sil_field,
                                                           position, info)
-                    permission = self.create_new_field_permission(field_access, field,
+                    permission = self.create_new_field_permission(field_access, field, node,
                                                                   position, info, ctx)
                     assign_stmt = self.viper.FieldAssign(field_access, rhs, position, info)
                     block = self.translate_block([permission, assign_stmt], position, info)
@@ -1334,7 +1346,7 @@ class StatementTranslator(CommonTranslator):
                 definedness_expr = self.check_var_defined(target, position, info)
         else:
             assignment = self.viper.FieldAssign
-            permission_inhale = self.create_new_field_permission(var, target,
+            permission_inhale = self.create_new_field_permission(var, target, node,
                                                                  position, info, ctx)
             before_assign.append(permission_inhale)
 
@@ -1344,7 +1356,7 @@ class StatementTranslator(CommonTranslator):
         return lhs_stmt + before_assign + [assign_stmt] + after_assign, [assign_val]
 
     def create_new_field_permission(self, field_acc: Expr, target: PythonField,
-                                    position: Position, info: Info, ctx: Context) -> Stmt:
+                                    node: ast.AST, position: Position, info: Info, ctx: Context) -> Stmt:
         """
         Creates a statement that checks if the receiver of the given field access is the
         self-parameter of the current method and there is a permission to create the
@@ -1360,7 +1372,8 @@ class StatementTranslator(CommonTranslator):
         may_set_pred = self.viper.PredicateAccess([receiver, id], MAY_SET_PRED, position,
                                                   info)
         may_set_perm = self.viper.CurrentPerm(may_set_pred, position, info)
-        may_set = self.viper.PermGtCmp(may_set_perm, no_perm, position, info)
+        may_set_pos = self.to_position(node, ctx, error_string='(field "{0}" does not exist)'.format(target.name))
+        may_set = self.viper.PermGtCmp(may_set_perm, no_perm, may_set_pos, info)
         full_perm = self.viper.FullPerm(position, info)
         all_may_set = self.viper.PredicateAccessPredicate(may_set_pred, full_perm,
                                                           position, info)

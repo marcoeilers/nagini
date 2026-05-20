@@ -12,3 +12,10 @@ method object___str__(self: Ref) returns (res: Ref)
 
 function object___str_val__(self: Ref): Seq[Int]
     decreases _
+
+method object___repr__(self: Ref) returns (res: Ref)
+    ensures issubtype(typeof(res), str())
+    ensures str___val__(res) == object___repr_val__(self)
+
+function object___repr_val__(self: Ref): Seq[Int]
+    decreases _
