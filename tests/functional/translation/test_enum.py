@@ -8,6 +8,6 @@ class flag(IntEnum):
     success = 0
     failure = 1
 
-#:: ExpectedOutput(invalid.program:Cannot extend enumeration)
+#:: ExpectedOutput(type.error:Cannot extend enum with existing members: "flag"  [misc])
 class sub_flag(flag):
     unknown = 3
