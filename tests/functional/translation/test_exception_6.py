@@ -3,5 +3,5 @@
 
 
 def from_type() -> None:
-    #:: ExpectedOutput(type.error:Exception must be derived from BaseException)
+    #:: ExpectedOutput(type.error:Exception must be derived from BaseException  [misc])
     raise Exception() from 2

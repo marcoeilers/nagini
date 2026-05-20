@@ -6,10 +6,6 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import ast
-import astunparse
-import re
-import tokenize
-from nagini_translation.lib import config
 
 from typing import (
     Any,
@@ -329,7 +325,7 @@ def pprint(node) -> str:
         return node
     if isinstance(node, ast.FunctionDef):
         return "unknown node in function " + node.name
-    res = astunparse.unparse(node)
+    res = ast.unparse(node)
     res = res.replace('\n', '')
     return res
 

@@ -7,7 +7,7 @@ def foo() -> int:
 
 foo()
 
-#:: ExpectedOutput(assert.failed:assertion.false)
+#:: ExpectedOutput(type.error:Name "bar" is used before definition  [used-before-def])
 bar()  # noqa: F821
 
 def bar() -> int:

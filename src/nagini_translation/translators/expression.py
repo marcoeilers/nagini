@@ -436,7 +436,7 @@ class ExpressionTranslator(CommonTranslator):
         stmt, exp = self.translate_expr(node.value, ctx)
         return stmt, exp
     
-    def translate_Ellipsis(self, node: ast.Ellipsis, ctx: Context) -> StmtsAndExpr:
+    def translate_Ellipsis(self, node: ast.Constant, ctx: Context) -> StmtsAndExpr:
         ellipsis_class = ctx.module.global_module.classes[ELLIPSIS_TYPE]
         func_name = '__create__'
         call = self.get_function_call(ellipsis_class, func_name, [], [], node, ctx)
@@ -444,7 +444,7 @@ class ExpressionTranslator(CommonTranslator):
 
     def translate_Bytes(self, node: ast.Constant, ctx: Context) -> StmtsAndExpr:
         elems = []
-        for c in node.s:
+        for c in node.value:
             lit = self.viper.IntLit(c, self.to_position(node, ctx),
                                     self.no_info(ctx))
             elems.append(self.to_ref(lit, ctx))

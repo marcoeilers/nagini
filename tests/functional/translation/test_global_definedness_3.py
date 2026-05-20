@@ -6,7 +6,7 @@ class A:
 
 a = A()
 
-#:: ExpectedOutput(assert.failed:assertion.false)
+#:: ExpectedOutput(type.error:Name "B" is used before definition  [used-before-def])
 b = B()  # noqa: F821
 
 class B:

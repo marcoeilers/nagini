@@ -13,5 +13,5 @@ class Super:
 class Sub(Super):
     def some_method(self) -> int:
         Ensures(Result() >= 15)
-        #:: ExpectedOutput(type.error:Too many arguments for "super")
+        #:: ExpectedOutput(type.error:Too many arguments for "super"  [misc])
         return 1 + super(self, Sub, self).some_method()

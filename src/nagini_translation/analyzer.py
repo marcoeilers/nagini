@@ -1483,6 +1483,8 @@ class Analyzer(ast.NodeVisitor):
             else:
                 msg = f'Type could not be fully inferred (this usually means that a type argument is unknown)'
             raise InvalidProgramException(node, 'partial.type', message=msg)
+        elif self.types.is_literal_type(mypy_type):
+            return self.convert_type(mypy_type.fallback, node, bound_type_vars)
         else:
             name = ""
             if hasattr(node, 'id'):
@@ -1552,7 +1554,6 @@ class Analyzer(ast.NodeVisitor):
         return type_var
 
     def _convert_type_type(self, mypy_type, node) -> PythonType:
-        name = 'type'
         type_class = self.module.global_module.classes['type']
         args = [self.convert_type(mypy_type.item, node)]
         return GenericType(type_class, args)
@@ -1577,6 +1578,8 @@ class Analyzer(ast.NodeVisitor):
             result = {}
             if alts:
                 for line, type in alts.items():
+                    if self.types.is_uninhabited_type(type):
+                        continue
                     result[line] = self.convert_type(type, node)
             return result
         else:

@@ -9,5 +9,5 @@ def callee(a: bool) -> int:
 
 
 def test2() -> None:
-    #:: ExpectedOutput(type.error:Argument 1 to "callee" has incompatible type "int"; expected "bool")
+    #:: ExpectedOutput(type.error:Argument 1 to "callee" has incompatible type "int"; expected "bool"  [arg-type])
     a = callee(2)

@@ -22,7 +22,7 @@ def main() -> None:
     x = inputPIN()
     while x > 0:
         Invariant(TerminatesSif(True, x if x > 0 else 0))
-        #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)|ExpectedOutput(carbon)(call.precondition:assertion.false)
+        #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)||ExpectedOutput(carbon)(call.precondition:assertion.false)
         _print(0)
         x -= 1
     while True:

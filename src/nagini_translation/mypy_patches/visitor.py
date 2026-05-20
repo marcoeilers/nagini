@@ -13,9 +13,9 @@ from mypy.nodes import (
     TryStmt, WithStmt, NameExpr, MemberExpr, OpExpr, SliceExpr, CastExpr, RevealExpr,
     UnaryExpr, ListExpr, TupleExpr, DictExpr, SetExpr, IndexExpr, AssignmentExpr,
     GeneratorExpr, ListComprehension, SetComprehension, DictionaryComprehension,
-    ConditionalExpr, TypeApplication, ExecStmt, Import, ImportFrom,
+    ConditionalExpr, TypeApplication, Import, ImportFrom,
     LambdaExpr, ComparisonExpr, OverloadedFuncDef, YieldFromExpr,
-    YieldExpr, StarExpr, BackquoteExpr, AwaitExpr, PrintStmt, SuperExpr, Node, REVEAL_TYPE,
+    YieldExpr, StarExpr, AwaitExpr, SuperExpr, Node, REVEAL_TYPE,
 )
 
 
@@ -277,9 +277,6 @@ class TraverserVisitor:
     def visit_star_expr(self, o: StarExpr) -> None:
         self.visit(o.expr)
 
-    def visit_backquote_expr(self, o: BackquoteExpr) -> None:
-        self.visit(o.expr)
-
     def visit_await_expr(self, o: AwaitExpr) -> None:
         self.visit(o.expr)
 
@@ -293,14 +290,3 @@ class TraverserVisitor:
     def visit_import_from(self, o: ImportFrom) -> None:
         for a in o.assignments:
             self.visit(a)
-
-    def visit_print_stmt(self, o: PrintStmt) -> None:
-        for arg in o.args:
-            self.visit(arg)
-
-    def visit_exec_stmt(self, o: ExecStmt) -> None:
-        self.visit(o.expr)
-        if o.globals:
-            self.visit(o.globals)
-        if o.locals:
-            self.visit(o.locals)
