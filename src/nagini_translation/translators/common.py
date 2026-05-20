@@ -78,7 +78,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         Visitor that is used if no other visitor is implemented.
         Simply raises an exception.
         """
-        raise UnsupportedException(node)
+        raise UnsupportedException(node, f'unsupported Python construct: {node.__class__.__name__}')
 
     def translate_block(self, stmtlist: List['silver.ast.Stmt'],
                         position: 'silver.ast.Position',

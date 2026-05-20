@@ -1285,7 +1285,7 @@ class Analyzer(ast.NodeVisitor):
             self.current_function.globals.add(name)
 
     def visit_Nonlocal(self, node: ast.Nonlocal) -> None:
-        raise UnsupportedException(node)
+        raise UnsupportedException(node, 'nonlocal statement')
 
     def convert_type(self, mypy_type, node, bound_type_vars: Dict[str, PythonType] = None) -> PythonType:
         """

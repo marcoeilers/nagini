@@ -386,7 +386,7 @@ class StatementTranslator(CommonTranslator):
                 may_set = self.get_may_set_predicate(receiver, python_field, ctx, pos)
                 result.append(self.viper.Inhale(may_set, pos, info))
             else:
-                raise UnsupportedException(node)
+                raise UnsupportedException(node, 'del is only supported for object fields')
         return result
 
     def translate_stmt_AugAssign(self, node: ast.AugAssign,
@@ -489,7 +489,7 @@ class StatementTranslator(CommonTranslator):
         elif iterable_type.name == RANGE_TYPE:
             pass
         else:
-            raise UnsupportedException(node)
+            raise UnsupportedException(node, 'for loop over unsupported iterable type')
 
         list_acc_field = self.viper.Field('list_acc', seq_ref, pos, info)
         iter_acc = self.viper.FieldAccess(iter_var.ref(), list_acc_field, pos,
@@ -998,7 +998,7 @@ class StatementTranslator(CommonTranslator):
             # Docstring or ellipsis, just skip.
             return []
         else:
-            raise UnsupportedException(node)
+            raise UnsupportedException(node, 'unsupported expression statement')
 
     def translate_stmt_If(self, node: ast.If, ctx: Context) -> List[Stmt]:
         cond_stmt, cond = self.translate_expr(node.test, ctx,

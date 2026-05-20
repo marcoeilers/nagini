@@ -109,7 +109,7 @@ class PureTranslator(CommonTranslator):
 
     def translate_pure_generic(self, conds: List,
                                node: ast.AST, ctx: Context) -> List[Wrapper]:
-        raise UnsupportedException(node)
+        raise UnsupportedException(node, f'unsupported statement type in pure function: {node.__class__.__name__}')
 
     def translate_pure_Expr(self, conds: List, node: ast.Expr,
                             ctx: Context) -> List[Wrapper]:
@@ -124,7 +124,7 @@ class PureTranslator(CommonTranslator):
         if isinstance(node.value, ast.Call) and get_func_name(node.value) == 'Assert':
             wrapper = AssertWrapper(conds, node.value, node)
             return [wrapper]
-        raise UnsupportedException(node)
+        raise UnsupportedException(node, 'unsupported expression in pure function; only Unfold, Assert, assignments, and docstrings are supported')
 
     def translate_pure_If(self, conds: List, node: ast.If,
                           ctx: Context) -> List[Wrapper]:

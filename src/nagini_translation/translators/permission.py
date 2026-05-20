@@ -39,7 +39,7 @@ class PermTranslator(CommonTranslator):
         if node.value == 1:
             return self.viper.FullPerm(self.to_position(node, ctx),
                                        self.no_info(ctx))
-        raise UnsupportedException(node)
+        raise UnsupportedException(node, 'only the literal 1 is supported as a permission amount; use division like 1/2 for fractional permissions')
 
     def translate_perm_or_int(self, node: ast.AST, ctx: Context):
         num_class = ast.Constant
@@ -101,7 +101,7 @@ class PermTranslator(CommonTranslator):
             return new_node(left, right,
                             self.to_position(node, ctx),
                             self.no_info(ctx))
-        raise UnsupportedException(node)
+        raise UnsupportedException(node, 'unsupported operator in permission expression')
 
     def translate_perm_Call(self, node: ast.Call, ctx: Context) -> Expr:
         func_name = get_func_name(node)

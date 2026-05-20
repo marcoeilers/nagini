@@ -1141,7 +1141,7 @@ class ExpressionTranslator(CommonTranslator):
         if self.is_type_equality(node, ctx):
             return self.translate_type_equality(node, ctx)
         if len(node.ops) != 1 or len(node.comparators) != 1:
-            raise UnsupportedException(node)
+            raise UnsupportedException(node, 'chained comparisons are not supported; use and to combine them')
         left_stmt, left = self.translate_expr(node.left, ctx)
         left_type = self.get_type(node.left, ctx)
         right_stmt, right = self.translate_expr(node.comparators[0], ctx)
@@ -1228,7 +1228,7 @@ class ExpressionTranslator(CommonTranslator):
             return self.translate_Bytes(node, ctx)
         if isEllipsis(node):
             return self.translate_Ellipsis(node, ctx)
-        raise UnsupportedException(node)
+        raise UnsupportedException(node, f'unsupported constant type: {type(node.value).__name__}')
 
     def translate_NameConstant(self, node: ast.Constant,
                                ctx: Context) -> StmtsAndExpr:
@@ -1243,7 +1243,7 @@ class ExpressionTranslator(CommonTranslator):
                     self.viper.NullLit(self.to_position(node, ctx),
                                        self.no_info(ctx)))
         else:
-            raise UnsupportedException(node)
+            raise UnsupportedException(node, f'unsupported singleton constant value: {node.value!r}')
 
     def translate_BoolOp(self, node: ast.BoolOp, ctx: Context,
                          impure=False) -> StmtsAndExpr:

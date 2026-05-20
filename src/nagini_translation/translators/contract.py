@@ -77,13 +77,13 @@ class ContractTranslator(CommonTranslator):
                 raise InvalidProgramException(node, 'purity.violated')
             return res
         else:
-            raise UnsupportedException(node)
+            raise UnsupportedException(node, "Acc() argument must be a field access, predicate call, or MayStart/ThreadPost")
 
     def translate_contract_Expr(self, node: ast.Expr, ctx: Context) -> Expr:
         if isinstance(node.value, ast.Call):
             return self.translate_contract(node.value, ctx)
         else:
-            raise UnsupportedException(node)
+            raise UnsupportedException(node, 'non-call expression in contract position')
 
     def translate_result(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
@@ -151,7 +151,7 @@ class ContractTranslator(CommonTranslator):
         elif name == 'ThreadPost':
             return self.translate_thread_post(node, args, perm, ctx)
         else:
-            raise UnsupportedException(node)
+            raise UnsupportedException(node, f'unsupported built-in predicate: {name}')
 
     def _get_field_perm(self, field_name: str, field_type: 'silver.ast.Type', perm: Expr,
                         rec: Expr, pos: Position, ctx: Context) -> Expr:
@@ -1172,4 +1172,4 @@ class ContractTranslator(CommonTranslator):
         elif func_name == 'arg':
             raise InvalidProgramException(node, 'invalid.arg.use')
         else:
-            raise UnsupportedException(node)
+            raise UnsupportedException(node, f'unknown or misused contract function: {func_name}')
