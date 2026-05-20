@@ -757,6 +757,42 @@ class Analyzer(ast.NodeVisitor):
     def visit_For(self, node: ast.While) -> None:
         self.visit_loop(node)
 
+    def visit_Match(self, node: ast.Match) -> None:
+        if self.current_function:
+            for case in node.cases:
+                for name in self._collect_match_pattern_names(case.pattern):
+                    fake = ast.Name(name, ast.Store(),
+                                    lineno=node.lineno, col_offset=node.col_offset)
+                    fake._parent = node
+                    self.visit(fake, node)
+        self.visit_default(node)
+
+    def _collect_match_pattern_names(self, pattern):
+        """Yield all variable names (strings) bound by a pattern."""
+        if pattern is None:
+            return
+        if isinstance(pattern, ast.MatchAs):
+            if pattern.name is not None:
+                yield pattern.name
+            if pattern.pattern is not None:
+                yield from self._collect_match_pattern_names(pattern.pattern)
+        elif isinstance(pattern, ast.MatchStar):
+            if pattern.name is not None:
+                yield pattern.name
+        elif isinstance(pattern, ast.MatchMapping):
+            for p in pattern.patterns:
+                yield from self._collect_match_pattern_names(p)
+            if pattern.rest is not None:
+                yield pattern.rest
+        elif isinstance(pattern, ast.MatchSequence):
+            for p in pattern.patterns:
+                yield from self._collect_match_pattern_names(p)
+        elif isinstance(pattern, ast.MatchClass):
+            for p in pattern.patterns:
+                yield from self._collect_match_pattern_names(p)
+            for p in pattern.kwd_patterns:
+                yield from self._collect_match_pattern_names(p)
+
     def _visit_single_name_assign(self, name: ast.Name, node: ast.Assign) -> Tuple[bool, bool]:
         is_alias = False
         is_type_var = False
