@@ -736,12 +736,19 @@ class ExpressionTranslator(CommonTranslator):
                 pos = self.to_position(node, ctx)
                 info = self.no_info(ctx)
                 result = self.viper.Result(self.translate_type(ctx.actual_function.result.type, ctx), pos, info)
+            elif (isinstance(ctx.actual_function, PythonMethod) and
+                  ctx.actual_function.pure and
+                  not isinstance(node.ctx, ast.Store) and
+                  self.is_local_variable(var, ctx) and
+                  var.name == node.id):
+                result = self.wrap_definedness_check(var.ref(node, ctx), var, node, ctx,
+                                                     name_override=var.name)
             else:
                 result = var.ref(node, ctx)
             return [], result
 
     def wrap_definedness_check(self, e: Expr, var: PythonVar, node: ast.AST,
-                               ctx: Context) -> Expr:
+                               ctx: Context, name_override: str = None) -> Expr:
         """
         Create an access to the given variable, wrapped into a function call which checks
         if the variable has been defined.
@@ -750,7 +757,8 @@ class ExpressionTranslator(CommonTranslator):
         info = self.no_info(ctx)
         id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, pos, info)
         var_param_decl = self.viper.LocalVarDecl('val', self.viper.Ref, pos, info)
-        id = self.viper.IntLit(self._get_string_value(var.sil_name), pos, info)
+        name = name_override if name_override is not None else var.sil_name
+        id = self.viper.IntLit(self._get_string_value(name), pos, info)
         return self.viper.FuncApp(CHECK_DEFINED_FUNC, [e, id], pos, info,
                                   self.viper.Ref, [var_param_decl, id_param_decl])
 
@@ -1171,7 +1179,7 @@ class ExpressionTranslator(CommonTranslator):
         if self.is_type_equality(node, ctx):
             return self.translate_type_equality(node, ctx)
         if len(node.ops) != 1 or len(node.comparators) != 1:
-            raise UnsupportedException(node)
+            raise UnsupportedException(node, 'chained comparisons are not supported; use and to combine them')
         left_stmt, left = self.translate_expr(node.left, ctx)
         left_type = self.get_type(node.left, ctx)
         right_stmt, right = self.translate_expr(node.comparators[0], ctx)
@@ -1266,7 +1274,7 @@ class ExpressionTranslator(CommonTranslator):
             return self.translate_Bytes(node, ctx)
         if isEllipsis(node):
             return self.translate_Ellipsis(node, ctx)
-        raise UnsupportedException(node)
+        raise UnsupportedException(node, f'unsupported constant type: {type(node.value).__name__}')
 
     def translate_NameConstant(self, node: ast.Constant,
                                ctx: Context) -> StmtsAndExpr:
@@ -1281,7 +1289,7 @@ class ExpressionTranslator(CommonTranslator):
                     self.viper.NullLit(self.to_position(node, ctx),
                                        self.no_info(ctx)))
         else:
-            raise UnsupportedException(node)
+            raise UnsupportedException(node, f'unsupported singleton constant value: {node.value!r}')
 
     def translate_BoolOp(self, node: ast.BoolOp, ctx: Context,
                          impure=False) -> StmtsAndExpr:

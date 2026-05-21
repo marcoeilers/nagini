@@ -24,7 +24,6 @@ from nagini_translation.lib.constants import (
     OBJECT_TYPE,
     PRIMITIVE_BOOL_TYPE,
     PRIMITIVE_INT_TYPE,
-    RANGE_TYPE,
     PSEQ_TYPE,
     PBYTESEQ_TYPE,
     PSET_TYPE,
@@ -80,7 +79,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         Visitor that is used if no other visitor is implemented.
         Simply raises an exception.
         """
-        raise UnsupportedException(node)
+        raise UnsupportedException(node, f'unsupported Python construct: {node.__class__.__name__}')
 
     def translate_block(self, stmtlist: List['silver.ast.Stmt'],
                         position: 'silver.ast.Position',
@@ -499,6 +498,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                                        self.viper.Bool, pos,
                                                        info)
         var_param_decl = self.viper.LocalVarDecl('val', self.viper.Ref, pos, info)
+        # We use an asserting function instead of Viper's asserting expression because that gives us
+        # a better error message (directly on the function application, not on the surrounding statement).
         deps_func = self.viper.FuncApp(ASSERTING_FUNC, [val, deps], deps_pos, info,
                                        self.viper.Ref, [var_param_decl,
                                                         assertion_param_decl])

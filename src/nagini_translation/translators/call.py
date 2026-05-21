@@ -634,7 +634,7 @@ class CallTranslator(CommonTranslator):
         elif func_name == 'bytearray':
             return self._translate_bytearray(node, ctx)
         else:
-            raise UnsupportedException(node)
+            raise UnsupportedException(node, f'unsupported built-in function: {func_name}')
 
     def _translate_method_call(self, target: PythonMethod, args: List[Expr],
                                arg_stmts: List[Stmt],

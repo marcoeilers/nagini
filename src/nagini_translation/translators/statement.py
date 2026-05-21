@@ -8,6 +8,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import ast
 
 from nagini_translation.lib.constants import (
+    BOOL_TYPE,
     BYTES_TYPE,
     COMBINED_NAME_ACCESSOR,
     DICT_TYPE,
@@ -21,6 +22,7 @@ from nagini_translation.lib.constants import (
     NAME_QUANTIFIER_VAR,
     NAME_DOMAIN,
     OBJECT_TYPE,
+    PRIMITIVE_BOOL_TYPE,
     PRIMITIVES,
     RANGE_TYPE,
     SET_TYPE,
@@ -385,7 +387,7 @@ class StatementTranslator(CommonTranslator):
                 may_set = self.get_may_set_predicate(receiver, python_field, ctx, pos)
                 result.append(self.viper.Inhale(may_set, pos, info))
             else:
-                raise UnsupportedException(node)
+                raise UnsupportedException(node, 'del is only supported for object fields')
         return result
 
     def translate_stmt_AugAssign(self, node: ast.AugAssign,
@@ -496,7 +498,7 @@ class StatementTranslator(CommonTranslator):
         elif iterable_type.name == RANGE_TYPE:
             pass
         else:
-            raise UnsupportedException(node)
+            raise UnsupportedException(node, 'for loop over unsupported iterable type')
 
         list_acc_field = self.viper.Field('list_acc', seq_ref, pos, info)
         iter_acc = self.viper.FieldAccess(iter_var.ref(), list_acc_field, pos,
@@ -1008,7 +1010,7 @@ class StatementTranslator(CommonTranslator):
             # Docstring or ellipsis, just skip.
             return []
         else:
-            raise UnsupportedException(node)
+            raise UnsupportedException(node, 'unsupported expression statement')
 
     def translate_stmt_If(self, node: ast.If, ctx: Context) -> List[Stmt]:
         cond_stmt, cond = self.translate_expr(node.test, ctx,
@@ -1031,6 +1033,267 @@ class StatementTranslator(CommonTranslator):
             cond_low.append(self.viper.Assert(self.viper.Low(cond, None, rule_pos, info), rule_pos, info))
         return cond_stmt + cond_low + [self.viper.If(cond, then_block, else_block,
                                                      position, info)]
+
+    def translate_stmt_Match(self, node: ast.Match, ctx: Context) -> List[Stmt]:
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+
+        subject_type = self.get_type(node.subject, ctx)
+        subj_stmts, subj_expr = self.translate_expr(node.subject, ctx)
+        subj_var = ctx.current_function.create_variable(
+            'match_subject', subject_type, self.translator)
+        subj_assign = self.viper.LocalVarAssign(subj_var.ref(), subj_expr, pos, info)
+        subj_defined = self.set_var_defined(subj_var, pos, info)
+
+        # Build nested if-else from right to left.
+        nested = self.translate_block([], pos, info)
+
+        for case in reversed(node.cases):
+            cond_stmts, cond_expr = self._translate_match_pattern_cond(
+                case.pattern, subj_var.ref(), subject_type, node, ctx)
+            if cond_stmts:
+                raise InvalidProgramException(node, 'purity.violated')
+
+            if case.guard is not None:
+                # Temporarily alias pattern-bound names to the subject variable so the
+                # guard can reference them without requiring a definedness proof yet.
+                aliases = self._collect_guard_aliases(case.pattern, subj_var)
+                with ctx.aliases_context():
+                    for name, var in aliases.items():
+                        ctx.set_alias(name, var, None)
+                    guard_stmts, guard_expr = self.translate_expr(
+                        case.guard, ctx, target_type=self.viper.Bool)
+                if guard_stmts:
+                    raise InvalidProgramException(node, 'purity.violated')
+                guard_pos = self.to_position(case.guard, ctx)
+                cond_expr = self.viper.And(cond_expr, guard_expr, guard_pos, info)
+
+            assign_stmts = self._translate_match_pattern_assignments(
+                case.pattern, subj_var.ref(), subject_type, node, ctx)
+            define_stmts = self._translate_match_pattern_defines(case.pattern, node, ctx)
+            body_stmts = flatten([self.translate_stmt(s, ctx) for s in case.body])
+
+            then_block = self.translate_block(
+                assign_stmts + define_stmts + body_stmts, pos, info)
+            nested = self.viper.If(cond_expr, then_block, nested, pos, info)
+
+        return subj_stmts + [subj_assign, subj_defined, nested]
+
+    def _collect_guard_aliases(self, pattern: ast.AST, subj_var: 'PythonVar') -> dict:
+        """Return {name: var} mapping pattern-bound names to the subject for guard evaluation."""
+        aliases = {}
+        if isinstance(pattern, ast.MatchAs):
+            if pattern.name is not None:
+                aliases[pattern.name] = subj_var
+            if pattern.pattern is not None:
+                aliases.update(self._collect_guard_aliases(pattern.pattern, subj_var))
+        return aliases
+
+    def _pattern_py_cond(self, pattern: ast.AST, node: ast.Match) -> Optional[ast.AST]:
+        """Return a Python AST node representing the branch condition for a match pattern.
+
+        Used to attach Python-level condition info to Viper branch expressions so that
+        verification errors can report meaningful branch conditions (e.g. ``x is True``).
+        Returns None for wildcard/capture patterns that always match.
+        """
+        if isinstance(pattern, ast.MatchAs):
+            if pattern.pattern is None:
+                return None
+            return self._pattern_py_cond(pattern.pattern, node)
+        if isinstance(pattern, ast.MatchSingleton):
+            if pattern.value is None or isinstance(pattern.value, bool):
+                return ast.Compare(
+                    left=node.subject, ops=[ast.Is()],
+                    comparators=[ast.Constant(value=pattern.value)],
+                    lineno=node.subject.lineno, col_offset=node.subject.col_offset,
+                    end_lineno=pattern.end_lineno, end_col_offset=pattern.end_col_offset)
+            return None
+        if isinstance(pattern, ast.MatchValue):
+            return ast.Compare(
+                left=node.subject, ops=[ast.Eq()],
+                comparators=[pattern.value],
+                lineno=node.subject.lineno, col_offset=node.subject.col_offset,
+                end_lineno=pattern.value.end_lineno, end_col_offset=pattern.value.end_col_offset)
+        if isinstance(pattern, ast.MatchClass):
+            return ast.Call(
+                func=ast.Name(id='isinstance', ctx=ast.Load(),
+                              lineno=node.subject.lineno, col_offset=node.subject.col_offset),
+                args=[node.subject, pattern.cls],
+                keywords=[],
+                lineno=node.subject.lineno, col_offset=node.subject.col_offset,
+                end_lineno=pattern.end_lineno, end_col_offset=pattern.end_col_offset)
+        if isinstance(pattern, ast.MatchOr):
+            sub_conds = [self._pattern_py_cond(p, node) for p in pattern.patterns]
+            sub_conds = [c for c in sub_conds if c is not None]
+            if not sub_conds:
+                return None
+            if len(sub_conds) == 1:
+                return sub_conds[0]
+            return ast.BoolOp(
+                op=ast.Or(), values=sub_conds,
+                lineno=pattern.lineno, col_offset=pattern.col_offset,
+                end_lineno=pattern.end_lineno, end_col_offset=pattern.end_col_offset)
+        return None
+
+    def _translate_match_pattern_cond(self, pattern: ast.AST, subj: 'Expr',
+                                      subj_type: 'PythonType', node: ast.Match,
+                                      ctx: 'Context') -> 'StmtsAndExpr':
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+
+        if isinstance(pattern, ast.MatchAs):
+            if pattern.pattern is None:
+                return [], self.viper.TrueLit(pos, info)
+            return self._translate_match_pattern_cond(
+                pattern.pattern, subj, subj_type, node, ctx)
+
+        if isinstance(pattern, ast.MatchSingleton):
+            if pattern.value is None:
+                py_cond = self._pattern_py_cond(pattern, node)
+                cond_pos = self.to_position(py_cond, ctx)
+                return [], self.viper.EqCmp(subj, self.viper.NullLit(pos, info), cond_pos, info)
+            if pattern.value is True or pattern.value is False:
+                # Python singleton patterns use `is`, not `==`: 1 is not True.
+                # We encode this as isinstance(subj, bool) AND bool.__unbox__(subj) [== True/False].
+                # The isinstance guard ensures int(1) never matches case True/False.
+                # Using Silver Bool (from __unbox__) keeps the two cases exhaustive for bool subjects.
+                bool_class = ctx.module.global_module.classes[BOOL_TYPE]
+                isinstance_cond = self.type_check(subj, bool_class, pos, ctx, inhale_exhale=False)
+                unboxed = self.get_function_call(bool_class, '__unbox__', [subj], [bool_class], node, ctx)
+                val_cond = unboxed if pattern.value is True else self.viper.Not(unboxed, pos, info)
+                py_cond = self._pattern_py_cond(pattern, node)
+                cond_pos = self.to_position(py_cond, ctx)
+                return [], self.viper.And(isinstance_cond, val_cond, cond_pos, info)
+            raise UnsupportedException(pattern, 'unsupported singleton pattern value')
+
+        if isinstance(pattern, ast.MatchValue):
+            val_stmts, val_expr = self.translate_expr(pattern.value, ctx)
+            val_type = self.get_type(pattern.value, ctx)
+            py_cond = self._pattern_py_cond(pattern, node)
+            cond_pos = self.to_position(py_cond, ctx)
+            eq_expr = self.get_function_call(
+                subj_type, '__eq__', [subj, val_expr], [subj_type, val_type], node, ctx,
+                position=cond_pos)
+            return val_stmts, self.to_bool(eq_expr, ctx, node)
+
+        if isinstance(pattern, ast.MatchClass):
+            if pattern.patterns:
+                raise UnsupportedException(pattern, 'positional class patterns not yet supported')
+            target = self.get_target(pattern.cls, ctx)
+            if not isinstance(target, PythonType):
+                raise InvalidProgramException(node, 'invalid.match.class.pattern')
+            py_cond = self._pattern_py_cond(pattern, node)
+            cond_pos = self.to_position(py_cond, ctx)
+            isinstance_cond = self.type_check(subj, target, cond_pos, ctx, inhale_exhale=False)
+            if not pattern.kwd_attrs:
+                return [], isinstance_cond
+            stmts = []
+            cond = isinstance_cond
+            for attr_name, kwd_pattern in zip(pattern.kwd_attrs, pattern.kwd_patterns):
+                field = target.get_field(attr_name)
+                if field is None:
+                    raise InvalidProgramException(node, 'invalid.match.class.pattern')
+                field = field.actual_field
+                attr_expr = self.viper.FieldAccess(subj, field.sil_field, pos, info)
+                attr_type = field.type
+                sub_stmts, sub_cond = self._translate_match_pattern_cond(
+                    kwd_pattern, attr_expr, attr_type, node, ctx)
+                stmts.extend(sub_stmts)
+                cond = self.viper.And(cond, sub_cond, cond_pos, info)
+            return stmts, cond
+
+        if isinstance(pattern, ast.MatchOr):
+            stmts = []
+            conds = []
+            for sub_pat in pattern.patterns:
+                sub_stmts, sub_cond = self._translate_match_pattern_cond(
+                    sub_pat, subj, subj_type, node, ctx)
+                stmts.extend(sub_stmts)
+                conds.append(sub_cond)
+            py_cond = self._pattern_py_cond(pattern, node)
+            cond_pos = self.to_position(py_cond, ctx) if py_cond is not None else pos
+            result = conds[0]
+            for i, c in enumerate(conds[1:], 1):
+                result = self.viper.Or(result, c, cond_pos if i == len(conds) - 1 else pos, info)
+            return stmts, result
+
+        if isinstance(pattern, ast.MatchSequence):
+            raise UnsupportedException(pattern, 'sequence patterns not yet supported')
+
+        if isinstance(pattern, ast.MatchMapping):
+            raise UnsupportedException(pattern, 'mapping patterns not yet supported')
+
+        raise UnsupportedException(pattern)
+
+    def _get_match_bound_var(self, name: str, node: ast.Match,
+                             ctx: 'Context') -> 'PythonVar':
+        var = ctx.current_function.locals.get(name)
+        if var is None:
+            var = ctx.actual_function.locals.get(name)
+        if var is None:
+            raise InvalidProgramException(node, 'undefined.var.in.match')
+        return var
+
+    def _translate_match_pattern_assignments(self, pattern: ast.AST, subj: 'Expr',
+                                             subj_type: 'PythonType', node: ast.Match,
+                                             ctx: 'Context') -> List['Stmt']:
+        """Variable assignments for pattern bindings, without set_var_defined."""
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        stmts = []
+
+        if isinstance(pattern, ast.MatchAs):
+            if pattern.name is not None:
+                var = self._get_match_bound_var(pattern.name, node, ctx)
+                stmts.append(self.viper.LocalVarAssign(var.ref(), subj, pos, info))
+            if pattern.pattern is not None:
+                stmts.extend(self._translate_match_pattern_assignments(
+                    pattern.pattern, subj, subj_type, node, ctx))
+            return stmts
+
+        if isinstance(pattern, ast.MatchClass):
+            if pattern.patterns:
+                raise UnsupportedException(pattern, 'positional class patterns not yet supported')
+            target = self.get_target(pattern.cls, ctx)
+            if not isinstance(target, PythonType):
+                raise InvalidProgramException(node, 'invalid.match.class.pattern')
+            for attr_name, kwd_pattern in zip(pattern.kwd_attrs, pattern.kwd_patterns):
+                field = target.get_field(attr_name)
+                if field is None:
+                    raise InvalidProgramException(node, 'invalid.match.class.pattern')
+                field = field.actual_field
+                attr_expr = self.viper.FieldAccess(subj, field.sil_field, pos, info)
+                attr_type = field.type
+                stmts.extend(self._translate_match_pattern_assignments(
+                    kwd_pattern, attr_expr, attr_type, node, ctx))
+            return stmts
+
+        return stmts
+
+    def _translate_match_pattern_defines(self, pattern: ast.AST, node: ast.Match,
+                                         ctx: 'Context') -> List['Stmt']:
+        """set_var_defined calls for all names bound by a pattern."""
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        stmts = []
+
+        if isinstance(pattern, ast.MatchAs):
+            if pattern.name is not None:
+                var = self._get_match_bound_var(pattern.name, node, ctx)
+                stmts.append(self.set_var_defined(var, pos, info))
+            if pattern.pattern is not None:
+                stmts.extend(self._translate_match_pattern_defines(
+                    pattern.pattern, node, ctx))
+            return stmts
+
+        if isinstance(pattern, ast.MatchClass):
+            if pattern.patterns:
+                return stmts
+            for kwd_pattern in pattern.kwd_patterns:
+                stmts.extend(self._translate_match_pattern_defines(kwd_pattern, node, ctx))
+            return stmts
+
+        return stmts
 
     def assign_to(self, lhs: ast.AST, rhs: Expr, rhs_index: Optional[int],
                   rhs_end: Optional[Expr], rhs_type: PythonType,
