@@ -14,7 +14,7 @@ class Point:
 def pure_match_class_keyword_capture(p: Point) -> int:
     Requires(Acc(p.x))
     Ensures(Result() == p.x)
-    match p:
+    match p:  #:: ExpectedOutput(unsupported:class patterns with parameters not yet supported)
         case Point(x=y):
             return y
         case _:

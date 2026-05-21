@@ -280,6 +280,9 @@ class PureTranslator(CommonTranslator):
                 yield from self._collect_pure_match_captures(
                     pattern.pattern, subj_sil_name, node)
         if isinstance(pattern, ast.MatchClass):
+            if pattern.patterns or pattern.kwd_patterns:
+                raise UnsupportedException(
+                    pattern, 'class patterns with parameters not yet supported')
             for kwd_pattern in pattern.kwd_patterns:
                 yield from self._collect_pure_match_captures(
                     kwd_pattern, subj_sil_name, node)
@@ -292,6 +295,9 @@ class PureTranslator(CommonTranslator):
             if pattern.pattern is not None:
                 yield from self._collect_match_guard_capture_names(pattern.pattern)
         if isinstance(pattern, ast.MatchClass):
+            if pattern.patterns or pattern.kwd_patterns:
+                raise UnsupportedException(
+                    pattern, 'class patterns with parameters not yet supported')
             for kwd_pattern in pattern.kwd_patterns:
                 yield from self._collect_match_guard_capture_names(kwd_pattern)
 
