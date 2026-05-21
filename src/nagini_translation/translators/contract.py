@@ -425,13 +425,14 @@ class ContractTranslator(CommonTranslator):
         if not (isinstance(call_target, PythonMethod) and call_target.opaque):
             raise InvalidProgramException(node, 'invalid.reveal.no.opaque.function')
 
-        stmt, exp = self.translate_expr(node.args[0], ctx)
+        stmt, exp_orig = self.translate_expr(node.args[0], ctx)
+        exp = self.unwrap(exp_orig)
         if not isinstance(exp, self.viper.ast.FuncApp):
-            raise UnsupportedException(node, "Unexpected: Revealed function application did not translate to a Viper FuncApp.")
-
+            raise UnsupportedException(node,
+                                       "Unexpected: Revealed function application did not translate to a Viper FuncApp.")
 
         res = self.viper.FuncAppWithInfo(exp, self.viper.AnnotationInfo('reveal', []))
-
+        res = self.to_type(res, exp_orig.typ(), ctx)
         return stmt, res
 
     def translate_fold(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
