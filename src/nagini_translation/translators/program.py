@@ -11,6 +11,7 @@ from typing import List, Set, Tuple
 
 from nagini_translation.lib.constants import (
     ARBITRARY_BOOL_FUNC,
+    ASSERTING_FUNC,
     ASSUMING_FUNC,
     CHECK_DEFINED_FUNC,
     ERROR_NAME,
@@ -632,6 +633,19 @@ class ProgramTranslator(CommonTranslator):
                                                  self.viper.Ref, [is_defined_pre], [],
                                                  var_param, pos, info)
         return [is_defined_func, check_defined_func]
+
+    def create_asserting_function(self, ctx: Context) -> List['silver.ast.Function']:
+        pos = self.no_position(ctx)
+        info = self.no_info(ctx)
+        var_param_decl = self.viper.LocalVarDecl('val', self.viper.Ref, pos, info)
+        var_param = self.viper.LocalVar('val', self.viper.Ref, pos, info)
+        assertion_param_decl = self.viper.LocalVarDecl('ass', self.viper.Bool, pos, info)
+        assertion_param = self.viper.LocalVar('ass', self.viper.Bool, pos, info)
+        asserting_func = self.viper.Function(ASSERTING_FUNC,
+                                             [var_param_decl, assertion_param_decl],
+                                             self.viper.Ref, [assertion_param], [],
+                                             var_param, pos, info)
+        return [asserting_func]
 
     def create_assuming_function(self, ctx: Context) -> List['silver.ast.Function']:
         pos = self.no_position(ctx)
@@ -1284,6 +1298,7 @@ class ProgramTranslator(CommonTranslator):
         fields.extend(obl_fields)
 
         functions.extend(self.create_definedness_functions(ctx))
+        functions.extend(self.create_asserting_function(ctx))
         functions.extend(self.create_assuming_function(ctx))
         functions.append(self.create_arbitrary_bool_func(ctx))
         predicates.append(self.create_may_set_predicate(ctx))

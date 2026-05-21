@@ -5,7 +5,7 @@ from nagini_contracts.contracts import *
 
 
 class A:
-    #:: ExpectedOutput(unsupported:Inlining constructors is currently not supported.)
-    @Inline
+
+    @Inline  #:: ExpectedOutput(unsupported:Inlining constructors is currently not supported.)
     def __init__(self) -> None:
         pass

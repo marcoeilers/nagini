@@ -6,8 +6,8 @@ from typing import List
 
 
 def match_sequence(x: List[int]) -> int:
-    #:: ExpectedOutput(unsupported:sequence patterns not yet supported)
-    match x:
+
+    match x:  #:: ExpectedOutput(unsupported:sequence patterns not yet supported)
         case [a, b]:
             return a + b
         case _:

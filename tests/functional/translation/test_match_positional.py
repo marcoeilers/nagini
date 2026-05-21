@@ -14,8 +14,8 @@ class Point:
 
 def match_positional(p: Point) -> int:
     Requires(Acc(p.x) and Acc(p.y))
-    #:: ExpectedOutput(unsupported:positional class patterns not yet supported)
-    match p:
+
+    match p:  #:: ExpectedOutput(unsupported:positional class patterns not yet supported)
         case Point(x, y):
             return x + y
         case _:

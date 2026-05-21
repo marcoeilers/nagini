@@ -48,6 +48,8 @@ IS_DEFINED_FUNC = '_isDefined'
 
 ASSUMING_FUNC = '_assuming'
 
+ASSERTING_FUNC = '_asserting'
+
 NAME_QUANTIFIER_VAR = '_name'
 
 COMBINE_NAME_FUNC = '_combine'
@@ -146,7 +148,8 @@ INTERNAL_NAMES = [
     'key',
     'guard',
     'value',
-    ASSUMING_FUNC
+    ASSUMING_FUNC,
+    ASSERTING_FUNC
 ]
 
 VIPER_KEYWORDS = [

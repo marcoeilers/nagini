@@ -6,8 +6,8 @@ from typing import List
 
 
 def match_sequence_star(x: List[int]) -> int:
-    #:: ExpectedOutput(unsupported:sequence patterns not yet supported)
-    match x:
+
+    match x:  #:: ExpectedOutput(unsupported:sequence patterns not yet supported)
         case [head, *tail]:
             return head
         case _:

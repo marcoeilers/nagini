@@ -6,8 +6,8 @@ from typing import Dict
 
 
 def match_mapping(d: Dict[str, int]) -> int:
-    #:: ExpectedOutput(unsupported:mapping patterns not yet supported)
-    match d:
+
+    match d:  #:: ExpectedOutput(unsupported:mapping patterns not yet supported)
         case {'key': v}:
             return v
         case _:
