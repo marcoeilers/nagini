@@ -1065,7 +1065,8 @@ class StatementTranslator(CommonTranslator):
                         case.guard, ctx, target_type=self.viper.Bool)
                 if guard_stmts:
                     raise InvalidProgramException(node, 'purity.violated')
-                cond_expr = self.viper.And(cond_expr, guard_expr, pos, info)
+                guard_pos = self.to_position(case.guard, ctx)
+                cond_expr = self.viper.And(cond_expr, guard_expr, guard_pos, info)
 
             assign_stmts = self._translate_match_pattern_assignments(
                 case.pattern, subj_var.ref(), subject_type, node, ctx)
@@ -1088,6 +1089,52 @@ class StatementTranslator(CommonTranslator):
                 aliases.update(self._collect_guard_aliases(pattern.pattern, subj_var))
         return aliases
 
+    def _pattern_py_cond(self, pattern: ast.AST, node: ast.Match) -> Optional[ast.AST]:
+        """Return a Python AST node representing the branch condition for a match pattern.
+
+        Used to attach Python-level condition info to Viper branch expressions so that
+        verification errors can report meaningful branch conditions (e.g. ``x is True``).
+        Returns None for wildcard/capture patterns that always match.
+        """
+        if isinstance(pattern, ast.MatchAs):
+            if pattern.pattern is None:
+                return None
+            return self._pattern_py_cond(pattern.pattern, node)
+        if isinstance(pattern, ast.MatchSingleton):
+            if pattern.value is None or isinstance(pattern.value, bool):
+                return ast.Compare(
+                    left=node.subject, ops=[ast.Is()],
+                    comparators=[ast.Constant(value=pattern.value)],
+                    lineno=node.subject.lineno, col_offset=node.subject.col_offset,
+                    end_lineno=pattern.end_lineno, end_col_offset=pattern.end_col_offset)
+            return None
+        if isinstance(pattern, ast.MatchValue):
+            return ast.Compare(
+                left=node.subject, ops=[ast.Eq()],
+                comparators=[pattern.value],
+                lineno=node.subject.lineno, col_offset=node.subject.col_offset,
+                end_lineno=pattern.value.end_lineno, end_col_offset=pattern.value.end_col_offset)
+        if isinstance(pattern, ast.MatchClass):
+            return ast.Call(
+                func=ast.Name(id='isinstance', ctx=ast.Load(),
+                              lineno=node.subject.lineno, col_offset=node.subject.col_offset),
+                args=[node.subject, pattern.cls],
+                keywords=[],
+                lineno=node.subject.lineno, col_offset=node.subject.col_offset,
+                end_lineno=pattern.end_lineno, end_col_offset=pattern.end_col_offset)
+        if isinstance(pattern, ast.MatchOr):
+            sub_conds = [self._pattern_py_cond(p, node) for p in pattern.patterns]
+            sub_conds = [c for c in sub_conds if c is not None]
+            if not sub_conds:
+                return None
+            if len(sub_conds) == 1:
+                return sub_conds[0]
+            return ast.BoolOp(
+                op=ast.Or(), values=sub_conds,
+                lineno=pattern.lineno, col_offset=pattern.col_offset,
+                end_lineno=pattern.end_lineno, end_col_offset=pattern.end_col_offset)
+        return None
+
     def _translate_match_pattern_cond(self, pattern: ast.AST, subj: 'Expr',
                                       subj_type: 'PythonType', node: ast.Match,
                                       ctx: 'Context') -> 'StmtsAndExpr':
@@ -1102,7 +1149,9 @@ class StatementTranslator(CommonTranslator):
 
         if isinstance(pattern, ast.MatchSingleton):
             if pattern.value is None:
-                return [], self.viper.EqCmp(subj, self.viper.NullLit(pos, info), pos, info)
+                py_cond = self._pattern_py_cond(pattern, node)
+                cond_pos = self.to_position(py_cond, ctx)
+                return [], self.viper.EqCmp(subj, self.viper.NullLit(pos, info), cond_pos, info)
             if pattern.value is True or pattern.value is False:
                 # Python singleton patterns use `is`, not `==`: 1 is not True.
                 # We encode this as isinstance(subj, bool) AND bool.__unbox__(subj) [== True/False].
@@ -1112,14 +1161,19 @@ class StatementTranslator(CommonTranslator):
                 isinstance_cond = self.type_check(subj, bool_class, pos, ctx, inhale_exhale=False)
                 unboxed = self.get_function_call(bool_class, '__unbox__', [subj], [bool_class], node, ctx)
                 val_cond = unboxed if pattern.value is True else self.viper.Not(unboxed, pos, info)
-                return [], self.viper.And(isinstance_cond, val_cond, pos, info)
+                py_cond = self._pattern_py_cond(pattern, node)
+                cond_pos = self.to_position(py_cond, ctx)
+                return [], self.viper.And(isinstance_cond, val_cond, cond_pos, info)
             raise UnsupportedException(pattern, 'unsupported singleton pattern value')
 
         if isinstance(pattern, ast.MatchValue):
             val_stmts, val_expr = self.translate_expr(pattern.value, ctx)
             val_type = self.get_type(pattern.value, ctx)
+            py_cond = self._pattern_py_cond(pattern, node)
+            cond_pos = self.to_position(py_cond, ctx)
             eq_expr = self.get_function_call(
-                subj_type, '__eq__', [subj, val_expr], [subj_type, val_type], node, ctx)
+                subj_type, '__eq__', [subj, val_expr], [subj_type, val_type], node, ctx,
+                position=cond_pos)
             return val_stmts, self.to_bool(eq_expr, ctx, node)
 
         if isinstance(pattern, ast.MatchClass):
@@ -1128,7 +1182,9 @@ class StatementTranslator(CommonTranslator):
             target = self.get_target(pattern.cls, ctx)
             if not isinstance(target, PythonType):
                 raise InvalidProgramException(node, 'invalid.match.class.pattern')
-            isinstance_cond = self.type_check(subj, target, pos, ctx, inhale_exhale=False)
+            py_cond = self._pattern_py_cond(pattern, node)
+            cond_pos = self.to_position(py_cond, ctx)
+            isinstance_cond = self.type_check(subj, target, cond_pos, ctx, inhale_exhale=False)
             if not pattern.kwd_attrs:
                 return [], isinstance_cond
             stmts = []
@@ -1143,7 +1199,7 @@ class StatementTranslator(CommonTranslator):
                 sub_stmts, sub_cond = self._translate_match_pattern_cond(
                     kwd_pattern, attr_expr, attr_type, node, ctx)
                 stmts.extend(sub_stmts)
-                cond = self.viper.And(cond, sub_cond, pos, info)
+                cond = self.viper.And(cond, sub_cond, cond_pos, info)
             return stmts, cond
 
         if isinstance(pattern, ast.MatchOr):
@@ -1154,9 +1210,11 @@ class StatementTranslator(CommonTranslator):
                     sub_pat, subj, subj_type, node, ctx)
                 stmts.extend(sub_stmts)
                 conds.append(sub_cond)
+            py_cond = self._pattern_py_cond(pattern, node)
+            cond_pos = self.to_position(py_cond, ctx) if py_cond is not None else pos
             result = conds[0]
-            for c in conds[1:]:
-                result = self.viper.Or(result, c, pos, info)
+            for i, c in enumerate(conds[1:], 1):
+                result = self.viper.Or(result, c, cond_pos if i == len(conds) - 1 else pos, info)
             return stmts, result
 
         if isinstance(pattern, ast.MatchSequence):

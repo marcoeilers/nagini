@@ -317,3 +317,42 @@ def match_capture_guaranteed(x: int) -> int:
         case y:
             pass
     return y
+
+
+def match_madness() -> None:
+    to_match = 1
+    res = 0
+    match to_match:
+        case True:
+            assert False
+        case _:
+            res = 7
+    assert res == 7
+
+def match_madness_2() -> None:
+    to_match = True
+    res = 0
+    match to_match:
+        case 1:
+            res = 7
+        case _:
+            assert False
+    assert res == 7
+
+class Point:
+    def __init__(self, x: int, y: int) -> None:
+        self.x = x
+        self.y = y
+        Ensures(Acc(self.x) and Acc(self.y) and self.x is x and self.y is y)
+
+def match_madness_3() -> None:
+    p = Point(3,4)
+    res = 0
+    match 4:
+        case p.x:
+            assert False
+        case p.y:
+            res = 7
+        case _:
+            assert False
+    assert res == 7

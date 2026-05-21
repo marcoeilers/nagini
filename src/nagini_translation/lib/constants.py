@@ -46,7 +46,7 @@ MAY_SET_PRED = '_MaySet'
 
 IS_DEFINED_FUNC = '_isDefined'
 
-ASSERTING_FUNC = '_asserting'
+ASSUMING_FUNC = '_assuming'
 
 NAME_QUANTIFIER_VAR = '_name'
 
@@ -145,7 +145,8 @@ INTERNAL_NAMES = [
     'Low',
     'key',
     'guard',
-    'value'
+    'value',
+    ASSUMING_FUNC
 ]
 
 VIPER_KEYWORDS = [

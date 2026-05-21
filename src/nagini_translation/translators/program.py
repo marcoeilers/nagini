@@ -11,7 +11,7 @@ from typing import List, Set, Tuple
 
 from nagini_translation.lib.constants import (
     ARBITRARY_BOOL_FUNC,
-    ASSERTING_FUNC,
+    ASSUMING_FUNC,
     CHECK_DEFINED_FUNC,
     ERROR_NAME,
     FUNCTION_DOMAIN_NAME,
@@ -633,19 +633,20 @@ class ProgramTranslator(CommonTranslator):
                                                  var_param, pos, info)
         return [is_defined_func, check_defined_func]
 
-    def create_asserting_function(self,
-                                            ctx: Context) -> List['silver.ast.Function']:
+    def create_assuming_function(self, ctx: Context) -> List['silver.ast.Function']:
         pos = self.no_position(ctx)
         info = self.no_info(ctx)
-        var_param_decl = self.viper.LocalVarDecl('val', self.viper.Ref, pos, info)
-        var_param = self.viper.LocalVar('val', self.viper.Ref, pos, info)
-        assertion_param_decl = self.viper.LocalVarDecl('ass', self.viper.Bool, pos, info)
-        assertion_param = self.viper.LocalVar('ass', self.viper.Bool, pos, info)
-        asserting_func = self.viper.Function(ASSERTING_FUNC,
-                                             [var_param_decl, assertion_param_decl],
-                                             self.viper.Ref, [assertion_param], [],
-                                             var_param, pos, info)
-        return [asserting_func]
+        r_param_decl = self.viper.LocalVarDecl('r', self.viper.Ref, pos, info)
+        r_param = self.viper.LocalVar('r', self.viper.Ref, pos, info)
+        fact_param_decl = self.viper.LocalVarDecl('fact', self.viper.Bool, pos, info)
+        fact_param = self.viper.LocalVar('fact', self.viper.Bool, pos, info)
+        result_var = self.viper.Result(self.viper.Ref, pos, info)
+        post_eq = self.viper.EqCmp(result_var, r_param, pos, info)
+        assuming_func = self.viper.Function(ASSUMING_FUNC,
+                                            [r_param_decl, fact_param_decl],
+                                            self.viper.Ref, [], [fact_param, post_eq],
+                                            None, pos, info)
+        return [assuming_func]
 
     def create_arbitrary_bool_func(self, ctx: Context) -> 'silver.ast.Function':
         pos = self.no_position(ctx)
@@ -1283,7 +1284,7 @@ class ProgramTranslator(CommonTranslator):
         fields.extend(obl_fields)
 
         functions.extend(self.create_definedness_functions(ctx))
-        functions.extend(self.create_asserting_function(ctx))
+        functions.extend(self.create_assuming_function(ctx))
         functions.append(self.create_arbitrary_bool_func(ctx))
         predicates.append(self.create_may_set_predicate(ctx))
 
