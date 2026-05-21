@@ -7,7 +7,7 @@ from nagini_contracts.contracts import *
 class Point:
     def __init__(self, x: int) -> None:
         self.x = x
-        Ensures(Acc(self.x) and self.x is x)
+        Ensures(Acc(self.x) and self.x == x)
 
 
 @Pure
