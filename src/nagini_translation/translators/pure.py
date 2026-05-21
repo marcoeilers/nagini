@@ -279,6 +279,12 @@ class PureTranslator(CommonTranslator):
             if pattern.pattern is not None:
                 yield from self._collect_pure_match_captures(
                     pattern.pattern, subj_sil_name, node)
+        if isinstance(pattern, ast.MatchClass):
+            if pattern.patterns:
+                return
+            for kwd_pattern in pattern.kwd_patterns:
+                yield from self._collect_pure_match_captures(
+                    kwd_pattern, subj_sil_name, node)
 
     def _collect_match_guard_capture_names(self, pattern: ast.AST):
         """Yield names that a guard expression might reference from the pattern."""
@@ -287,6 +293,11 @@ class PureTranslator(CommonTranslator):
                 yield pattern.name
             if pattern.pattern is not None:
                 yield from self._collect_match_guard_capture_names(pattern.pattern)
+        if isinstance(pattern, ast.MatchClass):
+            if pattern.patterns:
+                return
+            for kwd_pattern in pattern.kwd_patterns:
+                yield from self._collect_match_guard_capture_names(kwd_pattern)
 
     def _translate_return_wrapper(self, wrapper: Wrapper, previous: Expr,
                                   function: PythonMethod,
