@@ -28,7 +28,7 @@ def pure_cond_assign_all_branches_ok(x: int) -> int:
     return y
 
 
-@Pure
+@Pure  #:: ExpectedOutput(carbon)(postcondition.violated:assertion.false)
 def pure_cond_assign_missing_branch(x: int) -> int:
     # Only the then-branch assigns y; should be rejected.
     if x > 0:

@@ -285,7 +285,7 @@ def match_guard_cond_in_branch(x: int) -> None:
 
 
 # --- Definedness: variables defined only in some cases ---
-
+#:: ExpectedOutput(carbon)(postcondition.violated:assertion.false)
 def match_capture_undefined_after(x: int) -> int:
     match x:
         case 0:

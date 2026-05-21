@@ -279,7 +279,7 @@ def pure_match_capture_read_in_body(x: int) -> int:
             return 0
 
 
-@Pure
+@Pure  #:: ExpectedOutput(carbon)(postcondition.violated:assertion.false)
 def pure_match_capture_undefined_after(x: int) -> int:
     match x:
         case 0:
