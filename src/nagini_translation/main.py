@@ -400,6 +400,8 @@ def main() -> None:
         global sil_programs
         sil_programs = load_sil_files(jvm, args.int_bitops_size, args.sif, args.float_encoding)
 
+        print('Server started successfully on ' + DEFAULT_SERVER_SOCKET, flush=True)
+
         while True:
             file = socket.recv_string()
             response = ['']
