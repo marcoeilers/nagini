@@ -387,18 +387,21 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
     elif isinstance(node, ast.Call):
         return _get_call_type(node, module, current_function, containers,
                               container)
-    elif isinstance(node, ast.ListComp):
+    elif isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp)):
+        expected = {ast.ListComp: LIST_TYPE, ast.SetComp: SET_TYPE,
+                    ast.DictComp: DICT_TYPE}[type(node)]
         if (node._parent and isinstance(node._parent, (ast.Assign, ast.AnnAssign)) and
                     node is node._parent.value):
             # Constructor is assigned to variable;
-            # we get the type of the list from the type of the
+            # we get the type of the collection from the type of the
             # variable it's assigned to.
             trgt = node._parent.targets[0] if isinstance(node._parent, ast.Assign) else node._parent.target
             ann_type = get_type(trgt, containers, container)
-            if isinstance(ann_type, GenericType) and ann_type.python_class.name == 'list':
+            if isinstance(ann_type, GenericType) and ann_type.python_class.name == expected:
                 return ann_type
-        raise UnsupportedException(node, 'List comprehensions must be directly '
-                                       'assigned to a local variable.')
+        raise UnsupportedException(node, 'Comprehensions must be directly '
+                                       'assigned to a local variable of the '
+                                       'matching collection type.')
     else:
         raise UnsupportedException(node)
 
@@ -461,8 +464,8 @@ def _get_call_type(node: ast.Call, module: PythonModule,
         return _get_collection_literal_type(node, ['args'], PMSET_TYPE, module,
                                             containers, container)
     if func_name == 'enumerate':
-        if len(node.args) != 1:
-            raise UnsupportedException(node, 'enumerate only supported with single arg.')
+        if len(node.args) not in (1, 2):
+            raise UnsupportedException(node, 'enumerate only supported with one or two args.')
         list_type = module.global_module.classes[LIST_TYPE]
         int_type = module.global_module.classes[INT_TYPE]
         tuple_type = module.global_module.classes[TUPLE_TYPE]
