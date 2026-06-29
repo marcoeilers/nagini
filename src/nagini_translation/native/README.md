@@ -97,3 +97,19 @@ verify it with:
 ```
 verifast -read_options_from_source_file -allow_dead_code -c paper_example.c
 ```
+
+## Running the verified code as a real Python module
+
+To demonstrate that the verified C is genuine, runnable CPython glue code, the
+`bincoeff/` case study also ships `bincoeff_module.c`: the same verified
+`compute_bincoeff` function (the VeriFast annotations are plain C comments)
+packaged with CPython module boilerplate, a placeholder implementation of GMP's
+`mpz` API (a real build would `#include <gmp.h>` and link against GMP), and
+no-op definitions of the proof-only ghost operations `borrowRefs`/`returnRefs`.
+Build and exercise it with:
+
+```
+cd case_studies/bincoeff
+python setup.py build_ext --inplace
+python test_bincoeff_native.py
+```
