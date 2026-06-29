@@ -3,7 +3,7 @@ from nagini_contracts.contracts import *
 
 # LONG_MIN / LONG_MAX as @Pure functions: Nagini translates these to VeriFast
 # fixpoints (PURE_LONG_MIN()/PURE_LONG_MAX()), which it unfolds to the literal
-# values. (Module-level int constants are not resolved by the translator.)
+# values. 
 @Pure
 def LONG_MIN() -> int:
     return -9223372036854775808

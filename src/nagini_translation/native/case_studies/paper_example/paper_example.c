@@ -74,8 +74,7 @@ pyobj_hasval(result, PyLong_v(?result__val)) &*&
     long val_b = PyLong_AsLong(obj_b);
     if (PyErr_Occurred()) return NULL;
 
-    // Compare with C operators. NB: the spec returns a when a > b (else b), so
-    // we use '>' here (Listing 1.1 uses '>=', which would disagree at a == b).
+    // Compare with C operators.
     PyObject* winner;
     if (val_a > val_b) {
         winner = obj_a;
