@@ -362,6 +362,7 @@ class Translator:
             # "ast.UnaryOp": self.translate_UnaryOp,
             ast.IfExp: self.translate_IfExp_expr,
             ast.BoolOp: self.translate_BoolOp_expr,
+            ast.UnaryOp: self.translate_UnaryOp_expr,
             ast.BinOp: self.translate_BinOp_expr,
             ast.Compare: self.translate_Compare_expr,
             ast.Constant: self.translate_Constant_expr,
@@ -462,6 +463,22 @@ class Translator:
                             self.translate_generic_expr(node.body, ctx, py2vf_context(
                                 py2vf_ctx, prefix=py2vf_ctx.getprefix(), old=py2vf_ctx.old), v),
                             self.translate_generic_expr(node.orelse, ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix(), old=py2vf_ctx.old), v))
+
+    def translate_UnaryOp_expr(self, node: ast.UnaryOp, ctx: Context, py2vf_ctx: py2vf_context, v: AccessType) -> vf.Expr:
+        if (isinstance(v, ValAccess) == False):
+            raise NotImplementedError(
+                "UnaryOp expression cannot be translated in this context: "+str(node)+" in "+repr(v)+".\n Only value-semantics is supported")
+        if (isinstance(node.op, ast.UAdd)):
+            return self.translate_generic_expr(node.operand, ctx, py2vf_ctx, ValAccess())
+        elif (isinstance(node.op, ast.USub)):
+            # represent unary minus as (0 - operand), reusing the binary machinery
+            return vf.BinOp[vf.Int](
+                vf.ImmLiteral(vf.Int(0)),
+                self.translate_generic_expr(node.operand, ctx, py2vf_ctx, ValAccess()),
+                vf.Sub)
+        else:
+            raise NotImplementedError(
+                "UnaryOp operator not implemented: "+type(node.op).__name__)
 
     def translate_BinOp_expr(self, node: ast.BinOp, ctx: Context, py2vf_ctx: py2vf_context,  v: AccessType) -> vf.Expr:
         if(isinstance(v, ValAccess)==False):

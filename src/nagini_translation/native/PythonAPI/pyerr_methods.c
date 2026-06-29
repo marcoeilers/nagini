@@ -13,4 +13,14 @@ PyObject *PyErr_Occurred();
         case some(x): return result !=NULL &*& type==some(?y) &*& some(result) == ptr;
     };
 @*/
+
+// Standard exception type singletons (borrowed, statically alive).
+PyObject *PyExc_TypeError;
+PyObject *PyExc_ValueError;
+
+// Raises an exception of the given type with the given message, setting the
+// global error indicator.
+void PyErr_SetString(PyObject *type, const char *message);
+//@ requires PyExc(?e, ?t) &*& [?f]string(message, ?m);
+//@ ensures PyExc(some(_), some(_)) &*& [f]string(message, m);
 #endif
