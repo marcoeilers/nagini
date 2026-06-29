@@ -11,8 +11,17 @@ See http://doc.pytest.org/en/latest/writing_plugins.html for documentation.
 """
 import os
 import pytest
+import sys
 
 from nagini_translation.lib import config
+
+# Importing tests.py below starts the JVM with config.classpath, so ViperServer
+# mode (which swaps in viperserver.jar) must be enabled *before* that import.
+# pytest_configure runs too late, so the flag is read from the command line
+# here. The option is still registered in pytest_addoption so pytest accepts it.
+if '--viper-server' in sys.argv:
+    config.enable_viper_server()
+
 from nagini_translation.tests import _JVM as jvm
 from nagini_translation.verifier import ViperVerifier
 from typing import List
@@ -158,6 +167,9 @@ def pytest_addoption(parser: 'pytest.config.Parser'):
     parser.addoption('--store-viper', dest='store_viper', action='store_true')
     parser.addoption('--translation', dest='translation', action='store_true')
     parser.addoption('--verification', dest='verification', action='store_true')
+    parser.addoption('--viper-server', dest='viper_server', action='store_true',
+                     help='run the verification backend (Silicon/Carbon) through '
+                          'an in-process ViperServer instead of directly')
 
 
 def pytest_configure(config: 'pytest.config.Config'):
@@ -236,6 +248,17 @@ def pytest_configure(config: 'pytest.config.Config'):
             pytest.exit('No backend verifiers available on the classpath.')
         for verifier in verifiers:
             _pytest_config.add_verifier(verifier)
+
+
+def pytest_unconfigure(config: 'pytest.config.Config'):
+    """Shut ViperServer down at the end of the session so its (non-daemon)
+    Akka threads do not keep the process alive."""
+    if getattr(config.option, 'viper_server', False):
+        try:
+            from nagini_translation.viper_server import get_viper_server_manager
+            get_viper_server_manager(jvm).stop()
+        except Exception:
+            pass
 
 
 def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):

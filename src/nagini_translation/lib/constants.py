@@ -8,7 +8,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import ast
 
 DEFAULT_CLIENT_SOCKET = "tcp://localhost:5555"
-DEFAULT_SERVER_SOCKET = "tcp://*:5555"
+# Bind to loopback only so the server is not reachable from the network.
+DEFAULT_SERVER_SOCKET = "tcp://127.0.0.1:5555"
 
 
 LITERALS = ['True', 'False', 'None']

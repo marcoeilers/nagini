@@ -194,7 +194,21 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
         task()
 
 def get_verifier(path: str, jvm: JVM, viper_args: List[str], backend=ViperVerifier.silicon,
-                 counterexample=False, disable_branch_conditions=False) -> Union[Silicon, Carbon]:
+                 counterexample=False, disable_branch_conditions=False, arp=False, sif=False):
+    # The in-process ViperServer backend supports both Silicon and Carbon (but
+    # not SIF or ARP). On any failure to construct it (e.g. it is not on the
+    # classpath), fall back to the corresponding direct backend.
+    if (config.use_viper_server and backend in (ViperVerifier.silicon, ViperVerifier.carbon)
+            and not arp and not sif):
+        try:
+            from nagini_translation.viper_server import (ViperServer,
+                                                         get_viper_server_manager)
+            manager = get_viper_server_manager(jvm)
+            return ViperServer(jvm, manager, path, viper_args, counterexample,
+                               disable_branch_conditions, backend=backend.name)
+        except Exception:
+            logging.exception('ViperServer backend unavailable; falling back to '
+                              'the direct backend.')
     if backend == ViperVerifier.silicon:
         return Silicon(jvm, path, viper_args, counterexample, disable_branch_conditions)
     elif backend == ViperVerifier.carbon:
@@ -207,7 +221,8 @@ def verify(modules, prog: 'viper.silver.ast.Program', path: str, jvm: JVM, viper
     Verifies the given Viper program
     """
     try:
-        verifier = get_verifier(path, jvm, viper_args, backend, counterexample, disable_branch_conditions)
+        verifier = get_verifier(path, jvm, viper_args, backend, counterexample,
+                                disable_branch_conditions, arp=arp, sif=sif)
         vresult = verifier.verify(modules, prog, arp=arp, sif=sif)
         return vresult
     except JException as je:
@@ -329,6 +344,13 @@ def main() -> None:
         help='start Nagini server'
     )
     parser.add_argument(
+        '--viper-server',
+        action='store_true',
+        help='verify using an in-process ViperServer instance (enables result '
+             'caching and cancellation across requests); falls back to the '
+             'direct Silicon backend for Carbon/SIF/ARP or if unavailable'
+    )
+    parser.add_argument(
         '--counterexample',
         action='store_true',
         help='return a counterexample for every verification error if possible'
@@ -367,6 +389,8 @@ def main() -> None:
     config.z3_path = args.z3
     config.mypy_path = args.mypy_path
     config.set_verifier(args.verifier)
+    if args.viper_server:
+        config.enable_viper_server(args.verifier)
     if args.ignore_obligations:
         if args.force_obligations:
             parser.error('incompatible arguments: --ignore-obligations and --force-obligations')
@@ -400,6 +424,15 @@ def main() -> None:
         global sil_programs
         sil_programs = load_sil_files(jvm, args.int_bitops_size, args.sif, args.float_encoding)
 
+        if config.use_viper_server:
+            # Start the shared ViperServer once so its cache persists across
+            # requests. If it cannot start, requests fall back to direct Silicon.
+            try:
+                from nagini_translation.viper_server import get_viper_server_manager
+                get_viper_server_manager(jvm).start()
+            except Exception:
+                logging.exception('Could not start ViperServer; verification will '
+                                  'fall back to the direct Silicon backend.')
         print('Server started successfully on ' + DEFAULT_SERVER_SOCKET, flush=True)
 
         while True:
@@ -413,6 +446,20 @@ def main() -> None:
             socket.send_string(response[0])
     else:
         success = translate_and_verify(args.python_file, jvm, args, arp=args.arp, base_dir=args.base_dir)
+        if config.use_viper_server:
+            # Shut the ViperServer (and its actor system) down so the process
+            # can terminate.
+            try:
+                from nagini_translation.viper_server import get_viper_server_manager
+                get_viper_server_manager(jvm).stop()
+            except Exception:
+                logging.exception('Error while stopping ViperServer.')
+            # ViperServer/Akka may leave non-daemon threads alive that would keep
+            # the JVM (and process) from exiting; force a hard exit now that the
+            # result has been printed.
+            sys.stdout.flush()
+            sys.stderr.flush()
+            os._exit(0 if success else 1)
         sys.exit(0 if success else 1)
 
 

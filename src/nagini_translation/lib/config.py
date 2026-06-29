@@ -152,40 +152,58 @@ def resources_folder():
     return resources
 
 
-def _construct_classpath(verifier : str = None):
+def _construct_classpath(verifier : str = None, viper_server : bool = False):
     """ Contstructs JAVA classpath.
 
     First tries environment variables ``VIPERJAVAPATH``, ``SILICONJAR``
     and ``CARBONJAR``. If they are undefined, then tries to use OS
     specific locations.
+
+    When ``viper_server`` is set, ``viperserver.jar`` is used instead of the
+    standalone ``silicon.jar``/``carbon.jar`` (it bundles Silicon, Carbon and
+    Silver), so that the in-process ViperServer backend is available for either
+    backend.
     """
 
     viper_java_path = os.environ.get('VIPERJAVAPATH')
     silicon_jar = os.environ.get('SILICONJAR')
     carbon_jar = os.environ.get('CARBONJAR')
     arpplugin_jar = os.environ.get('ARPPLUGINJAR')
+    viperserver_jar = os.environ.get('VIPERSERVERJAR')
 
     if viper_java_path:
         return viper_java_path
 
-    if silicon_jar or carbon_jar:
+    if silicon_jar or carbon_jar or viperserver_jar:
+        if viper_server and viperserver_jar:
+            # viperserver.jar bundles both backends; it is always included.
+            entries = ((viperserver_jar, None), (arpplugin_jar, 'arpplugin'))
+        else:
+            entries = ((silicon_jar, 'carbon'), (carbon_jar, 'silicon'),
+                       (arpplugin_jar, 'arpplugin'))
+        # A tag of None means "always include" (e.g. viperserver.jar, which
+        # bundles both backends), regardless of the selected verifier.
         return os.pathsep.join(
-            jar for jar, v in ((silicon_jar, 'carbon'),
-                               (carbon_jar, 'silicon'),
-                               (arpplugin_jar, 'arpplugin'))
-            if jar and v != verifier)
+            jar for jar, v in entries if jar and (v is None or v != verifier))
 
     resources = resources_folder()
     silicon = os.path.join(resources, 'backends', 'silicon.jar')
     carbon = os.path.join(resources, 'backends', 'carbon.jar')
+    viperserver = os.path.join(resources, 'backends', 'viperserver.jar')
     silver_sif = os.path.join(resources, 'backends', 'silver-sif-extension.jar')
     silicon_sif = os.path.join(resources, 'backends', 'silicon-sif-extension.jar')
+    if viper_server:
+        # viperserver.jar bundles both Silicon and Carbon, so it is always
+        # included regardless of the selected verifier.
+        entries = ((viperserver, None), (silver_sif, 'silver-sif'),
+                   (silicon_sif, 'silicon-sif'))
+    else:
+        entries = ((silicon, 'carbon'), (carbon, 'silicon'),
+                   (silver_sif, 'silver-sif'), (silicon_sif, 'silicon-sif'))
+    # A tag of None means "always include" (e.g. viperserver.jar, which bundles
+    # both backends), regardless of the selected verifier.
     return os.pathsep.join(
-        jar for jar, v in ((silicon, 'carbon'),
-                           (carbon, 'silicon'),
-                           (silver_sif, 'silver-sif'),
-                           (silicon_sif, 'silicon-sif'))
-        if jar and v != verifier)
+        jar for jar, v in entries if jar and (v is None or v != verifier))
 
 
 def _get_boogie_path():
@@ -274,6 +292,20 @@ def set_verifier(v: str):
         classpath = _construct_classpath(v)
 
 
+def enable_viper_server(verifier: str = None):
+    """Enable the in-process ViperServer backend.
+
+    Unless the user provided an explicit classpath, this swaps ``silicon.jar``
+    for ``viperserver.jar`` so that ViperServer's classes are available.
+    """
+    global classpath, use_viper_server
+    use_viper_server = True
+    # Only auto-manage the classpath if it still matches an auto-constructed
+    # value (i.e. the user did not pass an explicit --viper-jar-path).
+    if classpath == _construct_classpath(verifier):
+        classpath = _construct_classpath(verifier, viper_server=True)
+
+
 mypy_dir = _get_mypy_dir()
 """
 Mypy executable dir. Initialized by calling
@@ -285,6 +317,13 @@ classpath = _construct_classpath()
 """
 JAVA class path. Initialized by calling
 :py:func:`_construct_classpath`.
+"""
+
+
+use_viper_server = False
+"""
+Whether the in-process ViperServer backend should be used for verification.
+Set via :py:func:`enable_viper_server`.
 """
 
 
