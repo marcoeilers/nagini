@@ -49,6 +49,7 @@ class NativeSpecExtractor:
                 funargs.append((translate_argtype(k, y) + " "+ str(py2vf_ctx.getExpr(arg_ast_name, y))))
             arg_accesses.append(translated_arg_access)
         return funargs, arg_accesses
+
     def env(self, modules: List[PythonModule]) -> str:
         # Class System Translation
         ctx = Context()
@@ -136,6 +137,11 @@ class NativeSpecExtractor:
         py2vf_ctx_setup = py2vf_context(prefix="")
         setupfacts = self.setup(f, ctx, py2vf_ctx_setup)
         py2vf_ctx_precond = py2vf_context(parent=py2vf_ctx_setup, prefix="")
+        # Print the signature of the C function the specs are generated for.
+        # @Native methods follow the CPython calling convention: they receive
+        # the (implicit) module/instance as `self` and their arguments packed
+        # into the `args` tuple, always returning a PyObject*.
+        print("static PyObject * " + f.name + "(PyObject *self, PyObject *args)")
         print("requires PyExc(none, none) &*&")
         print(vf.FactConjunction(
             setupfacts +
