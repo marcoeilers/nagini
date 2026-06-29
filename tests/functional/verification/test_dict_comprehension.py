@@ -26,7 +26,9 @@ def dict_comp_value_pass(src: List[int]) -> None:
     Requires(list_pred(src))
     Requires(len(src) > 0)
     d = {x: x + 1 for x in src}  # type: Dict[int, int]
-    assert d[src[0]] == src[0] + 1
+    # The last source element cannot be overwritten by a later duplicate key, so
+    # its value is pinned down.
+    assert d[src[len(src) - 1]] == src[len(src) - 1] + 1
 
 
 def dict_comp_value_fail(src: List[int]) -> None:
@@ -35,7 +37,7 @@ def dict_comp_value_fail(src: List[int]) -> None:
     d = {x: x + 1 for x in src}  # type: Dict[int, int]
     # The value is the mapped x + 1, not x.
     #:: ExpectedOutput(assert.failed:assertion.false)
-    assert d[src[0]] == src[0]
+    assert d[src[len(src) - 1]] == src[len(src) - 1]
 
 
 def dict_comp_missing_key_fail(src: List[int]) -> None:
@@ -51,10 +53,11 @@ def dict_comp_missing_key_fail(src: List[int]) -> None:
 def dict_comp_filter_pass(src: List[int]) -> None:
     Requires(list_pred(src))
     Requires(len(src) > 0)
-    Requires(src[0] > 5)
+    Requires(src[len(src) - 1] > 5)
     d = {x: x for x in src if x > 5}  # type: Dict[int, int]
-    assert src[0] in d
-    assert d[src[0]] == src[0]
+    # The last element passes the filter and has no later duplicate.
+    assert src[len(src) - 1] in d
+    assert d[src[len(src) - 1]] == src[len(src) - 1]
 
 
 def dict_comp_filter_fail(src: List[int]) -> None:
@@ -72,3 +75,38 @@ def dict_comp_no_reverse_fail(src: List[int]) -> None:
     d = {x: x + 1 for x in src}  # type: Dict[int, int]
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert len(d) == len(src)
+
+
+def dict_comp_duplicate_key_last_wins_pass(src: List[int]) -> None:
+    # When several source elements map to the same key, Python keeps the value
+    # produced by the *last* such element. Here src[0] and src[1] share a key
+    # (same value mod 2), so d maps that key to src[1] (the later one), e.g.
+    # {x % 2: x for x in [2, 4]} == {0: 4} in Python.
+    Requires(list_pred(src))
+    Requires(len(src) == 2)
+    Requires(src[0] % 2 == src[1] % 2)
+    d = {x % 2: x for x in src}  # type: Dict[int, int]
+    assert d[src[1] % 2] == src[1]
+
+
+def dict_comp_duplicate_key_last_wins_fail(src: List[int]) -> None:
+    # The earlier element's value does NOT survive a duplicate key.
+    Requires(list_pred(src))
+    Requires(len(src) == 2)
+    Requires(src[0] % 2 == src[1] % 2)
+    Requires(src[0] != src[1])
+    d = {x % 2: x for x in src}  # type: Dict[int, int]
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert d[src[0] % 2] == src[0]
+
+
+def dict_comp_duplicate_key_sound_fail(src: List[int]) -> None:
+    # Sanity check that duplicate keys with differing values do not make the
+    # encoding inhale a contradiction (which would let us prove anything).
+    Requires(list_pred(src))
+    Requires(len(src) == 2)
+    Requires(src[0] % 2 == src[1] % 2)
+    Requires(src[0] != src[1])
+    d = {x % 2: x for x in src}  # type: Dict[int, int]
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert False

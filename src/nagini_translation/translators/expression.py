@@ -407,24 +407,92 @@ class ExpressionTranslator(CommonTranslator):
         # The membership/value fact about the result, in terms of element_var.
         if field_name == 'set_acc':
             fact = self.viper.AnySetContains(body[0], field_acc, position, info)
+            if filter_cond is not None:
+                fact = self.viper.Implies(filter_cond, fact, position, info)
+            # Bind the element variable to the current source element.
+            let = self.viper.Let(element_var.decl, seq_i, fact, position, info)
+            trigger = self.viper.Trigger([seq_i], position, info)
+            forall_body = self.viper.Implies(index_in_bounds, let, position, info)
+            contents = self.viper.Forall([index_var.decl], [trigger], forall_body,
+                                         position, info)
         else:
-            key, val = body
-            contains = self.viper.MapContains(key, field_acc, position, info)
-            lookup = self.viper.MapLookup(field_acc, key, position, info)
-            fact = self.viper.And(contains,
-                                  self.viper.EqCmp(lookup, val, position, info),
-                                  position, info)
-        if filter_cond is not None:
-            fact = self.viper.Implies(filter_cond, fact, position, info)
-        # Bind the element variable to the current source element.
-        let = self.viper.Let(element_var.decl, seq_i, fact, position, info)
-        trigger = self.viper.Trigger([seq_i], position, info)
-        forall_body = self.viper.Implies(index_in_bounds, let, position, info)
-        contents = self.viper.Forall([index_var.decl], [trigger], forall_body,
-                                     position, info)
+            contents = self._dict_comp_contents(
+                field_acc, body, filter_cond, element_var, index_var, seq_i,
+                index_in_bounds, seq_len, iter, iter_type, node, ctx)
         inhale = self.viper.Inhale(self.viper.And(type_check, contents, position, info),
                                    position, info)
         return iter_stmt + [new_stmt, inhale]
+
+    def _dict_comp_contents(self, field_acc: Expr, body: List[Expr],
+                            filter_cond: Expr, element_var: PythonVar,
+                            index_var: PythonVar, seq_i: Expr,
+                            index_in_bounds: Expr, seq_len: Expr, iter: Expr,
+                            iter_type: PythonType, node: ast.AST,
+                            ctx: Context) -> Expr:
+        """Build the forward-direction fact for a dict comprehension, respecting
+        Python's "last value wins" rule: when several source elements produce
+        the same key, the resulting dict maps that key to the value produced by
+        the *last* (highest-index) such element. We therefore only assert the
+        key/value equality for a source element when no *later* source element
+        (also satisfying the filter) produces the same key."""
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        key, val = body
+        # A second index/element to range over the elements that come *after*
+        # the current one when checking whether the key reoccurs later.
+        int_class = ctx.module.global_module.classes[PRIMITIVE_INT_TYPE]
+        index_var2 = ctx.current_function.create_variable('j', int_class,
+                                                          self.translator, False)
+        seq_j = self.get_function_call(iter_type.cls, '__getitem__',
+                                       [iter, index_var2.ref()], [None, None],
+                                       node, ctx)
+        # Capture the current element's key, since the inner quantifier rebinds
+        # the element variable to the j-th element (so ``key`` becomes key_j).
+        # The key is a boxed (Ref) value, so the object class is sufficient here.
+        object_class = ctx.module.global_module.classes[OBJECT_TYPE]
+        key_var = ctx.current_function.create_variable('dictcomp_key', object_class,
+                                                       self.translator, False)
+        # Inner quantifier: no later in-bounds element (satisfying the filter)
+        # produces the same key as the current element. The element access seq_j
+        # is only well-defined for in-bounds j, so its binding must sit inside the
+        # bounds guard.
+        j_positive = self.viper.GeCmp(index_var2.ref(),
+                                      self.viper.IntLit(0, position, info), position,
+                                      info)
+        j_lt_len = self.viper.LtCmp(index_var2.ref(), seq_len, position, info)
+        j_in_bounds = self.viper.And(j_positive, j_lt_len, position, info)
+        j_after_i = self.viper.LtCmp(index_var.ref(), index_var2.ref(), position,
+                                     info)
+        if filter_cond is not None:
+            later_cond = self.viper.And(j_after_i, filter_cond, position, info)
+        else:
+            later_cond = j_after_i
+        distinct_key = self.viper.NeCmp(key, key_var.ref(), position, info)
+        dup_check = self.viper.Implies(later_cond, distinct_key, position, info)
+        j_let = self.viper.Let(element_var.decl, seq_j, dup_check, position, info)
+        inner_body = self.viper.Implies(j_in_bounds, j_let, position, info)
+        j_trigger = self.viper.Trigger([seq_j], position, info)
+        no_later_dup = self.viper.Forall([index_var2.decl], [j_trigger], inner_body,
+                                         position, info)
+        # The key is always present; its value is the current one only if this is
+        # the last occurrence of the key.
+        contains = self.viper.MapContains(key_var.ref(), field_acc, position, info)
+        lookup = self.viper.MapLookup(field_acc, key_var.ref(), position, info)
+        value_fact = self.viper.Implies(
+            no_later_dup, self.viper.EqCmp(lookup, val, position, info), position,
+            info)
+        per_element = self.viper.And(contains, value_fact, position, info)
+        if filter_cond is not None:
+            per_element = self.viper.Implies(filter_cond, per_element, position,
+                                             info)
+        # Bind key_var to this element's key, then bind the element variable to
+        # the current (i-th) source element, all inside the in-bounds guard.
+        key_bind = self.viper.Let(key_var.decl, key, per_element, position, info)
+        i_let = self.viper.Let(element_var.decl, seq_i, key_bind, position, info)
+        forall_body = self.viper.Implies(index_in_bounds, i_let, position, info)
+        i_trigger = self.viper.Trigger([seq_i], position, info)
+        return self.viper.Forall([index_var.decl], [i_trigger], forall_body,
+                                 position, info)
 
     def translate_Num(self, node: ast.Constant, ctx: Context) -> StmtsAndExpr:
         pos = self.to_position(node, ctx)
@@ -1376,13 +1444,37 @@ class ExpressionTranslator(CommonTranslator):
         info = self.no_info(ctx)
         comparison = None
         for i, op in enumerate(node.ops):
+            # Give every pairwise comparison its own source position, so that a
+            # verification error (or reported branch condition) caused by a
+            # single link of the chain points at exactly that link (e.g. ``b <
+            # c``) rather than at the whole comparison. For a non-chained
+            # comparison the synthetic node coincides with the original one.
+            pair_node = self._chained_comparison_pair(node, operands, op, i)
             cmp_stmts, cmp_expr = self._translate_comparison(
                 op, operand_exprs[i], operand_types[i],
-                operand_exprs[i + 1], operand_types[i + 1], node, ctx)
+                operand_exprs[i + 1], operand_types[i + 1], pair_node, ctx)
             stmts += cmp_stmts
             comparison = (cmp_expr if comparison is None
                           else self.viper.And(comparison, cmp_expr, position, info))
         return stmts, comparison
+
+    def _chained_comparison_pair(self, node: ast.Compare, operands: List[ast.AST],
+                                 op: ast.cmpop, i: int) -> ast.Compare:
+        """Build (for chained comparisons) a synthetic ``Compare`` node for the
+        ``i``-th pairwise comparison ``operands[i] op operands[i + 1]``, copying
+        the source location so error messages refer to just that link. For a
+        plain (non-chained) comparison the original node is returned unchanged."""
+        if len(node.ops) == 1:
+            return node
+        left_operand = operands[i]
+        right_operand = operands[i + 1]
+        pair_node = ast.Compare(left=left_operand, ops=[op],
+                                comparators=[right_operand])
+        pair_node.lineno = left_operand.lineno
+        pair_node.col_offset = left_operand.col_offset
+        pair_node.end_lineno = getattr(right_operand, 'end_lineno', None)
+        pair_node.end_col_offset = getattr(right_operand, 'end_col_offset', None)
+        return pair_node
 
     def _translate_comparison(self, op: ast.cmpop, left: Expr,
                               left_type: PythonType, right: Expr,
