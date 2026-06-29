@@ -490,19 +490,33 @@ class CallTranslator(CommonTranslator):
         if node.keywords:
             msg = 'range() with keyword args is currently not supported.'
             raise UnsupportedException(node, msg)
-        if len(node.args) == 2:
+        step_arg = None
+        if len(node.args) == 3:
+            start_arg = node.args[0]
+            end_arg = node.args[1]
+            step_arg = node.args[2]
+        elif len(node.args) == 2:
             start_arg = node.args[0]
             end_arg = node.args[1]
         elif len(node.args) == 1:
             start_arg = None
             end_arg = node.args[0]
         else:
-            msg = 'range() step is currently not supported.'
+            msg = 'range() requires between one and three arguments.'
             raise UnsupportedException(node, msg)
         range_class = ctx.module.global_module.classes[RANGE_TYPE]
         start_stmt, start = (self.translate_expr(start_arg, ctx, self.viper.Int) if start_arg
                              else ([], self.viper.IntLit(0, self.to_position(node, ctx), self.no_info(ctx))))
         end_stmt, end = self.translate_expr(end_arg, ctx, self.viper.Int)
+        if step_arg is not None:
+            # Only a positive step is supported. The precondition step >= 1 of
+            # range___create_step__ is checked at the call site.
+            step_stmt, step = self.translate_expr(step_arg, ctx, self.viper.Int)
+            args = [start, end, step, self.get_fresh_int_lit(ctx)]
+            arg_types = [None, None, None, None]
+            call = self.get_function_call(range_class, '__create_step__', args,
+                                          arg_types, node, ctx)
+            return start_stmt + end_stmt + step_stmt, call
         # Add unique integer to make new instance different from other ranges.
         args = [start, end, self.get_fresh_int_lit(ctx)]
         arg_types = [None, None, None]
@@ -512,18 +526,27 @@ class CallTranslator(CommonTranslator):
 
     def _translate_enumerate(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
-        Translate a call to enumerate(iterable) to a creation of a new list-object,
-        an inhale about its type, and an inhale defining the contents of the new
-        list.
+        Translate a call to enumerate(iterable[, start]) to a creation of a new
+        list-object, an inhale about its type, and an inhale defining the contents
+        of the new list. The optional start argument offsets the index of each
+        element.
         """
-        if len(node.args) != 1:
-            msg = 'enumerate() is currently only supported with one args.'
+        if node.keywords:
+            msg = 'enumerate() with keyword args is currently not supported.'
+            raise UnsupportedException(node, msg)
+        if len(node.args) not in (1, 2):
+            msg = 'enumerate() is currently only supported with one or two args.'
             raise UnsupportedException(node, msg)
         pos = self.to_position(node, ctx, rules=rules.INHALE_TO_CALL)
         info = self.no_info(ctx)
         result_type = self.get_type(node, ctx)
         arg_type = self.get_type(node.args[0], ctx)
         arg_stmt, arg = self.translate_expr(node.args[0], ctx)
+        if len(node.args) == 2:
+            start_stmt, start = self.translate_expr(node.args[1], ctx, self.viper.Int)
+            arg_stmt = arg_stmt + start_stmt
+        else:
+            start = self.viper.IntLit(0, pos, info)
         arg_contents, _ = self.get_sequence(arg_type, arg, None, node.args[0], ctx)
         new_list = ctx.current_function.create_variable('enumerate_res', result_type,
                                                        self.translator)
@@ -545,7 +568,8 @@ class CallTranslator(CommonTranslator):
         orig_seq_i = self.viper.SeqIndex(arg_contents, i_var.ref(), pos, info)
         content_type = result_type.type_args[0].type_args[1]
         content_has_type = self.type_check(orig_seq_i, content_type, pos, ctx, False)
-        tuple_for_i = self.create_tuple([i_var.ref(), orig_seq_i],
+        index_for_i = self.viper.Add(start, i_var.ref(), pos, info)
+        tuple_for_i = self.create_tuple([index_for_i, orig_seq_i],
                                         [int_type, content_type], node, ctx)
         new_list_i = self.viper.SeqIndex(seq_ref, i_var.ref(), pos, info)
         equal_content = self.viper.EqCmp(new_list_i, tuple_for_i, pos, info)

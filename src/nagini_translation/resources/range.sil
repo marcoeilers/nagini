@@ -14,6 +14,19 @@ function range___create__(start: Int, stop: Int, ctr: Int): Ref
   ensures typeof(result) == range_0()
 
 
+// Variant of range___create__ for a positive step. The contents are
+// characterized by their length and an indexing axiom instead of Viper's
+// built-in [start..stop) range, which only supports a step of one.
+function range___create_step__(start: Int, stop: Int, step: Int, ctr: Int): Ref
+  decreases _
+  requires step >= 1
+  ensures range___start__(result) == start
+  ensures range___stop__(result) == stop
+  ensures typeof(result) == range_0()
+  ensures |range___val__(result)| == (stop <= start ? 0 : (stop - start + step - 1) \ step)
+  ensures forall i: Int :: {range___val__(result)[i]} (i >= 0 && i < |range___val__(result)|) ==> range___val__(result)[i] == start + i * step
+
+
 function range___val__(self: Ref): Seq[Int]
     decreases _
 

@@ -1029,6 +1029,10 @@
             "args": ["__prim__int", "__prim__int", "__prim__int"],
             "type": "range"
         },
+        "__create_step__": {
+            "args": ["__prim__int", "__prim__int", "__prim__int", "__prim__int"],
+            "type": "range"
+        },
         "__val__": {
             "args": ["range"],
             "type": "object"

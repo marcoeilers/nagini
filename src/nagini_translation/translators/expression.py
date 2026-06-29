@@ -72,7 +72,7 @@ from nagini_translation.lib.util import (
 )
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 from math import isnan, isinf
 
 
@@ -166,8 +166,6 @@ class ExpressionTranslator(CommonTranslator):
     def translate_ListComp(self, node: ast.ListComp, ctx: Context) -> StmtsAndExpr:
         if len(node.generators) != 1:
             raise UnsupportedException(node, 'Multiple generators in list comprehension.')
-        if node.generators[0].ifs:
-            raise UnsupportedException(node, 'Filter in list comprehension.')
         list_class = ctx.module.global_module.classes['list']
         name = construct_lambda_prefix(node.lineno, node.col_offset)
         target = node.generators[0].target
@@ -176,16 +174,21 @@ class ExpressionTranslator(CommonTranslator):
         ctx.set_alias(target.id, element_var)
         ctx.allow_statements = False
         body_stmt, body = self.translate_expr(node.elt, ctx)
+        filter_stmt, filter_cond = self._translate_comp_filter(node.generators[0], ctx)
         ctx.allow_statements = True
         result_type = self.get_type(node.elt, ctx)
         list_type = GenericType(list_class, [result_type])
-        if body_stmt:
+        if body_stmt or filter_stmt:
             raise InvalidProgramException(node, 'impure.list.comprehension.body')
         ctx.remove_alias(target.id)
         result_var = ctx.current_function.create_variable('listcomp', list_type,
                                                          self.translator)
-        stmt = self._create_list_comp_inhale(result_var, list_type, element_var,
-                                             body, node, ctx)
+        if filter_cond is None:
+            stmt = self._create_list_comp_inhale(result_var, list_type, element_var,
+                                                 body, node, ctx)
+        else:
+            stmt = self._create_filtered_list_comp_inhale(
+                result_var, list_type, element_var, body, filter_cond, node, ctx)
         return stmt, result_var.ref()
 
     def _create_list_comp_inhale(self, result_var: PythonVar, list_type: PythonType,
@@ -244,6 +247,252 @@ class ExpressionTranslator(CommonTranslator):
             low_pos = self.to_position(node, ctx, rules=rules.COMPREHENSION_LOW)
             sif_checks.append(self.viper.Assert(self.viper.Low(seq_len, None, low_pos, info), low_pos, info))
         return iter_stmt + [inhale] + sif_checks
+
+    def _create_filtered_list_comp_inhale(self, result_var: PythonVar,
+                                          list_type: PythonType,
+                                          element_var: PythonVar, body: Expr,
+                                          filter_cond: Expr, node: ast.ListComp,
+                                          ctx: Context) -> List[Stmt]:
+        # Filtered list comprehensions get a weaker (but sound) specification than
+        # unfiltered ones: we cannot pin down the exact length or the index of
+        # each element, so we only inhale that the result is a list of the right
+        # type whose length is at most that of the source, and that every element
+        # produced for a source element satisfying the filter is contained in the
+        # result.
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        type_check = self.type_check(result_var.ref(), list_type, position, ctx, False)
+        list_acc_field = self.viper.Field('list_acc', self.viper.SeqType(self.viper.Ref),
+                                          position, info)
+        field_acc = self.viper.FieldAccess(result_var.ref(), list_acc_field, position,
+                                           info)
+        acc_pred = self.viper.FieldAccessPredicate(field_acc,
+                                                   self.viper.FullPerm(position, info),
+                                                   position, info)
+        type_and_perm = self.viper.And(type_check, acc_pred, position, info)
+        iter_stmt, iter = self.translate_expr(node.generators[0].iter, ctx)
+        iter_type = self.get_type(node.generators[0].iter, ctx)
+        sil_seq, _ = self.get_sequence(iter_type.python_class, iter, None, node, ctx,
+                                       position)
+        seq_len = self.viper.SeqLength(sil_seq, position, info)
+        result_len = self.viper.SeqLength(field_acc, position, info)
+        len_bound = self.viper.LeCmp(result_len, seq_len, position, info)
+        int_class = ctx.module.global_module.classes[PRIMITIVE_INT_TYPE]
+        index_var = ctx.current_function.create_variable('i', int_class,
+                                                         self.translator, False)
+        # Obtain the source element via __getitem__ so that it carries its type.
+        seq_i = self.get_function_call(iter_type.cls, '__getitem__',
+                                       [iter, index_var.ref()], [None, None],
+                                       node, ctx)
+        index_positive = self.viper.GeCmp(index_var.ref(),
+                                          self.viper.IntLit(0, position, info),
+                                          position, info)
+        index_lt_len = self.viper.LtCmp(index_var.ref(), seq_len, position, info)
+        index_in_bounds = self.viper.And(index_positive, index_lt_len, position, info)
+        member = self.viper.SeqContains(body, field_acc, position, info)
+        fact = self.viper.Implies(filter_cond, member, position, info)
+        let = self.viper.Let(element_var.decl, seq_i, fact, position, info)
+        trigger = self.viper.Trigger([seq_i], position, info)
+        forall_body = self.viper.Implies(index_in_bounds, let, position, info)
+        contents = self.viper.Forall([index_var.decl], [trigger], forall_body,
+                                     position, info)
+        all = self.viper.And(type_and_perm,
+                             self.viper.And(len_bound, contents, position, info),
+                             position, info)
+        return iter_stmt + [self.viper.Inhale(all, position, info)]
+
+    def _comp_setup(self, node: ast.AST, ctx: Context) -> Tuple[str, PythonVar]:
+        """Register the element variable alias for a comprehension and return the
+        target name (so the alias can be removed afterwards) and the element
+        variable."""
+        name = construct_lambda_prefix(node.lineno, node.col_offset)
+        target = node.generators[0].target
+        local_name = name + '$' + target.id
+        element_var = ctx.actual_function.special_vars[local_name]
+        ctx.set_alias(target.id, element_var)
+        return target.id, element_var
+
+    def _translate_comp_filter(self, generator: ast.comprehension,
+                               ctx: Context) -> StmtsAndExpr:
+        """Translate the conjunction of the ``if`` clauses of a comprehension
+        generator. Returns (stmts, None) when there is no filter."""
+        if not generator.ifs:
+            return [], None
+        stmts = []
+        cond = None
+        for if_clause in generator.ifs:
+            position = self.to_position(if_clause, ctx)
+            if_stmt, if_expr = self.translate_expr(if_clause, ctx)
+            if_expr = self.to_bool(if_expr, ctx, if_clause)
+            stmts += if_stmt
+            cond = (if_expr if cond is None
+                    else self.viper.And(cond, if_expr, position, self.no_info(ctx)))
+        return stmts, cond
+
+    def translate_SetComp(self, node: ast.SetComp, ctx: Context) -> StmtsAndExpr:
+        if len(node.generators) != 1:
+            raise UnsupportedException(node, 'Multiple generators in set comprehension.')
+        target_id, element_var = self._comp_setup(node, ctx)
+        ctx.allow_statements = False
+        body_stmt, body = self.translate_expr(node.elt, ctx)
+        filter_stmt, filter_cond = self._translate_comp_filter(node.generators[0], ctx)
+        ctx.allow_statements = True
+        if body_stmt or filter_stmt:
+            raise InvalidProgramException(node, 'impure.comprehension.body')
+        ctx.remove_alias(target_id)
+        result_type = self.get_type(node, ctx)
+        result_var = ctx.current_function.create_variable('setcomp', result_type,
+                                                          self.translator)
+        stmt = self._create_set_dict_comp_inhale(
+            result_var, result_type, 'set_acc', self.viper.SetType(self.viper.Ref),
+            element_var, [body], filter_cond, node, ctx)
+        return stmt, result_var.ref()
+
+    def translate_DictComp(self, node: ast.DictComp, ctx: Context) -> StmtsAndExpr:
+        if len(node.generators) != 1:
+            raise UnsupportedException(node, 'Multiple generators in dict comprehension.')
+        target_id, element_var = self._comp_setup(node, ctx)
+        ctx.allow_statements = False
+        key_stmt, key = self.translate_expr(node.key, ctx)
+        val_stmt, val = self.translate_expr(node.value, ctx)
+        filter_stmt, filter_cond = self._translate_comp_filter(node.generators[0], ctx)
+        ctx.allow_statements = True
+        if key_stmt or val_stmt or filter_stmt:
+            raise InvalidProgramException(node, 'impure.comprehension.body')
+        ctx.remove_alias(target_id)
+        result_type = self.get_type(node, ctx)
+        result_var = ctx.current_function.create_variable('dictcomp', result_type,
+                                                          self.translator)
+        map_type = self.viper.MapType(self.viper.Ref, self.viper.Ref)
+        stmt = self._create_set_dict_comp_inhale(
+            result_var, result_type, 'dict_acc', map_type, element_var, [key, val],
+            filter_cond, node, ctx)
+        return stmt, result_var.ref()
+
+    def _create_set_dict_comp_inhale(self, result_var: PythonVar,
+                                     result_type: PythonType, field_name: str,
+                                     field_type, element_var: PythonVar,
+                                     body: List[Expr], filter_cond: Expr,
+                                     node: ast.AST, ctx: Context) -> List[Stmt]:
+        # Create a new set/dict object holding (a superset of) the produced
+        # elements. We inhale the forward direction only: every element produced
+        # for a source element satisfying the (optional) filter is contained in
+        # the result. We deliberately do not constrain the result to contain
+        # *only* those elements, which keeps the encoding sound and simple.
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        acc_field = self.viper.Field(field_name, field_type, position, info)
+        new_stmt = self.viper.NewStmt(result_var.ref(), [acc_field], position, info)
+        field_acc = self.viper.FieldAccess(result_var.ref(), acc_field, position, info)
+        type_check = self.type_check(result_var.ref(), result_type, position, ctx)
+        # Iterate over the source.
+        iter_stmt, iter = self.translate_expr(node.generators[0].iter, ctx)
+        iter_type = self.get_type(node.generators[0].iter, ctx)
+        sil_seq, _ = self.get_sequence(iter_type.python_class, iter, None, node, ctx,
+                                       position)
+        seq_len = self.viper.SeqLength(sil_seq, position, info)
+        int_class = ctx.module.global_module.classes[PRIMITIVE_INT_TYPE]
+        index_var = ctx.current_function.create_variable('i', int_class,
+                                                         self.translator, False)
+        # Obtain the source element via __getitem__ rather than a raw sequence
+        # index so that it carries its Python type, making the body well-defined.
+        seq_i = self.get_function_call(iter_type.cls, '__getitem__',
+                                       [iter, index_var.ref()], [None, None],
+                                       node, ctx)
+        index_positive = self.viper.GeCmp(index_var.ref(),
+                                          self.viper.IntLit(0, position, info),
+                                          position, info)
+        index_lt_len = self.viper.LtCmp(index_var.ref(), seq_len, position, info)
+        index_in_bounds = self.viper.And(index_positive, index_lt_len, position, info)
+        # The membership/value fact about the result, in terms of element_var.
+        if field_name == 'set_acc':
+            fact = self.viper.AnySetContains(body[0], field_acc, position, info)
+            if filter_cond is not None:
+                fact = self.viper.Implies(filter_cond, fact, position, info)
+            # Bind the element variable to the current source element.
+            let = self.viper.Let(element_var.decl, seq_i, fact, position, info)
+            trigger = self.viper.Trigger([seq_i], position, info)
+            forall_body = self.viper.Implies(index_in_bounds, let, position, info)
+            contents = self.viper.Forall([index_var.decl], [trigger], forall_body,
+                                         position, info)
+        else:
+            contents = self._dict_comp_contents(
+                field_acc, body, filter_cond, element_var, index_var, seq_i,
+                index_in_bounds, seq_len, iter, iter_type, node, ctx)
+        inhale = self.viper.Inhale(self.viper.And(type_check, contents, position, info),
+                                   position, info)
+        return iter_stmt + [new_stmt, inhale]
+
+    def _dict_comp_contents(self, field_acc: Expr, body: List[Expr],
+                            filter_cond: Expr, element_var: PythonVar,
+                            index_var: PythonVar, seq_i: Expr,
+                            index_in_bounds: Expr, seq_len: Expr, iter: Expr,
+                            iter_type: PythonType, node: ast.AST,
+                            ctx: Context) -> Expr:
+        """Build the forward-direction fact for a dict comprehension, respecting
+        Python's "last value wins" rule: when several source elements produce
+        the same key, the resulting dict maps that key to the value produced by
+        the *last* (highest-index) such element. We therefore only assert the
+        key/value equality for a source element when no *later* source element
+        (also satisfying the filter) produces the same key."""
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        key, val = body
+        # A second index/element to range over the elements that come *after*
+        # the current one when checking whether the key reoccurs later.
+        int_class = ctx.module.global_module.classes[PRIMITIVE_INT_TYPE]
+        index_var2 = ctx.current_function.create_variable('j', int_class,
+                                                          self.translator, False)
+        seq_j = self.get_function_call(iter_type.cls, '__getitem__',
+                                       [iter, index_var2.ref()], [None, None],
+                                       node, ctx)
+        # Capture the current element's key, since the inner quantifier rebinds
+        # the element variable to the j-th element (so ``key`` becomes key_j).
+        # The key is a boxed (Ref) value, so the object class is sufficient here.
+        object_class = ctx.module.global_module.classes[OBJECT_TYPE]
+        key_var = ctx.current_function.create_variable('dictcomp_key', object_class,
+                                                       self.translator, False)
+        # Inner quantifier: no later in-bounds element (satisfying the filter)
+        # produces the same key as the current element. The element access seq_j
+        # is only well-defined for in-bounds j, so its binding must sit inside the
+        # bounds guard.
+        j_positive = self.viper.GeCmp(index_var2.ref(),
+                                      self.viper.IntLit(0, position, info), position,
+                                      info)
+        j_lt_len = self.viper.LtCmp(index_var2.ref(), seq_len, position, info)
+        j_in_bounds = self.viper.And(j_positive, j_lt_len, position, info)
+        j_after_i = self.viper.LtCmp(index_var.ref(), index_var2.ref(), position,
+                                     info)
+        if filter_cond is not None:
+            later_cond = self.viper.And(j_after_i, filter_cond, position, info)
+        else:
+            later_cond = j_after_i
+        distinct_key = self.viper.NeCmp(key, key_var.ref(), position, info)
+        dup_check = self.viper.Implies(later_cond, distinct_key, position, info)
+        j_let = self.viper.Let(element_var.decl, seq_j, dup_check, position, info)
+        inner_body = self.viper.Implies(j_in_bounds, j_let, position, info)
+        j_trigger = self.viper.Trigger([seq_j], position, info)
+        no_later_dup = self.viper.Forall([index_var2.decl], [j_trigger], inner_body,
+                                         position, info)
+        # The key is always present; its value is the current one only if this is
+        # the last occurrence of the key.
+        contains = self.viper.MapContains(key_var.ref(), field_acc, position, info)
+        lookup = self.viper.MapLookup(field_acc, key_var.ref(), position, info)
+        value_fact = self.viper.Implies(
+            no_later_dup, self.viper.EqCmp(lookup, val, position, info), position,
+            info)
+        per_element = self.viper.And(contains, value_fact, position, info)
+        if filter_cond is not None:
+            per_element = self.viper.Implies(filter_cond, per_element, position,
+                                             info)
+        # Bind key_var to this element's key, then bind the element variable to
+        # the current (i-th) source element, all inside the in-bounds guard.
+        key_bind = self.viper.Let(key_var.decl, key, per_element, position, info)
+        i_let = self.viper.Let(element_var.decl, seq_i, key_bind, position, info)
+        forall_body = self.viper.Implies(index_in_bounds, i_let, position, info)
+        i_trigger = self.viper.Trigger([seq_i], position, info)
+        return self.viper.Forall([index_var.decl], [i_trigger], forall_body,
+                                 position, info)
 
     def translate_Num(self, node: ast.Constant, ctx: Context) -> StmtsAndExpr:
         pos = self.to_position(node, ctx)
@@ -1178,20 +1427,67 @@ class ExpressionTranslator(CommonTranslator):
             return self.translate_thread_method_definition(node, ctx)
         if self.is_type_equality(node, ctx):
             return self.translate_type_equality(node, ctx)
-        if len(node.ops) != 1 or len(node.comparators) != 1:
-            raise UnsupportedException(node, 'chained comparisons are not supported; use and to combine them')
-        left_stmt, left = self.translate_expr(node.left, ctx)
-        left_type = self.get_type(node.left, ctx)
-        right_stmt, right = self.translate_expr(node.comparators[0], ctx)
-        right_type = self.get_type(node.comparators[0], ctx)
-        stmts = left_stmt + right_stmt
+        # Translate each operand exactly once. For chained comparisons like
+        # a < b < c this evaluates the shared middle operand b only once and
+        # combines the pairwise comparisons with a conjunction, matching Python
+        # semantics (a < b < c is equivalent to a < b and b < c).
+        operands = [node.left] + node.comparators
+        operand_exprs = []
+        operand_types = []
+        stmts = []
+        for operand in operands:
+            operand_stmt, operand_expr = self.translate_expr(operand, ctx)
+            stmts += operand_stmt
+            operand_exprs.append(operand_expr)
+            operand_types.append(self.get_type(operand, ctx))
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        comparison = None
+        for i, op in enumerate(node.ops):
+            # Give every pairwise comparison its own source position, so that a
+            # verification error (or reported branch condition) caused by a
+            # single link of the chain points at exactly that link (e.g. ``b <
+            # c``) rather than at the whole comparison. For a non-chained
+            # comparison the synthetic node coincides with the original one.
+            pair_node = self._chained_comparison_pair(node, operands, op, i)
+            cmp_stmts, cmp_expr = self._translate_comparison(
+                op, operand_exprs[i], operand_types[i],
+                operand_exprs[i + 1], operand_types[i + 1], pair_node, ctx)
+            stmts += cmp_stmts
+            comparison = (cmp_expr if comparison is None
+                          else self.viper.And(comparison, cmp_expr, position, info))
+        return stmts, comparison
+
+    def _chained_comparison_pair(self, node: ast.Compare, operands: List[ast.AST],
+                                 op: ast.cmpop, i: int) -> ast.Compare:
+        """Build (for chained comparisons) a synthetic ``Compare`` node for the
+        ``i``-th pairwise comparison ``operands[i] op operands[i + 1]``, copying
+        the source location so error messages refer to just that link. For a
+        plain (non-chained) comparison the original node is returned unchanged."""
+        if len(node.ops) == 1:
+            return node
+        left_operand = operands[i]
+        right_operand = operands[i + 1]
+        pair_node = ast.Compare(left=left_operand, ops=[op],
+                                comparators=[right_operand])
+        pair_node.lineno = left_operand.lineno
+        pair_node.col_offset = left_operand.col_offset
+        pair_node.end_lineno = getattr(right_operand, 'end_lineno', None)
+        pair_node.end_col_offset = getattr(right_operand, 'end_col_offset', None)
+        return pair_node
+
+    def _translate_comparison(self, op: ast.cmpop, left: Expr,
+                              left_type: PythonType, right: Expr,
+                              right_type: PythonType, node: ast.Compare,
+                              ctx: Context) -> StmtsAndExpr:
+        """Translate a single comparison of two already-translated operands."""
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
 
-        if isinstance(node.ops[0], ast.Is):
-            return (stmts, self.viper.EqCmp(left, right, position, info))
-        elif isinstance(node.ops[0], ast.IsNot):
-            return (stmts, self.viper.NeCmp(left, right, position, info))
+        if isinstance(op, ast.Is):
+            return ([], self.viper.EqCmp(left, right, position, info))
+        elif isinstance(op, ast.IsNot):
+            return ([], self.viper.NeCmp(left, right, position, info))
 
         # Unbox IntEnum to int
         if left_type.python_class.enum and left_type.python_class.enum_type == INT_TYPE:
@@ -1201,36 +1497,27 @@ class ExpressionTranslator(CommonTranslator):
             right = self.to_int(right, ctx, right_type)
             right_type = ctx.module.global_module.classes[INT_TYPE]
 
-        if self._is_primitive_operation(node.ops[0], left_type, right_type):
+        if self._is_primitive_operation(op, left_type, right_type):
             result = self._translate_primitive_operation(left, right, left_type,
-                                                         node.ops[0], position,
-                                                         ctx)
-            return stmts, result
-        elif isinstance(node.ops[0], (ast.In, ast.NotIn)):
-            contains_stmts, contains_expr = self._translate_contains(
-                left, right, left_type, right_type, node, ctx)
-            stmts.extend(contains_stmts)
-            return stmts, contains_expr
-        if isinstance(node.ops[0], ast.Eq):
-            int_compare = self.viper.EqCmp
+                                                         op, position, ctx)
+            return [], result
+        elif isinstance(op, (ast.In, ast.NotIn)):
+            return self._translate_contains(left, right, left_type, right_type,
+                                            node, ctx)
+        if isinstance(op, ast.Eq):
             compare_func = '__eq__'
-        elif isinstance(node.ops[0], ast.NotEq):
-            int_compare = self.viper.NeCmp
+        elif isinstance(op, ast.NotEq):
             compare_func = '__ne__'
-        elif isinstance(node.ops[0], ast.Gt):
-            int_compare = self.viper.GtCmp
+        elif isinstance(op, ast.Gt):
             compare_func = '__gt__'
-        elif isinstance(node.ops[0], ast.GtE):
-            int_compare = self.viper.GeCmp
+        elif isinstance(op, ast.GtE):
             compare_func = '__ge__'
-        elif isinstance(node.ops[0], ast.Lt):
-            int_compare = self.viper.LtCmp
+        elif isinstance(op, ast.Lt):
             compare_func = '__lt__'
-        elif isinstance(node.ops[0], ast.LtE):
-            int_compare = self.viper.LeCmp
+        elif isinstance(op, ast.LtE):
             compare_func = '__le__'
         else:
-            raise UnsupportedException(node.ops[0])
+            raise UnsupportedException(op)
         if left_type.get_function(compare_func):
             comparison = self.get_function_call(left_type, compare_func,
                                                 [left, right],
@@ -1247,7 +1534,7 @@ class ExpressionTranslator(CommonTranslator):
                                         position, info)
         else:
             raise InvalidProgramException(node, 'undefined.comparison')
-        return stmts, comparison
+        return [], comparison
 
     def _translate_contains(
             self, left: Expr, right: Expr, left_type: PythonType,
