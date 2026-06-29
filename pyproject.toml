@@ -11,14 +11,14 @@ build-backend = "setuptools.build_meta"
 name = "nagini"
 version = "1.3.0"
 dependencies = [
-    "jpype1==1.7.0",
+    "jpype1==1.7.1",
     "mypy==1.5.0",
     "toposort==1.10",
     "z3-solver==4.16.0.0; platform_machine == 'arm64' or platform_machine == 'ARM64' or platform_machine == 'aarch64'",
     "z3-solver==4.8.7.0; platform_machine != 'arm64' and platform_machine != 'ARM64' and platform_machine != 'aarch64'"
 ]
 requires-python = ">=3.12"
-authors = [{"name" = "Viper Team", "email" = "viper@inf.ethz.ch"}]
+authors = [{ name = "Viper Team", email = "viper@inf.ethz.ch" }]
 description = "Static verifier for Python 3, based on Viper"
 readme = "README.rst"
 license = "MPL-2.0"
@@ -38,7 +38,7 @@ classifiers=[
 server = ["pyzmq==27.1.0"]
 lsp = ["pygls>=1.3.0"]
 mcp = ["mcp>=1.2.0"]
-test = ["pytest==9.0.3"]
+test = ["pytest==9.1.1"]
 
 [project.urls]
 Homepage = "http://www.pm.inf.ethz.ch/research/nagini.html"

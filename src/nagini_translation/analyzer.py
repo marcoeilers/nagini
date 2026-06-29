@@ -967,6 +967,16 @@ class Analyzer(ast.NodeVisitor):
         self.visit_but_ignore(node, node._parent)
         return
 
+    def visit_SetComp(self, node: ast.SetComp) -> None:
+        # Set comprehensions register their element variable in the same way as
+        # list comprehensions.
+        self.visit_ListComp(node)
+
+    def visit_DictComp(self, node: ast.DictComp) -> None:
+        # Dict comprehensions register their element variable in the same way as
+        # list comprehensions; the key and value expressions reuse that variable.
+        self.visit_ListComp(node)
+
     def visit_Lambda(self, node: ast.Lambda) -> None:
         assert self.current_function
         name = construct_lambda_prefix(node.lineno, node.col_offset)

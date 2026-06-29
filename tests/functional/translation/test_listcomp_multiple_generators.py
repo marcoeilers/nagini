@@ -5,8 +5,8 @@ from nagini_contracts.contracts import *
 from typing import List
 
 
-def f(xs: List[int]) -> None:
+def f(xs: List[int]) -> List[int]:
     Requires(Acc(list_pred(xs)))
-    #:: ExpectedOutput(unsupported:enumerate only supported with single arg.)
-    for i, x in enumerate(xs, 1):
-        pass
+    Ensures(Acc(list_pred(Result())))
+    #:: ExpectedOutput(unsupported:Multiple generators in list comprehension.)
+    return [x + y for x in xs for y in xs]

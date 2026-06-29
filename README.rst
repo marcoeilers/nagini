@@ -139,7 +139,7 @@ To use it,
    environment variables, have to be set here. The dummy file does not need to exist, it is 
    never read, but some file name has to be supplied.
 
-2. Wait a few seconds to allow the server to start up
+2. Wait a few seconds to allow the server to start up. It prints a message like ``Server started successfully on <address>`` when it is ready.
 
 3. While the server is running, run a client to instruct the server to verify a specific file::
 

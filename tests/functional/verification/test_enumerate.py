@@ -25,6 +25,24 @@ def enumerate_wrong_content_assertion() -> None:
     assert False
 
 
+def enumerate_start_success() -> None:
+    a = [10, 11, 12]
+    b = enumerate(a, 5)
+    for b1, b2 in b:
+        Invariant(b1 == b2 - 5)
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert False
+
+
+def enumerate_start_wrong() -> None:
+    a = [10, 11, 12]
+    b = enumerate(a, 5)
+    for b1, b2 in b:
+        #:: ExpectedOutput(invariant.not.established:assertion.false)
+        Invariant(b1 == b2)
+    assert False
+
+
 def enumerate_permission_fail(a: List[int]) -> None:
     #:: ExpectedOutput(call.precondition:insufficient.permission)
     b = enumerate(a)

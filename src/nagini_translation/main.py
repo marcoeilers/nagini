@@ -433,6 +433,7 @@ def main() -> None:
             except Exception:
                 logging.exception('Could not start ViperServer; verification will '
                                   'fall back to the direct Silicon backend.')
+        print('Server started successfully on ' + DEFAULT_SERVER_SOCKET, flush=True)
 
         while True:
             file = socket.recv_string()
