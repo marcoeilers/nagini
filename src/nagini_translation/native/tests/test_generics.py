@@ -1,12 +1,12 @@
 """
 fixpoint PyClass PyClass_ObjectType(){
-        return ObjectType;
+	return ObjectType;
 }
 fixpoint PyClass PyClass_module_0Super(PyObj_Type T, PyObj_Type V){
-        return PyClass("module_0Super", PyClass_ObjectType, nil);
+	return PyClass("module_0Super", PyClass_ObjectType, nil);
 }
 fixpoint PyClass PyClass_module_0Someclass(PyObj_Type T, PyObj_Type V, PyObj_Type W){
-        return PyClass("module_0Someclass", PyClass_module_0Super(T, V), cons(W, nil));
+	return PyClass("module_0Someclass", PyClass_module_0Super(T, V), cons(W, nil));
 }
 """
 from nagini_contracts.contracts import *
@@ -36,28 +36,34 @@ class Someclass(Generic[T, V, W], Super[T, V]):
 @Native
 def test_forallAcc1(l: List[Someclass[float, int, float]]) -> int:
         """
-        requires PyExc(none, none) &*&
-        pyobj_hasval(args, PyTuple_v(cons(pair(?l__ptr, PyList_t(PyClass_t(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)))), nil))) &*&
-        pyobj_hasval(l__ptr, PyList_v(PyClass_t(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)))) &*&
-        pyobj_hascontent(l__ptr, List(?l__content__ptr)) &*&
-        list_forallpred(?l__content, pyobj_hasPyClassInstanceval(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)), True, nil) &*&
-        (map(fst, l__content) == l__content__ptr) &*&
-        (some(map(snd, l__content)) == some(?l__content__val)) &*&
-        list_forallpred(?l__content_DOT_t_attrptr2ptr, attr_binary_pred(hasAttr("t")), and(gte(0), lt(length(l__content__val))), nil) &*&
-        (map(fst, l__content_DOT_t_attrptr2ptr) == l__content__ptr) &*&
-        list_forallpred(?l__content_DOT_t, pyobj_hasPyClassInstanceval(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)), True, nil) &*&
-        (some(map(snd, l__content_DOT_t_attrptr2ptr)) == some(?l__content_DOT_t__ptr)) &*&
-        (map(fst, l__content_DOT_t) == l__content_DOT_t__ptr) &*&
-        (some(map(snd, l__content_DOT_t)) == some(?l__content_DOT_t__val));
-         
-        ensures PyExc(none, none) &*&
-        pyobj_hasval(args, PyTuple_v(cons(pair(l__ptr, PyList_t(PyClass_t(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)))), nil))) &*&
-        pyobj_hasval(l__ptr, PyList_v(PyClass_t(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)))) &*&
-        pyobj_hasval(result, PyLong_v(?result__val)) &*&
-        pyobj_hascontent(l__ptr, List(?NEW_l__content__ptr)) &*&
-        list_forallpred(?NEW_l__content, pyobj_hasPyClassInstanceval(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)), True, nil) &*&
-        (map(fst, NEW_l__content) == NEW_l__content__ptr) &*&
-        (some(map(snd, NEW_l__content)) == some(?NEW_l__content__val));
-        """
+static PyObject * test_forallAcc1(PyObject *self, PyObject *args)
+requires PyExc(none, none) &*&
+gil_lock(?gstate) &*&
+hasRef(args, false) &*&
+pyobj_hasval(args, PyTuple_v(cons(pair(?l__ptr, PyList_t(PyClass_t(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)))), nil))) &*&
+pyobj_hasval(l__ptr, PyList_v(PyClass_t(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)))) &*&
+pyobj_hascontent(l__ptr, List(?l__content__ptr)) &*&
+list_forallpred(?l__content, pyobj_hasPyClassInstanceval(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)), True, nil) &*&
+(map(fst, l__content) == l__content__ptr) &*&
+(some(map(snd, l__content)) == some(?l__content__val)) &*&
+list_forallpred(?l__content_DOT_t_attrptr2ptr, attr_binary_pred(hasAttr("t")), and(gte(0), lt(length(l__content__val))), nil) &*&
+(map(fst, l__content_DOT_t_attrptr2ptr) == l__content__ptr) &*&
+list_forallpred(?l__content_DOT_t, pyobj_hasPyClassInstanceval(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)), True, nil) &*&
+(some(map(snd, l__content_DOT_t_attrptr2ptr)) == some(?l__content_DOT_t__ptr)) &*&
+(map(fst, l__content_DOT_t) == l__content_DOT_t__ptr) &*&
+(some(map(snd, l__content_DOT_t)) == some(?l__content_DOT_t__val));
+
+ensures PyExc(none, none) &*&
+gil_lock(gstate) &*&
+hasRef(args, false) &*&
+hasRef(result, true) &*&
+pyobj_hasval(args, PyTuple_v(cons(pair(l__ptr, PyList_t(PyClass_t(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)))), nil))) &*&
+pyobj_hasval(l__ptr, PyList_v(PyClass_t(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)))) &*&
+pyobj_hasval(result, PyLong_v(?result__val)) &*&
+pyobj_hascontent(l__ptr, List(?NEW_l__content__ptr)) &*&
+list_forallpred(?NEW_l__content, pyobj_hasPyClassInstanceval(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)), True, nil) &*&
+(map(fst, NEW_l__content) == NEW_l__content__ptr) &*&
+(some(map(snd, NEW_l__content)) == some(?NEW_l__content__val));
+"""
         Requires(list_pred(l) and Forall(int, lambda i: Implies(i >= 0 and i < len(l), Acc(l[i].t))))
         Ensures(list_pred(l))

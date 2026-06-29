@@ -1,10 +1,16 @@
 /*@
 
-fixpoint int bin_mpz(unsigned int n, unsigned int k){
-  return ((k == 0) ? 1 :
-  ((n == k) ? 1 :
+// Made total (returns 0 outside the n >= k >= 0 domain) with a decreases
+// clause: VeriFast requires fixpoints to terminate for ALL inputs, and the
+// original recurred forever when n < k. Values on the n >= k >= 0 domain are
+// unchanged.
+fixpoint int bin_mpz(unsigned int n, unsigned int k)
+  decreases n;
+{
+  return (n == 0) ? ((k == 0) ? 1 : 0) :
+  ((k == 0 || n == k) ? 1 :
   (bin_mpz((n - 1), (k - 1)) +
-  bin_mpz((n - 1), k))));
+  bin_mpz((n - 1), k)));
 }
 @*/
 /*@

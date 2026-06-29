@@ -1,9 +1,9 @@
 """
 fixpoint PyClass PyClass_ObjectType(){
-          return ObjectType;
+	return ObjectType;
 }
 fixpoint PyClass PyClass_module_1mytupledclass(){
-          return PyClass("module_1mytupledclass", PyClass_ObjectType, nil);
+	return PyClass("module_1mytupledclass", PyClass_ObjectType, nil);
 }
 """
 import nagini_translation.t1 as t1
@@ -14,16 +14,22 @@ from nagini_contracts.contracts import *
 #TODO: this passes the translation and fails the verification
 def compare3(c: t1.mytupledclass) -> int:
           """
-          requires PyExc(none, none) &*&
-          pyobj_hasval(args, PyTuple_v(cons(pair(?c__ptr, PyClass_t(PyClass_module_1mytupledclass())), nil))) &*&
-          pyobj_hasval(c__ptr, PyClassInstance_v(PyClass_module_1mytupledclass())) &*&
-          pyobj_hasattr(c__ptr, "arg", ?c_DOT_arg__ptr) &*&
-          pyobj_hasval(c_DOT_arg__ptr, PyLong_v(?c_DOT_arg__val)) &*&
-          false;
+static PyObject * compare3(PyObject *self, PyObject *args)
+requires PyExc(none, none) &*&
+gil_lock(?gstate) &*&
+hasRef(args, false) &*&
+pyobj_hasval(args, PyTuple_v(cons(pair(?c__ptr, PyClass_t(PyClass_module_1mytupledclass())), nil))) &*&
+pyobj_hasval(c__ptr, PyClassInstance_v(PyClass_module_1mytupledclass())) &*&
+pyobj_hasattr(c__ptr, "arg", ?c_DOT_arg__ptr) &*&
+pyobj_hasval(c_DOT_arg__ptr, PyLong_v(?c_DOT_arg__val)) &*&
+false;
 
-          ensures PyExc(none, none) &*&
-          pyobj_hasval(args, PyTuple_v(cons(pair(c__ptr, PyClass_t(PyClass_module_1mytupledclass())), nil))) &*&
-          pyobj_hasval(c__ptr, PyClassInstance_v(PyClass_module_1mytupledclass())) &*&
-          pyobj_hasval(result, PyLong_v(?result__val));
-          """
+ensures PyExc(none, none) &*&
+gil_lock(gstate) &*&
+hasRef(args, false) &*&
+hasRef(result, true) &*&
+pyobj_hasval(args, PyTuple_v(cons(pair(c__ptr, PyClass_t(PyClass_module_1mytupledclass())), nil))) &*&
+pyobj_hasval(c__ptr, PyClassInstance_v(PyClass_module_1mytupledclass())) &*&
+pyobj_hasval(result, PyLong_v(?result__val));
+"""
           Requires(Acc(c.arg) and c.arg == (3,(21,12)))

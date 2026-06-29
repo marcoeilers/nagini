@@ -1,12 +1,12 @@
 """
-        fixpoint PyClass PyClass_ObjectType(){
-                return ObjectType;
+fixpoint PyClass PyClass_ObjectType(){
+	return ObjectType;
 }
 
 //WARNING: Pure function purefunction has a predicate in its precondition. => Not translated
 
 fixpoint int PURE_purefunction1(PyObject* i__ptr, int i__val){
-                 return ((i__val > 0) ? (18 + 1) : ((i__val < 0) ? 0 : (18 * 2)));
+	 return ((i__val > 0) ? (18 + 1) : ((i__val < 0) ? 0 : (18 * 2)));
 }
 
 predicate PRED_mypredicate(PyObject* i__ptr, int i__val) = (i__val > 0);
@@ -52,15 +52,21 @@ def purefunction1(i: int) -> int:
 @Native
 def mytest(i: int) -> int:
         """
-        requires PyExc(none, none) &*&
-        pyobj_hasval(args, PyTuple_v(cons(pair(?i__ptr, PyLong_t), nil))) &*&
-        pyobj_hasval(i__ptr, PyLong_v(?i__val)) &*&
-        (PURE_purefunction1(i__ptr, i__val) > 0);
+static PyObject * mytest(PyObject *self, PyObject *args)
+requires PyExc(none, none) &*&
+gil_lock(?gstate) &*&
+hasRef(args, false) &*&
+pyobj_hasval(args, PyTuple_v(cons(pair(?i__ptr, PyLong_t), nil))) &*&
+pyobj_hasval(i__ptr, PyLong_v(?i__val)) &*&
+(PURE_purefunction1(i__ptr, i__val) > 0);
 
-        ensures PyExc(none, none) &*&
-        pyobj_hasval(args, PyTuple_v(cons(pair(i__ptr, PyLong_t), nil))) &*&
-        pyobj_hasval(i__ptr, PyLong_v(i__val)) &*&
-        pyobj_hasval(result, PyLong_v(?result__val));
-        """
+ensures PyExc(none, none) &*&
+gil_lock(gstate) &*&
+hasRef(args, false) &*&
+hasRef(result, true) &*&
+pyobj_hasval(args, PyTuple_v(cons(pair(i__ptr, PyLong_t), nil))) &*&
+pyobj_hasval(i__ptr, PyLong_v(i__val)) &*&
+pyobj_hasval(result, PyLong_v(?result__val));
+"""
         #Requires(purefunction(i) > 0)
         Requires(purefunction1(i) > 0)

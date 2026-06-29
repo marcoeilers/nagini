@@ -146,6 +146,25 @@ class PyObj_HasContent(vf.PredicateFact):
         super().__init__("pyobj_hascontent", ptr, "List("+str(value)+")", frac=frac)
 
 
+class Gil_Lock(vf.PredicateFact):
+    # The native function is called while CPython holds the GIL and must return
+    # with it still held (releasing it is unsound under the borrowed-reference
+    # model). We thread the gil_lock resource through pre- and postcondition.
+    def __init__(self, gstate):
+        super().__init__("gil_lock", gstate)
+
+
+class PyObj_HasRef(vf.PredicateFact):
+    # Ownership of one reference to the PyObject that ptr points to.
+    # `owned` is True for a directly owned (new) reference and False for a
+    # borrowed one. Unlike pyobj_hasval, this is a genuine (non-duplicable)
+    # resource: each instance represents exactly one held reference.
+    def __init__(self, ptr: vf.Expr[PyObjPtr], owned, frac=Fraction(1)):
+        owned_str = ("true" if owned else "false") if isinstance(
+            owned, bool) else str(owned)
+        super().__init__("hasRef", ptr, owned_str, frac=frac)
+
+
 class PyObj_HasAttr(vf.PredicateFact):
     def __init__(self, obj: vf.Expr[PyObjPtr], attrName: str, attrValue: vf.Expr[PyObjPtr], frac=Fraction(1)):
         super().__init__("pyobj_hasattr", obj, "\""+attrName+"\"", attrValue, frac=frac)

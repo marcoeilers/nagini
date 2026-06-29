@@ -143,7 +143,13 @@ class NativeSpecExtractor:
         # into the `args` tuple, always returning a PyObject*.
         print("static PyObject * " + f.name + "(PyObject *self, PyObject *args)")
         print("requires PyExc(none, none) &*&")
+        # The function is entered holding the GIL (gil_lock) and the args tuple
+        # as a borrowed reference (the caller keeps ownership). References to the
+        # individual arguments are obtained inside the body via borrowRefs(args),
+        # not handed out by the contract.
         print(vf.FactConjunction(
+            [vfpy.Gil_Lock("?gstate"),
+             vfpy.PyObj_HasRef(vf.NamedValue("args"), False)] +
             setupfacts +
             [self.translator.translate(p[0], ctx, py2vf_ctx_precond)
              for p in f.precondition]
@@ -157,7 +163,14 @@ class NativeSpecExtractor:
             resultcall, PtrAccess(), vf.NamedValue("result"))
         result_hasvalfact=self.translator.create_hasval_fact(resultcall, f.result.type if f.result!=None else type(None), ctx, py2vf_ctx_postcond)
         py2vf_ctx_postcond.setprefix("NEW_")
+        # The GIL is still held on return, the borrowed args reference is
+        # returned to the caller, and the function hands back a new owned
+        # reference for its result (every CPython function returns a new
+        # reference, including Py_RETURN_NONE).
         print(vf.FactConjunction(
+            [vfpy.Gil_Lock("gstate"),
+             vfpy.PyObj_HasRef(vf.NamedValue("args"), False),
+             vfpy.PyObj_HasRef(vf.NamedValue("result"), True)] +
             self.setup(f, ctx, py2vf_ctx_setup) +
             # TODO: this does not handle "None" return type yet
             [result_hasvalfact]
