@@ -195,20 +195,20 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
 
 def get_verifier(path: str, jvm: JVM, viper_args: List[str], backend=ViperVerifier.silicon,
                  counterexample=False, disable_branch_conditions=False, arp=False, sif=False):
-    # The in-process ViperServer backend is only used for the standard Silicon
-    # backend (not Carbon, SIF or ARP). On any failure to construct it (e.g. it
-    # is not on the classpath), fall back to the direct Silicon backend.
-    if (backend == ViperVerifier.silicon and config.use_viper_server
+    # The in-process ViperServer backend supports both Silicon and Carbon (but
+    # not SIF or ARP). On any failure to construct it (e.g. it is not on the
+    # classpath), fall back to the corresponding direct backend.
+    if (config.use_viper_server and backend in (ViperVerifier.silicon, ViperVerifier.carbon)
             and not arp and not sif):
         try:
             from nagini_translation.viper_server import (ViperServer,
                                                          get_viper_server_manager)
             manager = get_viper_server_manager(jvm)
             return ViperServer(jvm, manager, path, viper_args, counterexample,
-                               disable_branch_conditions)
+                               disable_branch_conditions, backend=backend.name)
         except Exception:
             logging.exception('ViperServer backend unavailable; falling back to '
-                              'the direct Silicon backend.')
+                              'the direct backend.')
     if backend == ViperVerifier.silicon:
         return Silicon(jvm, path, viper_args, counterexample, disable_branch_conditions)
     elif backend == ViperVerifier.carbon:

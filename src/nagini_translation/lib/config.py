@@ -159,9 +159,10 @@ def _construct_classpath(verifier : str = None, viper_server : bool = False):
     and ``CARBONJAR``. If they are undefined, then tries to use OS
     specific locations.
 
-    When ``viper_server`` is set, ``viperserver.jar`` is used in place of
-    ``silicon.jar`` (it bundles both Silicon and Silver), so that the in-process
-    ViperServer backend is available.
+    When ``viper_server`` is set, ``viperserver.jar`` is used instead of the
+    standalone ``silicon.jar``/``carbon.jar`` (it bundles Silicon, Carbon and
+    Silver), so that the in-process ViperServer backend is available for either
+    backend.
     """
 
     viper_java_path = os.environ.get('VIPERJAVAPATH')
@@ -174,12 +175,16 @@ def _construct_classpath(verifier : str = None, viper_server : bool = False):
         return viper_java_path
 
     if silicon_jar or carbon_jar or viperserver_jar:
-        silicon_entry = viperserver_jar if (viper_server and viperserver_jar) else silicon_jar
+        if viper_server and viperserver_jar:
+            # viperserver.jar bundles both backends; it is always included.
+            entries = ((viperserver_jar, None), (arpplugin_jar, 'arpplugin'))
+        else:
+            entries = ((silicon_jar, 'carbon'), (carbon_jar, 'silicon'),
+                       (arpplugin_jar, 'arpplugin'))
+        # A tag of None means "always include" (e.g. viperserver.jar, which
+        # bundles both backends), regardless of the selected verifier.
         return os.pathsep.join(
-            jar for jar, v in ((silicon_entry, 'carbon'),
-                               (carbon_jar, 'silicon'),
-                               (arpplugin_jar, 'arpplugin'))
-            if jar and v != verifier)
+            jar for jar, v in entries if jar and (v is None or v != verifier))
 
     resources = resources_folder()
     silicon = os.path.join(resources, 'backends', 'silicon.jar')
@@ -187,13 +192,18 @@ def _construct_classpath(verifier : str = None, viper_server : bool = False):
     viperserver = os.path.join(resources, 'backends', 'viperserver.jar')
     silver_sif = os.path.join(resources, 'backends', 'silver-sif-extension.jar')
     silicon_sif = os.path.join(resources, 'backends', 'silicon-sif-extension.jar')
-    silicon_entry = viperserver if viper_server else silicon
+    if viper_server:
+        # viperserver.jar bundles both Silicon and Carbon, so it is always
+        # included regardless of the selected verifier.
+        entries = ((viperserver, None), (silver_sif, 'silver-sif'),
+                   (silicon_sif, 'silicon-sif'))
+    else:
+        entries = ((silicon, 'carbon'), (carbon, 'silicon'),
+                   (silver_sif, 'silver-sif'), (silicon_sif, 'silicon-sif'))
+    # A tag of None means "always include" (e.g. viperserver.jar, which bundles
+    # both backends), regardless of the selected verifier.
     return os.pathsep.join(
-        jar for jar, v in ((silicon_entry, 'carbon'),
-                           (carbon, 'silicon'),
-                           (silver_sif, 'silver-sif'),
-                           (silicon_sif, 'silicon-sif'))
-        if jar and v != verifier)
+        jar for jar, v in entries if jar and (v is None or v != verifier))
 
 
 def _get_boogie_path():

@@ -14,9 +14,12 @@ class JVM:
     """
 
     def __init__(self, classpath: str):
-        jpype.startJVM(jpype.getDefaultJVMPath(),
-                       '-Djava.class.path=' + classpath, '-Xss32m',
-                       convertStrings=True)
+        # Only one JVM can exist per process; reuse it if one is already running
+        # (e.g. started by another component or the test harness).
+        if not jpype.isJVMStarted():
+            jpype.startJVM(jpype.getDefaultJVMPath(),
+                           '-Djava.class.path=' + classpath, '-Xss32m',
+                           convertStrings=True)
         self.java = jpype.JPackage('java')
         self.scala = jpype.JPackage('scala')
         self.viper = jpype.JPackage('viper')
