@@ -241,6 +241,62 @@ class VerificationService:
             except Exception:
                 logging.exception('Error shutting down ViperServer.')
 
+    def current_options(self) -> dict:
+        """The effective configuration, as client-facing (camelCase) options."""
+        return {
+            'verifier': self._backend,
+            'sif': self._sif,
+            'intBitopsSize': self._bv_size,
+            'floatEncoding': self._float_encoding,
+            'useViperServer': config.use_viper_server,
+            'z3Path': config.z3_path,
+            'boogiePath': config.boogie_path,
+            'mypyPath': config.mypy_path,
+        }
+
+    def reconfigure(self, **options) -> dict:
+        """Change options between verification requests; return the effective
+        configuration.
+
+        Takes the same (snake_case) keys as the constructor. Options that
+        determine the JVM classpath (``viper_jar_path``) cannot change once the
+        JVM has started and are ignored. Options that affect the parsed Silver
+        resources (``sif``, ``int_bitops_size``, ``float_encoding``) trigger a
+        reload of those resources. Serialized against in-flight translations via
+        the state lock; already-submitted verifications are unaffected.
+        """
+        with self._state_lock:
+            if options.get('viper_jar_path'):
+                logging.warning('viper_jar_path cannot be changed at runtime; '
+                                'ignoring.')
+            if options.get('z3_path') is not None:
+                config.z3_path = options['z3_path']
+            if options.get('boogie_path') is not None:
+                config.boogie_path = options['boogie_path']
+            if options.get('mypy_path') is not None:
+                config.mypy_path = options['mypy_path']
+            if options.get('verifier_backend') is not None:
+                self._backend = options['verifier_backend']
+            if options.get('use_viper_server') is not None:
+                config.use_viper_server = bool(options['use_viper_server'])
+            reload_needed = False
+            if options.get('sif') is not None and options['sif'] != self._sif:
+                self._sif = options['sif']
+                reload_needed = True
+            if (options.get('int_bitops_size') is not None
+                    and options['int_bitops_size'] != self._bv_size):
+                self._bv_size = options['int_bitops_size']
+                reload_needed = True
+            if ('float_encoding' in options
+                    and options['float_encoding'] != self._float_encoding):
+                self._float_encoding = options['float_encoding']
+                reload_needed = True
+            if reload_needed:
+                import nagini_translation.main as main_module
+                main_module.sil_programs = load_sil_files(
+                    self.jvm, self._bv_size, self._sif, self._float_encoding)
+        return self.current_options()
+
     # -- internals ----------------------------------------------------------
 
     def _verify_concurrent(self, path, selected, base_dir, counterexample,
@@ -430,6 +486,37 @@ class VerificationService:
                           end_col=0, message=message, code=code)
 
 
+# Maps client-facing (camelCase) option keys to VerificationService kwargs.
+# Shared by the LSP (initializationOptions) and MCP (configure) frontends.
+OPTION_TO_KWARG = {
+    'z3Path': 'z3_path',
+    'viperJarPath': 'viper_jar_path',
+    'boogiePath': 'boogie_path',
+    'mypyPath': 'mypy_path',
+    'verifier': 'verifier_backend',
+    'sif': 'sif',
+    'intBitopsSize': 'int_bitops_size',
+    'floatEncoding': 'float_encoding',
+    'useViperServer': 'use_viper_server',
+}
+
+
+def options_to_kwargs(options) -> dict:
+    """Translate client-facing (camelCase) option keys to service kwargs.
+
+    Unknown keys and keys with a null value are ignored. Accepts a dict or None.
+    """
+    kwargs = {}
+    if not options:
+        return kwargs
+    if not isinstance(options, dict):
+        options = getattr(options, '__dict__', None) or {}
+    for option_key, kwarg in OPTION_TO_KWARG.items():
+        if options.get(option_key) is not None:
+            kwargs[kwarg] = options[option_key]
+    return kwargs
+
+
 def add_service_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """Add the CLI arguments needed to construct a :class:`VerificationService`."""
     parser.add_argument('--viper-jar-path', default=config.classpath,
@@ -447,10 +534,20 @@ def add_service_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     return parser
 
 
-def make_service(args: argparse.Namespace) -> VerificationService:
-    """Build a :class:`VerificationService` from parsed CLI arguments."""
-    return VerificationService(
+def service_kwargs_from_args(args: argparse.Namespace) -> dict:
+    """The :class:`VerificationService` constructor kwargs from parsed CLI args.
+
+    Returned as a plain dict so frontends (e.g. the LSP server) can override
+    individual entries with client-provided ``initializationOptions`` before
+    constructing the service.
+    """
+    return dict(
         z3_path=args.z3, viper_jar_path=args.viper_jar_path, boogie_path=args.boogie,
         mypy_path=args.mypy_path, int_bitops_size=args.int_bitops_size,
         use_viper_server=not args.no_viper_server, verifier_backend=args.verifier,
         sif=args.sif, float_encoding=args.float_encoding)
+
+
+def make_service(args: argparse.Namespace) -> VerificationService:
+    """Build a :class:`VerificationService` from parsed CLI arguments."""
+    return VerificationService(**service_kwargs_from_args(args))

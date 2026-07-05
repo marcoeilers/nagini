@@ -53,6 +53,53 @@ def test_word_at_finds_identifier():
     assert lsp_server._word_at("", 0) is None
 
 
+# -- initializationOptions handling (no JVM) --------------------------------
+
+def test_merge_service_options_overrides_and_ignores_unknown():
+    base = {"verifier_backend": "silicon", "z3_path": "/z", "use_viper_server": True}
+    merged = lsp_server.merge_service_options(base, {
+        "verifier": "carbon",
+        "z3Path": "/other",
+        "intBitopsSize": 16,
+        "unknownKey": 1,
+        "counterexamples": False,  # handled separately, not a service kwarg
+    })
+    assert merged["verifier_backend"] == "carbon"
+    assert merged["z3_path"] == "/other"
+    assert merged["int_bitops_size"] == 16
+    assert merged["use_viper_server"] is True  # untouched
+    assert "unknownKey" not in merged and "counterexamples" not in merged
+    assert base["verifier_backend"] == "silicon"  # base not mutated
+
+
+def test_merge_service_options_ignores_null_values():
+    base = {"z3_path": "/z"}
+    assert lsp_server.merge_service_options(base, {"z3Path": None}) == base
+
+
+def test_apply_initialization_options_updates_config_and_behavior():
+    srv = lsp_server.NaginiLanguageServer()
+    srv.service_kwargs = {"verifier_backend": "silicon", "use_viper_server": True}
+    srv.counterexamples = True
+    srv.apply_initialization_options({
+        "verifier": "carbon",
+        "useViperServer": False,
+        "counterexamples": False,
+    })
+    assert srv.service_kwargs["verifier_backend"] == "carbon"
+    assert srv.service_kwargs["use_viper_server"] is False
+    assert srv.counterexamples is False
+
+
+def test_apply_initialization_options_none_is_noop():
+    srv = lsp_server.NaginiLanguageServer()
+    srv.service_kwargs = {"verifier_backend": "silicon"}
+    srv.counterexamples = True
+    srv.apply_initialization_options(None)
+    assert srv.service_kwargs == {"verifier_backend": "silicon"}
+    assert srv.counterexamples is True
+
+
 # -- integration tests (require the verification service) -------------------
 
 def _verify_via_lsp(service, monkeypatch, uri):

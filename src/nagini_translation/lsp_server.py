@@ -21,6 +21,7 @@ import asyncio
 import logging
 import os
 import sys
+import threading
 
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional, Set
@@ -32,12 +33,21 @@ from pygls.lsp.server import LanguageServer
 from nagini_translation.service import (
     add_service_arguments,
     Diagnostic,
-    make_service,
+    options_to_kwargs,
+    service_kwargs_from_args,
     VerificationService,
 )
 
 
 VERIFY_METHOD_COMMAND = 'nagini.verifyMethod'
+
+
+def merge_service_options(base: dict, options: dict) -> dict:
+    """Return ``base`` service kwargs updated with recognized ``options``.
+
+    ``base`` is not mutated; unknown or null option keys are ignored.
+    """
+    return {**base, **options_to_kwargs(options)}
 
 
 class NaginiLanguageServer(LanguageServer):
@@ -46,26 +56,60 @@ class NaginiLanguageServer(LanguageServer):
         super().__init__('nagini-lsp', 'v0.1')
         self.service: Optional[VerificationService] = None
         self.counterexamples = True
+        # VerificationService constructor kwargs: seeded from CLI args in main(),
+        # then overridden by client initializationOptions. The service itself is
+        # built lazily (off the event loop) on the first verification, so the
+        # JVM starts only when needed and after config is known.
+        self.service_kwargs: dict = {}
+        self._service_lock = threading.Lock()
         # Several documents can verify at once; the service serializes only the
         # fast translation step internally.
         self._executor = ThreadPoolExecutor(max_workers=4,
                                             thread_name_prefix='nagini-verify')
         self._last_diagnostics = {}  # uri -> List[Diagnostic]
 
-    async def run_verification(self, uri: str, selected: Set[str] = None) -> None:
-        if self.service is None:
+    def apply_initialization_options(self, options) -> None:
+        """Apply client-provided ``initializationOptions`` to the config.
+
+        Called before the service is built, so the options take effect. Accepts
+        a dict (the usual shape) or ``None``.
+        """
+        if not options:
             return
+        if not isinstance(options, dict):
+            options = getattr(options, '__dict__', None) or {}
+        self.service_kwargs = merge_service_options(self.service_kwargs, options)
+        if options.get('counterexamples') is not None:
+            self.counterexamples = bool(options['counterexamples'])
+
+    def ensure_service(self) -> VerificationService:
+        """Build the verification service on first use (thread-safe)."""
+        if self.service is None:
+            with self._service_lock:
+                if self.service is None:
+                    self.service = VerificationService(**self.service_kwargs)
+        return self.service
+
+    async def run_verification(self, uri: str, selected: Set[str] = None) -> None:
         path = uris.to_fs_path(uri)
         if path is None:
             return
         # Precisely supersede any in-flight run *of this document*; other
         # documents keep verifying concurrently. The job token is the URI.
-        self.service.cancel(job_token=uri)
+        if self.service is not None:
+            self.service.cancel(job_token=uri)
         self.window_log_message(t.LogMessageParams(
             type=t.MessageType.Info, message='Nagini: verifying {}...'.format(path)))
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            self._executor, self._verify_blocking, uri, path, selected)
+        try:
+            result = await loop.run_in_executor(
+                self._executor, self._verify_blocking, uri, path, selected)
+        except Exception:
+            logging.exception('Verification could not run.')
+            self.window_log_message(t.LogMessageParams(
+                type=t.MessageType.Error,
+                message='Nagini: verification service unavailable (see log).'))
+            return
         if result.cancelled:
             # Superseded by a newer run; keep the existing diagnostics.
             return
@@ -80,11 +124,19 @@ class NaginiLanguageServer(LanguageServer):
             message='Nagini: {} in {:.1f}s'.format(summary, result.duration)))
 
     def _verify_blocking(self, uri, path, selected):
-        return self.service.verify(path, selected=selected,
-                                   counterexample=self.counterexamples, job_token=uri)
+        service = self.ensure_service()
+        return service.verify(path, selected=selected,
+                              counterexample=self.counterexamples, job_token=uri)
 
 
 server = NaginiLanguageServer()
+
+
+@server.feature(t.INITIALIZE)
+def initialize(ls: NaginiLanguageServer, params: t.InitializeParams):
+    """Apply client-provided ``initializationOptions`` (before the service is
+    built). pygls computes and returns the capabilities itself."""
+    ls.apply_initialization_options(getattr(params, 'initialization_options', None))
 
 
 def _to_lsp_diagnostic(d: Diagnostic, uri: str) -> t.Diagnostic:
@@ -229,14 +281,17 @@ def main():
     args = parser.parse_args()
     logging.basicConfig(level=getattr(logging, args.log.upper(), logging.WARNING))
     server.counterexamples = not args.no_counterexamples
-    server.service = make_service(args)
+    # Seed the config from CLI args; the client may override individual entries
+    # via initializationOptions. The service is built lazily on first use.
+    server.service_kwargs = service_kwargs_from_args(args)
     try:
         server.start_io()
     finally:
         # ViperServer/Akka leaves non-daemon threads alive; shut down and force
         # exit so the process actually terminates when the client disconnects.
         try:
-            server.service.shutdown()
+            if server.service is not None:
+                server.service.shutdown()
         except Exception:
             logging.exception('Error shutting down service.')
         sys.stdout.flush()

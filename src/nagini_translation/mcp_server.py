@@ -28,7 +28,8 @@ from typing import Optional
 
 from mcp.server.fastmcp import FastMCP
 
-from nagini_translation.service import add_service_arguments, make_service
+from nagini_translation.service import (add_service_arguments, make_service,
+                                        options_to_kwargs)
 
 
 mcp = FastMCP('nagini')
@@ -88,6 +89,20 @@ async def verify_snippet(code: str, counterexample: bool = False,
         return result.to_dict()
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+@mcp.tool()
+def configure(options: dict) -> dict:
+    """Change verification options for subsequent requests; returns the effective
+    configuration.
+
+    Recognized keys: `verifier` ('silicon' or 'carbon'), `z3Path`, `boogiePath`,
+    `mypyPath`, `sif`, `intBitopsSize`, `floatEncoding`, `useViperServer`.
+    `viperJarPath` cannot be changed after startup and is ignored. Unknown or
+    null keys are ignored. Changing `sif`/`intBitopsSize`/`floatEncoding`
+    reloads the Silver resources; already-running verifications are unaffected.
+    """
+    return _service.reconfigure(**options_to_kwargs(options))
 
 
 @mcp.tool()
