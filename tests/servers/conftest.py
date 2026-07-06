@@ -36,6 +36,21 @@ FAIL_SRC = (
     "    return a + b\n"
 )
 
+# Two top-level methods: `passing` verifies, `failing` has a postcondition
+# error. Used to check that selection (verify_method / --select) restricts
+# verification to the chosen method and ignores errors elsewhere.
+MIXED_SRC = (
+    "from nagini_contracts.contracts import *\n\n"
+    "def passing(a: int) -> int:\n"
+    "    Requires(a >= 0)\n"
+    "    Ensures(Result() >= a)\n"
+    "    return a + 1\n\n"
+    "def failing(a: int) -> int:\n"
+    "    Requires(a >= 0)\n"
+    "    Ensures(Result() > a)\n"
+    "    return a\n"
+)
+
 
 @pytest.fixture(scope="session")
 def service():
@@ -75,4 +90,11 @@ def pass_file(tmp_path):
 def fail_file(tmp_path):
     p = tmp_path / "fail_example.py"
     p.write_text(FAIL_SRC)
+    return str(p)
+
+
+@pytest.fixture
+def mixed_file(tmp_path):
+    p = tmp_path / "mixed_example.py"
+    p.write_text(MIXED_SRC)
     return str(p)

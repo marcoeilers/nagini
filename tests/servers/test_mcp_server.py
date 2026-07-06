@@ -116,6 +116,23 @@ def test_verify_method_restricts_to_one_method(service, fail_file):
     assert "diagnostics" in result
 
 
+def test_verify_method_excludes_error_outside_selection(service, mixed_file):
+    """Selecting a method must ignore verification errors in other methods."""
+    mcp_server._service = service
+    # Baseline: verifying the whole file surfaces the error in `failing`.
+    full = asyncio.run(mcp_server.verify_file(mixed_file))
+    assert full["success"] is False
+    assert any("postcondition" in d["code"] for d in full["diagnostics"])
+    # Selecting only the correct method excludes the error in `failing`.
+    ok = asyncio.run(mcp_server.verify_method(mixed_file, "passing"))
+    assert ok["success"] is True
+    assert ok["diagnostics"] == []
+    # Selecting the faulty method still reports its error.
+    bad = asyncio.run(mcp_server.verify_method(mixed_file, "failing"))
+    assert bad["success"] is False
+    assert any("postcondition" in d["code"] for d in bad["diagnostics"])
+
+
 def test_verify_snippet_inline_code(service, pass_src):
     mcp_server._service = service
     result = asyncio.run(mcp_server.verify_snippet(pass_src))

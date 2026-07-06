@@ -444,13 +444,14 @@ def main() -> None:
         print('Server started successfully on ' + DEFAULT_SERVER_SOCKET, flush=True)
 
         while True:
-            file = socket.recv_string()
+            file, selected = _parse_client_request(socket.recv_string())
             response = ['']
 
             def add_response(part):
                 response[0] = response[0] + '\n' + part
 
-            translate_and_verify(file, jvm, args, add_response, arp=args.arp, base_dir=args.base_dir)
+            translate_and_verify(file, jvm, args, add_response, arp=args.arp,
+                                  base_dir=args.base_dir, selected=selected)
             socket.send_string(response[0])
     else:
         success = translate_and_verify(args.python_file, jvm, args, arp=args.arp, base_dir=args.base_dir)
@@ -471,15 +472,38 @@ def main() -> None:
         sys.exit(0 if success else 1)
 
 
-def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_dir=None) -> bool:
+def _parse_client_request(request: str) -> Tuple[str, Union[Set[str], None]]:
+    """Parse a server-mode client request into ``(python_file, selected)``.
+
+    New clients send a JSON object ``{"file": ..., "select": "a,b"}``. For
+    backwards compatibility, a plain string (anything that is not a JSON object)
+    is treated as just the file path, with no selection.
+    """
+    try:
+        payload = json.loads(request)
+    except ValueError:
+        payload = None
+    if isinstance(payload, dict):
+        select = payload.get('select')
+        selected = set(select.split(',')) if select else None
+        return payload.get('file'), selected
+    return request, None
+
+
+def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_dir=None,
+                         selected=None) -> bool:
     """
     Translates input file to viper code and dispatches result to backend for verification
+
+    ``selected`` overrides ``args.select`` for this call (used by the server to
+    apply a per-request selection); when ``None`` the ``args.select`` value is used.
 
     :returns: Whether translation and verification was successful
     """
     try:
         start = time.time()
-        selected = set(args.select.split(',')) if args.select else set()
+        if selected is None:
+            selected = set(args.select.split(',')) if args.select else set()
         modules, prog = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif, base_dir=base_dir,
                                   ignore_global=args.ignore_global, arp=arp, verbose=args.verbose,
                                   counterexample=args.counterexample, float_encoding=args.float_encoding)
