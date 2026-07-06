@@ -110,14 +110,16 @@ The following command line options are available::
                     is selected. Alternatively, the 'BOOGIE_EXE' environment variable can be
                     set.
 
-    --viper-jar-path    
-                    Sets the path to the required Viper binaries ('silicon.jar' or
-                    'carbon.jar'). Only the binary for the selected backend is
-                    required. You can either use the provided binary packages installed
-                    by default or compile your own from source (see below).
+    --viper-jar-path
+                    Sets the path to the required Viper binary ('viperserver.jar').
+                    A single jar bundles both the Silicon and Carbon backends, so it
+                    is used regardless of the selected backend. You can either use the
+                    provided binary packages installed by default or compile your own
+                    from source (see below).
                     Expects either a single path or a colon- (Unix) or semicolon-
                     (Windows) separated list of paths. Alternatively, the environment
-                    variables 'SILICONJAR', 'CARBONJAR' or 'VIPERJAR' can be set.
+                    variable 'VIPERSERVERJAR' can be set, or 'VIPERJAVAPATH' for a
+                    full explicit classpath.
                         
 To see all possible command line options, invoke ``nagini`` without arguments.
 
@@ -135,15 +137,59 @@ To use it,
 1. Start a Nagini server::
 
         nagini --server <otherArgs> dummyFile.py
-   Note that all required arguments, including ``JAVA_HOME`` and other potentially required  
-   environment variables, have to be set here. The dummy file does not need to exist, it is 
+
+   Note that all required arguments, including ``JAVA_HOME`` and other potentially required
+   environment variables, have to be set here. The dummy file does not need to exist, it is
    never read, but some file name has to be supplied.
 
 2. Wait a few seconds to allow the server to start up. It prints a message like ``Server started successfully on <address>`` when it is ready.
 
 3. While the server is running, run a client to instruct the server to verify a specific file::
 
-        nagini_client path/to/file.py 
+        nagini_client path/to/file.py
+
+Model Context Protocol (MCP) Server
+===================================
+
+Nagini ships an MCP server that exposes verification to AI agents and MCP-capable
+editors (e.g. Claude Code, Claude Desktop, Cursor) over stdio. Through it, an agent
+can verify entire files, individual methods, or inline snippets and receive
+structured diagnostics (error positions, messages, and optional counterexamples).
+
+1. Install Nagini with the MCP dependencies::
+
+        pip install "nagini[mcp]"
+
+   As with normal command-line use, a Java installation is required. The Z3 and
+   Viper JAR binaries needed for verification are bundled with Nagini, so you do
+   not need to supply them separately. If Java is not found automatically, set the
+   ``JAVA_HOME`` environment variable to point to your Java installation.
+
+2. The server is launched via the ``nagini_mcp`` entry point and communicates over
+   stdio, so it is normally started by the MCP client rather than by hand. Configure
+   your client to run it, passing ``JAVA_HOME`` through the environment if needed.
+   For example::
+
+        {
+          "mcpServers": {
+            "nagini": {
+              "command": "nagini_mcp",
+              "env": { "JAVA_HOME": "/path/to/your/java" }
+            }
+          }
+        }
+
+   Use the absolute path to the ``nagini_mcp`` executable (e.g. the one inside your
+   virtual environment) if it is not on the client's ``PATH``. The server uses the
+   faster in-process ViperServer backend by default and accepts the same
+   configuration options as the command line (e.g. ``--verifier``); run
+   ``nagini_mcp --help`` to see them.
+
+The server exposes the following tools: ``verify_file``, ``verify_method``,
+``verify_snippet``, ``configure`` (change verification options at runtime),
+``cancel``, and ``flush_cache``. See the
+`wiki <https://github.com/marcoeilers/nagini/wiki>`_ for information on how to write
+specifications in Nagini.
 
 Alternative Viper Versions
 ==========================
