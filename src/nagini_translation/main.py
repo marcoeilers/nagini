@@ -22,7 +22,7 @@ from nagini_translation.analyzer import Analyzer
 from nagini_translation.sif_translator import SIFTranslator
 from nagini_translation.lib import config
 from nagini_translation.lib.constants import DEFAULT_SERVER_SOCKET
-from nagini_translation.lib.errors import error_manager
+from nagini_translation.lib.errors import error_manager, format_translation_error
 from nagini_translation.lib.jvmaccess import (
     getclass,
     getobject,
@@ -54,7 +54,15 @@ from nagini_translation import verifier
 from typing import List, Set, Tuple, Union
 
 
-TYPE_ERROR_PATTERN = r"^(?P<file>.*):(?P<line>\d+): error: (?P<msg>.*)$"
+# Matches a mypy error line. The column and end-position fields are optional:
+# mypy only emits them when show_column_numbers/show_error_end are set, and some
+# type errors Nagini raises itself carry only a line. The file group is
+# non-greedy so a Windows drive letter (``C:\...``) or a ``: error:`` inside the
+# message does not get mistaken for the line/column separators.
+TYPE_ERROR_PATTERN = (
+    r"^(?P<file>.*?):(?P<line>\d+)"
+    r"(?::(?P<col>\d+)(?::(?P<end_line>\d+):(?P<end_col>\d+))?)?"
+    r": error: (?P<msg>.*)$")
 TYPE_ERROR_MATCHER = re.compile(TYPE_ERROR_PATTERN)
 
 
@@ -486,9 +494,10 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                     issue += e.args[0]
                 else:
                     issue += ast.unparse(e.node)
-            line = str(e.node.lineno)
-            col = str(e.node.col_offset)
-            print(issue + ' (' + python_file + '@' + line + '.' + col + ')')
+            print(format_translation_error(
+                args.ide_mode, python_file, issue, e.node.lineno,
+                e.node.col_offset, getattr(e.node, 'end_lineno', None),
+                getattr(e.node, 'end_col_offset', None)))
         if isinstance(e, TypeException):
             for msg in e.messages:
                 parts = TYPE_ERROR_MATCHER.match(msg)
@@ -498,8 +507,17 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                     if file == '__main__':
                         file = python_file
                     msg = parts['msg']
-                    line = parts['line']
-                    print('Type error: ' + msg + ' (' + file + '@' + line + '.0)')
+                    line = int(parts['line'])
+                    # mypy reports a 1-based start column and an (exclusive) end
+                    # position when available; convert to the 0-based-column
+                    # convention format_translation_error expects. Fall back to
+                    # column 0 for errors Nagini raises itself (line only).
+                    col = int(parts['col']) - 1 if parts['col'] else 0
+                    line_end = int(parts['end_line']) if parts['end_line'] else None
+                    col_end = int(parts['end_col']) if parts['end_col'] else None
+                    print(format_translation_error(
+                        args.ide_mode, file, 'Type error: ' + msg, line, col,
+                        line_end, col_end))
                 else:
                     print(msg)
         return False
