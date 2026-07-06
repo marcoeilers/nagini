@@ -155,55 +155,37 @@ def resources_folder():
 def _construct_classpath(verifier : str = None, viper_server : bool = False):
     """ Contstructs JAVA classpath.
 
-    First tries environment variables ``VIPERJAVAPATH``, ``SILICONJAR``
-    and ``CARBONJAR``. If they are undefined, then tries to use OS
-    specific locations.
+    First tries the environment variable ``VIPERJAVAPATH`` (a full, explicit
+    classpath). If it is undefined, falls back to ``viperserver.jar`` (plus the
+    SIF extensions) bundled in the resources folder, optionally overridden via
+    the ``VIPERSERVERJAR``/``ARPPLUGINJAR`` environment variables.
 
-    When ``viper_server`` is set, ``viperserver.jar`` is used instead of the
-    standalone ``silicon.jar``/``carbon.jar`` (it bundles Silicon, Carbon and
-    Silver), so that the in-process ViperServer backend is available for either
-    backend.
+    ``viperserver.jar`` bundles Silicon, Carbon and Silver, so it serves *both*
+    the in-process ViperServer backend and the direct Silicon/Carbon backends;
+    the standalone ``silicon.jar``/``carbon.jar`` are no longer used. The
+    ``verifier`` and ``viper_server`` parameters therefore no longer influence
+    jar selection and are kept only for backwards compatibility with callers.
     """
 
     viper_java_path = os.environ.get('VIPERJAVAPATH')
-    silicon_jar = os.environ.get('SILICONJAR')
-    carbon_jar = os.environ.get('CARBONJAR')
-    arpplugin_jar = os.environ.get('ARPPLUGINJAR')
-    viperserver_jar = os.environ.get('VIPERSERVERJAR')
-
     if viper_java_path:
         return viper_java_path
 
-    if silicon_jar or carbon_jar or viperserver_jar:
-        if viper_server and viperserver_jar:
-            # viperserver.jar bundles both backends; it is always included.
-            entries = ((viperserver_jar, None), (arpplugin_jar, 'arpplugin'))
-        else:
-            entries = ((silicon_jar, 'carbon'), (carbon_jar, 'silicon'),
-                       (arpplugin_jar, 'arpplugin'))
-        # A tag of None means "always include" (e.g. viperserver.jar, which
-        # bundles both backends), regardless of the selected verifier.
-        return os.pathsep.join(
-            jar for jar, v in entries if jar and (v is None or v != verifier))
+    arpplugin_jar = os.environ.get('ARPPLUGINJAR')
+    viperserver_jar = os.environ.get('VIPERSERVERJAR')
+
+    if viperserver_jar:
+        return os.pathsep.join(jar for jar in (viperserver_jar, arpplugin_jar) if jar)
 
     resources = resources_folder()
-    silicon = os.path.join(resources, 'backends', 'silicon.jar')
-    carbon = os.path.join(resources, 'backends', 'carbon.jar')
     viperserver = os.path.join(resources, 'backends', 'viperserver.jar')
     silver_sif = os.path.join(resources, 'backends', 'silver-sif-extension.jar')
     silicon_sif = os.path.join(resources, 'backends', 'silicon-sif-extension.jar')
-    if viper_server:
-        # viperserver.jar bundles both Silicon and Carbon, so it is always
-        # included regardless of the selected verifier.
-        entries = ((viperserver, None), (silver_sif, 'silver-sif'),
-                   (silicon_sif, 'silicon-sif'))
-    else:
-        entries = ((silicon, 'carbon'), (carbon, 'silicon'),
-                   (silver_sif, 'silver-sif'), (silicon_sif, 'silicon-sif'))
-    # A tag of None means "always include" (e.g. viperserver.jar, which bundles
-    # both backends), regardless of the selected verifier.
+    # viperserver.jar (Silicon + Carbon + Silver) is always included; the SIF
+    # extensions are separate jars that add the secure-information-flow classes
+    # and are harmless when SIF is not used.
     return os.pathsep.join(
-        jar for jar, v in entries if jar and (v is None or v != verifier))
+        jar for jar in (viperserver, silver_sif, silicon_sif) if jar)
 
 
 def _get_boogie_path():
@@ -295,8 +277,9 @@ def set_verifier(v: str):
 def enable_viper_server(verifier: str = None):
     """Enable the in-process ViperServer backend.
 
-    Unless the user provided an explicit classpath, this swaps ``silicon.jar``
-    for ``viperserver.jar`` so that ViperServer's classes are available.
+    ViperServer's classes live in the same ``viperserver.jar`` that already
+    serves the direct backends, so this no longer changes the classpath; it only
+    records that the in-process backend should be used.
     """
     global classpath, use_viper_server
     use_viper_server = True

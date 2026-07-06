@@ -110,14 +110,16 @@ The following command line options are available::
                     is selected. Alternatively, the 'BOOGIE_EXE' environment variable can be
                     set.
 
-    --viper-jar-path    
-                    Sets the path to the required Viper binaries ('silicon.jar' or
-                    'carbon.jar'). Only the binary for the selected backend is
-                    required. You can either use the provided binary packages installed
-                    by default or compile your own from source (see below).
+    --viper-jar-path
+                    Sets the path to the required Viper binary ('viperserver.jar').
+                    A single jar bundles both the Silicon and Carbon backends, so it
+                    is used regardless of the selected backend. You can either use the
+                    provided binary packages installed by default or compile your own
+                    from source (see below).
                     Expects either a single path or a colon- (Unix) or semicolon-
                     (Windows) separated list of paths. Alternatively, the environment
-                    variables 'SILICONJAR', 'CARBONJAR' or 'VIPERJAR' can be set.
+                    variable 'VIPERSERVERJAR' can be set, or 'VIPERJAVAPATH' for a
+                    full explicit classpath.
                         
 To see all possible command line options, invoke ``nagini`` without arguments.
 

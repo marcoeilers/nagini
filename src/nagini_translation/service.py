@@ -162,14 +162,9 @@ class VerificationService:
         self._jobs = {}
         self._jobs_lock = threading.Lock()
 
+        # JVM() routes JVM System.out to System.err and quiets logback, so the
+        # JSON-RPC stream of a stdio-based LSP/MCP frontend on stdout stays clean.
         self.jvm = JVM(config.classpath)
-        # The JVM (logback/Silicon/ViperServer) writes to stdout, which would
-        # corrupt the JSON-RPC stream of a stdio-based LSP/MCP frontend. Route
-        # all JVM stdout to stderr; we never rely on JVM stdout.
-        try:
-            self.jvm.java.lang.System.setOut(self.jvm.java.lang.System.err)
-        except Exception:
-            logging.exception('Could not redirect JVM stdout.')
         # Preload the Silver resources once (sets the main module's global so
         # translate() reuses it). Tied to the service-level sif/float/bv_size.
         import nagini_translation.main as main_module

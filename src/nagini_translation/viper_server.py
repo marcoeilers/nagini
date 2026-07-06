@@ -11,7 +11,7 @@ import logging
 
 from typing import List
 
-from nagini_translation.lib.jvmaccess import getobject, JVM
+from nagini_translation.lib.jvmaccess import configure_java_logging, getobject, JVM
 from nagini_translation.lib.util import list_to_seq
 # Re-exported so the service can build backend args without importing verifier
 # directly; verifier.py is the single source of truth for these.
@@ -74,18 +74,13 @@ class ViperServerManager:
         return self._started
 
     def _configure_logging(self) -> None:
-        # viperserver.jar bundles a logback.xml that logs at DEBUG, which floods
-        # output with internal Silicon traces. Raise the root log level so only
-        # warnings and errors are shown (Nagini's own output uses Python
-        # logging and is unaffected).
-        try:
-            logger_factory = jpype.JClass('org.slf4j.LoggerFactory')
-            level = jpype.JClass('ch.qos.logback.classic.Level')
-            logback_logger = jpype.JClass('ch.qos.logback.classic.Logger')
-            root = jpype.JObject(logger_factory.getLogger('ROOT'), logback_logger)
-            root.setLevel(level.WARN)
-        except Exception:
-            logging.debug('Could not adjust ViperServer log level.', exc_info=True)
+        # viperserver.jar ships no logback.xml, so logback defaults to DEBUG on
+        # the console, flooding output with internal Silicon traces. Raise the
+        # root log level so only warnings and errors are shown. This normally
+        # already happened when the JVM was created (see
+        # jvmaccess.configure_java_logging); we repeat it here defensively in
+        # case the server is driven on a JVM started elsewhere.
+        configure_java_logging()
 
     def _duration(self, timeout_ms=None):
         jvm = self.jvm
