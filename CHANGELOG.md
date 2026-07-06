@@ -1,5 +1,26 @@
 # Nagini Changelog
 
+## v1.3.1 (July 2026)
+
+### New features
+
+- **MCP and LSP servers**: Nagini now ships a Model Context Protocol (MCP) server and a Language Server Protocol (LSP) server. The MCP server exposes verification to AI agents and MCP-capable editors (e.g. Claude Code, Claude Desktop, Cursor) over stdio, allowing whole files, individual methods, or inline snippets to be verified with structured diagnostics. The LSP server provides editor integration with live diagnostics and per-method verification. Install with `pip install "nagini[mcp]"` / `pip install "nagini[lsp]"`.
+- **ViperServer backend**: Verification can now run through an in-process ViperServer instance instead of invoking Silicon/Carbon directly. This enables result caching across requests, precise cancellation of running verifications, and concurrent verification of independent requests.
+- **Improved `--server` mode**: The verification server now accepts and can reconfigure command-line options between requests, prints a startup message once it is ready, and the client (`nagini_client`) accepts a `--select` argument to verify only specific methods or classes on a per-request basis.
+- **Correctly formatted translation errors in `--ide-mode`**: Translation errors (invalid program, unsupported feature, and type errors) are now emitted in the same `file:line:col:end_line:end_col: error: message` format as verification errors, so IDE/LSP frontends can parse them uniformly. Type errors now carry a real source range (start and end) rather than only a line. (#308)
+- **Chained comparisons**: Comparison chains such as `a < b < c` are now supported.
+- **`enumerate()` with a start argument**: `enumerate(xs, start)` is now supported.
+- **`range()` with a step argument**: `range(start, stop, step)` is now supported.
+- **Set and dict comprehensions**: Set comprehensions (`{x for x in xs}`) and dict comprehensions (`{k: v for ... in ...}`) are now supported, including comprehensions with filters and multiple generators. (#305)
+
+### Infrastructure and dependencies
+
+- **Single bundled Viper backend**: The separate `silicon.jar` and `carbon.jar` backends have been replaced by a single bundled `viperserver.jar`, which contains Silicon, Carbon, and Silver and serves both the direct and ViperServer-based backends. Extraneous backend log output (e.g. logback traces) is now suppressed so it cannot interfere with the CLI output, the test framework, or the LSP/MCP JSON-RPC stream.
+- Added optional dependency extras `server`, `lsp`, and `mcp` for the respective server modes.
+- Added CI test workflows for the LSP/MCP servers and a test suite that runs verification through ViperServer.
+
+---
+
 ## v1.3.0 (June 2026)
 
 ### New features
