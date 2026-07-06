@@ -7,7 +7,11 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 
 """Service-level tests for verification options: --ignore-global,
---disable-branch-conditions, and obligation auto-detection."""
+--disable-branch-conditions, obligation auto-detection and per-request
+overrides, per-request Viper backend arguments, and --write-viper-to-file."""
+
+
+import pytest
 
 
 _TOPLEVEL_ASSERT_SRC = (
@@ -107,3 +111,67 @@ def test_obligations_autodetected_per_program(service, tmp_path):
         _write(tmp_path, "must_terminate_bad.py", _MUST_TERMINATE_BAD_SRC))
     assert not bad.success
     assert bad.diagnostics
+
+
+# -- per-request obligation overrides ----------------------------------------
+
+def test_obligations_ignore_disables_encoding_per_request(service, tmp_path):
+    # With the encoding disabled for this request, the unsatisfiable
+    # MustTerminate obligation is not checked and the program verifies.
+    assert service.verify(
+        _write(tmp_path, "mt_bad_ignored.py", _MUST_TERMINATE_BAD_SRC),
+        obligations="ignore").success
+    # The override is per-request: the next auto-detected run checks it again.
+    assert not service.verify(
+        _write(tmp_path, "mt_bad_auto.py", _MUST_TERMINATE_BAD_SRC)).success
+
+
+def test_obligations_force_keeps_encoding_active(service, tmp_path):
+    assert service.verify(
+        _write(tmp_path, "no_obl_forced.py", _NO_OBLIGATIONS_SRC),
+        obligations="force").success
+
+
+def test_obligations_invalid_value_rejected(service, tmp_path):
+    with pytest.raises(ValueError):
+        service.verify(_write(tmp_path, "obl_bad.py", _NO_OBLIGATIONS_SRC),
+                       obligations="never")
+
+
+# -- per-request viper args ---------------------------------------------------
+
+def test_viper_args_reach_the_backend_command_line(service, tmp_path):
+    original = service.current_options()
+    try:
+        service.reconfigure(disable_branch_conditions=True)
+        # Baseline: the service-wide option suppresses branch conditions.
+        off = service.verify(_write(tmp_path, "va_off.py", _BRANCH_ERROR_SRC))
+        assert not off.success
+        assert all(not d.branch_conditions for d in off.diagnostics)
+        # Re-enabling the flag through per-request viper_args overrides it,
+        # which proves the arguments end up on the backend command line.
+        on = service.verify(
+            _write(tmp_path, "va_on.py", _BRANCH_ERROR_SRC),
+            viper_args=["--enableBranchconditionReporting"])
+        assert not on.success
+        assert any(d.branch_conditions for d in on.diagnostics)
+    finally:
+        service.reconfigure(
+            disable_branch_conditions=original["disableBranchConditions"])
+
+
+def test_viper_args_invalid_option_fails_cleanly(service, tmp_path):
+    result = service.verify(
+        _write(tmp_path, "va_bad.py", _NO_OBLIGATIONS_SRC),
+        viper_args=["--no-such-silicon-option"])
+    assert not result.success
+
+
+# -- --write-viper-to-file ----------------------------------------------------
+
+def test_write_viper_to_file(service, tmp_path):
+    out = tmp_path / "translated.vpr"
+    assert service.verify(
+        _write(tmp_path, "wv.py", _NO_OBLIGATIONS_SRC),
+        write_viper_to_file=str(out)).success
+    assert "method" in out.read_text()

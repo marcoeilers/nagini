@@ -24,7 +24,7 @@ import sys
 import tempfile
 
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional
+from typing import List, Optional
 
 from mcp.server.fastmcp import FastMCP
 
@@ -48,6 +48,10 @@ async def verify_file(path: str, method: Optional[str] = None,
                       counterexample: bool = False,
                       ignore_global: bool = False,
                       base_dir: Optional[str] = None,
+                      viper_args: Optional[List[str]] = None,
+                      obligations: Optional[str] = None,
+                      write_viper_to_file: Optional[str] = None,
+                      arp: bool = False,
                       job_token: Optional[str] = None) -> dict:
     """Verify a Nagini Python file.
 
@@ -68,36 +72,59 @@ async def verify_file(path: str, method: Optional[str] = None,
     resolve), and leave it unset for a standalone file. Pass a `job_token` to
     allow precisely cancelling this run via the `cancel` tool. Multiple
     verifications may run concurrently.
+
+    `viper_args` are extra command-line arguments passed to the Viper backend,
+    e.g. `["--timeout=60"]` for a per-run verification timeout in seconds (the
+    CLI's `--viper-arg`, as a list). `obligations` overrides the obligation
+    encoding for this request: 'force' enables it, 'ignore' disables it, and
+    'auto' (default) detects per program. `write_viper_to_file` writes the
+    translated Viper program to that path for debugging. Set `arp` to verify
+    under abstract read permissions (requires the ARP plugin on the classpath;
+    such requests run serially).
     """
     selected = {method} if method else None
     result = await _run(lambda: _service.verify(
         path, selected=selected, counterexample=counterexample, base_dir=base_dir,
-        ignore_global=ignore_global, job_token=job_token))
+        ignore_global=ignore_global, viper_args=viper_args,
+        obligations=obligations, write_viper_to_file=write_viper_to_file,
+        arp=arp, job_token=job_token))
     return result.to_dict()
 
 
 @mcp.tool()
 async def verify_method(path: str, method: str, counterexample: bool = False,
+                        base_dir: Optional[str] = None,
+                        viper_args: Optional[List[str]] = None,
+                        obligations: Optional[str] = None,
+                        write_viper_to_file: Optional[str] = None,
+                        arp: bool = False,
                         job_token: Optional[str] = None) -> dict:
     """Verify only a single method of a file (fast, via Nagini's --select).
 
     `path` should be absolute (see `verify_file`). `method` names a top-level
     function by its bare name (e.g. `my_func`), a method as `ClassName.method_name`
-    (its bare name also matches), or a whole class by `ClassName`.
+    (its bare name also matches), or a whole class by `ClassName`. The other
+    parameters are as in `verify_file`.
     """
     result = await _run(lambda: _service.verify(
         path, selected={method}, counterexample=counterexample,
-        job_token=job_token))
+        base_dir=base_dir, viper_args=viper_args, obligations=obligations,
+        write_viper_to_file=write_viper_to_file, arp=arp, job_token=job_token))
     return result.to_dict()
 
 
 @mcp.tool()
 async def verify_snippet(code: str, counterexample: bool = False,
                          ignore_global: bool = False,
+                         viper_args: Optional[List[str]] = None,
+                         obligations: Optional[str] = None,
+                         write_viper_to_file: Optional[str] = None,
+                         arp: bool = False,
                          job_token: Optional[str] = None) -> dict:
     """Verify an inline snippet of Nagini Python code (written to a temp file).
 
-    Set `ignore_global` to skip verification of top-level statements.
+    Set `ignore_global` to skip verification of top-level statements. The other
+    parameters are as in `verify_file`.
     """
     tmp_dir = tempfile.mkdtemp(prefix='nagini_mcp_')
     tmp_path = os.path.join(tmp_dir, 'snippet.py')
@@ -106,7 +133,9 @@ async def verify_snippet(code: str, counterexample: bool = False,
             f.write(code)
         result = await _run(lambda: _service.verify(
             tmp_path, counterexample=counterexample, base_dir=tmp_dir,
-            ignore_global=ignore_global, job_token=job_token))
+            ignore_global=ignore_global, viper_args=viper_args,
+            obligations=obligations, write_viper_to_file=write_viper_to_file,
+            arp=arp, job_token=job_token))
         return result.to_dict()
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)

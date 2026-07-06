@@ -187,7 +187,10 @@ structured diagnostics (error positions, messages, and optional counterexamples)
 
 The server exposes the following tools: ``verify_file``, ``verify_method``,
 ``verify_snippet``, ``configure`` (change verification options at runtime),
-``cancel``, and ``flush_cache``. See the
+``cancel``, and ``flush_cache``. The verification tools also accept per-request
+options: extra Viper backend arguments (``viper_args``, e.g. a ``--timeout``),
+an obligation-encoding override (``obligations``), dumping the translated Viper
+program (``write_viper_to_file``), and abstract read permissions (``arp``). See the
 `wiki <https://github.com/marcoeilers/nagini/wiki>`_ for information on how to write
 specifications in Nagini.
 

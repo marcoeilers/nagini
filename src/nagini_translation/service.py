@@ -182,7 +182,8 @@ class VerificationService:
 
     def verify(self, path: str, *, selected: Set[str] = None, base_dir: str = None,
                arp: bool = False, counterexample: bool = False,
-               ignore_global: bool = False,
+               ignore_global: bool = False, viper_args: List[str] = None,
+               obligations: str = None, write_viper_to_file: str = None,
                job_token: str = None) -> VerifyResult:
         """Translate and verify the file at ``path`` and return structured results.
 
@@ -190,22 +191,44 @@ class VerificationService:
         Viper verification overlaps. Pass a ``job_token`` to allow precise
         cancellation of this request via :meth:`cancel`. Set ``ignore_global``
         to skip verification of top-level (module-global) statements.
+        ``viper_args`` are extra command-line arguments for the Viper backend
+        (the CLI's ``--viper-arg``, as a list). ``obligations`` overrides the
+        obligation encoding for this request: ``'force'`` enables it,
+        ``'ignore'`` disables it, ``'auto'``/``None`` auto-detects per program.
+        ``write_viper_to_file`` writes the translated Viper program to that
+        path. ``arp`` verifies under abstract read permissions (such requests
+        run serially).
         """
         path = os.path.abspath(path)
+        if obligations not in (None, 'auto', 'force', 'ignore'):
+            raise ValueError("obligations must be 'auto', 'force' or 'ignore', "
+                             "got {!r}.".format(obligations))
+        viper_args = list(viper_args) if viper_args else []
         if self._can_run_concurrently(arp):
             return self._verify_concurrent(path, selected, base_dir, counterexample,
-                                           ignore_global, job_token)
+                                           ignore_global, viper_args, obligations,
+                                           write_viper_to_file, job_token)
         with self._state_lock:
             return self._verify_serial(path, selected, base_dir, arp, counterexample,
-                                       ignore_global)
+                                       ignore_global, viper_args, obligations,
+                                       write_viper_to_file)
 
-    def _reset_obligations(self) -> None:
-        """Restore the obligation auto-detection setting before a translation.
+    def _apply_obligations(self, obligations: str = None) -> None:
+        """Set the obligation encoding mode before a translation.
 
-        Must be called while holding the state lock. Setting ``disable_all`` to
-        ``None`` would be written as the string ``"None"`` (breaking getboolean),
-        so we remove the key to return to auto-detection instead.
+        Must be called while holding the state lock. ``'force'`` enables the
+        encoding and ``'ignore'`` disables it, for this translation only;
+        otherwise the service's startup setting is restored. Setting
+        ``disable_all`` to ``None`` would be written as the string ``"None"``
+        (breaking getboolean), so we remove the key to return to auto-detection
+        instead.
         """
+        if obligations == 'force':
+            config.obligation_config.disable_all = False
+            return
+        if obligations == 'ignore':
+            config.obligation_config.disable_all = True
+            return
         section = config.obligation_config._info
         if self._initial_obligations_disable_all is None:
             if 'disable_all' in section:
@@ -324,7 +347,8 @@ class VerificationService:
     # -- internals ----------------------------------------------------------
 
     def _verify_concurrent(self, path, selected, base_dir, counterexample,
-                           ignore_global, job_token) -> VerifyResult:
+                           ignore_global, viper_args, obligations,
+                           write_viper_to_file, job_token) -> VerifyResult:
         from nagini_translation.viper_server import (build_carbon_backend_args,
                                                      build_silicon_backend_args,
                                                      get_viper_server_manager)
@@ -332,7 +356,7 @@ class VerificationService:
         start = time.time()
         # 1. Translate and snapshot this job's error-mapping state (serialized).
         with self._state_lock:
-            self._reset_obligations()
+            self._apply_obligations(obligations)
             try:
                 translated = translate(
                     path, self.jvm, self._bv_size,
@@ -352,17 +376,29 @@ class VerificationService:
                     path, 'Type checking failed.', 'type.error')],
                     time.time() - start, translation_failed=True)
             modules, prog = translated
+            if write_viper_to_file:
+                with open(write_viper_to_file, 'w') as f:
+                    f.write(str(prog))
             snapshot = (dict(error_manager._items),
                         dict(error_manager._conversion_rules))
             error_manager.clear()
 
         # 2. Submit and await the result lock-free, so jobs overlap in Viper.
         if self._backend == 'carbon':
-            backend_args = build_carbon_backend_args([])
+            backend_args = build_carbon_backend_args(viper_args)
         else:
             backend_args = build_silicon_backend_args(
-                [], counterexample, self._disable_branch_conditions)
-        job_id = manager.submit(prog, path, backend_args, backend=self._backend)
+                viper_args, counterexample, self._disable_branch_conditions)
+        try:
+            job_id = manager.submit(prog, path, backend_args, backend=self._backend)
+        except Exception:
+            # Most commonly the backend rejected the arguments (Scallop parse
+            # error on a bad viper_args entry).
+            logging.exception('Verification job could not be submitted.')
+            return VerifyResult(False, [self._point_diagnostic(
+                path, 'Verification could not be started; the Viper backend '
+                'rejected the configuration (check viper_args).',
+                'verifier.error')], time.time() - start)
         if job_token is not None:
             with self._jobs_lock:
                 self._jobs[job_token] = job_id
@@ -404,10 +440,11 @@ class VerificationService:
         return VerifyResult(False, diagnostics, duration)
 
     def _verify_serial(self, path, selected, base_dir, arp,
-                       counterexample, ignore_global) -> VerifyResult:
+                       counterexample, ignore_global, viper_args, obligations,
+                       write_viper_to_file) -> VerifyResult:
         start = time.time()
         try:
-            self._reset_obligations()
+            self._apply_obligations(obligations)
             selected_set = set(selected) if selected else set()
             translated = translate(
                 path, self.jvm, self._bv_size, selected=selected_set,
@@ -419,11 +456,14 @@ class VerificationService:
                     path, 'Type checking failed.', 'type.error')],
                     time.time() - start, translation_failed=True)
             modules, prog = translated
+            if write_viper_to_file:
+                with open(write_viper_to_file, 'w') as f:
+                    f.write(str(prog))
             backend = (ViperVerifier.silicon if self._backend == 'silicon'
                        else ViperVerifier.carbon)
             vresult = verify_program(
-                modules, prog, path, self.jvm, [], backend=backend, arp=arp,
-                counterexample=counterexample, sif=self._sif,
+                modules, prog, path, self.jvm, viper_args, backend=backend,
+                arp=arp, counterexample=counterexample, sif=self._sif,
                 disable_branch_conditions=self._disable_branch_conditions)
             duration = time.time() - start
             if vresult is None:
