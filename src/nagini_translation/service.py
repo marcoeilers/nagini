@@ -122,7 +122,8 @@ class VerificationService:
                  boogie_path: str = None, mypy_path: str = None,
                  int_bitops_size: int = 8, use_viper_server: bool = True,
                  verifier_backend: str = 'silicon', sif=False,
-                 float_encoding: str = None):
+                 float_encoding: str = None,
+                 disable_branch_conditions: bool = False):
         if viper_jar_path:
             config.classpath = viper_jar_path
         if z3_path:
@@ -145,6 +146,13 @@ class VerificationService:
         self._sif = sif
         self._float_encoding = float_encoding
         self._bv_size = int_bitops_size
+        self._disable_branch_conditions = disable_branch_conditions
+        # The obligation encoding is auto-detected per program by translate(),
+        # which persistently sets obligation_config.disable_all once a program
+        # without obligations is seen. In a long-lived service that would then
+        # break a later program that *does* use obligations, so we snapshot the
+        # initial setting and restore it before every verification.
+        self._initial_obligations_disable_all = config.obligation_config.disable_all
         # Guards all access to the global error_manager state (translation and
         # error conversion). The slow Viper verification runs *outside* this
         # lock, so multiple verifications proceed concurrently.
@@ -179,19 +187,36 @@ class VerificationService:
 
     def verify(self, path: str, *, selected: Set[str] = None, base_dir: str = None,
                arp: bool = False, counterexample: bool = False,
+               ignore_global: bool = False,
                job_token: str = None) -> VerifyResult:
         """Translate and verify the file at ``path`` and return structured results.
 
         Multiple calls may run concurrently: translation is serialized but the
         Viper verification overlaps. Pass a ``job_token`` to allow precise
-        cancellation of this request via :meth:`cancel`.
+        cancellation of this request via :meth:`cancel`. Set ``ignore_global``
+        to skip verification of top-level (module-global) statements.
         """
         path = os.path.abspath(path)
         if self._can_run_concurrently(arp):
             return self._verify_concurrent(path, selected, base_dir, counterexample,
-                                           job_token)
+                                           ignore_global, job_token)
         with self._state_lock:
-            return self._verify_serial(path, selected, base_dir, arp, counterexample)
+            return self._verify_serial(path, selected, base_dir, arp, counterexample,
+                                       ignore_global)
+
+    def _reset_obligations(self) -> None:
+        """Restore the obligation auto-detection setting before a translation.
+
+        Must be called while holding the state lock. Setting ``disable_all`` to
+        ``None`` would be written as the string ``"None"`` (breaking getboolean),
+        so we remove the key to return to auto-detection instead.
+        """
+        section = config.obligation_config._info
+        if self._initial_obligations_disable_all is None:
+            if 'disable_all' in section:
+                del section['disable_all']
+        else:
+            config.obligation_config.disable_all = self._initial_obligations_disable_all
 
     def cancel(self, job_token: str = None) -> None:
         """Cancel a verification.
@@ -249,6 +274,7 @@ class VerificationService:
             'intBitopsSize': self._bv_size,
             'floatEncoding': self._float_encoding,
             'useViperServer': config.use_viper_server,
+            'disableBranchConditions': self._disable_branch_conditions,
             'z3Path': config.z3_path,
             'boogiePath': config.boogie_path,
             'mypyPath': config.mypy_path,
@@ -279,6 +305,9 @@ class VerificationService:
                 self._backend = options['verifier_backend']
             if options.get('use_viper_server') is not None:
                 config.use_viper_server = bool(options['use_viper_server'])
+            if options.get('disable_branch_conditions') is not None:
+                self._disable_branch_conditions = bool(
+                    options['disable_branch_conditions'])
             reload_needed = False
             if options.get('sif') is not None and options['sif'] != self._sif:
                 self._sif = options['sif']
@@ -300,7 +329,7 @@ class VerificationService:
     # -- internals ----------------------------------------------------------
 
     def _verify_concurrent(self, path, selected, base_dir, counterexample,
-                           job_token) -> VerifyResult:
+                           ignore_global, job_token) -> VerifyResult:
         from nagini_translation.viper_server import (build_carbon_backend_args,
                                                      build_silicon_backend_args,
                                                      get_viper_server_manager)
@@ -308,12 +337,13 @@ class VerificationService:
         start = time.time()
         # 1. Translate and snapshot this job's error-mapping state (serialized).
         with self._state_lock:
+            self._reset_obligations()
             try:
                 translated = translate(
                     path, self.jvm, self._bv_size,
                     selected=set(selected) if selected else set(), sif=False,
                     base_dir=base_dir, arp=False, counterexample=counterexample,
-                    float_encoding=self._float_encoding)
+                    ignore_global=ignore_global, float_encoding=self._float_encoding)
             except (TypeException, InvalidProgramException, UnsupportedException) as e:
                 return VerifyResult(False, self._exception_diagnostics(e, path),
                                     time.time() - start, translation_failed=True)
@@ -335,7 +365,8 @@ class VerificationService:
         if self._backend == 'carbon':
             backend_args = build_carbon_backend_args([])
         else:
-            backend_args = build_silicon_backend_args([], counterexample, False)
+            backend_args = build_silicon_backend_args(
+                [], counterexample, self._disable_branch_conditions)
         job_id = manager.submit(prog, path, backend_args, backend=self._backend)
         if job_token is not None:
             with self._jobs_lock:
@@ -378,14 +409,16 @@ class VerificationService:
         return VerifyResult(False, diagnostics, duration)
 
     def _verify_serial(self, path, selected, base_dir, arp,
-                       counterexample) -> VerifyResult:
+                       counterexample, ignore_global) -> VerifyResult:
         start = time.time()
         try:
+            self._reset_obligations()
             selected_set = set(selected) if selected else set()
             translated = translate(
                 path, self.jvm, self._bv_size, selected=selected_set,
                 sif=self._sif, base_dir=base_dir, arp=arp,
-                counterexample=counterexample, float_encoding=self._float_encoding)
+                counterexample=counterexample, ignore_global=ignore_global,
+                float_encoding=self._float_encoding)
             if translated is None:
                 return VerifyResult(False, [self._point_diagnostic(
                     path, 'Type checking failed.', 'type.error')],
@@ -395,7 +428,8 @@ class VerificationService:
                        else ViperVerifier.carbon)
             vresult = verify_program(
                 modules, prog, path, self.jvm, [], backend=backend, arp=arp,
-                counterexample=counterexample, sif=self._sif)
+                counterexample=counterexample, sif=self._sif,
+                disable_branch_conditions=self._disable_branch_conditions)
             duration = time.time() - start
             if vresult is None:
                 # main.verify swallows JVM exceptions and returns None.
@@ -498,6 +532,7 @@ OPTION_TO_KWARG = {
     'intBitopsSize': 'int_bitops_size',
     'floatEncoding': 'float_encoding',
     'useViperServer': 'use_viper_server',
+    'disableBranchConditions': 'disable_branch_conditions',
 }
 
 
@@ -529,6 +564,9 @@ def add_service_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     parser.add_argument('--sif', default=False)
     parser.add_argument('--int-bitops-size', type=int, default=8)
     parser.add_argument('--float-encoding', default=None)
+    parser.add_argument('--disable-branch-conditions', action='store_true',
+                        help='do not report branch conditions for verification '
+                             'errors (Silicon backend)')
     parser.add_argument('--no-viper-server', action='store_true',
                         help='disable the in-process ViperServer backend')
     return parser
@@ -545,7 +583,8 @@ def service_kwargs_from_args(args: argparse.Namespace) -> dict:
         z3_path=args.z3, viper_jar_path=args.viper_jar_path, boogie_path=args.boogie,
         mypy_path=args.mypy_path, int_bitops_size=args.int_bitops_size,
         use_viper_server=not args.no_viper_server, verifier_backend=args.verifier,
-        sif=args.sif, float_encoding=args.float_encoding)
+        sif=args.sif, float_encoding=args.float_encoding,
+        disable_branch_conditions=args.disable_branch_conditions)
 
 
 def make_service(args: argparse.Namespace) -> VerificationService:

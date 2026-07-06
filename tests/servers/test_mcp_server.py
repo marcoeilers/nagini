@@ -7,6 +7,10 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 
 import asyncio
+import json
+import os
+import sys
+import tempfile
 
 import pytest
 
@@ -17,6 +21,74 @@ from nagini_translation import mcp_server
 
 _DIAG_KEYS = {"file", "startLine", "startCol", "endLine", "endCol", "severity",
               "code", "source", "message"}
+
+
+def _tool_result_payload(result):
+    """Extract the JSON dict a tool returned from an MCP CallToolResult."""
+    structured = getattr(result, "structuredContent", None)
+    if isinstance(structured, dict):
+        return structured
+    for content in result.content:
+        if getattr(content, "type", None) == "text":
+            return json.loads(content.text)
+    raise AssertionError("no textual content in tool result")
+
+
+def _run_stdio_smoke(pass_file):
+    """Drive the server as a real MCP client would: spawn it as a subprocess and
+    talk to it over stdio. Returns (tool names, verify result, server stderr)."""
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+
+    params = StdioServerParameters(
+        command=sys.executable,
+        args=["-m", "nagini_translation.mcp_server", "--log", "WARNING"],
+        # Inherit the parent environment so JAVA_HOME / jar paths reach the JVM,
+        # just as an MCP client is expected to pass them through.
+        env=dict(os.environ),
+    )
+
+    async def _go(errlog):
+        async with stdio_client(params, errlog=errlog) as (read, write):
+            async with ClientSession(read, write) as session:
+                await asyncio.wait_for(session.initialize(), timeout=180)
+                tools = await session.list_tools()
+                names = {tool.name for tool in tools.tools}
+                result = await asyncio.wait_for(
+                    session.call_tool("verify_file", {"path": pass_file}),
+                    timeout=300)
+                return names, result
+
+    with tempfile.TemporaryFile(mode="w+") as errlog:
+        names, result = asyncio.run(_go(errlog))
+        errlog.seek(0)
+        server_stderr = errlog.read()
+    return names, result, server_stderr
+
+
+def test_stdio_transport_end_to_end_and_clean_shutdown(pass_file):
+    # Integration smoke test over the actual stdio transport and process
+    # lifecycle (the in-process tool-call tests below never exercise those).
+    # Starts its own JVM/ViperServer, so it is skipped if that is unavailable.
+    pytest.importorskip("mcp.client.stdio")
+    try:
+        names, result, server_stderr = _run_stdio_smoke(pass_file)
+    except Exception as e:  # pragma: no cover - environment dependent
+        pytest.skip("MCP stdio server could not be started: {}".format(e))
+
+    # The full tool surface is advertised over the wire.
+    assert {"verify_file", "verify_method", "verify_snippet",
+            "configure", "cancel", "flush_cache"}.issubset(names)
+
+    # A structured result round-trips through the transport, not just in-process.
+    payload = _tool_result_payload(result)
+    assert payload["success"] is True
+    assert payload["diagnostics"] == []
+
+    # Closing the client pipe shuts the server down cleanly; in particular it
+    # must not trip the "I/O operation on closed file" flush error on exit.
+    assert "I/O operation on closed file" not in server_stderr
+    assert "Traceback (most recent call last)" not in server_stderr
 
 
 def test_verify_file_reports_structured_failure(service, fail_file):
@@ -104,3 +176,39 @@ def test_configure_reload_option_then_verify(service, pass_file, fail_file):
         assert asyncio.run(mcp_server.verify_file(fail_file))["success"] is False
     finally:
         service.reconfigure(int_bitops_size=original["intBitopsSize"])
+
+
+_TOPLEVEL_ASSERT_SRC = (
+    "from nagini_contracts.contracts import *\n\nassert False\n"
+)
+_BRANCH_ERROR_SRC = (
+    "from nagini_contracts.contracts import *\n\n"
+    "def f(x: int) -> None:\n    if x > 0:\n        assert False\n"
+)
+
+
+def test_verify_ignore_global_via_tool(service):
+    mcp_server._service = service
+    # Top-level statements verified by default -> the false assert fails.
+    assert asyncio.run(mcp_server.verify_snippet(_TOPLEVEL_ASSERT_SRC))["success"] is False
+    # ignore_global param skips them -> verifies.
+    assert asyncio.run(
+        mcp_server.verify_snippet(_TOPLEVEL_ASSERT_SRC, ignore_global=True))["success"] is True
+
+
+def test_configure_disable_branch_conditions_via_tool(service):
+    mcp_server._service = service
+    original = service.current_options()
+    try:
+        mcp_server.configure({"disableBranchConditions": False})
+        on = asyncio.run(mcp_server.verify_snippet(_BRANCH_ERROR_SRC))
+        assert on["success"] is False
+        assert any(d["branchConditions"] for d in on["diagnostics"])
+
+        mcp_server.configure({"disableBranchConditions": True})
+        off = asyncio.run(mcp_server.verify_snippet(_BRANCH_ERROR_SRC))
+        assert off["success"] is False
+        assert all(not d["branchConditions"] for d in off["diagnostics"])
+    finally:
+        service.reconfigure(
+            disable_branch_conditions=original["disableBranchConditions"])

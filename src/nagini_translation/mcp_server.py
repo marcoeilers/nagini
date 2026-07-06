@@ -46,28 +46,45 @@ async def _run(fn):
 @mcp.tool()
 async def verify_file(path: str, method: Optional[str] = None,
                       counterexample: bool = False,
+                      ignore_global: bool = False,
                       base_dir: Optional[str] = None,
                       job_token: Optional[str] = None) -> dict:
     """Verify a Nagini Python file.
 
+    `path` should be absolute; relative paths are resolved against the server
+    process's working directory (set by the MCP client, not the caller), which
+    is usually not what you want.
+
     Returns structured diagnostics: a list of {file, startLine, startCol,
     endLine, endCol, severity, code, message, reason, counterexample,
     branchConditions, vias}, plus `success` and `duration`. Optionally restrict
-    to a single `method` (qualified name, e.g. `MyClass.my_method`). Pass a
-    `job_token` to allow precisely cancelling this run via the `cancel` tool.
-    Multiple verifications may run concurrently.
+    to a single `method`: a top-level function by its bare name (e.g. `my_func`),
+    a method as `ClassName.method_name` (its bare name also matches), or a whole
+    class by `ClassName` to verify all its methods. Set `ignore_global` to skip
+    verification of top-level (module-global) statements.
+
+    `base_dir` is the package root used to resolve intra-package imports during
+    type checking; set it for a file that is part of a package (so its imports
+    resolve), and leave it unset for a standalone file. Pass a `job_token` to
+    allow precisely cancelling this run via the `cancel` tool. Multiple
+    verifications may run concurrently.
     """
     selected = {method} if method else None
     result = await _run(lambda: _service.verify(
         path, selected=selected, counterexample=counterexample, base_dir=base_dir,
-        job_token=job_token))
+        ignore_global=ignore_global, job_token=job_token))
     return result.to_dict()
 
 
 @mcp.tool()
 async def verify_method(path: str, method: str, counterexample: bool = False,
                         job_token: Optional[str] = None) -> dict:
-    """Verify only a single method of a file (fast, via Nagini's --select)."""
+    """Verify only a single method of a file (fast, via Nagini's --select).
+
+    `path` should be absolute (see `verify_file`). `method` names a top-level
+    function by its bare name (e.g. `my_func`), a method as `ClassName.method_name`
+    (its bare name also matches), or a whole class by `ClassName`.
+    """
     result = await _run(lambda: _service.verify(
         path, selected={method}, counterexample=counterexample,
         job_token=job_token))
@@ -76,8 +93,12 @@ async def verify_method(path: str, method: str, counterexample: bool = False,
 
 @mcp.tool()
 async def verify_snippet(code: str, counterexample: bool = False,
+                         ignore_global: bool = False,
                          job_token: Optional[str] = None) -> dict:
-    """Verify an inline snippet of Nagini Python code (written to a temp file)."""
+    """Verify an inline snippet of Nagini Python code (written to a temp file).
+
+    Set `ignore_global` to skip verification of top-level statements.
+    """
     tmp_dir = tempfile.mkdtemp(prefix='nagini_mcp_')
     tmp_path = os.path.join(tmp_dir, 'snippet.py')
     try:
@@ -85,7 +106,7 @@ async def verify_snippet(code: str, counterexample: bool = False,
             f.write(code)
         result = await _run(lambda: _service.verify(
             tmp_path, counterexample=counterexample, base_dir=tmp_dir,
-            job_token=job_token))
+            ignore_global=ignore_global, job_token=job_token))
         return result.to_dict()
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -97,10 +118,11 @@ def configure(options: dict) -> dict:
     configuration.
 
     Recognized keys: `verifier` ('silicon' or 'carbon'), `z3Path`, `boogiePath`,
-    `mypyPath`, `sif`, `intBitopsSize`, `floatEncoding`, `useViperServer`.
-    `viperJarPath` cannot be changed after startup and is ignored. Unknown or
-    null keys are ignored. Changing `sif`/`intBitopsSize`/`floatEncoding`
-    reloads the Silver resources; already-running verifications are unaffected.
+    `mypyPath`, `sif`, `intBitopsSize`, `floatEncoding`, `useViperServer`,
+    `disableBranchConditions`. `viperJarPath` cannot be changed after startup and
+    is ignored. Unknown or null keys are ignored. Changing
+    `sif`/`intBitopsSize`/`floatEncoding` reloads the Silver resources;
+    already-running verifications are unaffected.
     """
     return _service.reconfigure(**options_to_kwargs(options))
 
@@ -134,8 +156,13 @@ def main():
             _service.shutdown()
         except Exception:
             logging.exception('Error shutting down service.')
-        sys.stdout.flush()
-        sys.stderr.flush()
+        # The stdio transport may already have closed these streams by the time
+        # we get here; flushing a closed stream raises ValueError, so ignore it.
+        for stream in (sys.stdout, sys.stderr):
+            try:
+                stream.flush()
+            except (ValueError, OSError):
+                pass
         os._exit(0)
 
 

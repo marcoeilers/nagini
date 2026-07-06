@@ -56,6 +56,7 @@ class NaginiLanguageServer(LanguageServer):
         super().__init__('nagini-lsp', 'v0.1')
         self.service: Optional[VerificationService] = None
         self.counterexamples = True
+        self.ignore_global = False
         # VerificationService constructor kwargs: seeded from CLI args in main(),
         # then overridden by client initializationOptions. The service itself is
         # built lazily (off the event loop) on the first verification, so the
@@ -81,6 +82,8 @@ class NaginiLanguageServer(LanguageServer):
         self.service_kwargs = merge_service_options(self.service_kwargs, options)
         if options.get('counterexamples') is not None:
             self.counterexamples = bool(options['counterexamples'])
+        if options.get('ignoreGlobal') is not None:
+            self.ignore_global = bool(options['ignoreGlobal'])
 
     def ensure_service(self) -> VerificationService:
         """Build the verification service on first use (thread-safe)."""
@@ -126,7 +129,8 @@ class NaginiLanguageServer(LanguageServer):
     def _verify_blocking(self, uri, path, selected):
         service = self.ensure_service()
         return service.verify(path, selected=selected,
-                              counterexample=self.counterexamples, job_token=uri)
+                              counterexample=self.counterexamples,
+                              ignore_global=self.ignore_global, job_token=uri)
 
 
 server = NaginiLanguageServer()
