@@ -290,6 +290,12 @@ class TypeInfo:
         result = mypy.options.Options()
         result.strict_optional = strict_optional
         result.show_traceback = True
+        # Emit "file:line:col:end_line:end_col: error: msg" so that reported type
+        # errors carry a real source range (start and end) instead of only a
+        # line, matching the format Nagini produces for verification errors.
+        # show_error_end implies show_column_numbers.
+        result.show_column_numbers = True
+        result.show_error_end = True
         result.export_types = True
         result.preserve_asts = True
         result.warn_no_return = False

@@ -14,6 +14,29 @@ from nagini_translation.lib.errors.messages import ERRORS, REASONS, VAGUE_REASON
 from nagini_translation.lib.errors.rules import Rules
 
 
+def format_translation_error(ide_mode: bool, file: str, message: str,
+                             line: int, col: int, line_end: int = None,
+                             col_end: int = None) -> str:
+    """Format a translation error (invalid program, unsupported, type error).
+
+    In IDE mode this mirrors the layout produced for verification errors by
+    :meth:`Error.string` (``file:line:col:line_end:col_end: error: message``),
+    so an IDE/LSP frontend can parse translation and verification errors
+    uniformly. ``line`` is 1-based and ``col`` is a 0-based column (the Python
+    AST ``col_offset`` convention, which is also what Nagini stores in Viper
+    positions); IDE mode emits ``col + 1`` to match the columns Viper reports.
+    Without IDE mode the human-readable ``message (file@line.col)`` form is kept.
+    """
+    if ide_mode:
+        if line_end is None:
+            line_end = line
+        if col_end is None:
+            col_end = col
+        return '{0}:{1}:{2}:{3}:{4}: error: {5}'.format(
+            file, line, col + 1, line_end, col_end + 1, message)
+    return '{0} ({1}@{2}.{3})'.format(message, file, line, col)
+
+
 class Position:
     """Wrapper around ``AbstractSourcePosition``."""
 

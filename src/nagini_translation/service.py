@@ -501,9 +501,16 @@ class VerificationService:
                 if file == '__main__':
                     file = path
                 line = int(parts['line'])
+                # mypy gives a 1-based start column and an (exclusive) end
+                # position when available; Diagnostic uses 0-based columns (the
+                # same convention as verification errors here). Fall back to a
+                # zero-width span at column 0 for line-only messages.
+                col = int(parts['col']) - 1 if parts['col'] else 0
+                end_line = int(parts['end_line']) if parts['end_line'] else line
+                end_col = int(parts['end_col']) if parts['end_col'] else col
                 diagnostics.append(Diagnostic(
-                    file=file, start_line=line, start_col=0, end_line=line,
-                    end_col=0, message='Type error: ' + parts['msg'],
+                    file=file, start_line=line, start_col=col, end_line=end_line,
+                    end_col=end_col, message='Type error: ' + parts['msg'],
                     code='type.error'))
             else:
                 diagnostics.append(self._point_diagnostic(path, msg, 'type.error'))
