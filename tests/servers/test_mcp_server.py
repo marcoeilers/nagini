@@ -213,6 +213,16 @@ def test_verify_ignore_global_via_tool(service):
         mcp_server.verify_snippet(_TOPLEVEL_ASSERT_SRC, ignore_global=True))["success"] is True
 
 
+def test_verify_viper_args_and_include_viper_via_tool(service, pass_src):
+    mcp_server._service = service
+    result = asyncio.run(mcp_server.verify_snippet(
+        pass_src, viper_args=["--timeout=300"], include_viper=True))
+    assert result["success"] is True
+    assert "method" in result["viperProgram"]
+    # The (large) Viper program is only included on request.
+    assert "viperProgram" not in asyncio.run(mcp_server.verify_snippet(pass_src))
+
+
 def test_configure_disable_branch_conditions_via_tool(service):
     mcp_server._service = service
     original = service.current_options()

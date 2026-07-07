@@ -7,7 +7,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 
 """Service-level tests for verification options: --ignore-global,
---disable-branch-conditions, and obligation auto-detection."""
+--disable-branch-conditions, obligation auto-detection, per-request Viper
+backend arguments, and include_viper."""
 
 
 _TOPLEVEL_ASSERT_SRC = (
@@ -107,3 +108,45 @@ def test_obligations_autodetected_per_program(service, tmp_path):
         _write(tmp_path, "must_terminate_bad.py", _MUST_TERMINATE_BAD_SRC))
     assert not bad.success
     assert bad.diagnostics
+
+
+# -- per-request viper args ---------------------------------------------------
+
+def test_viper_args_reach_the_backend_command_line(service, tmp_path):
+    original = service.current_options()
+    try:
+        service.reconfigure(disable_branch_conditions=True)
+        # Baseline: the service-wide option suppresses branch conditions.
+        off = service.verify(_write(tmp_path, "va_off.py", _BRANCH_ERROR_SRC))
+        assert not off.success
+        assert all(not d.branch_conditions for d in off.diagnostics)
+        # Re-enabling the flag through per-request viper_args overrides it,
+        # which proves the arguments end up on the backend command line.
+        on = service.verify(
+            _write(tmp_path, "va_on.py", _BRANCH_ERROR_SRC),
+            viper_args=["--enableBranchconditionReporting"])
+        assert not on.success
+        assert any(d.branch_conditions for d in on.diagnostics)
+    finally:
+        service.reconfigure(
+            disable_branch_conditions=original["disableBranchConditions"])
+
+
+def test_viper_args_invalid_option_fails_cleanly(service, tmp_path):
+    result = service.verify(
+        _write(tmp_path, "va_bad.py", _NO_OBLIGATIONS_SRC),
+        viper_args=["--no-such-silicon-option"])
+    assert not result.success
+
+
+# -- include_viper ------------------------------------------------------------
+
+def test_include_viper_returns_translated_program(service, tmp_path):
+    result = service.verify(_write(tmp_path, "iv.py", _NO_OBLIGATIONS_SRC),
+                            include_viper=True)
+    assert result.success
+    assert "method" in result.viper_program
+    # Off by default, and then absent from the serialized result.
+    default = service.verify(_write(tmp_path, "iv2.py", _NO_OBLIGATIONS_SRC))
+    assert default.viper_program is None
+    assert "viperProgram" not in default.to_dict()
