@@ -87,7 +87,6 @@ async def verify_file(path: str, method: Optional[str] = None,
 
 @mcp.tool()
 async def verify_method(path: str, method: str, counterexample: bool = False,
-                        base_dir: Optional[str] = None,
                         viper_args: Optional[List[str]] = None,
                         include_viper: bool = False,
                         job_token: Optional[str] = None) -> dict:
@@ -100,8 +99,8 @@ async def verify_method(path: str, method: str, counterexample: bool = False,
     """
     result = await _run(lambda: _service.verify(
         path, selected={method}, counterexample=counterexample,
-        base_dir=base_dir, viper_args=viper_args,
-        include_viper=include_viper, job_token=job_token))
+        viper_args=viper_args, include_viper=include_viper,
+        job_token=job_token))
     return result.to_dict()
 
 
