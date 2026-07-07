@@ -28,6 +28,7 @@
 - **Python 3.12–3.14 support**: Nagini now targets Python 3.12 and newer (3.13 and 3.14 are also supported). Python versions older than 3.12 are no longer supported. (#300)
 - **`match` statement support**: `match`/`case` statements are now supported in both impure and pure functions. Most pattern types (value, OR, sequence, mapping, class, wildcard, capture) are handled, with class patterns with keyword arguments currently unsupported. (#301, #302)
 - **Branch condition reporting**: When using the Silicon backend, error messages now include the branch conditions that led to the error — the set of conditions along the execution path that the verifier was exploring when it found the failure. (#298)
+- **`@dataclass` support**: Added support for dataclasses, both frozen and non-frozen, including `__post_init__` and default values. (#299)
 - **Bytearray and PByteSeq**: Added support for `bytearray` and a corresponding pure ghost type `PByteSeq`. (#299)
 - **`IntEnum` support**: Classes subclassing `IntEnum` are now supported. (#299)
 - **Bit shift operators**: Left (`<<`) and right (`>>`) shift operators are now supported for integers. (#299)
