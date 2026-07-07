@@ -150,3 +150,26 @@ def test_include_viper_returns_translated_program(service, tmp_path):
     default = service.verify(_write(tmp_path, "iv2.py", _NO_OBLIGATIONS_SRC))
     assert default.viper_program is None
     assert "viperProgram" not in default.to_dict()
+
+
+# -- strictInt --------------------------------------------------------------
+
+_BOOL_AS_INT_SRC = (
+    "from nagini_contracts.contracts import *\n\n"
+    "def f() -> int:\n"
+    "    return True\n"
+)
+
+
+def test_strict_int_toggles_bool_int_conformance(service, tmp_path):
+    path = _write(tmp_path, "strict_int.py", _BOOL_AS_INT_SRC)
+    # Off by default: bool is a subtype of int.
+    assert service.verify(path).success
+    service.reconfigure(strict_int=True)
+    try:
+        strict = service.verify(path)
+        assert not strict.success
+        assert any("postcondition" in d.code for d in strict.diagnostics)
+    finally:
+        service.reconfigure(strict_int=False)
+    assert service.verify(path).success
