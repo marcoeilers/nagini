@@ -21,8 +21,8 @@ def test_bool_arg_rejected() -> None:
     takes_int(True)
 
 
+#:: ExpectedOutput(postcondition.violated:assertion.false)
 def returns_bool_as_int() -> int:
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
     return True
 
 
