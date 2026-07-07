@@ -6,8 +6,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import argparse
-import astunparse
-import copy
+import ast
 import inspect
 import json
 import logging
@@ -23,7 +22,7 @@ from nagini_translation.analyzer import Analyzer
 from nagini_translation.sif_translator import SIFTranslator
 from nagini_translation.lib import config
 from nagini_translation.lib.constants import DEFAULT_SERVER_SOCKET
-from nagini_translation.lib.errors import error_manager
+from nagini_translation.lib.errors import error_manager, format_translation_error
 from nagini_translation.lib.jvmaccess import (
     getclass,
     getobject,
@@ -52,10 +51,18 @@ from nagini_translation.verifier import (
     ViperVerifier
 )
 from nagini_translation import verifier
-from typing import List, Set, Tuple
+from typing import List, Set, Tuple, Union
 
 
-TYPE_ERROR_PATTERN = r"^(?P<file>.*):(?P<line>\d+): error: (?P<msg>.*)$"
+# Matches a mypy error line. The column and end-position fields are optional:
+# mypy only emits them when show_column_numbers/show_error_end are set, and some
+# type errors Nagini raises itself carry only a line. The file group is
+# non-greedy so a Windows drive letter (``C:\...``) or a ``: error:`` inside the
+# message does not get mistaken for the line/column separators.
+TYPE_ERROR_PATTERN = (
+    r"^(?P<file>.*?):(?P<line>\d+)"
+    r"(?::(?P<col>\d+)(?::(?P<end_line>\d+):(?P<end_col>\d+))?)?"
+    r": error: (?P<msg>.*)$")
 TYPE_ERROR_MATCHER = re.compile(TYPE_ERROR_PATTERN)
 
 
@@ -66,8 +73,8 @@ def parse_sil_file(sil_path: str, bv_path: str, bv_size: int, jvm, float_option:
     with open(sil_path, 'r') as file:
         text = file.read()
     with open(bv_path, 'r') as file:
-        int_min = -(2 ** (bv_size - 1))
-        int_max = 2 ** (bv_size - 1) - 1
+        int_min = -(2 ** (bv_size))
+        int_max = 2 ** (bv_size) - 1
         text += "\n" + file.read().replace("NBITS", str(bv_size)).replace("INT_MIN_VAL", str(int_min)).replace("INT_MAX_VAL", str(int_max))
     if float_option == "real":
         text = text.replace("float.sil", "float_real.sil")
@@ -195,17 +202,36 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
     for task in analyzer.deferred_tasks:
         task()
 
+def get_verifier(path: str, jvm: JVM, viper_args: List[str], backend=ViperVerifier.silicon,
+                 counterexample=False, disable_branch_conditions=False, arp=False, sif=False):
+    # The in-process ViperServer backend supports both Silicon and Carbon (but
+    # not SIF or ARP). On any failure to construct it (e.g. it is not on the
+    # classpath), fall back to the corresponding direct backend.
+    if (config.use_viper_server and backend in (ViperVerifier.silicon, ViperVerifier.carbon)
+            and not arp and not sif):
+        try:
+            from nagini_translation.viper_server import (ViperServer,
+                                                         get_viper_server_manager)
+            manager = get_viper_server_manager(jvm)
+            return ViperServer(jvm, manager, path, viper_args, counterexample,
+                               disable_branch_conditions, backend=backend.name)
+        except Exception:
+            logging.exception('ViperServer backend unavailable; falling back to '
+                              'the direct backend.')
+    if backend == ViperVerifier.silicon:
+        return Silicon(jvm, path, viper_args, counterexample, disable_branch_conditions)
+    elif backend == ViperVerifier.carbon:
+        return Carbon(jvm, path, viper_args)
 
 def verify(modules, prog: 'viper.silver.ast.Program', path: str, jvm: JVM, viper_args: List[str],
-           backend=ViperVerifier.silicon, arp=False, counterexample=False, sif=False) -> VerificationResult:
+           backend=ViperVerifier.silicon, arp=False, counterexample=False,
+           sif=False, disable_branch_conditions=False) -> VerificationResult:
     """
     Verifies the given Viper program
     """
     try:
-        if backend == ViperVerifier.silicon:
-            verifier = Silicon(jvm, path, viper_args, counterexample)
-        elif backend == ViperVerifier.carbon:
-            verifier = Carbon(jvm, path, viper_args)
+        verifier = get_verifier(path, jvm, viper_args, backend, counterexample,
+                                disable_branch_conditions, arp=arp, sif=sif)
         vresult = verifier.verify(modules, prog, arp=arp, sif=sif)
         return vresult
     except JException as je:
@@ -327,6 +353,13 @@ def main() -> None:
         help='start Nagini server'
     )
     parser.add_argument(
+        '--viper-server',
+        action='store_true',
+        help='verify using an in-process ViperServer instance (enables result '
+             'caching and cancellation across requests); falls back to the '
+             'direct Silicon backend for Carbon/SIF/ARP or if unavailable'
+    )
+    parser.add_argument(
         '--counterexample',
         action='store_true',
         help='return a counterexample for every verification error if possible'
@@ -355,8 +388,14 @@ def main() -> None:
     parser.add_argument(
         '--strict-int',
         action='store_true',
-        default=True,
+        default=False,
         help='Require exact int type (type(x) == int) rather than subtype (isinstance(x, int)) in many places.'
+    )
+    parser.add_argument(
+        '--disable-branch-conditions',
+        help='Disable reporting of branch conditions for verification errors with the Silicon backend..',
+        action='store_true',
+        default=False,
     )
     args = parser.parse_args()
 
@@ -365,6 +404,8 @@ def main() -> None:
     config.z3_path = args.z3
     config.mypy_path = args.mypy_path
     config.set_verifier(args.verifier)
+    if args.viper_server:
+        config.enable_viper_server(args.verifier)
     if args.ignore_obligations:
         if args.force_obligations:
             parser.error('incompatible arguments: --ignore-obligations and --force-obligations')
@@ -398,43 +439,78 @@ def main() -> None:
         global sil_programs
         sil_programs = load_sil_files(jvm, args.int_bitops_size, args.sif, args.float_encoding)
 
+        if config.use_viper_server:
+            # Start the shared ViperServer once so its cache persists across
+            # requests. If it cannot start, requests fall back to direct Silicon.
+            try:
+                from nagini_translation.viper_server import get_viper_server_manager
+                get_viper_server_manager(jvm).start()
+            except Exception:
+                logging.exception('Could not start ViperServer; verification will '
+                                  'fall back to the direct Silicon backend.')
+        print('Server started successfully on ' + DEFAULT_SERVER_SOCKET, flush=True)
+
         while True:
-            message = socket.recv_string()
+            file, selected = _parse_client_request(socket.recv_string())
             response = ['']
 
             def add_response(part):
                 response[0] = response[0] + '\n' + part
 
-            try:
-                request = json.loads(message)
-                file = request['python_file']
-
-                # Build per-request args: start from server args, apply client overrides
-                req_args = copy.copy(args)
-                for key, value in request.items():
-                    if key != 'python_file':
-                        setattr(req_args, key, value)
-
-                success = translate_and_verify(file, jvm, req_args, add_response, arp=req_args.arp, base_dir=req_args.base_dir)
-            except Exception:
-                add_response("Server error while handling request:")
-                add_response(traceback.format_exc())
-                success = False
-            socket.send_string(json.dumps({'output': response[0], 'success': success}))
+            translate_and_verify(file, jvm, args, add_response, arp=args.arp,
+                                  base_dir=args.base_dir, selected=selected)
+            socket.send_string(response[0])
     else:
         success = translate_and_verify(args.python_file, jvm, args, arp=args.arp, base_dir=args.base_dir)
+        if config.use_viper_server:
+            # Shut the ViperServer (and its actor system) down so the process
+            # can terminate.
+            try:
+                from nagini_translation.viper_server import get_viper_server_manager
+                get_viper_server_manager(jvm).stop()
+            except Exception:
+                logging.exception('Error while stopping ViperServer.')
+            # ViperServer/Akka may leave non-daemon threads alive that would keep
+            # the JVM (and process) from exiting; force a hard exit now that the
+            # result has been printed.
+            sys.stdout.flush()
+            sys.stderr.flush()
+            os._exit(0 if success else 1)
         sys.exit(0 if success else 1)
 
 
-def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_dir=None) -> bool:
+def _parse_client_request(request: str) -> Tuple[str, Union[Set[str], None]]:
+    """Parse a server-mode client request into ``(python_file, selected)``.
+
+    New clients send a JSON object ``{"file": ..., "select": "a,b"}``. For
+    backwards compatibility, a plain string (anything that is not a JSON object)
+    is treated as just the file path, with no selection.
+    """
+    try:
+        payload = json.loads(request)
+    except ValueError:
+        payload = None
+    if isinstance(payload, dict):
+        select = payload.get('select')
+        selected = set(select.split(',')) if select else None
+        return payload.get('file'), selected
+    return request, None
+
+
+def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_dir=None,
+                         selected=None) -> bool:
     """
     Translates input file to viper code and dispatches result to backend for verification
+
+    ``selected`` overrides ``args.select`` for this call (used by the server to
+    apply a per-request selection); when ``None`` the ``args.select`` value is used.
 
     :returns: Whether translation and verification was successful
     """
     try:
         start = time.time()
-        selected = set(args.select.split(',')) if args.select else set()
+        if selected is None:
+            selected = set(args.select.split(',')) if args.select else set()
         modules, prog = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif, base_dir=base_dir,
                                   ignore_global=args.ignore_global, arp=arp, verbose=args.verbose,
                                   counterexample=args.counterexample, float_encoding=args.float_encoding,
@@ -458,7 +534,8 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
             for i in range(args.benchmark):
                 start = time.time()
                 modules, prog = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif, arp=arp, base_dir=base_dir,
-                                          ignore_global=args.ignore_global, float_encoding=args.float_encoding)
+                                          ignore_global=args.ignore_global, float_encoding=args.float_encoding,
+                                          strict_int=args.strict_int)
                 vresult = verify(modules, prog, python_file, jvm, viper_args, backend=backend, arp=arp)
                 end = time.time()
                 print("{}, {}, {}, {}, {}".format(
@@ -470,7 +547,8 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                 submitter.setProgram(prog)
 
             vresult = verify(modules, prog, python_file, jvm, viper_args,
-                             backend=backend, arp=arp, counterexample=args.counterexample, sif=args.sif)
+                             backend=backend, arp=arp, counterexample=args.counterexample,
+                             sif=args.sif, disable_branch_conditions=args.disable_branch_conditions)
 
             if submitter is not None:
                 submitter.setSuccess(vresult.__bool__())
@@ -495,10 +573,11 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                 if e.args[0]:
                     issue += e.args[0]
                 else:
-                    issue += astunparse.unparse(e.node)
-            line = str(e.node.lineno)
-            col = str(e.node.col_offset)
-            print(issue + ' (' + python_file + '@' + line + '.' + col + ')')
+                    issue += ast.unparse(e.node)
+            print(format_translation_error(
+                args.ide_mode, python_file, issue, e.node.lineno,
+                e.node.col_offset, getattr(e.node, 'end_lineno', None),
+                getattr(e.node, 'end_col_offset', None)))
         if isinstance(e, TypeException):
             for msg in e.messages:
                 parts = TYPE_ERROR_MATCHER.match(msg)
@@ -508,8 +587,17 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                     if file == '__main__':
                         file = python_file
                     msg = parts['msg']
-                    line = parts['line']
-                    print('Type error: ' + msg + ' (' + file + '@' + line + '.0)')
+                    line = int(parts['line'])
+                    # mypy reports a 1-based start column and an (exclusive) end
+                    # position when available; convert to the 0-based-column
+                    # convention format_translation_error expects. Fall back to
+                    # column 0 for errors Nagini raises itself (line only).
+                    col = int(parts['col']) - 1 if parts['col'] else 0
+                    line_end = int(parts['end_line']) if parts['end_line'] else None
+                    col_end = int(parts['end_col']) if parts['end_col'] else None
+                    print(format_translation_error(
+                        args.ide_mode, file, 'Type error: ' + msg, line, col,
+                        line_end, col_end))
                 else:
                     print(msg)
         return False

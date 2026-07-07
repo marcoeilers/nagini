@@ -5,7 +5,7 @@ from nagini_contracts.contracts import *
 from typing import List
 
 def test_list_3(r: List[int]) -> None:
-    #:: ExpectedOutput(application.precondition:insufficient.permission)|ExpectedOutput(carbon)(application.precondition:insufficient.permission)
+    #:: ExpectedOutput(application.precondition:insufficient.permission)||ExpectedOutput(carbon)(application.precondition:insufficient.permission)
     Requires(Forall(r, lambda i: (i > 0, [])))
 
     a = 3

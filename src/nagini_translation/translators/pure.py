@@ -10,7 +10,9 @@ import ast
 from typing import Dict, List, Union
 
 from nagini_contracts.contracts import CONTRACT_WRAPPER_FUNCS
-from nagini_translation.lib.constants import PRIMITIVE_BOOL_TYPE, BOOL_TYPE
+from nagini_translation.lib.constants import (
+    ASSUMING_FUNC, BOOL_TYPE, IS_DEFINED_FUNC, PRIMITIVE_BOOL_TYPE
+)
 from nagini_translation.lib.program_nodes import PythonMethod, PythonType, PythonVar
 from nagini_translation.lib.typedefs import (
     Expr,
@@ -32,13 +34,15 @@ class AssignWrapper:
     be executed under conditions conds.
     """
 
-    def __init__(self, name: str, conds: List, expr: ast.AST, node: ast.AST):
+    def __init__(self, name: str, conds: List, expr: ast.AST, node: ast.AST,
+                 user_var: bool = False):
         self.name = name
         self.cond = conds
         self.expr = expr
         self.node = node
         self.names = {}
         self.var = None
+        self.user_var = user_var
 
 
 class ReturnWrapper:
@@ -83,8 +87,17 @@ class NotWrapper:
     """
     Represents a negation of the condition cond.
     """
-    def __init__(self, cond):
+    def __init__(self, cond, node):
         self.cond = cond
+        self.node = node
+
+class CondWrapper:
+    """
+    Represents the condition cond.
+    """
+    def __init__(self, cond, node):
+        self.cond = cond
+        self.node = node
 
 
 class BinOpWrapper:
@@ -95,6 +108,31 @@ class BinOpWrapper:
     def __init__(self, op: ast.BinOp, rhs: ast.AST):
         self.op = op
         self.rhs = rhs
+
+
+class MatchPatternExpr:
+    """
+    Sentinel stored in AssignWrapper.expr for deferred match-pattern condition evaluation.
+    Resolved in _translate_wrapper_expr by calling _translate_match_pattern_cond.
+    """
+    def __init__(self, subj_sil_name: str, pattern: ast.AST, subj_type,
+                 match_node: ast.Match, guard=None, guard_aliases=None):
+        self.subj_sil_name = subj_sil_name
+        self.pattern = pattern
+        self.subj_type = subj_type
+        self.match_node = match_node
+        self.guard = guard
+        self.guard_aliases = guard_aliases or {}
+
+
+class SubjectVarRef:
+    """
+    Sentinel stored in AssignWrapper.expr that resolves to the match subject variable.
+    Used to encode capture-variable assignments in pure match translation.
+    """
+    def __init__(self, subj_sil_name: str):
+        self.subj_sil_name = subj_sil_name
+
 
 Wrapper = Union[AssignWrapper, ReturnWrapper, UnfoldWrapper, AssertWrapper]
 
@@ -109,7 +147,7 @@ class PureTranslator(CommonTranslator):
 
     def translate_pure_generic(self, conds: List,
                                node: ast.AST, ctx: Context) -> List[Wrapper]:
-        raise UnsupportedException(node)
+        raise UnsupportedException(node, f'unsupported statement type in pure function: {node.__class__.__name__}')
 
     def translate_pure_Expr(self, conds: List, node: ast.Expr,
                             ctx: Context) -> List[Wrapper]:
@@ -124,7 +162,7 @@ class PureTranslator(CommonTranslator):
         if isinstance(node.value, ast.Call) and get_func_name(node.value) == 'Assert':
             wrapper = AssertWrapper(conds, node.value, node)
             return [wrapper]
-        raise UnsupportedException(node)
+        raise UnsupportedException(node, 'unsupported expression in pure function; only Unfold, Assert, assignments, and docstrings are supported')
 
     def translate_pure_If(self, conds: List, node: ast.If,
                           ctx: Context) -> List[Wrapper]:
@@ -136,8 +174,8 @@ class PureTranslator(CommonTranslator):
         cond_var = ctx.current_function.create_variable('cond',
             ctx.module.global_module.classes[PRIMITIVE_BOOL_TYPE], self.translator)
         cond_let = AssignWrapper(cond_var.sil_name, conds, cond, node)
-        then_cond = conds + [cond_var.sil_name]
-        else_cond = conds + [NotWrapper(cond_var.sil_name)]
+        then_cond = conds + [CondWrapper(cond_var.sil_name, node.test)]
+        else_cond = conds + [NotWrapper(cond_var.sil_name, node.test)]
         then = [self.translate_pure(then_cond, stmt, ctx) for stmt in node.body]
         then = flatten(then)
         else_ = []
@@ -162,7 +200,7 @@ class PureTranslator(CommonTranslator):
         """
         assert isinstance(node.target, ast.Name)
         val = BinOpWrapper(node.op, node.value)
-        wrapper = AssignWrapper(node.target.id, conds, val, node)
+        wrapper = AssignWrapper(node.target.id, conds, val, node, user_var=True)
         return [wrapper]
 
     def translate_pure_Assign(self, conds: List, node: ast.Assign,
@@ -173,7 +211,7 @@ class PureTranslator(CommonTranslator):
         assert len(node.targets) == 1
         if not isinstance(node.targets[0], ast.Name):
             raise UnsupportedException(node, "Multi-target assignments are not supported in pure functions.")
-        wrapper = AssignWrapper(node.targets[0].id, conds, node.value, node)
+        wrapper = AssignWrapper(node.targets[0].id, conds, node.value, node, user_var=True)
         return [wrapper]
 
     def translate_pure_AnnAssign(self, conds: List, node: ast.AnnAssign,
@@ -183,8 +221,80 @@ class PureTranslator(CommonTranslator):
         """
         if not isinstance(node.target, ast.Name):
             raise UnsupportedException(node, "Only assignments to single variables are supported in pure functions.")
-        wrapper = AssignWrapper(node.target.id, conds, node.value, node)
+        wrapper = AssignWrapper(node.target.id, conds, node.value, node, user_var=True)
         return [wrapper]
+
+    def translate_pure_Match(self, conds: List, node: ast.Match,
+                             ctx: Context) -> List[Wrapper]:
+        """
+        Translates a match statement to a list of wrappers for the pure translator.
+        Each case becomes an AssignWrapper holding a MatchPatternExpr condition,
+        followed by capture AssignWrappers and body wrappers.
+        """
+        subject_type = self.get_type(node.subject, ctx)
+        bool_class = ctx.module.global_module.classes[PRIMITIVE_BOOL_TYPE]
+
+        subj_var = ctx.current_function.create_variable(
+            'match_subject', subject_type, self.translator)
+        subj_wrapper = AssignWrapper(subj_var.sil_name, conds, node.subject, node)
+
+        result = [subj_wrapper]
+        prev_conds = list(conds)
+
+        for case in node.cases:
+            guard_aliases = {}
+            if case.guard is not None:
+                for name in self._collect_match_guard_capture_names(case.pattern):
+                    guard_aliases[name] = subj_var.sil_name
+
+            case_var = ctx.current_function.create_variable(
+                'match_case', bool_class, self.translator)
+            case_expr = MatchPatternExpr(
+                subj_var.sil_name, case.pattern, subject_type, node,
+                guard=case.guard, guard_aliases=guard_aliases)
+            case_wrapper = AssignWrapper(case_var.sil_name, prev_conds, case_expr, node)
+            result.append(case_wrapper)
+
+            case_conds = prev_conds + [CondWrapper(case_var.sil_name, node)]
+            for cap_name, cap_expr in self._collect_pure_match_captures(
+                    case.pattern, subj_var.sil_name, node):
+                cap_wrapper = AssignWrapper(cap_name, case_conds, cap_expr, node,
+                                            user_var=True)
+                result.append(cap_wrapper)
+
+            body_wrappers = flatten([self.translate_pure(case_conds, stmt, ctx)
+                                     for stmt in case.body])
+            result.extend(body_wrappers)
+
+            prev_conds = prev_conds + [NotWrapper(case_var.sil_name, node)]
+
+        return result
+
+    def _collect_pure_match_captures(self, pattern: ast.AST, subj_sil_name: str,
+                                     node: ast.Match):
+        """Yield (python_name, SubjectVarRef) for each variable bound by pattern."""
+        if isinstance(pattern, ast.MatchAs):
+            if pattern.name is not None:
+                yield pattern.name, SubjectVarRef(subj_sil_name)
+            if pattern.pattern is not None:
+                yield from self._collect_pure_match_captures(
+                    pattern.pattern, subj_sil_name, node)
+        if isinstance(pattern, ast.MatchClass):
+            if pattern.patterns or pattern.kwd_patterns:
+                raise UnsupportedException(
+                    pattern, 'class patterns with parameters not yet supported')
+
+    def _collect_match_guard_capture_names(self, pattern: ast.AST):
+        """Yield names that a guard expression might reference from the pattern."""
+        if isinstance(pattern, ast.MatchAs):
+            if pattern.name is not None:
+                yield pattern.name
+            if pattern.pattern is not None:
+                yield from self._collect_match_guard_capture_names(pattern.pattern)
+        if isinstance(pattern, ast.MatchClass):
+            if pattern.patterns or pattern.kwd_patterns:
+                raise UnsupportedException(
+                    pattern, 'class patterns with parameters not yet supported')
 
     def _translate_return_wrapper(self, wrapper: Wrapper, previous: Expr,
                                   function: PythonMethod,
@@ -199,12 +309,41 @@ class PureTranslator(CommonTranslator):
                 return self.viper.CondExp(self.to_bool(cond, ctx), val,
                                           previous, position, info)
             else:
-                return val
+                # No fallback expression yet: this is the last return in program
+                # order, and it is guarded by a condition.  Wrap the missing-path
+                # in `asserting false in dummy` so the verifier rejects any
+                # execution path that does not reach an explicit return.
+                # Paths where the condition is provably always true (e.g. due to
+                # preconditions or exhaustive branches) pass without a complaint.
+                no_pos = self.no_position(ctx)
+                no_inf = self.no_info(ctx)
+                false_lit = self.viper.FalseLit(no_pos, no_inf)
+                dummies = {
+                    self.viper.Int:  self.viper.IntLit(0, no_pos, no_inf),
+                    self.viper.Bool: self.viper.FalseLit(no_pos, no_inf),
+                    self.viper.Ref:  self.viper.NullLit(no_pos, no_inf),
+                }
+                dummy = dummies.get(val.typ(), self.viper.NullLit(no_pos, no_inf))
+                fallback = self.viper.Asserting(false_lit, dummy, position, no_inf)
+                return self.viper.CondExp(self.to_bool(cond, ctx), val,
+                                          fallback, position, info)
         else:
             if previous:
                 raise InvalidProgramException(function.node,
                                               'function.dead.code')
             return val
+
+    def _wrap_with_assuming(self, val: Expr, python_name: str, position,
+                            info, ctx: Context) -> Expr:
+        """Wrap val in _assuming(val, _isDefined(id)) to produce the definedness fact."""
+        id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, position, info)
+        r_param_decl = self.viper.LocalVarDecl('r', self.viper.Ref, position, info)
+        fact_param_decl = self.viper.LocalVarDecl('fact', self.viper.Bool, position, info)
+        id_lit = self.viper.IntLit(self._get_string_value(python_name), position, info)
+        is_defined = self.viper.FuncApp(IS_DEFINED_FUNC, [id_lit], position, info,
+                                        self.viper.Bool, [id_param_decl])
+        return self.viper.FuncApp(ASSUMING_FUNC, [val, is_defined], position, info,
+                                  self.viper.Ref, [r_param_decl, fact_param_decl])
 
     def _translate_assign_wrapper(self, wrapper: Wrapper, previous: Expr,
                                   function: PythonMethod,
@@ -213,6 +352,8 @@ class PureTranslator(CommonTranslator):
         position = self.to_position(wrapper.node, ctx)
         val = self._translate_wrapper_expr(wrapper, ctx)
         val = self.to_type(val, wrapper.var.decl.typ(), ctx)
+        if wrapper.user_var and wrapper.var.decl.typ() == self.viper.Ref:
+            val = self._wrap_with_assuming(val, wrapper.name, position, info, ctx)
         if not previous:
             raise InvalidProgramException(function.node,
                                           'function.return.missing')
@@ -335,6 +476,27 @@ class PureTranslator(CommonTranslator):
                 val = self.viper.Mul(var, val, position, info)
             else:
                 raise UnsupportedException(wrapper.node)
+        elif isinstance(wrapper.expr, SubjectVarRef):
+            return ctx.var_aliases[wrapper.expr.subj_sil_name].ref()
+        elif isinstance(wrapper.expr, MatchPatternExpr):
+            mpe = wrapper.expr
+            subj_ref = ctx.var_aliases[mpe.subj_sil_name].ref()
+            stmt_translator = self.config.stmt_translator
+            stmts, val = stmt_translator._translate_match_pattern_cond(
+                mpe.pattern, subj_ref, mpe.subj_type, mpe.match_node, ctx)
+            if stmts:
+                raise InvalidProgramException(mpe.match_node, 'purity.violated')
+            if mpe.guard is not None:
+                with ctx.aliases_context():
+                    for cap_name, sil_name in mpe.guard_aliases.items():
+                        ctx.set_alias(cap_name, ctx.var_aliases[sil_name], None)
+                    guard_stmts, guard_expr = self.translate_expr(
+                        mpe.guard, ctx, target_type=self.viper.Bool)
+                if guard_stmts:
+                    raise InvalidProgramException(mpe.match_node, 'purity.violated')
+                guard_pos = self.to_position(mpe.guard, ctx)
+                val = self.viper.And(val, guard_expr, guard_pos, info)
+            return val
         else:
             stmt, val = self.translate_expr(wrapper.expr, ctx)
         if stmt:
@@ -425,15 +587,26 @@ class PureTranslator(CommonTranslator):
         using the renamings in names.
         """
         previous = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
+        previous_node = None
         for cond in conds:
             if isinstance(cond, NotWrapper):
-                current = self.to_bool(ctx.var_aliases.get(cond.cond).ref(), ctx)
+                current = self.to_bool(ctx.var_aliases.get(cond.cond).ref(cond.node, ctx), ctx)
                 current = self.viper.Not(current, self.no_position(ctx),
                                          self.no_info(ctx))
+                cur_node = ast.UnaryOp(ast.Not(), cond.node, lineno=cond.node.lineno, col_offset=cond.node.col_offset,
+                                       end_lineno=cond.node.end_lineno)
+            elif isinstance(cond, CondWrapper):
+                current = self.to_bool(ctx.var_aliases.get(cond.cond).ref(cond.node, ctx), ctx)
+                cur_node = cond.node
             else:
-                current = ctx.var_aliases.get(cond).ref()
+                raise Exception()
+            if not previous_node:
+                previous_node = cur_node
+            else:
+                previous_node = ast.BoolOp(ast.And(), [previous_node, cur_node], lineno=previous_node.lineno,
+                                           end_lineno=cur_node.end_lineno, col_offset=previous_node.col_offset)
             previous = self.viper.And(self.to_bool(previous, ctx),
                                       self.to_bool(current, ctx),
-                                      self.no_position(ctx),
+                                      self.to_position(previous_node, ctx),
                                       self.no_info(ctx))
         return previous

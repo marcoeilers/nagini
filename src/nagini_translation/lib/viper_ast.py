@@ -422,6 +422,9 @@ class ViperAST:
     def MapContains(self, key, m, position, info):
         return self.ast.MapContains(key, m, position, info, self.NoTrafos)
 
+    def MapLookup(self, m, key, position, info):
+        return self.ast.MapLookup(m, key, position, info, self.NoTrafos)
+
     def SeqAppend(self, left, right, position, info):
         return self.ast.SeqAppend(left, right, position, info, self.NoTrafos)
 

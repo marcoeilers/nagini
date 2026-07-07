@@ -14,6 +14,29 @@ from nagini_translation.lib.errors.messages import ERRORS, REASONS, VAGUE_REASON
 from nagini_translation.lib.errors.rules import Rules
 
 
+def format_translation_error(ide_mode: bool, file: str, message: str,
+                             line: int, col: int, line_end: int = None,
+                             col_end: int = None) -> str:
+    """Format a translation error (invalid program, unsupported, type error).
+
+    In IDE mode this mirrors the layout produced for verification errors by
+    :meth:`Error.string` (``file:line:col:line_end:col_end: error: message``),
+    so an IDE/LSP frontend can parse translation and verification errors
+    uniformly. ``line`` is 1-based and ``col`` is a 0-based column (the Python
+    AST ``col_offset`` convention, which is also what Nagini stores in Viper
+    positions); IDE mode emits ``col + 1`` to match the columns Viper reports.
+    Without IDE mode the human-readable ``message (file@line.col)`` form is kept.
+    """
+    if ide_mode:
+        if line_end is None:
+            line_end = line
+        if col_end is None:
+            col_end = col
+        return '{0}:{1}:{2}:{3}:{4}: error: {5}'.format(
+            file, line, col + 1, line_end, col_end + 1, message)
+    return '{0} ({1}@{2}.{3})'.format(message, file, line, col)
+
+
 class Position:
     """Wrapper around ``AbstractSourcePosition``."""
 
@@ -99,7 +122,8 @@ class Error:
 
     def __init__(self, error: 'AbstractVerificationError', rules: Rules,
                  reason_item: Any, node: 'ast.Node' = None,
-                 vias: List[Any] = None, inputs: List[Any] = None) -> None:
+                 vias: List[Any] = None, inputs: List[Any] = None,
+                 bcs: List[str] = None) -> None:
 
         # Translate error id.
         viper_reason = error.reason() if hasattr(error, 'reason') else None
@@ -127,6 +151,7 @@ class Error:
         else:
             self.reason = None
         self.position = Position(error.pos())
+        self.bcs = bcs
 
     def pos(self) -> 'ast.AbstractSourcePosition':
         """Get position.
@@ -152,6 +177,12 @@ class Error:
     def readable_message(self) -> str:
         """Readable error message."""
         return self._error.readableMessage()
+
+    @property
+    def bcs_string(self) -> str:
+        if not self.bcs:
+            return ""
+        return ".\nBranch conditions: \n  " + "\n  ".join(self.bcs)
 
     @property
     def position_string(self) -> str:
@@ -197,8 +228,9 @@ class Error:
                 self.message, self.reason)
         else:
             if self._inputs is not None:
-                return '{0} {1} ({2}).\n{3}'.format(
-                    self.message, self.reason.string(show_viper_errors), self.position_string, str(self._inputs))
+                return '{0} {1} ({2}){3}.\n{4}'.format(
+                    self.message, self.reason.string(show_viper_errors), self.position_string, self.bcs_string,
+                    str(self._inputs))
             else:
-                return '{0} {1} ({2})'.format(
-                    self.message, self.reason.string(show_viper_errors), self.position_string)
+                return '{0} {1} ({2}){3}'.format(
+                    self.message, self.reason.string(show_viper_errors), self.position_string, self.bcs_string)

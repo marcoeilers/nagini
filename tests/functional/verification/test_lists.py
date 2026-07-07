@@ -236,3 +236,33 @@ def test_index() -> None:
     assert mylist.index(super3) == 2
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert mylist.index(super1) == 3
+
+
+def test_eq1() -> None:
+    l1: list[int] = [1,2,3]
+    l2: list[int] = [1,2,3]
+
+    assert l1 == l2
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert l1 is l2
+
+def test_eq2() -> None:
+    l1: list[int] = [1,2]
+    l2: list[int] = [1,2,3]
+
+    assert l1 != l2
+    l1.append(3)
+    assert l1 == l2
+    l2.append(4)
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert l1 == l2
+
+# TODO
+# def test_index_to_elem(l: list[int]) -> None:
+#     Requires(list_pred(l))
+#     Requires(Forall(int, lambda j: (Implies(0 <= j and j < len(l), 0 <= l[j] and l[j] < 256), [[l[j]]])))
+
+#     assert Forall(l, lambda el: 0 <= el and el < 256)
+
+#     #:: ExpectedOutput(assert.failed:assertion.false)
+#     assert Forall(l, lambda el: 0 <= el and el < 255)

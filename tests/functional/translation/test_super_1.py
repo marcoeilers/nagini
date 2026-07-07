@@ -13,5 +13,5 @@ class Super:
 class Sub(Super):
     def some_method(self) -> int:
         Ensures(Result() >= 15)
-        #:: ExpectedOutput(type.error:"super" with a single argument not supported)
+        #:: ExpectedOutput(type.error:"super" with a single argument not supported  [misc])
         return 1 + super(self).some_method()

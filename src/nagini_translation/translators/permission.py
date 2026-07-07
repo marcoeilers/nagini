@@ -35,17 +35,14 @@ class PermTranslator(CommonTranslator):
     def translate_perm_Constant(self, node: 'ast.Constant', ctx: Context) -> Expr:
         return self.translate_perm_Num(node, ctx)
 
-    def translate_perm_Num(self, node: ast.Num, ctx: Context) -> Expr:
-        if node.n == 1:
+    def translate_perm_Num(self, node: ast.Constant, ctx: Context) -> Expr:
+        if node.value == 1:
             return self.viper.FullPerm(self.to_position(node, ctx),
                                        self.no_info(ctx))
-        raise UnsupportedException(node)
+        raise UnsupportedException(node, 'only the literal 1 is supported as a permission amount; use division like 1/2 for fractional permissions')
 
     def translate_perm_or_int(self, node: ast.AST, ctx: Context):
-        num_class = ast.Num
-        import sys
-        if sys.version_info[1] >= 8:
-            num_class = ast.Constant
+        num_class = ast.Constant
         if isinstance(node, num_class):
             stmt, int_val = self.translate_expr(node, ctx, self.viper.Int)
             if stmt:
@@ -104,7 +101,7 @@ class PermTranslator(CommonTranslator):
             return new_node(left, right,
                             self.to_position(node, ctx),
                             self.no_info(ctx))
-        raise UnsupportedException(node)
+        raise UnsupportedException(node, 'unsupported operator in permission expression')
 
     def translate_perm_Call(self, node: ast.Call, ctx: Context) -> Expr:
         func_name = get_func_name(node)
