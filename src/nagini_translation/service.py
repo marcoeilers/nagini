@@ -374,17 +374,7 @@ class VerificationService:
         else:
             backend_args = build_silicon_backend_args(
                 viper_args, counterexample, self._disable_branch_conditions)
-        try:
-            job_id = manager.submit(prog, path, backend_args, backend=self._backend)
-        except Exception:
-            # Most commonly the backend rejected the arguments (Scallop parse
-            # error on a bad viper_args entry).
-            logging.exception('Verification job could not be submitted.')
-            return VerifyResult(False, [self._point_diagnostic(
-                path, 'Verification could not be started; the Viper backend '
-                'rejected the configuration (check viper_args).',
-                'verifier.error')], time.time() - start,
-                viper_program=viper_text)
+        job_id = manager.submit(prog, path, backend_args, backend=self._backend)
         if job_token is not None:
             with self._jobs_lock:
                 self._jobs[job_token] = job_id
