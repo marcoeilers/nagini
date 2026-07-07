@@ -95,15 +95,19 @@ class VerifyResult:
     duration: float
     translation_failed: bool = False
     cancelled: bool = False
+    viper_program: Optional[str] = None
 
     def to_dict(self) -> dict:
-        return {
+        result = {
             'success': self.success,
             'translationFailed': self.translation_failed,
             'cancelled': self.cancelled,
             'duration': self.duration,
             'diagnostics': [d.to_dict() for d in self.diagnostics],
         }
+        if self.viper_program is not None:
+            result['viperProgram'] = self.viper_program
+        return result
 
 
 class VerificationService:
@@ -183,7 +187,7 @@ class VerificationService:
     def verify(self, path: str, *, selected: Set[str] = None, base_dir: str = None,
                arp: bool = False, counterexample: bool = False,
                ignore_global: bool = False, viper_args: List[str] = None,
-               obligations: str = None, write_viper_to_file: str = None,
+               include_viper: bool = False,
                job_token: str = None) -> VerifyResult:
         """Translate and verify the file at ``path`` and return structured results.
 
@@ -192,43 +196,27 @@ class VerificationService:
         cancellation of this request via :meth:`cancel`. Set ``ignore_global``
         to skip verification of top-level (module-global) statements.
         ``viper_args`` are extra command-line arguments for the Viper backend
-        (the CLI's ``--viper-arg``, as a list). ``obligations`` overrides the
-        obligation encoding for this request: ``'force'`` enables it,
-        ``'ignore'`` disables it, ``'auto'``/``None`` auto-detects per program.
-        ``write_viper_to_file`` writes the translated Viper program to that
-        path. ``arp`` verifies under abstract read permissions (such requests
-        run serially).
+        (the CLI's ``--viper-arg``, as a list). ``include_viper`` returns the
+        translated Viper program in ``viper_program``. ``arp`` verifies under
+        abstract read permissions (such requests run serially).
         """
         path = os.path.abspath(path)
-        if obligations not in (None, 'auto', 'force', 'ignore'):
-            raise ValueError("obligations must be 'auto', 'force' or 'ignore', "
-                             "got {!r}.".format(obligations))
         viper_args = list(viper_args) if viper_args else []
         if self._can_run_concurrently(arp):
             return self._verify_concurrent(path, selected, base_dir, counterexample,
-                                           ignore_global, viper_args, obligations,
-                                           write_viper_to_file, job_token)
+                                           ignore_global, viper_args,
+                                           include_viper, job_token)
         with self._state_lock:
             return self._verify_serial(path, selected, base_dir, arp, counterexample,
-                                       ignore_global, viper_args, obligations,
-                                       write_viper_to_file)
+                                       ignore_global, viper_args, include_viper)
 
-    def _apply_obligations(self, obligations: str = None) -> None:
-        """Set the obligation encoding mode before a translation.
+    def _reset_obligations(self) -> None:
+        """Restore the obligation auto-detection setting before a translation.
 
-        Must be called while holding the state lock. ``'force'`` enables the
-        encoding and ``'ignore'`` disables it, for this translation only;
-        otherwise the service's startup setting is restored. Setting
-        ``disable_all`` to ``None`` would be written as the string ``"None"``
-        (breaking getboolean), so we remove the key to return to auto-detection
-        instead.
+        Must be called while holding the state lock. Setting ``disable_all`` to
+        ``None`` would be written as the string ``"None"`` (breaking getboolean),
+        so we remove the key to return to auto-detection instead.
         """
-        if obligations == 'force':
-            config.obligation_config.disable_all = False
-            return
-        if obligations == 'ignore':
-            config.obligation_config.disable_all = True
-            return
         section = config.obligation_config._info
         if self._initial_obligations_disable_all is None:
             if 'disable_all' in section:
@@ -347,8 +335,8 @@ class VerificationService:
     # -- internals ----------------------------------------------------------
 
     def _verify_concurrent(self, path, selected, base_dir, counterexample,
-                           ignore_global, viper_args, obligations,
-                           write_viper_to_file, job_token) -> VerifyResult:
+                           ignore_global, viper_args, include_viper,
+                           job_token) -> VerifyResult:
         from nagini_translation.viper_server import (build_carbon_backend_args,
                                                      build_silicon_backend_args,
                                                      get_viper_server_manager)
@@ -356,7 +344,7 @@ class VerificationService:
         start = time.time()
         # 1. Translate and snapshot this job's error-mapping state (serialized).
         with self._state_lock:
-            self._apply_obligations(obligations)
+            self._reset_obligations()
             try:
                 translated = translate(
                     path, self.jvm, self._bv_size,
@@ -376,9 +364,7 @@ class VerificationService:
                     path, 'Type checking failed.', 'type.error')],
                     time.time() - start, translation_failed=True)
             modules, prog = translated
-            if write_viper_to_file:
-                with open(write_viper_to_file, 'w') as f:
-                    f.write(str(prog))
+            viper_text = str(prog) if include_viper else None
             snapshot = (dict(error_manager._items),
                         dict(error_manager._conversion_rules))
             error_manager.clear()
@@ -398,7 +384,8 @@ class VerificationService:
             return VerifyResult(False, [self._point_diagnostic(
                 path, 'Verification could not be started; the Viper backend '
                 'rejected the configuration (check viper_args).',
-                'verifier.error')], time.time() - start)
+                'verifier.error')], time.time() - start,
+                viper_program=viper_text)
         if job_token is not None:
             with self._jobs_lock:
                 self._jobs[job_token] = job_id
@@ -407,7 +394,8 @@ class VerificationService:
         except Exception:
             # Most commonly this is a cancelled job (its actor was stopped).
             logging.debug('Verification job failed or was cancelled.', exc_info=True)
-            return VerifyResult(False, [], time.time() - start, cancelled=True)
+            return VerifyResult(False, [], time.time() - start, cancelled=True,
+                                viper_program=viper_text)
         finally:
             if job_token is not None:
                 with self._jobs_lock:
@@ -420,12 +408,12 @@ class VerificationService:
         if result is None:
             return VerifyResult(False, [self._point_diagnostic(
                 path, 'Internal verifier error (see server log).',
-                'verifier.error')], duration)
+                'verifier.error')], duration, viper_program=viper_text)
 
         # 3. Convert the result with this job's snapshot installed (serialized).
         is_failure = isinstance(result, self.jvm.viper.silver.verifier.Failure)
         if not is_failure:
-            return VerifyResult(True, [], duration)
+            return VerifyResult(True, [], duration, viper_program=viper_text)
         with self._state_lock:
             error_manager._items, error_manager._conversion_rules = snapshot
             try:
@@ -437,14 +425,14 @@ class VerificationService:
                 diagnostics = self._failure_diagnostics(failure, path)
             finally:
                 error_manager.clear()
-        return VerifyResult(False, diagnostics, duration)
+        return VerifyResult(False, diagnostics, duration, viper_program=viper_text)
 
     def _verify_serial(self, path, selected, base_dir, arp,
-                       counterexample, ignore_global, viper_args, obligations,
-                       write_viper_to_file) -> VerifyResult:
+                       counterexample, ignore_global, viper_args,
+                       include_viper) -> VerifyResult:
         start = time.time()
         try:
-            self._apply_obligations(obligations)
+            self._reset_obligations()
             selected_set = set(selected) if selected else set()
             translated = translate(
                 path, self.jvm, self._bv_size, selected=selected_set,
@@ -456,9 +444,7 @@ class VerificationService:
                     path, 'Type checking failed.', 'type.error')],
                     time.time() - start, translation_failed=True)
             modules, prog = translated
-            if write_viper_to_file:
-                with open(write_viper_to_file, 'w') as f:
-                    f.write(str(prog))
+            viper_text = str(prog) if include_viper else None
             backend = (ViperVerifier.silicon if self._backend == 'silicon'
                        else ViperVerifier.carbon)
             vresult = verify_program(
@@ -470,11 +456,11 @@ class VerificationService:
                 # main.verify swallows JVM exceptions and returns None.
                 return VerifyResult(False, [self._point_diagnostic(
                     path, 'Internal verifier error (see server log).',
-                    'verifier.error')], duration)
+                    'verifier.error')], duration, viper_program=viper_text)
             if isinstance(vresult, Failure):
                 return VerifyResult(False, self._failure_diagnostics(vresult, path),
-                                    duration)
-            return VerifyResult(True, [], duration)
+                                    duration, viper_program=viper_text)
+            return VerifyResult(True, [], duration, viper_program=viper_text)
         except (TypeException, InvalidProgramException, UnsupportedException) as e:
             return VerifyResult(False, self._exception_diagnostics(e, path),
                                 time.time() - start, translation_failed=True)

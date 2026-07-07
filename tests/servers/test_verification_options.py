@@ -7,11 +7,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 
 """Service-level tests for verification options: --ignore-global,
---disable-branch-conditions, obligation auto-detection and per-request
-overrides, per-request Viper backend arguments, and --write-viper-to-file."""
-
-
-import pytest
+--disable-branch-conditions, obligation auto-detection, per-request Viper
+backend arguments, and include_viper."""
 
 
 _TOPLEVEL_ASSERT_SRC = (
@@ -113,31 +110,6 @@ def test_obligations_autodetected_per_program(service, tmp_path):
     assert bad.diagnostics
 
 
-# -- per-request obligation overrides ----------------------------------------
-
-def test_obligations_ignore_disables_encoding_per_request(service, tmp_path):
-    # With the encoding disabled for this request, the unsatisfiable
-    # MustTerminate obligation is not checked and the program verifies.
-    assert service.verify(
-        _write(tmp_path, "mt_bad_ignored.py", _MUST_TERMINATE_BAD_SRC),
-        obligations="ignore").success
-    # The override is per-request: the next auto-detected run checks it again.
-    assert not service.verify(
-        _write(tmp_path, "mt_bad_auto.py", _MUST_TERMINATE_BAD_SRC)).success
-
-
-def test_obligations_force_keeps_encoding_active(service, tmp_path):
-    assert service.verify(
-        _write(tmp_path, "no_obl_forced.py", _NO_OBLIGATIONS_SRC),
-        obligations="force").success
-
-
-def test_obligations_invalid_value_rejected(service, tmp_path):
-    with pytest.raises(ValueError):
-        service.verify(_write(tmp_path, "obl_bad.py", _NO_OBLIGATIONS_SRC),
-                       obligations="never")
-
-
 # -- per-request viper args ---------------------------------------------------
 
 def test_viper_args_reach_the_backend_command_line(service, tmp_path):
@@ -167,11 +139,14 @@ def test_viper_args_invalid_option_fails_cleanly(service, tmp_path):
     assert not result.success
 
 
-# -- --write-viper-to-file ----------------------------------------------------
+# -- include_viper ------------------------------------------------------------
 
-def test_write_viper_to_file(service, tmp_path):
-    out = tmp_path / "translated.vpr"
-    assert service.verify(
-        _write(tmp_path, "wv.py", _NO_OBLIGATIONS_SRC),
-        write_viper_to_file=str(out)).success
-    assert "method" in out.read_text()
+def test_include_viper_returns_translated_program(service, tmp_path):
+    result = service.verify(_write(tmp_path, "iv.py", _NO_OBLIGATIONS_SRC),
+                            include_viper=True)
+    assert result.success
+    assert "method" in result.viper_program
+    # Off by default, and then absent from the serialized result.
+    default = service.verify(_write(tmp_path, "iv2.py", _NO_OBLIGATIONS_SRC))
+    assert default.viper_program is None
+    assert "viperProgram" not in default.to_dict()

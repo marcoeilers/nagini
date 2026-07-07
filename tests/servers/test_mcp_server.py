@@ -213,28 +213,14 @@ def test_verify_ignore_global_via_tool(service):
         mcp_server.verify_snippet(_TOPLEVEL_ASSERT_SRC, ignore_global=True))["success"] is True
 
 
-_MUST_TERMINATE_BAD_SRC = (
-    "from nagini_contracts.contracts import *\n"
-    "from nagini_contracts.obligations import MustTerminate\n\n"
-    "def rec(n: int) -> int:\n    Requires(MustTerminate(1))\n    return rec(n)\n"
-)
-
-
-def test_verify_viper_args_and_write_viper_via_tool(service, tmp_path, pass_src):
+def test_verify_viper_args_and_include_viper_via_tool(service, pass_src):
     mcp_server._service = service
-    out = tmp_path / "snippet.vpr"
     result = asyncio.run(mcp_server.verify_snippet(
-        pass_src, viper_args=["--timeout=300"], write_viper_to_file=str(out)))
+        pass_src, viper_args=["--timeout=300"], include_viper=True))
     assert result["success"] is True
-    assert "method" in out.read_text()
-
-
-def test_verify_obligations_override_via_tool(service):
-    mcp_server._service = service
-    assert asyncio.run(mcp_server.verify_snippet(
-        _MUST_TERMINATE_BAD_SRC, obligations="ignore"))["success"] is True
-    assert asyncio.run(mcp_server.verify_snippet(
-        _MUST_TERMINATE_BAD_SRC))["success"] is False
+    assert "method" in result["viperProgram"]
+    # The (large) Viper program is only included on request.
+    assert "viperProgram" not in asyncio.run(mcp_server.verify_snippet(pass_src))
 
 
 def test_configure_disable_branch_conditions_via_tool(service):
