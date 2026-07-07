@@ -197,8 +197,7 @@ class VerificationService:
         to skip verification of top-level (module-global) statements.
         ``viper_args`` are extra command-line arguments for the Viper backend
         (the CLI's ``--viper-arg``, as a list). ``include_viper`` returns the
-        translated Viper program in ``viper_program``. ``arp`` verifies under
-        abstract read permissions (such requests run serially).
+        translated Viper program in ``viper_program``.
         """
         path = os.path.abspath(path)
         viper_args = list(viper_args) if viper_args else []

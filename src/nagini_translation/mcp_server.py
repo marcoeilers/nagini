@@ -50,7 +50,6 @@ async def verify_file(path: str, method: Optional[str] = None,
                       base_dir: Optional[str] = None,
                       viper_args: Optional[List[str]] = None,
                       include_viper: bool = False,
-                      arp: bool = False,
                       job_token: Optional[str] = None) -> dict:
     """Verify a Nagini Python file.
 
@@ -76,15 +75,13 @@ async def verify_file(path: str, method: Optional[str] = None,
     e.g. `["--timeout=60"]` for a per-run verification timeout in seconds (the
     CLI's `--viper-arg`, as a list). `include_viper` returns the translated
     Viper program in `viperProgram`; even a small file translates to hundreds
-    of lines, so only request it when needed. Set `arp` to verify under
-    abstract read permissions (requires the ARP plugin on the classpath; such
-    requests run serially).
+    of lines, so only request it when needed.
     """
     selected = {method} if method else None
     result = await _run(lambda: _service.verify(
         path, selected=selected, counterexample=counterexample, base_dir=base_dir,
         ignore_global=ignore_global, viper_args=viper_args,
-        include_viper=include_viper, arp=arp, job_token=job_token))
+        include_viper=include_viper, job_token=job_token))
     return result.to_dict()
 
 
@@ -93,7 +90,6 @@ async def verify_method(path: str, method: str, counterexample: bool = False,
                         base_dir: Optional[str] = None,
                         viper_args: Optional[List[str]] = None,
                         include_viper: bool = False,
-                        arp: bool = False,
                         job_token: Optional[str] = None) -> dict:
     """Verify only a single method of a file (fast, via Nagini's --select).
 
@@ -105,7 +101,7 @@ async def verify_method(path: str, method: str, counterexample: bool = False,
     result = await _run(lambda: _service.verify(
         path, selected={method}, counterexample=counterexample,
         base_dir=base_dir, viper_args=viper_args,
-        include_viper=include_viper, arp=arp, job_token=job_token))
+        include_viper=include_viper, job_token=job_token))
     return result.to_dict()
 
 
@@ -114,7 +110,6 @@ async def verify_snippet(code: str, counterexample: bool = False,
                          ignore_global: bool = False,
                          viper_args: Optional[List[str]] = None,
                          include_viper: bool = False,
-                         arp: bool = False,
                          job_token: Optional[str] = None) -> dict:
     """Verify an inline snippet of Nagini Python code (written to a temp file).
 
@@ -129,7 +124,7 @@ async def verify_snippet(code: str, counterexample: bool = False,
         result = await _run(lambda: _service.verify(
             tmp_path, counterexample=counterexample, base_dir=tmp_dir,
             ignore_global=ignore_global, viper_args=viper_args,
-            include_viper=include_viper, arp=arp, job_token=job_token))
+            include_viper=include_viper, job_token=job_token))
         return result.to_dict()
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)

@@ -5,6 +5,7 @@ build
 deps/JPype1
 __pycache__
 .virtualenv
+.venv
 .cache
 .installed.cfg
 .mr.developer.cfg
