@@ -5,7 +5,7 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 from nagini_contracts.contracts import *
-from typing import List
+from typing import List, Tuple
 
 
 def takes_int(x: int) -> None:
@@ -80,3 +80,55 @@ def reads_pseq_bool_param_rejected(s: PSeq[bool]) -> None:
     Requires(len(s) > 0)
     #:: ExpectedOutput(call.precondition:assertion.false)
     takes_int(s[0])
+
+
+def reads_tuple_int_param(t: Tuple[int, int]) -> None:
+    takes_int(t[0])
+    takes_int(t[1])
+
+
+def reads_single_int_tuple(t: Tuple[int]) -> None:
+    takes_int(t[0])
+
+
+def reads_homogeneous_tuple(t: Tuple[int, ...]) -> None:
+    Requires(len(t) > 0)
+    takes_int(t[0])
+
+
+def reads_mixed_tuple(t: Tuple[int, str]) -> None:
+    # Only the int slot can be passed to takes_int.
+    takes_int(t[0])
+
+
+def tuple_literal_strict() -> None:
+    t = (1, 2, 3)
+    takes_int(t[0])
+    takes_int(t[2])
+
+
+def unpacks_tuple_int(t: Tuple[int, int]) -> None:
+    a, b = t
+    takes_int(a)
+    takes_int(b)
+
+
+def _make_int_pair() -> Tuple[int, int]:
+    return (1, 2)
+
+
+def returns_tuple_int_used() -> None:
+    t = _make_int_pair()
+    takes_int(t[0])
+
+
+def reads_bool_tuple_rejected(t: Tuple[bool, bool]) -> None:
+    # Tuple[bool, bool] elements must NOT be promoted to strict int.
+    #:: ExpectedOutput(call.precondition:assertion.false)
+    takes_int(t[0])
+
+
+def reads_bool_variadic_tuple_rejected(t: Tuple[bool, ...]) -> None:
+    Requires(len(t) > 0)
+    #:: ExpectedOutput(call.precondition:assertion.false)
+    takes_int(t[0])
