@@ -622,15 +622,18 @@ class ProgramTranslator(CommonTranslator):
         info = self.no_info(ctx)
         id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, pos, info)
         id_param = self.viper.LocalVar('id', self.viper.Int, pos, info)
+        func_terminates = self.viper.DecreasesWildcard(None, pos, self.no_info(ctx))
         is_defined_func = self.viper.Function(IS_DEFINED_FUNC, [id_param_decl],
-                                              self.viper.Bool, [], [], None, pos, info)
+                                              self.viper.Bool, [], [func_terminates],
+                                              None, pos, info)
         var_param_decl = self.viper.LocalVarDecl('val', self.viper.Ref, pos, info)
         var_param = self.viper.LocalVar('val', self.viper.Ref, pos, info)
         is_defined_pre = self.viper.FuncApp(IS_DEFINED_FUNC, [id_param], pos, info,
                                             self.viper.Bool, [id_param_decl])
         check_defined_func = self.viper.Function(CHECK_DEFINED_FUNC,
                                                  [var_param_decl, id_param_decl],
-                                                 self.viper.Ref, [is_defined_pre], [],
+                                                 self.viper.Ref, [is_defined_pre],
+                                                 [func_terminates],
                                                  var_param, pos, info)
         return [is_defined_func, check_defined_func]
 
@@ -641,9 +644,11 @@ class ProgramTranslator(CommonTranslator):
         var_param = self.viper.LocalVar('val', self.viper.Ref, pos, info)
         assertion_param_decl = self.viper.LocalVarDecl('ass', self.viper.Bool, pos, info)
         assertion_param = self.viper.LocalVar('ass', self.viper.Bool, pos, info)
+        asserting_terminates = self.viper.DecreasesWildcard(None, pos, self.no_info(ctx))
         asserting_func = self.viper.Function(ASSERTING_FUNC,
                                              [var_param_decl, assertion_param_decl],
-                                             self.viper.Ref, [assertion_param], [],
+                                             self.viper.Ref, [assertion_param],
+                                             [asserting_terminates],
                                              var_param, pos, info)
         return [asserting_func]
 
@@ -656,9 +661,11 @@ class ProgramTranslator(CommonTranslator):
         fact_param = self.viper.LocalVar('fact', self.viper.Bool, pos, info)
         result_var = self.viper.Result(self.viper.Ref, pos, info)
         post_eq = self.viper.EqCmp(result_var, r_param, pos, info)
+        assuming_terminates = self.viper.DecreasesWildcard(None, pos, self.no_info(ctx))
         assuming_func = self.viper.Function(ASSUMING_FUNC,
                                             [r_param_decl, fact_param_decl],
-                                            self.viper.Ref, [], [fact_param, post_eq],
+                                            self.viper.Ref, [],
+                                            [fact_param, post_eq, assuming_terminates],
                                             None, pos, info)
         return [assuming_func]
 
