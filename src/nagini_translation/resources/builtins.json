@@ -46,6 +46,11 @@
             "type": null,
             "MustTerminate": true
         },
+        "insert": {
+            "args": ["list", "__prim__int", "object"],
+            "type": null,
+            "MustTerminate": true
+        },
         "extend": {
             "args": ["list", "list"],
             "type": null,
@@ -54,6 +59,16 @@
         "reverse": {
             "args": ["list"],
             "type": "list",
+            "MustTerminate": true
+        },
+        "copy": {
+            "args": ["list"],
+            "type": "list",
+            "MustTerminate": true
+        },
+        "remove": {
+            "args": ["list", "object"],
+            "type": null,
             "MustTerminate": true
         },
         "__setitem__": {
@@ -103,6 +118,10 @@
         "__sil_seq__": {
             "args": ["list"],
             "type": "__prim__Seq"
+        },
+        "index": {
+            "args": ["list", "object"],
+            "type": "__prim__int"
         },
         "__eq__": {
             "args": ["list", "object"],
