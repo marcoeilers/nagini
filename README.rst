@@ -3,6 +3,13 @@ Nagini is an automatic verifier for statically typed Python programs, based on t
 
 Our CAV 2018 tool paper describing Nagini can be found `here <http://pm.inf.ethz.ch/publications/getpdf.php?bibname=Own&id=EilersMueller18.pdf>`_, and a more detailed description of its encoding can be found in `Marco Eilers' thesis <https://pm.inf.ethz.ch/publications/Eilers2022.pdf>`_. Also see `the Wiki <https://github.com/marcoeilers/nagini/wiki>`_ for the documentation of Nagini's specification language. See the `changelog <CHANGELOG.md>`_ for the version history.
 
+
+Visual Studio Code Plugin
+===================================
+
+Nagini can be used via a Vistual Studio code plugin available `here <https://marketplace.visualstudio.com/items?itemName=viper-admin.nagini-ide>`_. The plugin requires Java and Python to be installed (see dependencies below). 
+
+
 Dependencies (Ubuntu Linux)
 ===================================
 
@@ -40,7 +47,7 @@ Execute the following commands (on Windows, you may have to use ``cmd`` and not 
 
     on Windows.
         
-3.  Install Nagini::
+3.  Install Nagini from PyPI::
 
         pip install nagini
         # or with optional dependencies for server mode and testing:
