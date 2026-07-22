@@ -23,7 +23,7 @@ import shutil
 import sys
 import tempfile
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from typing import List, Optional
 
 from mcp.server.fastmcp import FastMCP
@@ -33,10 +33,26 @@ from nagini_translation.service import (add_service_arguments, make_service,
 
 
 mcp = FastMCP('nagini')
-_service = None
+_service_future: Optional[Future] = None
 # Multiple verifications can run at once; the service serializes only the fast
 # translation step internally.
 _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix='nagini-verify')
+
+
+def _get_service():
+    """Wait for the service to finish booting. Blocks; call only from
+    `_executor` threads, never from the event loop (FastMCP runs even sync
+    tools on the loop)."""
+    assert _service_future is not None
+    return _service_future.result()
+
+
+def _service_if_ready():
+    """The booted service, or None while it is still booting or failed to boot."""
+    if (_service_future is not None and _service_future.done()
+            and _service_future.exception() is None):
+        return _service_future.result()
+    return None
 
 
 async def _run(fn):
@@ -78,7 +94,7 @@ async def verify_file(path: str, method: Optional[str] = None,
     of lines, so only request it when needed.
     """
     selected = {method} if method else None
-    result = await _run(lambda: _service.verify(
+    result = await _run(lambda: _get_service().verify(
         path, selected=selected, counterexample=counterexample, base_dir=base_dir,
         ignore_global=ignore_global, viper_args=viper_args,
         include_viper=include_viper, job_token=job_token))
@@ -97,7 +113,7 @@ async def verify_method(path: str, method: str, counterexample: bool = False,
     (its bare name also matches), or a whole class by `ClassName`. The other
     parameters are as in `verify_file`.
     """
-    result = await _run(lambda: _service.verify(
+    result = await _run(lambda: _get_service().verify(
         path, selected={method}, counterexample=counterexample,
         viper_args=viper_args, include_viper=include_viper,
         job_token=job_token))
@@ -120,7 +136,7 @@ async def verify_snippet(code: str, counterexample: bool = False,
     try:
         with open(tmp_path, 'w') as f:
             f.write(code)
-        result = await _run(lambda: _service.verify(
+        result = await _run(lambda: _get_service().verify(
             tmp_path, counterexample=counterexample, base_dir=tmp_dir,
             ignore_global=ignore_global, viper_args=viper_args,
             include_viper=include_viper, job_token=job_token))
@@ -130,7 +146,7 @@ async def verify_snippet(code: str, counterexample: bool = False,
 
 
 @mcp.tool()
-def configure(options: dict) -> dict:
+async def configure(options: dict) -> dict:
     """Change verification options for subsequent requests; returns the effective
     configuration.
 
@@ -141,21 +157,25 @@ def configure(options: dict) -> dict:
     `sif`/`intBitopsSize`/`floatEncoding` reloads the Silver resources;
     already-running verifications are unaffected.
     """
-    return _service.reconfigure(**options_to_kwargs(options))
+    return await _run(lambda: _get_service().reconfigure(**options_to_kwargs(options)))
 
 
 @mcp.tool()
 def cancel(job_token: Optional[str] = None) -> dict:
     """Cancel verification: a specific run if `job_token` is given, else all."""
-    _service.cancel(job_token=job_token)
-    return {'cancelled': True, 'jobToken': job_token}
+    service = _service_if_ready()
+    if service is not None:
+        service.cancel(job_token=job_token)
+    return {'cancelled': service is not None, 'jobToken': job_token}
 
 
 @mcp.tool()
 def flush_cache() -> dict:
     """Clear the ViperServer result cache."""
-    _service.flush_cache()
-    return {'flushed': True}
+    service = _service_if_ready()
+    if service is not None:
+        service.flush_cache()
+    return {'flushed': service is not None}
 
 
 def main():
@@ -164,13 +184,18 @@ def main():
     parser.add_argument('--log', default='WARNING')
     args = parser.parse_args()
     logging.basicConfig(level=getattr(logging, args.log.upper(), logging.WARNING))
-    global _service
-    _service = make_service(args)
+    global _service_future
+    # The JVM-backed service boots in the background (see `main`) so the MCP handshake is answered
+    # immediately instead of after JVM startup, which can exceed common client startup timeouts.
+    _service_future = ThreadPoolExecutor(
+        max_workers=1, thread_name_prefix='nagini-boot').submit(make_service, args)
     try:
         mcp.run()
     finally:
         try:
-            _service.shutdown()
+            service = _service_if_ready()
+            if service is not None:
+                service.shutdown()
         except Exception:
             logging.exception('Error shutting down service.')
         # The stdio transport may already have closed these streams by the time
