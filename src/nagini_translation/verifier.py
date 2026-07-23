@@ -37,6 +37,7 @@ def build_silicon_backend_args(viper_args: List[str], counterexample: bool,
         '--exhaleMode=2',
         '--alternativeFunctionVerificationOrder',
         '--z3ResourcesPerMillisecond=9000',
+        '--proverConfigArgs=memory_max_size=4096', # Remove before merging
         '--disableDefaultPlugins',
         *(['--enableBranchconditionReporting'] if not disable_branch_conditions else []),
         '--plugin=viper.silver.plugin.standard.refute.RefutePlugin:'
