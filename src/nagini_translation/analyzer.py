@@ -23,6 +23,7 @@ from nagini_contracts.obligations import OBLIGATION_CONTRACT_FUNCS
 from nagini_translation.analyzer_io import IOOperationAnalyzer
 from nagini_translation.external.ast_util import mark_text_ranges
 from nagini_translation.lib.constants import (
+    BUILTIN_PREDICATES,
     CALLABLE_TYPE,
     EXTENDABLE_BUILTINS,
     IGNORED_IMPORTS,
@@ -719,6 +720,13 @@ class Analyzer(ast.NodeVisitor):
         name = node.name
         if self._is_illegal_magic_method_name(name):
             raise InvalidProgramException(node, 'illegal.magic.method')
+        # Calls to these dispatch on the bare name, so a user definition would be
+        # silently shadowed by the built-in.
+        if name in BUILTIN_PREDICATES:
+            raise InvalidProgramException(
+                node, 'builtin.predicate.shadowed',
+                f'"{name}" is a built-in Nagini predicate name and cannot be '
+                'redefined; choose a different name.')
         assert isinstance(name, str)
         if self.is_io_operation(node):
             self.io_operation_analyzer.analyze_io_operation(node)
