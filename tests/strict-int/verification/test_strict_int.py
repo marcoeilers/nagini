@@ -5,7 +5,17 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 from nagini_contracts.contracts import *
-from typing import List, Tuple
+from typing import List, Optional, Tuple
+
+
+def opt_list_pred_no_invariant(xs: Optional[List[int]]) -> int:
+    # The list invariant only applies to actual list types; an Optional argument
+    # (type_args [None, list]) crashed the translator here.
+    Requires(Implies(xs is not None, Acc(list_pred(xs))))
+    Ensures(Result() >= 0)
+    if xs is None:
+        return 0
+    return len(xs)
 
 
 def takes_int(x: int) -> None:
