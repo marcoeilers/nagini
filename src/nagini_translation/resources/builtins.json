@@ -888,11 +888,13 @@
         },
         "update": {
             "args": ["PSeq", "__prim__int", "object"],
-            "type": "PSeq"
+            "type": "PSeq",
+            "generic_type": -2
         },
         "__add__": {
             "args": ["PSeq", "PSeq"],
-            "type": "PSeq"
+            "type": "PSeq",
+            "generic_type": -2
         },
         "__eq__": {
             "args": ["PSeq", "PSeq"],
@@ -987,11 +989,13 @@
         },
         "__add__": {
             "args": ["PSet", "PSet"],
-            "type": "PSet"
+            "type": "PSet",
+            "generic_type": -2
         },
         "__sub__": {
             "args": ["PSet", "PSet"],
-            "type": "PSet"
+            "type": "PSet",
+            "generic_type": -2
         },
         "__eq__": {
             "args": ["PSet", "PSet"],
@@ -1025,11 +1029,13 @@
         },
         "__add__": {
             "args": ["PMultiset", "PMultiset"],
-            "type": "PMultiset"
+            "type": "PMultiset",
+            "generic_type": -2
         },
         "__sub__": {
             "args": ["PMultiset", "PMultiset"],
-            "type": "PMultiset"
+            "type": "PMultiset",
+            "generic_type": -2
         },
         "__eq__": {
             "args": ["PMultiset", "PMultiset"],
