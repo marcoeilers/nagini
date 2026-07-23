@@ -673,7 +673,9 @@ class ContractTranslator(CommonTranslator):
 
         dom_target = self.get_target(domain_node, ctx)
 
-        if isinstance(dom_target, PythonType):
+        if isinstance(dom_target, PythonType) and not isinstance(domain_node, ast.Call):
+            # We were given a type, not a container; the check for ast.Call is needed because
+            # get_target also returns a PythonType for constructor calls.
             result = self.type_check(ref_var, dom_target, pos, ctx, False)
             # Not recommended as a trigger, since it's very broad and will get triggered
             # a lot.
