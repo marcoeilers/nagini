@@ -369,6 +369,15 @@ class StatementTranslator(CommonTranslator):
         info = self.no_info(ctx)
         full_perm = self.viper.FullPerm(self.no_position(ctx), info)
         for t in node.targets:
+            if isinstance(t, ast.Subscript):
+                target_cls = self.get_type(t.value, ctx)
+                lhs_stmt, target_expr = self.translate_expr(t.value, ctx)
+                ind_stmt, index = self.translate_expr(t.slice, ctx)
+                call = self.get_method_call(target_cls, '__delitem__',
+                                            [target_expr, index], [None, None],
+                                            [], t, ctx)
+                result.extend(lhs_stmt + ind_stmt + call)
+                continue
             target = self.get_target(t, ctx)
             if isinstance(target, PythonField):
                 pos = self.to_position(t, ctx)
@@ -387,7 +396,7 @@ class StatementTranslator(CommonTranslator):
                 may_set = self.get_may_set_predicate(receiver, python_field, ctx, pos)
                 result.append(self.viper.Inhale(may_set, pos, info))
             else:
-                raise UnsupportedException(node, 'del is only supported for object fields')
+                raise UnsupportedException(node, 'del is only supported for object fields and subscripts')
         return result
 
     def translate_stmt_AugAssign(self, node: ast.AugAssign,

@@ -157,6 +157,23 @@ method list_remove(self: Ref, item: Ref) returns ()
                           && (forall j: Int :: 0 <= j && j < i ==> old(self.list_acc)[j] != item)
                           && self.list_acc == old(self.list_acc)[..i] ++ old(self.list_acc)[i+1..]
 
+method list_pop(self: Ref) returns (_res: Ref)
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires acc(self.list_acc)
+    requires @error("List may be empty.")(|self.list_acc| > 0)
+    ensures acc(self.list_acc)
+    ensures issubtype(typeof(_res), list_arg(typeof(self), 0))
+    ensures _res == old(self.list_acc)[|old(self.list_acc)| - 1]
+    ensures self.list_acc == old(self.list_acc)[..|old(self.list_acc)| - 1]
+
+method list___delitem__(self: Ref, key: Int) returns ()
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires acc(self.list_acc)
+    requires @error("List index may be negative.")(key >= 0)
+    requires @error("List index may be out of bounds.")(key < list___len__(self))
+    ensures acc(self.list_acc)
+    ensures self.list_acc == old(self.list_acc)[..key] ++ old(self.list_acc)[key+1..]
+
 function list_index(self: Ref, item: Ref): Int
     decreases _
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))

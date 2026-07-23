@@ -917,7 +917,10 @@ class CallTranslator(CommonTranslator):
             if keywords:
                 raise UnsupportedException(node, desc='Keyword arguments in call to '
                                                       'builtin function: ' + target.name)
-            diff = target.nargs - len(unpacked_args)
+            # The receiver of a method call is not among arg_nodes but fills the
+            # first declared parameter; count it, or extra arguments beyond the
+            # modeled arity are silently dropped downstream.
+            diff = target.nargs - len(unpacked_args) - (1 if implicit_receiver else 0)
             if diff < 0:
                 raise UnsupportedException(node, 'Unsupported version of builtin '
                                                  'function: ' + target.name)

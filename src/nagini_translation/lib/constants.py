@@ -277,6 +277,7 @@ LEGAL_MAGIC_METHODS = {
 
     '__getitem__',
     '__setitem__',
+    '__contains__',
 
     '__iadd__',
     '__isub__',
