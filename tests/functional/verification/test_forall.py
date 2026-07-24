@@ -88,6 +88,12 @@ def test_type_quantification_n_fail(d: Dict[str, str], s: str) -> None:
     Assert(Forall2(int, int, lambda i, j: (Implies(i >= 0 and i < len(r) and j >= 0 and j < 3, r[i][j] > 3), [[r[i][j]]])))
 
 
+def range_quant_fail(xs: List[int]) -> None:
+    Requires(Acc(list_pred(xs)))
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    Assert(Forall(range(0, len(xs)), lambda i: (xs[i] == 8, [[xs[i]]])))
+
+
 def foo(l: Optional[List[int]]) -> None:
     Requires(l is not None)
     Requires(list_pred(l))
