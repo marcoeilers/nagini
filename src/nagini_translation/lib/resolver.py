@@ -464,6 +464,10 @@ def _get_call_type(node: ast.Call, module: PythonModule,
             raise InvalidProgramException(node, 'invalid.super.call')
     if func_name == 'len':
         return module.global_module.classes[INT_TYPE]
+    if func_name == 'id':
+        # A user-defined function named 'id' shadows the builtin.
+        if get_target(node.func, containers, container) is None:
+            return module.global_module.classes[INT_TYPE]
     if func_name in ('token', 'ctoken', 'MustTerminate', 'MustRelease'):
         return module.global_module.classes[BOOL_TYPE]
     if func_name == PSEQ_TYPE:

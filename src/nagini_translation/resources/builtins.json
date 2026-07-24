@@ -12,6 +12,10 @@
         "__cast__": {
             "args": ["type", "object"],
             "type": "object"
+        },
+        "__id__": {
+            "args": ["object"],
+            "type": "__prim__int"
         }
     },
     "methods": {
