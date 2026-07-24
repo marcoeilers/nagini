@@ -369,6 +369,15 @@ class StatementTranslator(CommonTranslator):
         info = self.no_info(ctx)
         full_perm = self.viper.FullPerm(self.no_position(ctx), info)
         for t in node.targets:
+            if isinstance(t, ast.Subscript):
+                target_cls = self.get_type(t.value, ctx)
+                lhs_stmt, target_expr = self.translate_expr(t.value, ctx)
+                ind_stmt, index = self.translate_expr(t.slice, ctx)
+                call = self.get_method_call(target_cls, '__delitem__',
+                                            [target_expr, index], [None, None],
+                                            [], t, ctx)
+                result.extend(lhs_stmt + ind_stmt + call)
+                continue
             target = self.get_target(t, ctx)
             if isinstance(target, PythonField):
                 pos = self.to_position(t, ctx)
@@ -387,7 +396,7 @@ class StatementTranslator(CommonTranslator):
                 may_set = self.get_may_set_predicate(receiver, python_field, ctx, pos)
                 result.append(self.viper.Inhale(may_set, pos, info))
             else:
-                raise UnsupportedException(node, 'del is only supported for object fields')
+                raise UnsupportedException(node, 'del is only supported for object fields and subscripts')
         return result
 
     def translate_stmt_AugAssign(self, node: ast.AugAssign,
@@ -608,6 +617,27 @@ class StatementTranslator(CommonTranslator):
         invariant.append(self.viper.Implies(some_error, previous_is_all, pos,
                                             info))
         invariant.append(self.viper.Implies(empty_iterator, some_error, pos, info))
+
+        if ctx.strict_int and target_var.type.name == INT_TYPE:
+            # Carry the strict element-type fact across the loop body. Without
+            # this, __next__'s `issubtype(typeof(_res), int())` postcondition
+            # cannot establish the strict `typeof(target) == int()` that the
+            # target_type invariant above requires in strict-int mode.
+            i_decl = self.viper.LocalVarDecl('__si_i', self.viper.Int, pos, info)
+            i_ref = self.viper.LocalVar('__si_i', self.viper.Int, pos, info)
+            seq_at_i = self.viper.SeqIndex(iter_acc, i_ref, pos, info)
+            bounds = self.viper.And(
+                self.viper.LeCmp(zero, i_ref, pos, info),
+                self.viper.LtCmp(i_ref, iter_list_len, pos, info),
+                pos, info)
+            int_cls = ctx.module.global_module.classes[INT_TYPE]
+            int_lit = self.type_factory.translate_type_literal(int_cls, pos, ctx)
+            typeof_eq = self.viper.EqCmp(self.type_factory.typeof(seq_at_i, ctx),
+                                         int_lit, pos, info)
+            forall_body = self.viper.Implies(bounds, typeof_eq, pos, info)
+            trigger = self.viper.Trigger([seq_at_i], pos, info)
+            invariant.append(self.viper.Forall([i_decl], [trigger], forall_body,
+                                               pos, info))
         return invariant
 
     def _get_iterator(self, iterable: Expr, iterable_type: PythonType,

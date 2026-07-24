@@ -344,6 +344,7 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         right_type = get_type(node.right, containers, container)
 
         func = None
+        receiver = left_type
         if left_type == right_type or isinstance(right_type, TypeVar):
             func = left_type.get_func_or_method(LEFT_OPERATOR_FUNCTIONS[type(node.op)])
 
@@ -355,15 +356,26 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                 base_right_func = left_type.get_compatible_func_or_method(right_func_name, [right_type, left_type])
                 if right_func.overrides or base_right_func == None:
                     func = right_func
+                    receiver = right_type
 
             if func is None:
                 left_func = left_type.get_compatible_func_or_method(LEFT_OPERATOR_FUNCTIONS[type(node.op)], [left_type, right_type])
                 if left_func:
                     func = left_func
+                    receiver = left_type
                 if right_func:
                     func = right_func
+                    receiver = right_type
         if func is None:
             raise UnsupportedException(node, 'Unsupported operator')
+        # Parameterize the result from the receiver, like the PythonMethod call case
+        # above: generic_type -2 means the receiver's type, >= 0 one of its type args.
+        if func.generic_type == -2:
+            return receiver
+        if func.generic_type >= 0:
+            return receiver.type_args[func.generic_type]
+        if func.type is not None and func.type.contains_type_var():
+            return func.type.substitute(receiver.get_bound_type_vars())
         return func.type
 
     elif isinstance(node, ast.UnaryOp):
@@ -452,6 +464,10 @@ def _get_call_type(node: ast.Call, module: PythonModule,
             raise InvalidProgramException(node, 'invalid.super.call')
     if func_name == 'len':
         return module.global_module.classes[INT_TYPE]
+    if func_name == 'id':
+        # A user-defined function named 'id' shadows the builtin.
+        if get_target(node.func, containers, container) is None:
+            return module.global_module.classes[INT_TYPE]
     if func_name in ('token', 'ctoken', 'MustTerminate', 'MustRelease'):
         return module.global_module.classes[BOOL_TYPE]
     if func_name == PSEQ_TYPE:

@@ -136,7 +136,7 @@ def configure(options: dict) -> dict:
 
     Recognized keys: `verifier` ('silicon' or 'carbon'), `z3Path`, `boogiePath`,
     `mypyPath`, `sif`, `intBitopsSize`, `floatEncoding`, `useViperServer`,
-    `disableBranchConditions`. `viperJarPath` cannot be changed after startup and
+    `disableBranchConditions`, `strictInt`. `viperJarPath` cannot be changed after startup and
     is ignored. Unknown or null keys are ignored. Changing
     `sif`/`intBitopsSize`/`floatEncoding` reloads the Silver resources;
     already-running verifications are unaffected.

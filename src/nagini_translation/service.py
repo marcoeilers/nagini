@@ -127,7 +127,9 @@ class VerificationService:
                  int_bitops_size: int = 8, use_viper_server: bool = True,
                  verifier_backend: str = 'silicon', sif=False,
                  float_encoding: str = None,
-                 disable_branch_conditions: bool = False):
+                 disable_branch_conditions: bool = False,
+                 strict_int: bool = False,
+                 force_obligations: bool = False):
         if viper_jar_path:
             config.classpath = viper_jar_path
         if z3_path:
@@ -151,6 +153,10 @@ class VerificationService:
         self._float_encoding = float_encoding
         self._bv_size = int_bitops_size
         self._disable_branch_conditions = disable_branch_conditions
+        self._strict_int = strict_int
+        if force_obligations:
+            # False instead of None: force the obligation encoding (see main.py).
+            config.obligation_config.disable_all = False
         # The obligation encoding is auto-detected per program by translate(),
         # which persistently sets obligation_config.disable_all once a program
         # without obligations is seen. In a long-lived service that would then
@@ -280,6 +286,7 @@ class VerificationService:
             'floatEncoding': self._float_encoding,
             'useViperServer': config.use_viper_server,
             'disableBranchConditions': self._disable_branch_conditions,
+            'strictInt': self._strict_int,
             'z3Path': config.z3_path,
             'boogiePath': config.boogie_path,
             'mypyPath': config.mypy_path,
@@ -313,6 +320,8 @@ class VerificationService:
             if options.get('disable_branch_conditions') is not None:
                 self._disable_branch_conditions = bool(
                     options['disable_branch_conditions'])
+            if options.get('strict_int') is not None:
+                self._strict_int = bool(options['strict_int'])
             reload_needed = False
             if options.get('sif') is not None and options['sif'] != self._sif:
                 self._sif = options['sif']
@@ -349,7 +358,8 @@ class VerificationService:
                     path, self.jvm, self._bv_size,
                     selected=set(selected) if selected else set(), sif=False,
                     base_dir=base_dir, arp=False, counterexample=counterexample,
-                    ignore_global=ignore_global, float_encoding=self._float_encoding)
+                    ignore_global=ignore_global, float_encoding=self._float_encoding,
+                    strict_int=self._strict_int)
             except (TypeException, InvalidProgramException, UnsupportedException) as e:
                 return VerifyResult(False, self._exception_diagnostics(e, path),
                                     time.time() - start, translation_failed=True)
@@ -427,7 +437,8 @@ class VerificationService:
                 path, self.jvm, self._bv_size, selected=selected_set,
                 sif=self._sif, base_dir=base_dir, arp=arp,
                 counterexample=counterexample, ignore_global=ignore_global,
-                float_encoding=self._float_encoding)
+                float_encoding=self._float_encoding,
+                strict_int=self._strict_int)
             if translated is None:
                 return VerifyResult(False, [self._point_diagnostic(
                     path, 'Type checking failed.', 'type.error')],
@@ -550,6 +561,7 @@ OPTION_TO_KWARG = {
     'floatEncoding': 'float_encoding',
     'useViperServer': 'use_viper_server',
     'disableBranchConditions': 'disable_branch_conditions',
+    'strictInt': 'strict_int',
 }
 
 
@@ -586,6 +598,12 @@ def add_service_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentP
                              'errors (Silicon backend)')
     parser.add_argument('--no-viper-server', action='store_true',
                         help='disable the in-process ViperServer backend')
+    parser.add_argument('--strict-int', action='store_true', default=False,
+                        help='require exact int type (type(x) == int) rather '
+                             'than subtype (isinstance(x, int)) in many places')
+    parser.add_argument('--force-obligations', action='store_true', default=False,
+                        help='force use of the obligations encoding used to '
+                             'verify liveness properties')
     return parser
 
 
@@ -601,7 +619,8 @@ def service_kwargs_from_args(args: argparse.Namespace) -> dict:
         mypy_path=args.mypy_path, int_bitops_size=args.int_bitops_size,
         use_viper_server=not args.no_viper_server, verifier_backend=args.verifier,
         sif=args.sif, float_encoding=args.float_encoding,
-        disable_branch_conditions=args.disable_branch_conditions)
+        disable_branch_conditions=args.disable_branch_conditions,
+        strict_int=args.strict_int, force_obligations=args.force_obligations)
 
 
 def make_service(args: argparse.Namespace) -> VerificationService:

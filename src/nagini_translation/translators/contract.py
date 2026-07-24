@@ -13,9 +13,11 @@ from nagini_translation.lib.constants import (
     BOOL_TYPE,
     BUILTIN_PREDICATES,
     GET_ARG_FUNC,
+    DICT_TYPE,
     GET_OLD_FUNC,
     GLOBAL_VAR_FIELD,
     INT_TYPE,
+    LIST_TYPE,
     FLOAT_TYPE,
     JOINABLE_FUNC,
     METHOD_ID_DOMAIN,
@@ -144,12 +146,24 @@ class ContractTranslator(CommonTranslator):
         pos = self.to_position(node, ctx)
         if name == 'list_pred':
             # field list_acc : Seq[Ref]
-            return self._get_field_perm('list_acc', seq_ref, perm, args[0], pos, ctx)
+            field_perm = self._get_field_perm('list_acc', seq_ref, perm,
+                                              args[0], pos, ctx)
+            strict_inv = self._strict_int_list_invariant(node.args[0], args[0],
+                                                         pos, ctx)
+            if strict_inv is None:
+                return field_perm
+            return self.viper.And(field_perm, strict_inv, pos, self.no_info(ctx))
         elif name == 'set_pred':
             # field set_acc : Set[Ref]
             return self._get_field_perm('set_acc', set_ref, perm, args[0], pos, ctx)
         elif name == 'dict_pred':
-            return self._get_field_perm('dict_acc', map_ref_ref, perm, args[0], pos, ctx)
+            field_perm = self._get_field_perm('dict_acc', map_ref_ref, perm,
+                                              args[0], pos, ctx)
+            strict_inv = self._strict_int_dict_invariant(node.args[0], args[0],
+                                                         pos, ctx)
+            if strict_inv is None:
+                return field_perm
+            return self.viper.And(field_perm, strict_inv, pos, self.no_info(ctx))
         elif name == 'bytearray_pred':
             return self._get_field_perm('bytearray_acc', seq_int, perm, args[0], pos, ctx)
         elif name == 'MayStart':
@@ -168,6 +182,97 @@ class ContractTranslator(CommonTranslator):
             perm = self.viper.PermMul(perm, ctx.perm_factor, pos, info)
         pred = self.viper.FieldAccessPredicate(field_acc, perm, pos, info)
         return pred
+
+    def _strict_int_list_invariant(self, list_py_node: ast.AST, list_ref: Expr,
+                                   pos: Position, ctx: Context) -> Expr:
+        # In strict-int mode, List[int] elements must be exactly int (not bool
+        # or any other int subtype). Returns a quantified invariant:
+        #     forall i :: 0 <= i < |l.list_acc| ==> typeof(l.list_acc[i]) == int()
+        # or None when the invariant doesn't apply.
+        if not ctx.strict_int:
+            return None
+        list_type = self.get_type(list_py_node, ctx)
+        # The argument may not be a list at all (list_pred dispatches on the bare
+        # name), and Optional/union type_args contain None placeholders.
+        if (list_type is None or list_type.name != LIST_TYPE
+                or not getattr(list_type, 'type_args', None)):
+            return None
+        elem_type = list_type.type_args[0]
+        if elem_type is None or elem_type.name != INT_TYPE:
+            return None
+        info = self.no_info(ctx)
+        seq_ref = self.viper.SeqType(self.viper.Ref)
+        field = self.viper.Field('list_acc', seq_ref, pos, info)
+        field_acc = self.viper.FieldAccess(list_ref, field, pos, info)
+        i_decl = self.viper.LocalVarDecl('i', self.viper.Int, pos, info)
+        i_ref = self.viper.LocalVar('i', self.viper.Int, pos, info)
+        seq_at_i = self.viper.SeqIndex(field_acc, i_ref, pos, info)
+        zero = self.viper.IntLit(0, pos, info)
+        length = self.viper.SeqLength(field_acc, pos, info)
+        bounds = self.viper.And(
+            self.viper.LeCmp(zero, i_ref, pos, info),
+            self.viper.LtCmp(i_ref, length, pos, info),
+            pos, info)
+        int_cls = ctx.module.global_module.classes[INT_TYPE]
+        int_lit = self.type_factory.translate_type_literal(int_cls, pos, ctx)
+        typeof_at_i = self.type_factory.typeof(seq_at_i, ctx)
+        eq = self.viper.EqCmp(typeof_at_i, int_lit, pos, info)
+        body = self.viper.Implies(bounds, eq, pos, info)
+        trigger = self.viper.Trigger([seq_at_i], pos, info)
+        return self.viper.Forall([i_decl], [trigger], body, pos, info)
+
+    def _strict_int_dict_invariant(self, dict_py_node: ast.AST, dict_ref: Expr,
+                                   pos: Position, ctx: Context) -> Expr:
+        # Mirror of _strict_int_list_invariant for Dict[int, ...]: in strict-int
+        # mode a dict whose key and/or value type is int must have those keys /
+        # values exactly int (not bool or any other int subtype). Returns the
+        # conjunction of whichever of these apply, quantified over the domain:
+        #     forall k :: k in d.dict_acc ==> typeof(k) == int()           (keys)
+        #     forall k :: k in d.dict_acc ==> typeof(d.dict_acc[k]) == int() (values)
+        # or None when neither applies.
+        if not ctx.strict_int:
+            return None
+        dict_type = self.get_type(dict_py_node, ctx)
+        # The argument may not be a dict at all (dict_pred dispatches on the bare
+        # name), and Optional/union type_args contain None placeholders.
+        if (dict_type is None or dict_type.name != DICT_TYPE
+                or not getattr(dict_type, 'type_args', None)
+                or len(dict_type.type_args) < 2):
+            return None
+        key_type, value_type = dict_type.type_args[0], dict_type.type_args[1]
+        key_is_int = key_type is not None and key_type.name == INT_TYPE
+        value_is_int = value_type is not None and value_type.name == INT_TYPE
+        if not key_is_int and not value_is_int:
+            return None
+        info = self.no_info(ctx)
+        map_ref_ref = self.viper.MapType(self.viper.Ref, self.viper.Ref)
+        field = self.viper.Field('dict_acc', map_ref_ref, pos, info)
+        field_acc = self.viper.FieldAccess(dict_ref, field, pos, info)
+        k_decl = self.viper.LocalVarDecl('k', self.viper.Ref, pos, info)
+        k_ref = self.viper.LocalVar('k', self.viper.Ref, pos, info)
+        contains = self.viper.MapContains(k_ref, field_acc, pos, info)
+        int_cls = ctx.module.global_module.classes[INT_TYPE]
+        int_lit = self.type_factory.translate_type_literal(int_cls, pos, ctx)
+        conjuncts = []
+        if key_is_int:
+            key_eq = self.viper.EqCmp(self.type_factory.typeof(k_ref, ctx),
+                                      int_lit, pos, info)
+            key_body = self.viper.Implies(contains, key_eq, pos, info)
+            key_trigger = self.viper.Trigger([contains], pos, info)
+            conjuncts.append(self.viper.Forall([k_decl], [key_trigger], key_body,
+                                               pos, info))
+        if value_is_int:
+            lookup = self.viper.MapLookup(field_acc, k_ref, pos, info)
+            val_eq = self.viper.EqCmp(self.type_factory.typeof(lookup, ctx),
+                                      int_lit, pos, info)
+            val_body = self.viper.Implies(contains, val_eq, pos, info)
+            val_trigger = self.viper.Trigger([lookup], pos, info)
+            conjuncts.append(self.viper.Forall([k_decl], [val_trigger], val_body,
+                                               pos, info))
+        result = conjuncts[0]
+        for extra in conjuncts[1:]:
+            result = self.viper.And(result, extra, pos, info)
+        return result
 
     def translate_may_start(self, node: ast.Call, args: List[Expr], perm: Expr,
                             ctx: Context) -> Expr:

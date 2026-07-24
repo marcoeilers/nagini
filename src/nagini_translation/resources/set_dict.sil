@@ -153,6 +153,26 @@ method dict___setitem__(self: Ref, key: Ref, item: Ref) returns ()
     ensures self.dict_acc == old(self.dict_acc)[key := item]
 
 
+method dict___delitem__(self: Ref, key: Ref) returns ()
+    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    requires acc(self.dict_acc)
+    requires @error("Key might not be present in dictionary.")(key in self.dict_acc)
+    ensures acc(self.dict_acc)
+    ensures domain(self.dict_acc) == domain(old(self.dict_acc)) setminus Set(key)
+    ensures forall k: Ref :: {self.dict_acc[k]} k in self.dict_acc ==> self.dict_acc[k] == old(self.dict_acc)[k]
+    ensures |self.dict_acc| == |old(self.dict_acc)| - 1
+
+method dict_pop(self: Ref, key: Ref) returns (_res: Ref)
+    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    requires acc(self.dict_acc)
+    requires @error("Key might not be present in dictionary.")(key in self.dict_acc)
+    ensures acc(self.dict_acc)
+    ensures issubtype(typeof(_res), dict_arg(typeof(self), 1))
+    ensures _res == old(self.dict_acc)[key]
+    ensures domain(self.dict_acc) == domain(old(self.dict_acc)) setminus Set(key)
+    ensures forall k: Ref :: {self.dict_acc[k]} k in self.dict_acc ==> self.dict_acc[k] == old(self.dict_acc)[k]
+    ensures |self.dict_acc| == |old(self.dict_acc)| - 1
+
 method dict_values(self: Ref) returns (_res: Ref)
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
     requires acc(self.dict_acc, 1/100)

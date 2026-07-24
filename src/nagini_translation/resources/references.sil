@@ -19,3 +19,24 @@ method object___repr__(self: Ref) returns (res: Ref)
 
 function object___repr_val__(self: Ref): Seq[Int]
     decreases _
+
+/*
+ * Models the identity of an object as an injective function from references
+ * to integers, which is consistent with the translation of 'is' as reference
+ * equality: id(x) == id(y) holds exactly if x is y. Injectivity is expressed
+ * via an inverse function to avoid quantifying over pairs of references.
+ */
+domain _ObjectId {
+    function _object_id(r: Ref): Int
+    function _object_id_inv(id: Int): Ref
+
+    axiom object_id_injective {
+        forall r: Ref :: {_object_id(r)} _object_id_inv(_object_id(r)) == r
+    }
+}
+
+function object___id__(self: Ref): Int
+    decreases _
+{
+    _object_id(self)
+}

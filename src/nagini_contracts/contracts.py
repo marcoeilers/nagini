@@ -433,7 +433,7 @@ def ToMS(s: PSeq[T]) -> PMultiset[T]:
 # The following annotations have no runtime semantics. They are only used for
 # the Python to Viper translation.
 
-def Acc(field, ratio=1) -> bool:
+def Acc(field, ratio: float=1) -> bool:
     """
     Access permission to field.
     0 < ratio < 1 means read-only access.

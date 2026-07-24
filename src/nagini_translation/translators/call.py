@@ -129,6 +129,14 @@ class CallTranslator(CommonTranslator):
                                                          [None], node, ctx)
         return stmt + len_stmt, len_val
 
+    def _translate_id(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        assert len(node.args) == 1
+        stmt, target = self.translate_expr(node.args[0], ctx)
+        object_class = ctx.module.global_module.classes['object']
+        id_val = self.get_function_call(object_class, '__id__', [target],
+                                        [None], node, ctx)
+        return stmt, id_val
+
     def _translate_str(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
@@ -633,6 +641,8 @@ class CallTranslator(CommonTranslator):
             return self._translate_isinstance(node, ctx)
         elif func_name == 'super':
             return self._translate_super(node, ctx)
+        elif func_name == 'id':
+            return self._translate_id(node, ctx)
         elif func_name == 'len':
             return self._translate_len(node, ctx)
         elif func_name == 'str':
@@ -917,7 +927,10 @@ class CallTranslator(CommonTranslator):
             if keywords:
                 raise UnsupportedException(node, desc='Keyword arguments in call to '
                                                       'builtin function: ' + target.name)
-            diff = target.nargs - len(unpacked_args)
+            # The receiver of a method call is not among arg_nodes but fills the
+            # first declared parameter; count it, or extra arguments beyond the
+            # modeled arity are silently dropped downstream.
+            diff = target.nargs - len(unpacked_args) - (1 if implicit_receiver else 0)
             if diff < 0:
                 raise UnsupportedException(node, 'Unsupported version of builtin '
                                                  'function: ' + target.name)
@@ -1410,6 +1423,9 @@ class CallTranslator(CommonTranslator):
             elif func_name in OBLIGATION_CONTRACT_FUNCS:
                 return self.translate_obligation_contractfunc_call(node, ctx, impure)
             elif func_name in BUILTINS:
+                if func_name == 'id' and self.get_target(node.func, ctx) is not None:
+                    # A user-defined function named 'id' shadows the builtin.
+                    return self.translate_normal_call_node(node, ctx, impure)
                 return self._translate_builtin_func(node, ctx)
             elif func_name == "Thread":
                 return self._translate_thread_creation(node, ctx)
