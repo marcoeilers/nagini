@@ -784,6 +784,11 @@ class ExpressionTranslator(CommonTranslator):
         args = [target, slice]
         stmt = target_stmt + start_stmt + stop_stmt
         getitem = target_type.get_func_or_method('__getitem_slice__')
+        if getitem is None:
+            # Only builtin sequence types model slicing.
+            raise UnsupportedException(
+                node, "slice expressions on type '{}'".format(
+                    getattr(target_type, 'name', target_type)))
         if not getitem.pure:
             result_var = ctx.current_function.create_variable(
                 'slice_res', target_type, self.translator)
@@ -1311,9 +1316,9 @@ class ExpressionTranslator(CommonTranslator):
                 func_name = "__pow_unrolled__"
             call_stmt, call = self.get_func_or_method_call(left_type, func_name, [left, right], [left_type, right_type], node, ctx)
             if call is None:
-                raise UnsupportedException(node, "Unsupported binary operator")
+                raise UnsupportedException(node, self._binop_error(node, left_type, right_type))
             return stmt + call_stmt, call
-            
+
         else:
             right_func_name = RIGHT_OPERATOR_FUNCTIONS[type(node.op)]
             right_func = right_type.get_compatible_func_or_method(right_func_name, [right_type, left_type])
@@ -1332,6 +1337,21 @@ class ExpressionTranslator(CommonTranslator):
             if right_func:
                 call_stmt, call = self.get_func_or_method_call(right_type, right_func_name, [right, left], [right_type, left_type], node, ctx)
                 return stmt + call_stmt, call
+            # Neither operand models this operator (e.g. '%'-formatting on str).
+            raise UnsupportedException(node, self._binop_error(node, left_type, right_type))
+
+    @staticmethod
+    def _binop_error(node: ast.BinOp, left_type: PythonType,
+                     right_type: PythonType) -> str:
+        op_symbol = {
+            ast.Add: '+', ast.Sub: '-', ast.Mult: '*', ast.Div: '/',
+            ast.FloorDiv: '//', ast.Mod: '%', ast.Pow: '**',
+            ast.LShift: '<<', ast.RShift: '>>', ast.BitOr: '|',
+            ast.BitXor: '^', ast.BitAnd: '&', ast.MatMult: '@',
+        }.get(type(node.op), type(node.op).__name__)
+        return ("binary operator '{}' on operand types {} and {}".format(
+            op_symbol, getattr(left_type, 'name', left_type),
+            getattr(right_type, 'name', right_type)))
 
     def is_thread_method_definition(self, node: ast.Compare, ctx: Context) -> bool:
         """

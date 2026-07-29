@@ -1708,7 +1708,12 @@ class StatementTranslator(CommonTranslator):
         cond_stmt, cond = self.translate_expr(node.test, ctx,
                                               target_type=self.viper.Bool)
         if cond_stmt:
-            raise InvalidProgramException(node, 'purity.violated')
+            raise InvalidProgramException(
+                node, 'purity.violated',
+                message='the while-loop condition calls an impure function or '
+                        'method; loop guards must be pure. Hoist the call: '
+                        'evaluate it into a local variable before the loop and '
+                        'again at the end of the loop body.')
         invariants, cond_low = self._translate_while_invariants(node, cond, ctx)
         if ctx.sif == 'prob':
             rule_pos = self.to_position(node.test, ctx, rules=rules.BRANCH_CONDITION_ASSERT)
