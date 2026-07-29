@@ -129,7 +129,8 @@ class VerificationService:
                  float_encoding: str = None,
                  disable_branch_conditions: bool = False,
                  strict_int: bool = False,
-                 force_obligations: bool = False):
+                 force_obligations: bool = False,
+                 default_viper_args: List[str] = None):
         if viper_jar_path:
             config.classpath = viper_jar_path
         if z3_path:
@@ -149,6 +150,7 @@ class VerificationService:
                              'environment variable).')
 
         self._backend = verifier_backend
+        self._default_viper_args = list(default_viper_args) if default_viper_args else []
         self._sif = sif
         self._float_encoding = float_encoding
         self._bv_size = int_bitops_size
@@ -194,6 +196,7 @@ class VerificationService:
                arp: bool = False, counterexample: bool = False,
                ignore_global: bool = False, viper_args: List[str] = None,
                include_viper: bool = False,
+               int_bitops_size: int = None,
                job_token: str = None) -> VerifyResult:
         """Translate and verify the file at ``path`` and return structured results.
 
@@ -203,21 +206,33 @@ class VerificationService:
         to skip verification of top-level (module-global) statements.
         ``viper_args`` are extra command-line arguments for the Viper backend
         (the CLI's ``--viper-arg``, as a list). ``include_viper`` returns the
-        translated Viper program in ``viper_program``.
+        translated Viper program in ``viper_program``. ``int_bitops_size`` sets
+        the bitvector width used to encode int bitwise operations for this
+        request; like :meth:`reconfigure` it is sticky (subsequent requests
+        keep it) and reloads the Silver resources only when the width changes.
         """
         path = os.path.abspath(path)
         start = time.time()
         viper_args = list(viper_args) if viper_args else []
+        # Server-default backend args (the CLI's --viper-arg, given at service
+        # launch), applied to every request. The request's own viper_args win:
+        # a default is dropped when the request passes the same flag itself.
+        if self._default_viper_args:
+            given = {a.split('=', 1)[0] for a in viper_args}
+            viper_args = [a for a in self._default_viper_args
+                          if a.split('=', 1)[0] not in given] + viper_args
         try:
             if self._can_run_concurrently(arp):
                 return self._verify_concurrent(path, selected, base_dir,
                                                counterexample,
                                                ignore_global, viper_args,
-                                               include_viper, job_token)
+                                               include_viper, job_token,
+                                               int_bitops_size=int_bitops_size)
             with self._state_lock:
                 return self._verify_serial(path, selected, base_dir, arp,
                                            counterexample, ignore_global,
-                                           viper_args, include_viper)
+                                           viper_args, include_viper,
+                                           int_bitops_size=int_bitops_size)
         except Exception as e:
             # Last-resort conversion of internal crashes (translator bugs,
             # unexpected error shapes) into a structured result: callers get a
@@ -228,6 +243,18 @@ class VerificationService:
                 path, 'Internal Nagini error: {}: {} (traceback in server '
                 'log).'.format(type(e).__name__, e), 'internal.error')],
                 time.time() - start)
+
+    def _apply_bitops_size(self, size: int) -> None:
+        """Switch the bitvector width for subsequent translations; sticky, like
+        :meth:`reconfigure`. Must be called while holding the state lock.
+        No-op when ``size`` is ``None`` or already current.
+        """
+        if size is None or size == self._bv_size:
+            return
+        self._bv_size = size
+        import nagini_translation.main as main_module
+        main_module.sil_programs = load_sil_files(self.jvm, self._bv_size,
+                                                  self._sif, self._float_encoding)
 
     def _reset_obligations(self) -> None:
         """Restore the obligation auto-detection setting before a translation.
@@ -358,7 +385,7 @@ class VerificationService:
 
     def _verify_concurrent(self, path, selected, base_dir, counterexample,
                            ignore_global, viper_args, include_viper,
-                           job_token) -> VerifyResult:
+                           job_token, int_bitops_size=None) -> VerifyResult:
         from nagini_translation.viper_server import (build_carbon_backend_args,
                                                      build_silicon_backend_args,
                                                      get_viper_server_manager)
@@ -366,6 +393,7 @@ class VerificationService:
         start = time.time()
         # 1. Translate and snapshot this job's error-mapping state (serialized).
         with self._state_lock:
+            self._apply_bitops_size(int_bitops_size)
             self._reset_obligations()
             try:
                 translated = translate(
@@ -452,9 +480,10 @@ class VerificationService:
 
     def _verify_serial(self, path, selected, base_dir, arp,
                        counterexample, ignore_global, viper_args,
-                       include_viper) -> VerifyResult:
+                       include_viper, int_bitops_size=None) -> VerifyResult:
         start = time.time()
         try:
+            self._apply_bitops_size(int_bitops_size)
             self._reset_obligations()
             selected_set = set(selected) if selected else set()
             translated = translate(
@@ -654,6 +683,11 @@ def add_service_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     parser.add_argument('--force-obligations', action='store_true', default=False,
                         help='force use of the obligations encoding used to '
                              'verify liveness properties')
+    parser.add_argument('--viper-arg', default=None,
+                        help='arguments forwarded to the Viper backend on every '
+                             'verification request, separated by commas (same '
+                             "syntax as the CLI's --viper-arg; a request's own "
+                             'viper_args override same-name flags)')
     return parser
 
 
@@ -670,7 +704,8 @@ def service_kwargs_from_args(args: argparse.Namespace) -> dict:
         use_viper_server=not args.no_viper_server, verifier_backend=args.verifier,
         sif=args.sif, float_encoding=args.float_encoding,
         disable_branch_conditions=args.disable_branch_conditions,
-        strict_int=args.strict_int, force_obligations=args.force_obligations)
+        strict_int=args.strict_int, force_obligations=args.force_obligations,
+        default_viper_args=args.viper_arg.split(',') if args.viper_arg else None)
 
 
 def make_service(args: argparse.Namespace) -> VerificationService:
