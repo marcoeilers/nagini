@@ -1106,6 +1106,15 @@ class Analyzer(ast.NodeVisitor):
                     (node.args, self._aliases.copy()))
             elif node.func.id == 'Exsures':
                 exception = self.get_target(node.args[0], self.module)
+                if exception is None:
+                    # An unresolvable exception type (e.g. a builtin like
+                    # ValueError, which Nagini does not model).
+                    raise InvalidProgramException(
+                        node, 'invalid.program',
+                        message='Exsures names an exception type Nagini '
+                                'cannot resolve: {}. Use a module-defined '
+                                'Exception subclass.'.format(
+                                    ast.unparse(node.args[0])))
                 if exception not in self.current_function.declared_exceptions:
                     self.current_function.declared_exceptions[exception] = []
                 self.current_function.declared_exceptions[exception].append(

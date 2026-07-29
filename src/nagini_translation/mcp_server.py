@@ -40,7 +40,13 @@ _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix='nagini-verify'
 
 
 async def _run(fn):
-    return await asyncio.get_event_loop().run_in_executor(_executor, fn)
+    try:
+        return await asyncio.get_event_loop().run_in_executor(_executor, fn)
+    except Exception:
+        # The MCP layer reports tool exceptions as a bare str(e); make sure
+        # the traceback is at least recoverable from the server's stderr.
+        logging.exception('Verification tool crashed.')
+        raise
 
 
 @mcp.tool()

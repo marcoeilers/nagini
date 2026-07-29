@@ -15,6 +15,13 @@ from nagini_translation.lib.util import (
 )
 
 
+def _member_name(n: 'ast.Node') -> str:
+    """Name of the member containing ``n``; nodes can sit outside any member
+    (e.g. positions that map into contract expressions), so never assume one."""
+    member = get_containing_member(n)
+    return member.name if member is not None else '(unknown)'
+
+
 ERRORS = {
     'assignment.failed':
         lambda n: 'Assignment might fail.',
@@ -56,10 +63,10 @@ ERRORS = {
         lambda n: 'Loop invariant might not hold on entry.',
     'function.not.wellformed':
         lambda n: ('Function {} might not be '
-                   'well-formed.').format(get_containing_member(n).name),
+                   'well-formed.').format(_member_name(n)),
     'predicate.not.wellformed':
         lambda n: ('Predicate {} might not be '
-                   'well-formed.').format(get_containing_member(n).name),
+                   'well-formed.').format(_member_name(n)),
     'termination_check.failed':
         lambda n: 'Operation might not terminate.',
     'leak_check.failed':

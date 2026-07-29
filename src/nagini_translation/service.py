@@ -206,14 +206,28 @@ class VerificationService:
         translated Viper program in ``viper_program``.
         """
         path = os.path.abspath(path)
+        start = time.time()
         viper_args = list(viper_args) if viper_args else []
-        if self._can_run_concurrently(arp):
-            return self._verify_concurrent(path, selected, base_dir, counterexample,
-                                           ignore_global, viper_args,
-                                           include_viper, job_token)
-        with self._state_lock:
-            return self._verify_serial(path, selected, base_dir, arp, counterexample,
-                                       ignore_global, viper_args, include_viper)
+        try:
+            if self._can_run_concurrently(arp):
+                return self._verify_concurrent(path, selected, base_dir,
+                                               counterexample,
+                                               ignore_global, viper_args,
+                                               include_viper, job_token)
+            with self._state_lock:
+                return self._verify_serial(path, selected, base_dir, arp,
+                                           counterexample, ignore_global,
+                                           viper_args, include_viper)
+        except Exception as e:
+            # Last-resort conversion of internal crashes (translator bugs,
+            # unexpected error shapes) into a structured result: callers get a
+            # diagnostic instead of a bare exception string, and the full
+            # traceback lands in the server log.
+            logging.exception('Internal error verifying %s.', path)
+            return VerifyResult(False, [self._point_diagnostic(
+                path, 'Internal Nagini error: {}: {} (traceback in server '
+                'log).'.format(type(e).__name__, e), 'internal.error')],
+                time.time() - start)
 
     def _reset_obligations(self) -> None:
         """Restore the obligation auto-detection setting before a translation.
@@ -420,8 +434,18 @@ class VerificationService:
                 errors = []
                 while it.hasNext():
                     errors.append(it.next())
-                failure = Failure(errors, self.jvm, modules, self._sif)
-                diagnostics = self._failure_diagnostics(failure, path)
+                try:
+                    failure = Failure(errors, self.jvm, modules, self._sif)
+                    diagnostics = self._failure_diagnostics(failure, path)
+                except Exception:
+                    # Even a failed conversion must yield the raw Viper
+                    # messages rather than crash the request.
+                    logging.exception('Failed to convert errors for %s.', path)
+                    diagnostics = [self._point_diagnostic(
+                        path, self._raw_error_message(e), 'verifier.error')
+                        for e in errors] or [self._point_diagnostic(
+                            path, 'Internal verifier error (see server log).',
+                            'verifier.error')]
             finally:
                 error_manager.clear()
         return VerifyResult(False, diagnostics, duration, viper_program=viper_text)
@@ -473,35 +497,61 @@ class VerificationService:
         diagnostics = []
         seen = set()
         for error in failure.errors:
-            pos = error.position
             try:
-                file_name = pos.file_name
+                diag = self._error_diagnostic(error, path)
             except Exception:
-                file_name = path
-            vias = [(str(reason), str(p))
-                    for reason, p in (error.reason.vias or error._vias or [])]
-            try:
-                reason_pos = (error.reason.position.line, error.reason.position.column)
-            except Exception:
-                reason_pos = None
-            diag = Diagnostic(
-                file=file_name,
-                start_line=pos.line, start_col=pos.column,
-                end_line=pos.line_end, end_col=pos.column_end,
-                message=error.message,
-                code=error.full_id,
-                reason=error.reason.string(False),
-                reason_position=reason_pos,
-                vias=vias,
-                counterexample=(str(error._inputs)
-                                if error._inputs is not None else None),
-                branch_conditions=list(error.bcs) if error.bcs else [],
-            )
+                # Rendering a diagnostic must never lose the error itself
+                # (internal verifier exceptions produce errors without a
+                # mapped reason or position).
+                logging.exception('Failed to render diagnostic for %s.', path)
+                diag = self._point_diagnostic(
+                    path, self._raw_error_message(error), 'verifier.error')
             key = (diag.file, diag.start_line, diag.start_col, diag.code, diag.message)
             if key not in seen:
                 seen.add(key)
                 diagnostics.append(diag)
         return diagnostics
+
+    def _error_diagnostic(self, error, path: str) -> Diagnostic:
+        pos = error.position
+        try:
+            file_name = pos.file_name
+        except Exception:
+            file_name = path
+        reason = error.reason  # None for internal verifier exceptions
+        vias = [(str(r), str(p))
+                for r, p in ((reason.vias if reason is not None else None)
+                             or error._vias or [])]
+        try:
+            reason_pos = (reason.position.line, reason.position.column)
+        except Exception:
+            reason_pos = None
+        return Diagnostic(
+            file=file_name,
+            start_line=pos.line, start_col=pos.column,
+            end_line=pos.line_end, end_col=pos.column_end,
+            message=(error.message if reason is not None
+                     else self._raw_error_message(error)),
+            code=error.full_id,
+            reason=reason.string(False) if reason is not None else None,
+            reason_position=reason_pos,
+            vias=vias,
+            counterexample=(str(error._inputs)
+                            if error._inputs is not None else None),
+            branch_conditions=list(error.bcs) if error.bcs else [],
+        )
+
+    @staticmethod
+    def _raw_error_message(error) -> str:
+        """Best-effort message for an error whose normal rendering is
+        unavailable (no reason mapping, exotic error class)."""
+        for attr in ('readable_message', 'readableMessage', 'text'):
+            try:
+                value = getattr(error, attr)
+                return str(value() if callable(value) else value)
+            except Exception:
+                continue
+        return 'Internal verifier error (see server log).'
 
     def _exception_diagnostics(self, e, path: str) -> List[Diagnostic]:
         if isinstance(e, (InvalidProgramException, UnsupportedException)):
