@@ -86,6 +86,12 @@
             "type": null,
             "MustTerminate": true
         },
+        "__delitem_slice__": {
+            "args": ["list", "slice"],
+            "type": null,
+            "display_name": "__delitem__",
+            "MustTerminate": true
+        },
         "__setitem__": {
             "args": ["list", "__prim__int", "object"],
             "type": null,

@@ -174,6 +174,18 @@ method list___delitem__(self: Ref, key: Int) returns ()
     ensures acc(self.list_acc)
     ensures self.list_acc == old(self.list_acc)[..key] ++ old(self.list_acc)[key+1..]
 
+method list___delitem_slice__(self: Ref, key: Ref) returns ()
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires issubtype(typeof(key), slice())
+    requires acc(self.list_acc)
+    ensures acc(self.list_acc)
+    ensures let ln == ((|old(self.list_acc)|)) in
+        let rawlo == ((slice___start__(key, ln))) in
+            let lo == ((rawlo < 0 ? 0 : (rawlo > ln ? ln : rawlo))) in
+                let rawhi == ((slice___stop__(key, ln))) in
+                    let hi == ((rawhi < lo ? lo : (rawhi > ln ? ln : rawhi))) in
+                        self.list_acc == old(self.list_acc)[..lo] ++ old(self.list_acc)[hi..]
+
 function list_index(self: Ref, item: Ref): Int
     decreases _
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))

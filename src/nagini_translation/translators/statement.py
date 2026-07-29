@@ -372,6 +372,26 @@ class StatementTranslator(CommonTranslator):
             if isinstance(t, ast.Subscript):
                 target_cls = self.get_type(t.value, ctx)
                 lhs_stmt, target_expr = self.translate_expr(t.value, ctx)
+                if isinstance(t.slice, ast.Slice):
+                    if t.slice.step:
+                        raise UnsupportedException(node, 'slice step')
+                    slice_class = ctx.module.global_module.classes['slice']
+                    null = self.viper.NullLit(self.no_position(ctx),
+                                              self.no_info(ctx))
+                    start = stop = null
+                    start_stmt = stop_stmt = []
+                    if t.slice.lower:
+                        start_stmt, start = self.translate_expr(t.slice.lower, ctx)
+                    if t.slice.upper:
+                        stop_stmt, stop = self.translate_expr(t.slice.upper, ctx)
+                    slice_expr = self.get_function_call(
+                        slice_class, '__create__', [start, stop], [None, None],
+                        t.slice, ctx)
+                    call = self.get_method_call(target_cls, '__delitem_slice__',
+                                                [target_expr, slice_expr],
+                                                [None, None], [], t, ctx)
+                    result.extend(lhs_stmt + start_stmt + stop_stmt + call)
+                    continue
                 ind_stmt, index = self.translate_expr(t.slice, ctx)
                 call = self.get_method_call(target_cls, '__delitem__',
                                             [target_expr, index], [None, None],
