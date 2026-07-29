@@ -1351,30 +1351,17 @@ class StatementTranslator(CommonTranslator):
                   allow_impure: bool = False) -> Tuple[List[Stmt], List[Expr]]:
         """
         Assigns the given expression ``rhs`` to the target given in ``lhs``.
-        If ``rhs_index`` is set, will only assign the element of ``rhs`` at
-        this index; if ``rhs_end`` is also set, will assign a list containing
-        the given range of elements to ``lhs`` (assuming ``lhs`` is of type
-        ast.Starred).
+        ``rhs_index`` and ``rhs_end`` are only meaningful when ``lhs`` is of
+        type ast.Starred: a list containing the elements of ``rhs`` from
+        ``rhs_index`` up to ``rhs_end`` is assigned to the starred target.
 
         In addition to assignment statements, returns a list of assertions
         which are known to hold after the assignment, to be used in loop
         invariants.
         """
-        position = self.to_position(node, ctx)
-        info = self.no_info(ctx)
         if isinstance(lhs, ast.Starred):
             return self._assign_to_starred(lhs, rhs, rhs_index, rhs_end,
                                            rhs_type, node, ctx)
-        if rhs_index is not None:
-            rhs_lit = self.viper.IntLit(rhs_index, position, info)
-            args = [rhs, rhs_lit]
-            arg_types = [rhs_type, None]
-            rhs = self.get_function_call(rhs_type, '__getitem__', args,
-                                         arg_types, node, ctx)
-            if rhs_type.name == TUPLE_TYPE and rhs_type.exact_length:
-                rhs_type = rhs_type.type_args[rhs_index]
-            else:
-                rhs_type = rhs_type.type_args[0]
         if isinstance(lhs, ast.Tuple):
             return self._assign_to_tuple(lhs, rhs, rhs_type, node, ctx)
 
@@ -1493,16 +1480,12 @@ class StatementTranslator(CommonTranslator):
         inner_if = self.viper.If(may_set, in_ex, empty_block, position, info)
         return inner_if
 
-    def _assign_with_subscript(self, lhs: ast.Tuple, rhs: Expr, node: ast.AST,
+    def _assign_with_subscript(self, lhs: ast.Subscript, rhs: Expr, node: ast.AST,
                                ctx: Context, allow_impure: bool) -> Tuple[List[Stmt],
                                                                           List[Expr]]:
         # Special treatment for subscript; instead of an assignment, we
         # need to call a setitem method.
-        if isinstance(node, ast.Assign):
-            target = node.targets[0]
-        elif isinstance(node, (ast.AnnAssign, ast.AugAssign)):
-            target = node.target
-        if isinstance(target.slice, ast.Slice):
+        if isinstance(lhs.slice, ast.Slice):
             raise UnsupportedException(node, 'assignment to slice')
         position = self.to_position(node, ctx)
         target_cls = self.get_type(lhs.value, ctx)
@@ -1537,26 +1520,62 @@ class StatementTranslator(CommonTranslator):
         stmt_result = []
         val_result = []
         has_starred_receiver = False
-        # Need to find out how many other receivers come after a starred
-        # expression (if any) to calculate the last index that should be
-        # assigned to the starred expression.
+        starred_index = None
+        # Python evaluates the entire right-hand side before assigning to
+        # any target, so first snapshot every element value into a fresh
+        # local; the targets may overlap the operands, as in
+        # xs[0], xs[1] = xs[1], xs[0].
+        elem_temps = []
         for index, e in enumerate(lhs.elts):
             if isinstance(e, ast.Starred):
                 has_starred_receiver = True
+                starred_index = index
                 no_after_starred = len(lhs.elts) - index - 1
                 next = -no_after_starred
-            else:
-                next = next + 1
-            next_expr = self.viper.IntLit(next, position, info)
+                elem_temps.append(None)
+                continue
+            next = next + 1
             if next <= 0:
-                # Calculate next index dynamically as len(rhs) + next
-                # because len(rhs) might be unknown statically.
-                len_expr = self.get_function_call(rhs_type, '__len__',
-                                                  [rhs], [None], node, ctx)
-                next_expr = self.viper.Add(len_expr, next_expr, position,
-                                           info)
-            stmt, val = self.assign_to(e, rhs, index, next_expr,
-                                       rhs_type, node, ctx)
+                # Elements after a starred receiver sit at the end of rhs,
+                # whose length may be unknown statically; address them from
+                # the back via a negative index.
+                rhs_index = next - 1
+            else:
+                rhs_index = index
+            index_lit = self.viper.IntLit(rhs_index, position, info)
+            elem = self.get_function_call(rhs_type, '__getitem__',
+                                          [rhs, index_lit], [rhs_type, None],
+                                          node, ctx)
+            if rhs_type.name == TUPLE_TYPE and rhs_type.exact_length:
+                elem_type = rhs_type.type_args[rhs_index]
+            else:
+                elem_type = rhs_type.type_args[0]
+            elem_temp = ctx.current_function.create_variable(
+                'tuple_elem', elem_type, self.translator)
+            stmt_result.append(self.viper.LocalVarAssign(elem_temp.ref(),
+                                                         elem, position,
+                                                         info))
+            val_result.append(self.viper.EqCmp(elem_temp.ref(), elem,
+                                               position, info))
+            elem_temps.append((elem_temp, elem_type))
+        if has_starred_receiver:
+            # The starred receiver takes the rhs segment from its own index
+            # up to len(rhs) - no_after_starred.
+            len_expr = self.get_function_call(rhs_type, '__len__',
+                                              [rhs], [None], node, ctx)
+            end_lit = self.viper.IntLit(-no_after_starred, position, info)
+            starred_end = self.viper.Add(len_expr, end_lit, position, info)
+            stmt, val = self.assign_to(lhs.elts[starred_index], rhs,
+                                       starred_index, starred_end, rhs_type,
+                                       node, ctx)
+            stmt_result += stmt
+            val_result += val
+        for index, e in enumerate(lhs.elts):
+            if isinstance(e, ast.Starred):
+                continue
+            elem_temp, elem_type = elem_temps[index]
+            stmt, val = self.assign_to(e, elem_temp.ref(), None, None,
+                                       elem_type, node, ctx)
             stmt_result += stmt
             val_result += val
         right_len = self.get_function_call(rhs_type, '__len__', [rhs], [None], node, ctx)
