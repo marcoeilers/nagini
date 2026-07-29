@@ -28,6 +28,7 @@ from typing import List, Optional, Set, Tuple
 
 from nagini_translation.lib import config
 from nagini_translation.lib.errors import error_manager
+from nagini_translation.lib.errors.messages import invalid_program_message
 from nagini_translation.lib.jvmaccess import JVM
 from nagini_translation.lib.typeinfo import TypeException
 from nagini_translation.lib.util import (
@@ -586,7 +587,8 @@ class VerificationService:
         if isinstance(e, (InvalidProgramException, UnsupportedException)):
             if isinstance(e, InvalidProgramException):
                 code = 'invalid.program'
-                message = 'Invalid program: ' + (e.message or e.code)
+                message = ('Invalid program: ' +
+                           invalid_program_message(e.code, e.message))
             else:
                 code = 'unsupported'
                 detail = e.args[0] if e.args and e.args[0] else ast.unparse(e.node)

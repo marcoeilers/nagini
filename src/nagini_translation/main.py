@@ -23,6 +23,7 @@ from nagini_translation.sif_translator import SIFTranslator
 from nagini_translation.lib import config
 from nagini_translation.lib.constants import DEFAULT_SERVER_SOCKET
 from nagini_translation.lib.errors import error_manager, format_translation_error
+from nagini_translation.lib.errors.messages import invalid_program_message
 from nagini_translation.lib.jvmaccess import (
     getclass,
     getobject,
@@ -563,11 +564,8 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
         print("Translation failed")
         if isinstance(e, (InvalidProgramException, UnsupportedException)):
             if isinstance(e, InvalidProgramException):
-                issue = 'Invalid program: '
-                if e.message:
-                    issue += e.message
-                else:
-                    issue += e.code
+                issue = ('Invalid program: ' +
+                         invalid_program_message(e.code, e.message))
             else:
                 issue = 'Not supported: '
                 if e.args[0]:
