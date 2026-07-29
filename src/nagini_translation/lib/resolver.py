@@ -320,12 +320,17 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         return module.global_module.classes[BOOL_TYPE]
     elif isinstance(node, ast.BoolOp):
         # And and Or always return one of their operands, so we use the common
-        # supertype of all arguments.
+        # supertype of all arguments. Operands with no value type (bare
+        # predicate accesses like list_pred(xs) in assertion positions) do
+        # not contribute to the value type.
         # TODO: We could also use a union type, but since support for e.g.
         # calling methods on those isn't amazing yet, we don't do that yet.
         operand_types = [get_type(operand, containers, container)
                          for operand in node.values]
-        return common_supertype(operand_types)
+        valued = [t for t in operand_types if t is not None]
+        if not valued:
+            return None
+        return common_supertype(valued)
     elif isinstance(node, ast.List):
         return _get_collection_literal_type(node, ['elts'], LIST_TYPE, module,
                                             containers, container)
