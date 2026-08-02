@@ -30,6 +30,7 @@ from lsprotocol import types as t
 from pygls import uris
 from pygls.lsp.server import LanguageServer
 
+from nagini_translation.models.converter import counterexample_to_text
 from nagini_translation.service import (
     add_service_arguments,
     Diagnostic,
@@ -221,7 +222,8 @@ def hover(ls: NaginiLanguageServer, params: t.HoverParams) -> Optional[t.Hover]:
         if (d.start_line - 1) <= line <= (d.end_line - 1) and (d.counterexample or d.branch_conditions):
             parts = []
             if d.counterexample:
-                parts.append('**Counterexample**\n```\n{}\n```'.format(d.counterexample))
+                parts.append('**Counterexample**\n```\n{}\n```'.format(
+                    counterexample_to_text(d.counterexample)))
             if d.branch_conditions:
                 parts.append('**Branch conditions:** ' + ', '.join(d.branch_conditions))
             return t.Hover(contents=t.MarkupContent(

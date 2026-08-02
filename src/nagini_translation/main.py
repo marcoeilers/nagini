@@ -365,6 +365,13 @@ def main() -> None:
         help='return a counterexample for every verification error if possible'
     )
     parser.add_argument(
+        '--json',
+        action='store_true',
+        help='print the verification result as a single line of JSON '
+             '(structured diagnostics including counterexamples) instead of '
+             'the human-readable output'
+    )
+    parser.add_argument(
         '--viper-arg',
         help='Arguments to be forwarded to Viper, separated by commas'
     )
@@ -449,7 +456,11 @@ def main() -> None:
         print('Server started successfully on ' + DEFAULT_SERVER_SOCKET, flush=True)
 
         while True:
-            file, selected = _parse_client_request(socket.recv_string())
+            file, selected, options = _parse_client_request(socket.recv_string())
+            if options.get('format') == 'json':
+                payload = _handle_json_request(file, selected, options, jvm, args)
+                socket.send_string(json.dumps(payload))
+                continue
             response = ['']
 
             def add_response(part):
@@ -458,6 +469,24 @@ def main() -> None:
             translate_and_verify(file, jvm, args, add_response, arp=args.arp,
                                   base_dir=args.base_dir, selected=selected)
             socket.send_string(response[0])
+    elif args.json:
+        payload = _handle_json_request(args.python_file, None,
+                                       {'counterexample': args.counterexample},
+                                       jvm, args)
+        success = bool(payload.get('success'))
+        sys.stdout.flush()
+        sys.stderr.flush()
+        # Keep the JSON as the final line on stdout so clients can find it
+        # even when warnings were printed earlier.
+        print(json.dumps(payload), flush=True)
+        if config.use_viper_server:
+            try:
+                from nagini_translation.viper_server import get_viper_server_manager
+                get_viper_server_manager(jvm).stop()
+            except Exception:
+                logging.exception('Error while stopping ViperServer.')
+            os._exit(0 if success else 1)
+        sys.exit(0 if success else 1)
     else:
         success = translate_and_verify(args.python_file, jvm, args, arp=args.arp, base_dir=args.base_dir)
         if config.use_viper_server:
@@ -477,12 +506,14 @@ def main() -> None:
         sys.exit(0 if success else 1)
 
 
-def _parse_client_request(request: str) -> Tuple[str, Union[Set[str], None]]:
-    """Parse a server-mode client request into ``(python_file, selected)``.
+def _parse_client_request(request: str) -> Tuple[str, Union[Set[str], None], dict]:
+    """Parse a server-mode client request into ``(python_file, selected, options)``.
 
-    New clients send a JSON object ``{"file": ..., "select": "a,b"}``. For
-    backwards compatibility, a plain string (anything that is not a JSON object)
-    is treated as just the file path, with no selection.
+    New clients send a JSON object ``{"file": ..., "select": "a,b"}``, possibly
+    with additional per-request options (``"format": "json"``,
+    ``"counterexample": true``). For backwards compatibility, a plain string
+    (anything that is not a JSON object) is treated as just the file path, with
+    no selection and no options.
     """
     try:
         payload = json.loads(request)
@@ -491,8 +522,50 @@ def _parse_client_request(request: str) -> Tuple[str, Union[Set[str], None]]:
     if isinstance(payload, dict):
         select = payload.get('select')
         selected = set(select.split(',')) if select else None
-        return payload.get('file'), selected
-    return request, None
+        options = {k: v for k, v in payload.items()
+                   if k not in ('file', 'select')}
+        return payload.get('file'), selected, options
+    return request, None, {}
+
+
+# Version of the JSON response format produced by ``_handle_json_request`` and
+# ``--json``; bump when making incompatible changes so clients can detect them.
+JSON_PROTOCOL_VERSION = 1
+
+
+def _handle_json_request(python_file, selected, options, jvm, args) -> dict:
+    """Handle a server request with ``"format": "json"``.
+
+    Returns a JSON-ready dict: ``VerifyResult.to_dict()`` plus ``protocol`` and
+    ``backend`` fields, with per-error structured counterexamples when the
+    request asks for them (``"counterexample": true``, Silicon only). Never
+    raises: any internal error is reported as an ``error`` field so the server
+    loop stays alive.
+    """
+    from nagini_translation.service import verify_structured
+    try:
+        counterexample = bool(options.get('counterexample'))
+        if counterexample and args.verifier != 'silicon':
+            logging.warning('Counterexamples are only supported with the '
+                            'Silicon backend; ignoring the request option.')
+            counterexample = False
+        if selected is None:
+            selected = set(args.select.split(',')) if args.select else set()
+        viper_args = [] if args.viper_arg is None else args.viper_arg.split(',')
+        result = verify_structured(
+            jvm, python_file, backend=args.verifier,
+            bv_size=args.int_bitops_size, sif=args.sif, base_dir=args.base_dir,
+            selected=selected, counterexample=counterexample,
+            ignore_global=args.ignore_global, arp=args.arp,
+            viper_args=viper_args, float_encoding=args.float_encoding,
+            disable_branch_conditions=args.disable_branch_conditions)
+        payload = result.to_dict()
+    except Exception as e:
+        logging.exception('Error handling JSON verification request.')
+        payload = {'error': str(e) or type(e).__name__}
+    payload['protocol'] = JSON_PROTOCOL_VERSION
+    payload['backend'] = args.verifier
+    return payload
 
 
 def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_dir=None,

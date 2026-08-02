@@ -59,7 +59,10 @@ async def verify_file(path: str, method: Optional[str] = None,
 
     Returns structured diagnostics: a list of {file, startLine, startCol,
     endLine, endCol, severity, code, message, reason, counterexample,
-    branchConditions, vias}, plus `success` and `duration`. Optionally restrict
+    branchConditions, vias}, plus `success` and `duration`. `counterexample`
+    (when requested and available) is a structured object: {kind: "model",
+    oldStore, oldHeap, store, heap} with stores as [{name, value}] and heaps
+    as [{name, entries: [{name, value}]}], or {kind: "text", text} for SIF. Optionally restrict
     to a single `method`: a top-level function by its bare name (e.g. `my_func`),
     a method as `ClassName.method_name` (its bare name also matches), or a whole
     class by `ClassName` to verify all its methods. Set `ignore_global` to skip

@@ -26,12 +26,25 @@ def main():
         '--select',
         default=None,
         help='select specific methods or classes to verify, separated by commas')
+    parser.add_argument(
+        '--json',
+        action='store_true',
+        help='request the verification result as structured JSON')
+    parser.add_argument(
+        '--counterexample',
+        action='store_true',
+        help='request a counterexample for every verification error '
+             '(Silicon backend only; requires --json)')
 
     args = parser.parse_args()
 
     request = {'file': args.python_file}
     if args.select:
         request['select'] = args.select
+    if args.json:
+        request['format'] = 'json'
+    if args.counterexample:
+        request['counterexample'] = True
     socket.send_string(json.dumps(request))
     response = socket.recv_string()
 

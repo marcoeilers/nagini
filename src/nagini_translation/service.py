@@ -41,6 +41,7 @@ from nagini_translation.main import (
     TYPE_ERROR_MATCHER,
     verify as verify_program,
 )
+from nagini_translation.models.converter import counterexample_to_dict
 from nagini_translation.verifier import Failure, Success, ViperVerifier
 
 
@@ -53,6 +54,11 @@ class Diagnostic:
     ``col`` is 0-indexed. LSP adapters must convert to 0-indexed lines
     (``line - 1``); the existing ``ide_mode`` format instead renders columns
     1-indexed (``col + 1``), so don't mix the two conventions.
+
+    ``counterexample`` is the structured dict produced by
+    :func:`nagini_translation.models.converter.counterexample_to_dict` (or
+    ``None``); use ``counterexample_to_text`` to render it for plain-text
+    consumers.
     """
     file: str
     start_line: int
@@ -66,7 +72,7 @@ class Diagnostic:
     reason: Optional[str] = None
     reason_position: Optional[Tuple[int, int]] = None
     vias: List[Tuple[str, str]] = field(default_factory=list)
-    counterexample: Optional[str] = None
+    counterexample: Optional[dict] = None
     branch_conditions: List[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -459,82 +465,154 @@ class VerificationService:
                 'consistency.error')], time.time() - start, translation_failed=True)
 
     def _failure_diagnostics(self, failure: Failure, path: str) -> List[Diagnostic]:
-        diagnostics = []
-        seen = set()
-        for error in failure.errors:
-            pos = error.position
-            try:
-                file_name = pos.file_name
-            except Exception:
-                file_name = path
-            vias = [(str(reason), str(p))
-                    for reason, p in (error.reason.vias or error._vias or [])]
-            try:
-                reason_pos = (error.reason.position.line, error.reason.position.column)
-            except Exception:
-                reason_pos = None
-            diag = Diagnostic(
-                file=file_name,
-                start_line=pos.line, start_col=pos.column,
-                end_line=pos.line_end, end_col=pos.column_end,
-                message=error.message,
-                code=error.full_id,
-                reason=error.reason.string(False),
-                reason_position=reason_pos,
-                vias=vias,
-                counterexample=(str(error._inputs)
-                                if error._inputs is not None else None),
-                branch_conditions=list(error.bcs) if error.bcs else [],
-            )
-            key = (diag.file, diag.start_line, diag.start_col, diag.code, diag.message)
-            if key not in seen:
-                seen.add(key)
-                diagnostics.append(diag)
-        return diagnostics
+        return failure_to_diagnostics(failure, path)
 
     def _exception_diagnostics(self, e, path: str) -> List[Diagnostic]:
-        if isinstance(e, (InvalidProgramException, UnsupportedException)):
-            if isinstance(e, InvalidProgramException):
-                code = 'invalid.program'
-                message = 'Invalid program: ' + (e.message or e.code)
-            else:
-                code = 'unsupported'
-                detail = e.args[0] if e.args and e.args[0] else ast.unparse(e.node)
-                message = 'Not supported: ' + detail
-            line = getattr(e.node, 'lineno', 1)
-            col = getattr(e.node, 'col_offset', 0)
-            return [Diagnostic(file=path, start_line=line, start_col=col,
-                               end_line=line, end_col=col, message=message,
-                               code=code)]
-        # TypeException
-        diagnostics = []
-        for msg in e.messages:
-            parts = TYPE_ERROR_MATCHER.match(msg)
-            if parts:
-                parts = parts.groupdict()
-                file = parts['file']
-                if file == '__main__':
-                    file = path
-                line = int(parts['line'])
-                # mypy gives a 1-based start column and an (exclusive) end
-                # position when available; Diagnostic uses 0-based columns (the
-                # same convention as verification errors here). Fall back to a
-                # zero-width span at column 0 for line-only messages.
-                col = int(parts['col']) - 1 if parts['col'] else 0
-                end_line = int(parts['end_line']) if parts['end_line'] else line
-                end_col = int(parts['end_col']) if parts['end_col'] else col
-                diagnostics.append(Diagnostic(
-                    file=file, start_line=line, start_col=col, end_line=end_line,
-                    end_col=end_col, message='Type error: ' + parts['msg'],
-                    code='type.error'))
-            else:
-                diagnostics.append(self._point_diagnostic(path, msg, 'type.error'))
-        return diagnostics
+        return exception_to_diagnostics(e, path)
 
     @staticmethod
     def _point_diagnostic(path: str, message: str, code: str) -> Diagnostic:
-        return Diagnostic(file=path, start_line=1, start_col=0, end_line=1,
-                          end_col=0, message=message, code=code)
+        return _point_diagnostic(path, message, code)
+
+
+def failure_to_diagnostics(failure: Failure, path: str) -> List[Diagnostic]:
+    """Convert a verification :class:`Failure` to structured diagnostics."""
+    diagnostics = []
+    seen = set()
+    for error in failure.errors:
+        pos = error.position
+        try:
+            file_name = pos.file_name
+        except Exception:
+            file_name = path
+        vias = [(str(reason), str(p))
+                for reason, p in (error.reason.vias or error._vias or [])]
+        try:
+            reason_pos = (error.reason.position.line, error.reason.position.column)
+        except Exception:
+            reason_pos = None
+        diag = Diagnostic(
+            file=file_name,
+            start_line=pos.line, start_col=pos.column,
+            end_line=pos.line_end, end_col=pos.column_end,
+            message=error.message,
+            code=error.full_id,
+            reason=error.reason.string(False),
+            reason_position=reason_pos,
+            vias=vias,
+            counterexample=counterexample_to_dict(error._inputs),
+            branch_conditions=list(error.bcs) if error.bcs else [],
+        )
+        key = (diag.file, diag.start_line, diag.start_col, diag.code, diag.message)
+        if key not in seen:
+            seen.add(key)
+            diagnostics.append(diag)
+    return diagnostics
+
+
+def exception_to_diagnostics(e, path: str) -> List[Diagnostic]:
+    """Convert a translation/type exception to structured diagnostics."""
+    if isinstance(e, (InvalidProgramException, UnsupportedException)):
+        if isinstance(e, InvalidProgramException):
+            code = 'invalid.program'
+            message = 'Invalid program: ' + (e.message or e.code)
+        else:
+            code = 'unsupported'
+            detail = e.args[0] if e.args and e.args[0] else ast.unparse(e.node)
+            message = 'Not supported: ' + detail
+        line = getattr(e.node, 'lineno', 1)
+        col = getattr(e.node, 'col_offset', 0)
+        return [Diagnostic(file=path, start_line=line, start_col=col,
+                           end_line=line, end_col=col, message=message,
+                           code=code)]
+    # TypeException
+    diagnostics = []
+    for msg in e.messages:
+        parts = TYPE_ERROR_MATCHER.match(msg)
+        if parts:
+            parts = parts.groupdict()
+            file = parts['file']
+            if file == '__main__':
+                file = path
+            line = int(parts['line'])
+            # mypy gives a 1-based start column and an (exclusive) end
+            # position when available; Diagnostic uses 0-based columns (the
+            # same convention as verification errors here). Fall back to a
+            # zero-width span at column 0 for line-only messages.
+            col = int(parts['col']) - 1 if parts['col'] else 0
+            end_line = int(parts['end_line']) if parts['end_line'] else line
+            end_col = int(parts['end_col']) if parts['end_col'] else col
+            diagnostics.append(Diagnostic(
+                file=file, start_line=line, start_col=col, end_line=end_line,
+                end_col=end_col, message='Type error: ' + parts['msg'],
+                code='type.error'))
+        else:
+            diagnostics.append(_point_diagnostic(path, msg, 'type.error'))
+    return diagnostics
+
+
+def _point_diagnostic(path: str, message: str, code: str) -> Diagnostic:
+    return Diagnostic(file=path, start_line=1, start_col=0, end_line=1,
+                      end_col=0, message=message, code=code)
+
+
+def verify_structured(jvm, path: str, *, backend: str = 'silicon',
+                      bv_size: int = 8, sif=False, base_dir: str = None,
+                      selected: Set[str] = None, counterexample: bool = False,
+                      ignore_global: bool = False, arp: bool = False,
+                      viper_args: List[str] = None, float_encoding: str = None,
+                      disable_branch_conditions: bool = False) -> VerifyResult:
+    """Single-shot translate-and-verify returning a structured result.
+
+    Unlike :class:`VerificationService`, this reuses an already-running JVM
+    (and the module-global Silver resources) owned by the caller — it is the
+    structured counterpart of ``main.translate_and_verify``, used by the ZMQ
+    server's JSON requests and the ``--json`` CLI mode. Prints nothing.
+    """
+    path = os.path.abspath(path)
+    viper_args = list(viper_args) if viper_args else []
+    start = time.time()
+    if counterexample and config.use_viper_server:
+        # A failure replayed from the ViperServer cache carries no
+        # counterexample model, so force this run to actually re-verify.
+        try:
+            from nagini_translation.viper_server import get_viper_server_manager
+            get_viper_server_manager(jvm).flush_cache()
+        except Exception:
+            logging.exception('Error flushing ViperServer cache.')
+    try:
+        translated = translate(
+            path, jvm, bv_size, selected=set(selected) if selected else set(),
+            sif=sif, base_dir=base_dir, arp=arp, counterexample=counterexample,
+            ignore_global=ignore_global, float_encoding=float_encoding)
+        if translated is None:
+            return VerifyResult(False, [_point_diagnostic(
+                path, 'Type checking failed.', 'type.error')],
+                time.time() - start, translation_failed=True)
+        modules, prog = translated
+        viper_backend = (ViperVerifier.silicon if backend == 'silicon'
+                         else ViperVerifier.carbon)
+        vresult = verify_program(
+            modules, prog, path, jvm, viper_args, backend=viper_backend,
+            arp=arp, counterexample=counterexample, sif=sif,
+            disable_branch_conditions=disable_branch_conditions)
+        duration = time.time() - start
+        if vresult is None:
+            # main.verify swallows JVM exceptions and returns None.
+            return VerifyResult(False, [_point_diagnostic(
+                path, 'Internal verifier error (see server log).',
+                'verifier.error')], duration)
+        if isinstance(vresult, Failure):
+            return VerifyResult(False, failure_to_diagnostics(vresult, path),
+                                duration)
+        return VerifyResult(True, [], duration)
+    except (TypeException, InvalidProgramException, UnsupportedException) as e:
+        return VerifyResult(False, exception_to_diagnostics(e, path),
+                            time.time() - start, translation_failed=True)
+    except ConsistencyException as e:
+        return VerifyResult(False, [_point_diagnostic(
+            path, e.message + ': Translated AST contains inconsistencies.',
+            'consistency.error')], time.time() - start, translation_failed=True)
 
 
 # Maps client-facing (camelCase) option keys to VerificationService kwargs.

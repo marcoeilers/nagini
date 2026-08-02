@@ -13,7 +13,7 @@ from nagini_translation.lib.jvmaccess import (
 from nagini_translation.lib.program_nodes import PythonMethod, PythonType, GenericType, PythonField, PythonClass, OptionalType, TypeVar
 from nagini_translation.lib.util import int_to_string, UnsupportedException
 from collections import OrderedDict
-from typing import Dict, Tuple, Union
+from typing import Dict, Optional, Tuple, Union
 
 
 ISSUBTYPE = 'issubtype<Bool>'
@@ -85,6 +85,81 @@ class Model:
             return 'Old store:{0}\nOld heap:{1}\nCurrent store:{2}\nCurrent heap:{3}\n'.format(ostore_string, oheap_string,
                                                                                                store_string, heap_string)
         return 'Store:{0}\nHeap:{1}\n'.format(store_string, heap_string)
+
+    def to_dict(self) -> dict:
+        """A JSON-ready structured form of this counterexample.
+
+        Store sections are lists of ``{"name": ..., "value": ...}`` and heap
+        sections lists of ``{"name": ..., "entries": [{"name": ..., "value":
+        ...}]}`` (an empty ``entries`` list is a predicate/permission-only
+        entry), all in the model's order with leaf values stringified.
+        ``oldStore``/``oldHeap`` are ``None`` for pure methods, which only have
+        a single store and heap.
+        """
+        def store_dict(store):
+            return [{'name': str(k), 'value': str(v)} for k, v in store.items()]
+
+        def heap_dict(heap):
+            return [{'name': str(o),
+                     'entries': [{'name': str(f), 'value': str(v)}
+                                 for f, v in parts.items()]}
+                    for o, parts in heap.items()]
+
+        has_old = self.input_store is not None and self.old_heap is not None
+        return {
+            'kind': 'model',
+            'oldStore': store_dict(self.input_store) if has_old else None,
+            'oldHeap': heap_dict(self.old_heap) if has_old else None,
+            'store': store_dict(self.current_store or OrderedDict()),
+            'heap': heap_dict(self.heap or OrderedDict()),
+        }
+
+
+def counterexample_to_dict(inputs) -> Optional[dict]:
+    """Serialize an ``Error._inputs`` counterexample to a JSON-ready dict.
+
+    ``inputs`` is ``None`` (no counterexample), a :class:`Model`, or — for the
+    SIF double-execution case — an already-rendered string.
+    """
+    if inputs is None:
+        return None
+    if isinstance(inputs, Model):
+        return inputs.to_dict()
+    return {'kind': 'text', 'text': str(inputs)}
+
+
+def counterexample_to_text(ce: Optional[dict]) -> str:
+    """Render a dict produced by :func:`counterexample_to_dict` as text.
+
+    Produces the same layout as :meth:`Model.__str__` for ``kind == "model"``.
+    """
+    if ce is None:
+        return ''
+    if ce.get('kind') != 'model':
+        return str(ce.get('text', ''))
+
+    def store_text(store):
+        if not store:
+            return ' Empty.'
+        return '\n  ' + ',\n  '.join(
+            '{} -> {}'.format(e['name'], e['value']) for e in store)
+
+    def heap_text(heap):
+        if not heap:
+            return ' Empty.'
+        return '\n  ' + ',\n  '.join(
+            '{} -> {{ {} }}'.format(
+                o['name'],
+                ', '.join('{} -> {}'.format(e['name'], e['value'])
+                          for e in o['entries']))
+            for o in heap)
+
+    if ce.get('oldStore') is not None and ce.get('oldHeap') is not None:
+        return 'Old store:{0}\nOld heap:{1}\nCurrent store:{2}\nCurrent heap:{3}\n'.format(
+            store_text(ce['oldStore']), heap_text(ce['oldHeap']),
+            store_text(ce['store']), heap_text(ce['heap']))
+    return 'Store:{0}\nHeap:{1}\n'.format(store_text(ce['store']),
+                                          heap_text(ce['heap']))
 
 
 class NoFittingValueException(Exception):
