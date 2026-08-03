@@ -9,9 +9,10 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 
 from collections import namedtuple
+from contextlib import contextmanager
 from uuid import uuid1
 
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from nagini_translation.lib.errors.wrappers import Error
 from nagini_translation.lib.errors.rules import Rules
@@ -46,6 +47,48 @@ class ErrorManager:
         """Clear all state."""
         self._items.clear()
         self._conversion_rules.clear()
+
+    def detach(self) -> Tuple[Dict[str, Item], Dict[str, Rules]]:
+        """Hand the current state over to the caller and start from scratch.
+
+        Unlike :meth:`clear`, this does not invalidate the tables: it rebinds
+        them, so a caller that needs the information of one translation to
+        outlive the next one (a debug session, for instance) can keep the old
+        tables alive. That is an O(1) operation, whereas copying them is not:
+        one entry is created per ``to_position`` call, so a translation of any
+        realistic program produces hundreds of thousands of them.
+        """
+        items, rules = self._items, self._conversion_rules
+        self._items = {}
+        self._conversion_rules = {}
+        return items, rules
+
+    @contextmanager
+    def using(self, items: Dict[str, Item],
+              rules: Dict[str, Rules]) -> None:
+        """Temporarily make the given tables the current state.
+
+        Lets code that goes through the singleton (:meth:`convert` and hence
+        ``Failure``) work with the tables of an earlier translation that was
+        :meth:`detach`\\ ed.
+        """
+        saved = (self._items, self._conversion_rules)
+        self._items, self._conversion_rules = items, rules
+        try:
+            yield
+        finally:
+            self._items, self._conversion_rules = saved
+
+    def get_item(self, pos: 'ast.AbstractSourcePosition') -> Optional[Item]:
+        """The item recorded for ``pos``, or None if there is none.
+
+        Unlike :meth:`_get_item` this tolerates positions that carry an
+        identifier which is not in the table, which happens for any node that a
+        backend synthesized while copying a position from a node we created.
+        """
+        if not hasattr(pos, 'id'):
+            return None
+        return self._items.get(pos.id())
 
     def convert(
             self,

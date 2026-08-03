@@ -47,6 +47,35 @@ def build_silicon_backend_args(viper_args: List[str], counterexample: bool,
     ]
 
 
+def build_silicon_debug_backend_args(viper_args: List[str],
+                                     counterexample: bool = True) -> List[str]:
+    """The Silicon command line used for a verification-debugger run.
+
+    Debugging needs Silicon to keep the expression form of everything it
+    assumes (``--enableDebugging``) and a fresh run (``--disableCaching``).
+    Some of Nagini's normal options are incompatible with that and are
+    *replaced* rather than appended, since Silicon rejects contradictory ones:
+
+    * ``--exhaleMode=1``: the more complete exhale keeps permissions in the
+      heap, which is what makes the heap part of a counterexample informative.
+    * ``--counterexample=mapped``: only the mapped counterexample has the
+      structure the debugger's model builder needs.
+    """
+    base = build_silicon_backend_args(viper_args, counterexample=False,
+                                      disable_branch_conditions=False)
+    kept = [arg for arg in base
+            if not arg.startswith('--exhaleMode')
+            and not arg.startswith('--counterexample')]
+    return [
+        *kept,
+        '--exhaleMode=1',
+        '--enableDebugging',
+        '--disableCaching',
+        *(['--counterexample=mapped', '--proverArgs=model.partial=true']
+          if counterexample else []),
+    ]
+
+
 def build_carbon_backend_args(viper_args: List[str]) -> List[str]:
     """The Carbon command line used by Nagini.
 

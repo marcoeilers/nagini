@@ -171,6 +171,9 @@ class VerificationService:
         # per-job cancellation.
         self._jobs = {}
         self._jobs_lock = threading.Lock()
+        # The verification debugger, created on first use since starting a
+        # session is expensive and most services never do.
+        self._debug_handler = None
 
         # JVM() routes JVM System.out to System.err and quiets logback, so the
         # JSON-RPC stream of a stdio-based LSP/MCP frontend on stdout stays clean.
@@ -261,6 +264,21 @@ class VerificationService:
         except Exception:
             return False
 
+    # -- verification debugger ---------------------------------------------
+
+    def debug(self, command: str, **params) -> dict:
+        """Run a verification-debugger command; see :mod:`.debugger`."""
+        return self._debugger.handle(command, params)
+
+    @property
+    def _debugger(self) -> 'DebugCommandHandler':
+        if self._debug_handler is None:
+            from nagini_translation.debugger import DebugCommandHandler
+            self._debug_handler = DebugCommandHandler(
+                self.jvm, bv_size=self._bv_size, sif=self._sif,
+                float_encoding=self._float_encoding)
+        return self._debug_handler
+
     def flush_cache(self) -> None:
         if config.use_viper_server:
             try:
@@ -270,6 +288,11 @@ class VerificationService:
                 logging.exception('Error flushing ViperServer cache.')
 
     def shutdown(self) -> None:
+        if self._debug_handler is not None:
+            try:
+                self._debug_handler.close()
+            except Exception:
+                logging.exception('Error closing the debug session.')
         if config.use_viper_server:
             try:
                 from nagini_translation.viper_server import get_viper_server_manager

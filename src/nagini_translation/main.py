@@ -52,7 +52,7 @@ from nagini_translation.verifier import (
     ViperVerifier
 )
 from nagini_translation import verifier
-from typing import List, Set, Tuple, Union
+from typing import List, NamedTuple, Optional, Set, Tuple, Union
 
 
 # Matches a mypy error line. The column and end-position fields are optional:
@@ -108,6 +108,22 @@ def load_sil_files(jvm: JVM, bv_size: int, sif: bool = False, float_option: str 
     return parse_sil_file(os.path.join(resources_path, 'all.sil'), os.path.join(default_path, 'intbv.sil'), bv_size, jvm, float_option)
 
 
+class TranslationArtifacts(NamedTuple):
+    """Everything one translation produced.
+
+    :func:`translate` only returns the two parts a verification needs. Anything
+    that has to keep working with the translated program afterwards -- the
+    verification debugger, which translates further expressions in the context
+    of the program it is debugging -- needs the translator and the Viper AST
+    factory as well, since they hold the JVM-side state the program was built
+    with.
+    """
+    modules: List['PythonModule']
+    prog: Program
+    translator: 'Translator'
+    viper_ast: ViperAST
+
+
 def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), base_dir: str = None,
               sif: bool = False, arp: bool = False, ignore_global: bool = False,
               reload_resources: bool = False, verbose: bool = False,
@@ -115,6 +131,24 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
               counterexample: bool = False) -> Tuple[List['PythonModule'], Program]:
     """
     Translates the Python module at the given path to a Viper program
+    """
+    result = translate_full(path, jvm, bv_size, selected=selected, base_dir=base_dir, sif=sif,
+                            arp=arp, ignore_global=ignore_global, reload_resources=reload_resources,
+                            verbose=verbose, check_consistency=check_consistency,
+                            float_encoding=float_encoding, counterexample=counterexample)
+    if result is None:
+        return None
+    return result.modules, result.prog
+
+
+def translate_full(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), base_dir: str = None,
+                   sif: bool = False, arp: bool = False, ignore_global: bool = False,
+                   reload_resources: bool = False, verbose: bool = False,
+                   check_consistency: bool = False, float_encoding: str = None,
+                   counterexample: bool = False) -> Optional[TranslationArtifacts]:
+    """
+    Translates the Python module at the given path to a Viper program, and
+    returns the translator and Viper AST factory along with the result.
     """
     path = os.path.abspath(path)
     error_manager.clear()
@@ -185,7 +219,7 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
             print(error.toString())
         if consistency_errors:
             raise ConsistencyException('consistency.error')
-    return modules, prog
+    return TranslationArtifacts(modules, prog, translator, viper_ast)
 
 
 def collect_modules(analyzer: Analyzer, path: str) -> None:
@@ -455,8 +489,22 @@ def main() -> None:
                                   'fall back to the direct Silicon backend.')
         print('Server started successfully on ' + DEFAULT_SERVER_SOCKET, flush=True)
 
+        debug_handler = None
+
         while True:
             file, selected, options = _parse_client_request(socket.recv_string())
+            if options.get('debug'):
+                if debug_handler is None:
+                    from nagini_translation.debugger import DebugCommandHandler
+                    debug_handler = DebugCommandHandler(
+                        jvm, bv_size=args.int_bitops_size, sif=args.sif,
+                        float_encoding=args.float_encoding)
+                request = dict(options['debug'])
+                request.setdefault('file', file)
+                payload = debug_handler.handle(request.pop('command', ''), request)
+                payload['protocol'] = JSON_PROTOCOL_VERSION
+                socket.send_string(json.dumps(payload))
+                continue
             if options.get('format') == 'json':
                 payload = _handle_json_request(file, selected, options, jvm, args)
                 socket.send_string(json.dumps(payload))

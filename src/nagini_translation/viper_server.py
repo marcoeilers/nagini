@@ -113,6 +113,40 @@ class ViperServerManager:
             backend_cfg = self.jvm.viper.server.core.SiliconConfig.apply(args_list)
         return self.server.verify(program_id, backend_cfg, prog, none)
 
+    def submit_for_debugging(self, prog, program_id: str, backend_args: List[str]):
+        """Verify an in-memory program and keep the Silicon instance alive.
+
+        Returns the ``Silicon`` instance whose ``debugSession`` holds the
+        symbolic state of every failure, or raises if the run could not be
+        started. Silicon (not just its result) has to survive because a debug
+        session owns a live prover and the symbolic state of the failing
+        branch; the caller is responsible for calling ``stop()`` on it.
+
+        The message stream must be consumed before we block on the Silicon
+        future: ViperServer's stream is backpressured, so a verification whose
+        messages nobody reads never finishes.
+        """
+        jvm = self.jvm
+        none = getobject(jvm.java, jvm.scala, 'None')
+        args_list = list_to_seq(backend_args, jvm, jvm.java.lang.String).toList()
+        backend_cfg = jvm.viper.server.core.SiliconConfig.apply(args_list)
+        pair = self.server.verifyForDebugging(program_id, backend_cfg, prog, none)
+        job_id, silicon_future = pair._1(), pair._2()
+        # Attach the consumer first, then wait; see the docstring.
+        results_future = self.result_future(job_id)
+        result = self._await(silicon_future)
+        try:
+            self._await(results_future, timeout_ms=60000)
+        except Exception:
+            # The verification results themselves are of no interest here (the
+            # debugger reads the failures off the Silicon instance), and
+            # getResultsFuture is stricter about the message shape than we need.
+            logging.debug('Ignoring result future of a debug verification.',
+                          exc_info=True)
+        if result.isLeft():
+            raise Exception(str(result.left().get()))
+        return result.right().get()
+
     def result_future(self, job_id):
         return self.jvm.viper.server.core.ViperCoreServerUtils.getResultsFuture(
             self.server, job_id, self.executor)

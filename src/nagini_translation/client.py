@@ -35,6 +35,12 @@ def main():
         action='store_true',
         help='request a counterexample for every verification error '
              '(Silicon backend only; requires --json)')
+    parser.add_argument(
+        '--debug',
+        default=None,
+        metavar='JSON',
+        help='send a verification-debugger command instead of verifying, as a '
+             'JSON object with a "command" key, e.g. \'{"command": "start"}\'')
 
     args = parser.parse_args()
 
@@ -45,6 +51,8 @@ def main():
         request['format'] = 'json'
     if args.counterexample:
         request['counterexample'] = True
+    if args.debug:
+        request['debug'] = json.loads(args.debug)
     socket.send_string(json.dumps(request))
     response = socket.recv_string()
 
