@@ -789,6 +789,9 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             func = ctx.module.methods[func_name]
         if not func:
             raise InvalidProgramException(node, 'unknown.method.called')
+        if func.interface and len(args) > len(func.get_args()):
+            raise UnsupportedException(
+                node, 'this call arity is not supported by the builtin model')
         actual_args = []
         for arg, param, _ in zip(args, func.get_args(), arg_types):
             if param.type.name == PRIMITIVE_BOOL_TYPE:
