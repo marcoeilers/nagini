@@ -19,6 +19,8 @@ servers build on; it can also be reused by the existing ZMQ server.
 import argparse
 import ast
 import glob
+import hashlib
+import json
 import logging
 import os
 import signal
@@ -250,7 +252,8 @@ class VerificationService:
                  disable_branch_conditions: bool = False,
                  strict_int: bool = False,
                  force_obligations: bool = False,
-                 default_viper_args: List[str] = None):
+                 default_viper_args: List[str] = None,
+                 record_dir: str = None):
         if viper_jar_path:
             config.classpath = viper_jar_path
         if z3_path:
@@ -276,6 +279,9 @@ class VerificationService:
         self._bv_size = int_bitops_size
         self._disable_branch_conditions = disable_branch_conditions
         self._strict_int = strict_int
+        self._record_dir = record_dir
+        self._record_seq = 0
+        self._record_lock = threading.Lock()
         if force_obligations:
             # False instead of None: force the obligation encoding (see main.py).
             config.obligation_config.disable_all = False
@@ -348,30 +354,113 @@ class VerificationService:
             given = {a.split('=', 1)[0] for a in viper_args}
             viper_args = [a for a in self._default_viper_args
                           if a.split('=', 1)[0] not in given] + viper_args
+        # Snapshot the source before verification: the agent may edit the file
+        # while the run is in flight, and the record must show what was verified.
+        source = self._read_source(path)
         try:
             if self._can_run_concurrently(arp):
-                return self._verify_concurrent(path, selected, base_dir,
-                                               counterexample,
-                                               ignore_global, viper_args,
-                                               include_viper, job_token,
-                                               translate_only=translate_only,
-                                               int_bitops_size=int_bitops_size)
-            with self._state_lock:
-                return self._verify_serial(path, selected, base_dir, arp,
-                                           counterexample, ignore_global,
-                                           viper_args, include_viper,
-                                           translate_only=translate_only,
-                                           int_bitops_size=int_bitops_size)
+                result = self._verify_concurrent(path, selected, base_dir,
+                                                 counterexample,
+                                                 ignore_global, viper_args,
+                                                 include_viper, job_token,
+                                                 translate_only=translate_only,
+                                                 int_bitops_size=int_bitops_size)
+            else:
+                with self._state_lock:
+                    result = self._verify_serial(path, selected, base_dir, arp,
+                                                 counterexample, ignore_global,
+                                                 viper_args, include_viper,
+                                                 translate_only=translate_only,
+                                                 int_bitops_size=int_bitops_size)
         except Exception as e:
             # Last-resort conversion of internal crashes (translator bugs,
             # unexpected error shapes) into a structured result: callers get a
             # diagnostic instead of a bare exception string, and the full
             # traceback lands in the server log.
             logging.exception('Internal error verifying %s.', path)
-            return VerifyResult(False, [self._point_diagnostic(
+            result = VerifyResult(False, [self._point_diagnostic(
                 path, 'Internal Nagini error: {}: {} (traceback in server '
                 'log).'.format(type(e).__name__, e), 'internal.error')],
                 time.time() - start)
+        self._record(path, selected, base_dir, viper_args, source, start, result)
+        return result
+
+    @staticmethod
+    def _read_source(path):
+        try:
+            with open(path, 'rb') as f:
+                return f.read()
+        except OSError:
+            return None
+
+    def _record(self, path, selected, base_dir, viper_args, source, start,
+                result) -> None:
+        """Archive one verification attempt under the service's record dir.
+
+        Server-side only — nothing about the recording is visible through the
+        MCP tools. Every attempt gets meta.json (effective backend args,
+        content hashes of the project's .py files for attempt-series
+        attribution) and result.json (full structured result incl. debug
+        payloads). Full file contents (the verified file plus its sibling
+        .py files) are archived only when a diagnostic carries
+        reasonUnknown == 'canceled': those are the budget-exhausted queries
+        worth replaying in later SMT experiments. Recording failures must
+        never affect verification.
+        """
+        if not self._record_dir:
+            return
+        try:
+            with self._record_lock:
+                self._record_seq += 1
+                seq = self._record_seq
+            attempt = os.path.join(self._record_dir, 'attempt-%04d' % seq)
+            os.makedirs(attempt, exist_ok=True)
+            has_canceled = any(
+                (d.debug or {}).get('reasonUnknown') == 'canceled'
+                for d in result.diagnostics)
+            src_dir = os.path.dirname(path)
+            project_files = {}
+            for name in sorted(os.listdir(src_dir) or []):
+                if not name.endswith('.py'):
+                    continue
+                data = self._read_source(os.path.join(src_dir, name))
+                if data is None:
+                    continue
+                project_files[name] = hashlib.sha256(data).hexdigest()
+                if has_canceled:
+                    files_dir = os.path.join(attempt, 'files')
+                    os.makedirs(files_dir, exist_ok=True)
+                    with open(os.path.join(files_dir, name), 'wb') as f:
+                        f.write(data)
+            if has_canceled and source is not None:
+                with open(os.path.join(attempt, 'source.py'), 'wb') as f:
+                    f.write(source)
+            meta = {
+                'seq': seq,
+                'path': path,
+                'selected': sorted(selected) if selected else None,
+                'baseDir': base_dir,
+                'effectiveViperArgs': viper_args,
+                'backend': self._backend,
+                'strictInt': self._strict_int,
+                'intBitopsSize': self._bv_size,
+                'sourceSha256': (hashlib.sha256(source).hexdigest()
+                                 if source is not None else None),
+                'projectFiles': project_files,
+                'startTime': start,
+                'duration': result.duration,
+                'success': result.success,
+                'cancelled': result.cancelled,
+                'translationFailed': result.translation_failed,
+                'diagnosticCount': len(result.diagnostics),
+            }
+            with open(os.path.join(attempt, 'meta.json'), 'w') as f:
+                json.dump(meta, f, indent=1)
+            with open(os.path.join(attempt, 'result.json'), 'w') as f:
+                json.dump(result.to_dict(), f, indent=1)
+        except Exception:
+            logging.exception('Failed to record verification attempt for %s.',
+                              path)
 
     def _apply_bitops_size(self, size: int) -> None:
         """Switch the bitvector width for subsequent translations; sticky, like
@@ -856,6 +945,11 @@ def add_service_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentP
                              'verification request, separated by commas (same '
                              "syntax as the CLI's --viper-arg; a request's own "
                              'viper_args override same-name flags)')
+    parser.add_argument('--record-dir', default=None,
+                        help='archive every verification attempt (source '
+                             'snapshot, effective backend args, full result '
+                             'incl. debug payloads) into this directory; '
+                             'server-side only, invisible to MCP clients')
     return parser
 
 
@@ -873,7 +967,8 @@ def service_kwargs_from_args(args: argparse.Namespace) -> dict:
         sif=args.sif, float_encoding=args.float_encoding,
         disable_branch_conditions=args.disable_branch_conditions,
         strict_int=args.strict_int, force_obligations=args.force_obligations,
-        default_viper_args=args.viper_arg.split(',') if args.viper_arg else None)
+        default_viper_args=args.viper_arg.split(',') if args.viper_arg else None,
+        record_dir=args.record_dir)
 
 
 def make_service(args: argparse.Namespace) -> VerificationService:
