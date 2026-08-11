@@ -382,7 +382,8 @@ class VerificationService:
                 path, 'Internal Nagini error: {}: {} (traceback in server '
                 'log).'.format(type(e).__name__, e), 'internal.error')],
                 time.time() - start)
-        self._record(path, selected, base_dir, viper_args, source, start, result)
+        self._record(path, selected, base_dir, viper_args, source, start,
+                     result, translate_only)
         return result
 
     @staticmethod
@@ -394,7 +395,7 @@ class VerificationService:
             return None
 
     def _record(self, path, selected, base_dir, viper_args, source, start,
-                result) -> None:
+                result, translate_only=False) -> None:
         """Archive one verification attempt under the service's record dir.
 
         Server-side only — nothing about the recording is visible through the
@@ -452,6 +453,7 @@ class VerificationService:
                 'success': result.success,
                 'cancelled': result.cancelled,
                 'translationFailed': result.translation_failed,
+                'translateOnly': translate_only,
                 'diagnosticCount': len(result.diagnostics),
             }
             with open(os.path.join(attempt, 'meta.json'), 'w') as f:
