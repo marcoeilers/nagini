@@ -196,7 +196,7 @@ class VerificationService:
     def verify(self, path: str, *, selected: Set[str] = None, base_dir: str = None,
                arp: bool = False, counterexample: bool = False,
                ignore_global: bool = False, viper_args: List[str] = None,
-               include_viper: bool = False,
+               include_viper: bool = False, translate_only: bool = False,
                int_bitops_size: int = None,
                job_token: str = None) -> VerifyResult:
         """Translate and verify the file at ``path`` and return structured results.
@@ -207,7 +207,9 @@ class VerificationService:
         to skip verification of top-level (module-global) statements.
         ``viper_args`` are extra command-line arguments for the Viper backend
         (the CLI's ``--viper-arg``, as a list). ``include_viper`` returns the
-        translated Viper program in ``viper_program``. ``int_bitops_size`` sets
+        translated Viper program in ``viper_program``. ``translate_only`` stops
+        after translation (mypy + Nagini-to-Viper): success means the file is a
+        valid Nagini program; no proof obligations are checked. ``int_bitops_size`` sets
         the bitvector width used to encode int bitwise operations for this
         request; like :meth:`reconfigure` it is sticky (subsequent requests
         keep it) and reloads the Silver resources only when the width changes.
@@ -228,11 +230,13 @@ class VerificationService:
                                                counterexample,
                                                ignore_global, viper_args,
                                                include_viper, job_token,
+                                               translate_only=translate_only,
                                                int_bitops_size=int_bitops_size)
             with self._state_lock:
                 return self._verify_serial(path, selected, base_dir, arp,
                                            counterexample, ignore_global,
                                            viper_args, include_viper,
+                                           translate_only=translate_only,
                                            int_bitops_size=int_bitops_size)
         except Exception as e:
             # Last-resort conversion of internal crashes (translator bugs,
@@ -386,7 +390,8 @@ class VerificationService:
 
     def _verify_concurrent(self, path, selected, base_dir, counterexample,
                            ignore_global, viper_args, include_viper,
-                           job_token, int_bitops_size=None) -> VerifyResult:
+                           job_token, translate_only=False,
+                           int_bitops_size=None) -> VerifyResult:
         from nagini_translation.viper_server import (build_carbon_backend_args,
                                                      build_silicon_backend_args,
                                                      get_viper_server_manager)
@@ -417,6 +422,9 @@ class VerificationService:
                     time.time() - start, translation_failed=True)
             modules, prog = translated
             viper_text = str(prog) if include_viper else None
+            if translate_only:
+                return VerifyResult(True, [], time.time() - start,
+                                    viper_program=viper_text)
             snapshot = (dict(error_manager._items),
                         dict(error_manager._conversion_rules))
             error_manager.clear()
@@ -481,7 +489,8 @@ class VerificationService:
 
     def _verify_serial(self, path, selected, base_dir, arp,
                        counterexample, ignore_global, viper_args,
-                       include_viper, int_bitops_size=None) -> VerifyResult:
+                       include_viper, translate_only=False,
+                       int_bitops_size=None) -> VerifyResult:
         start = time.time()
         try:
             self._apply_bitops_size(int_bitops_size)
@@ -499,6 +508,9 @@ class VerificationService:
                     time.time() - start, translation_failed=True)
             modules, prog = translated
             viper_text = str(prog) if include_viper else None
+            if translate_only:
+                return VerifyResult(True, [], time.time() - start,
+                                    viper_program=viper_text)
             backend = (ViperVerifier.silicon if self._backend == 'silicon'
                        else ViperVerifier.carbon)
             vresult = verify_program(
