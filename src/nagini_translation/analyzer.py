@@ -198,8 +198,28 @@ class Analyzer(ast.NodeVisitor):
                 if len(stmt.names) == 1 and stmt.names[0].name == '*':
                     names = None
                 else:
-                    names = [(name.name, name.asname if name.asname else None)
-                             for name in stmt.names] # TODO rename?
+                    names = []
+                    for name in stmt.names:
+                        # A member that mypy knows as a module is a submodule
+                        # import (`from pkg import helpers`): bind it into the
+                        # importing module's namespaces — the same shape as
+                        # `import pkg.helpers as helpers` — instead of treating
+                        # it as a name defined inside the package.
+                        member_module = module_name + '.' + name.name
+                        if member_module in self.types.files:
+                            member_path = os.path.abspath(
+                                self.types.files[member_module])
+                            self.add_module(member_path, abs_path,
+                                            name.asname if name.asname
+                                            else name.name, parse_result)
+                        else:
+                            names.append((name.name,
+                                          name.asname if name.asname else None))
+                    if not names:
+                        # Every member was a submodule: keep the package itself
+                        # in from_imports (so its own statements still execute
+                        # at the import site) but let the view expose nothing.
+                        names = [('$nothing', None)]
                 self.add_module(path, abs_path, None, parse_result, names)
         self.module_index = self.module_paths.index(abs_path) + 1
 
@@ -713,6 +733,15 @@ class Analyzer(ast.NodeVisitor):
     def visit_ImportFrom(self, node: ast.ImportFrom):
         module_name = self.module.get_relative_import_name(node.module, node.level)
         self.analyze_import(module_name)
+        for name in node.names:
+            if name.name == '*':
+                continue
+            # Members that are submodules (`from pkg import helpers`) are
+            # bound as namespace imports during collect_imports; their
+            # contents must be analyzed like any imported module.
+            member_module = module_name + '.' + name.name
+            if member_module in self.types.files:
+                self.analyze_import(member_module)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         if self.current_function:
