@@ -127,8 +127,6 @@ class TypeTranslator(CommonTranslator):
             return None
         if not getattr(pseq_type, 'type_args', None):
             return None
-        if pseq_type.type_args[0].name != INT_TYPE:
-            return None
         info = self.no_info(ctx)
         seq_class = ctx.module.global_module.classes[PSEQ_TYPE]
         sil_seq = self.get_function_call(seq_class, '__sil_seq__',
@@ -136,17 +134,18 @@ class TypeTranslator(CommonTranslator):
         i_decl = self.viper.LocalVarDecl('i', self.viper.Int, pos, info)
         i_ref = self.viper.LocalVar('i', self.viper.Int, pos, info)
         seq_at_i = self.viper.SeqIndex(sil_seq, i_ref, pos, info)
+        # int elements and (nested) tuples with int slots both yield facts.
+        facts = self.strict_int_value_facts(seq_at_i, pseq_type.type_args[0],
+                                            pos, ctx)
+        if facts is None:
+            return None
         zero = self.viper.IntLit(0, pos, info)
         length = self.viper.SeqLength(sil_seq, pos, info)
         bounds = self.viper.And(
             self.viper.LeCmp(zero, i_ref, pos, info),
             self.viper.LtCmp(i_ref, length, pos, info),
             pos, info)
-        int_cls = ctx.module.global_module.classes[INT_TYPE]
-        int_lit = self.type_factory.translate_type_literal(int_cls, pos, ctx)
-        typeof_at_i = self.type_factory.typeof(seq_at_i, ctx)
-        eq = self.viper.EqCmp(typeof_at_i, int_lit, pos, info)
-        body = self.viper.Implies(bounds, eq, pos, info)
+        body = self.viper.Implies(bounds, facts, pos, info)
         trigger = self.viper.Trigger([seq_at_i], pos, info)
         return self.viper.Forall([i_decl], [trigger], body, pos, info)
 
@@ -176,29 +175,19 @@ class TypeTranslator(CommonTranslator):
         seq_ref_type = self.viper.SeqType(self.viper.Ref)
         tuple_val = self.viper.FuncApp('tuple___val__', [tuple_ref], pos, info,
                                        seq_ref_type)
-        int_cls = ctx.module.global_module.classes[INT_TYPE]
-        int_lit = self.type_factory.translate_type_literal(int_cls, pos, ctx)
         if getattr(tuple_type, 'exact_length', True):
-            # Heterogeneous tuple: emit a conjunct per int slot. Indexing into
+            # Heterogeneous tuple: strict_int_value_facts emits a conjunct per
+            # int-bearing slot, recursing through nested tuples. Indexing into
             # `tuple___sil_seq__` carries the length axiom so in-bounds checks
             # succeed for known slot indices.
-            conjuncts = []
-            for i, arg_type in enumerate(type_args):
-                if arg_type is None or arg_type.name != INT_TYPE:
-                    continue
-                idx = self.viper.IntLit(i, pos, info)
-                at_i = self.viper.SeqIndex(sil_seq, idx, pos, info)
-                typeof_at_i = self.type_factory.typeof(at_i, ctx)
-                conjuncts.append(self.viper.EqCmp(typeof_at_i, int_lit, pos,
-                                                  info))
-            if not conjuncts:
-                return None
-            result = conjuncts[0]
-            for c in conjuncts[1:]:
-                result = self.viper.And(result, c, pos, info)
-            return result
-        # Variadic Tuple[T, ...]: single element type.
-        if type_args[0] is None or type_args[0].name != INT_TYPE:
+            return self.strict_int_value_facts(tuple_ref, tuple_type, pos, ctx)
+        # Variadic Tuple[T, ...]: single element type (int, or a nested tuple
+        # with int slots).
+        elem_facts_probe = self.strict_int_value_facts(
+            self.viper.SeqIndex(sil_seq, self.viper.IntLit(0, pos, info),
+                                pos, info),
+            type_args[0], pos, ctx)
+        if elem_facts_probe is None:
             return None
         i_decl = self.viper.LocalVarDecl('i', self.viper.Int, pos, info)
         i_ref = self.viper.LocalVar('i', self.viper.Int, pos, info)
@@ -210,9 +199,9 @@ class TypeTranslator(CommonTranslator):
             self.viper.LeCmp(zero, i_ref, pos, info),
             self.viper.LtCmp(i_ref, length, pos, info),
             pos, info)
-        typeof_at_i = self.type_factory.typeof(sil_at_i, ctx)
-        eq = self.viper.EqCmp(typeof_at_i, int_lit, pos, info)
-        body = self.viper.Implies(bounds, eq, pos, info)
+        elem_facts = self.strict_int_value_facts(sil_at_i, type_args[0],
+                                                 pos, ctx)
+        body = self.viper.Implies(bounds, elem_facts, pos, info)
         trig_sil = self.viper.Trigger([sil_at_i], pos, info)
         trig_val = self.viper.Trigger([val_at_i], pos, info)
         return self.viper.Forall([i_decl], [trig_sil, trig_val], body, pos,

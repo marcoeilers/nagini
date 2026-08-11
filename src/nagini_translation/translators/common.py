@@ -29,6 +29,7 @@ from nagini_translation.lib.constants import (
     PSET_TYPE,
     SET_TYPE,
     SINGLE_NAME,
+    TUPLE_TYPE,
     UNION_TYPE,
 )
 from nagini_translation.lib.context import Context
@@ -720,6 +721,56 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                   actual_position,
                                   self.no_info(ctx), type, formal_args)
         return call
+
+    def strict_int_value_facts(self, value: Expr, value_type: PythonType,
+                               pos: 'silver.ast.Position',
+                               ctx: Context) -> 'Optional[Expr]':
+        """Strict-int exact-typing conjuncts for one value term, composing
+        through tuple nesting: for int, ``typeof(value) == int()``; for an
+        exact-length tuple, the conjunction over its int-bearing slots via
+        ``tuple___sil_seq__`` (tuples are heap-independent, so slot facts are
+        expressible wherever the tuple term is, e.g. under a container
+        quantifier); anything else yields None. Deeper heap containers
+        (a list inside a list) need permissions to read their contents and
+        are out of scope."""
+        if not ctx.strict_int or value_type is None:
+            return None
+        info = self.no_info(ctx)
+        if value_type.name == INT_TYPE:
+            int_cls = ctx.module.global_module.classes[INT_TYPE]
+            int_lit = self.type_factory.translate_type_literal(int_cls, pos, ctx)
+            return self.viper.EqCmp(self.type_factory.typeof(value, ctx),
+                                    int_lit, pos, info)
+        if (value_type.name == TUPLE_TYPE
+                and getattr(value_type, 'type_args', None)
+                and getattr(value_type, 'exact_length', True)):
+            tuple_class = ctx.module.global_module.classes[TUPLE_TYPE]
+            sil_seq = self.get_function_call(tuple_class, '__sil_seq__',
+                                             [value], [None], None, ctx, pos)
+            conjuncts = []
+            for i, arg_type in enumerate(value_type.type_args):
+                at_i = self.viper.SeqIndex(
+                    sil_seq, self.viper.IntLit(i, pos, info), pos, info)
+                fact = self.strict_int_value_facts(at_i, arg_type, pos, ctx)
+                if fact is not None:
+                    conjuncts.append(fact)
+            if not conjuncts:
+                return None
+            result = conjuncts[0]
+            for extra in conjuncts[1:]:
+                result = self.viper.And(result, extra, pos, info)
+            # Guard on the tuple's length: in contexts where the value's tuple
+            # type is not yet in scope (e.g. under a container quantifier),
+            # the slot indices cannot be bounds-proven — the guard makes the
+            # facts conditional, and `tuple___sil_seq__`'s own
+            # `|result| == tuple___len__(self)` postcondition discharges the
+            # bounds under it. Consumers know the length from `typeof`.
+            length = self.get_function_call(tuple_class, '__len__',
+                                            [value], [None], None, ctx, pos)
+            n_lit = self.viper.IntLit(len(value_type.type_args), pos, info)
+            guard = self.viper.EqCmp(length, n_lit, pos, info)
+            return self.viper.Implies(guard, result, pos, info)
+        return None
 
     def get_function_call(self, receiver: PythonType,
                           func_name: str, args: List[Expr],
