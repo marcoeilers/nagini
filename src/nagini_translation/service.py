@@ -18,8 +18,10 @@ servers build on; it can also be reused by the existing ZMQ server.
 
 import argparse
 import ast
+import glob
 import logging
 import os
+import signal
 import threading
 import time
 
@@ -168,6 +170,66 @@ def _debug_payload(error) -> Optional[dict]:
         return None
 
 
+# Grace period on top of the backend's own --timeout before the service declares a
+# verification wedged and force-kills its prover processes (see _hard_wall_seconds).
+HARD_DEADLINE_GRACE = 60
+
+
+def _hard_wall_seconds(backend_args) -> Optional[int]:
+    """Wall cap for one verification job, derived from the effective backend args.
+
+    Silicon's --timeout produces a TimeoutOccurred *result* at T seconds, but the
+    result is only delivered after teardown joins the worker pool — and a prover
+    stuck deep in a single hard query ignores the JVM-side interrupt, so the job
+    (and, since jobs serialize per client, every queued call behind it) can grind
+    for many extra minutes. Cap the wait at T plus a grace period; None (no
+    --timeout, or --timeout=0) means wait indefinitely.
+    """
+    timeout = None
+    args = list(backend_args)
+    for i, arg in enumerate(args):
+        if arg.startswith('--timeout='):
+            timeout = arg.split('=', 1)[1]
+        elif arg == '--timeout' and i + 1 < len(args):
+            timeout = args[i + 1]
+    try:
+        seconds = int(timeout)
+    except (TypeError, ValueError):
+        return None
+    return seconds + HARD_DEADLINE_GRACE if seconds > 0 else None
+
+
+def _is_await_timeout(exc: Exception) -> bool:
+    """True for the TimeoutException scala.concurrent.Await.result raises."""
+    return ('TimeoutException' in type(exc).__name__
+            or 'Futures timed out' in str(exc))
+
+
+def _kill_child_provers() -> None:
+    """SIGKILL any prover process (z3/boogie) spawned by this process.
+
+    Used only after a hard-deadline cancel: StopVerification interrupts the job's
+    JVM threads, but a prover blocked in one long-running query never reads the
+    exit command and keeps burning CPU — and Silicon's teardown in turn blocks on
+    it. The JVM is in-process (JPype), so provers are direct children of this
+    process; killing them unblocks the readers with EOF and the job actor dies
+    quickly. Killing is process-wide, so the caller must ensure no concurrent
+    job is in flight (it would lose its provers and fail as cancelled).
+    """
+    me = str(os.getpid())
+    for stat_path in glob.glob('/proc/[0-9]*/stat'):
+        try:
+            with open(stat_path) as f:
+                fields = f.read().split()
+            comm, ppid = fields[1].strip('()'), fields[3]
+            if ppid == me and (comm.startswith('z3') or comm.startswith('boogie')):
+                os.kill(int(fields[0]), signal.SIGKILL)
+                logging.warning('Killed wedged prover process %s (%s).',
+                                fields[0], comm)
+        except (OSError, IndexError, ValueError):
+            continue
+
+
 class VerificationService:
     """
     Long-lived, in-process Nagini verification service.
@@ -231,6 +293,11 @@ class VerificationService:
         # per-job cancellation.
         self._jobs = {}
         self._jobs_lock = threading.Lock()
+        # Number of verify() calls currently awaiting a ViperServer result; the
+        # hard-deadline path only force-kills prover processes when the wedged
+        # job is the sole one in flight (killing is process-wide, so a
+        # concurrent job would lose its provers too).
+        self._inflight = 0
 
         # JVM() routes JVM System.out to System.err and quiets logback, so the
         # JSON-RPC stream of a stdio-based LSP/MCP frontend on stdout stays clean.
@@ -496,14 +563,43 @@ class VerificationService:
         if job_token is not None:
             with self._jobs_lock:
                 self._jobs[job_token] = job_id
+        wall_cap = _hard_wall_seconds(backend_args)
+        with self._jobs_lock:
+            self._inflight += 1
         try:
-            result = manager.await_result(job_id)
-        except Exception:
+            result = manager.await_result(
+                job_id, timeout_ms=wall_cap * 1000 if wall_cap else None)
+        except Exception as e:
+            if wall_cap is not None and _is_await_timeout(e):
+                # The backend blew through its own --timeout plus the grace
+                # period: cancel the job and, when no other job would be hit,
+                # hard-kill the prover processes so the server is immediately
+                # usable again; either way report a plain timeout.
+                with self._jobs_lock:
+                    alone = self._inflight == 1
+                logging.warning('Verification of %s exceeded the hard %ss wall '
+                                '(backend --timeout plus %ss grace); '
+                                'cancelling%s.', path, wall_cap,
+                                HARD_DEADLINE_GRACE,
+                                ' and killing provers' if alone else
+                                '; provers left running (concurrent job in flight)')
+                try:
+                    manager.cancel_job(job_id)
+                finally:
+                    if alone:
+                        _kill_child_provers()
+                return VerifyResult(False, [self._point_diagnostic(
+                    path, 'Timeout occurred: verification exceeded %s second(s) '
+                    '(hard wall).' % wall_cap,
+                    'TimeoutOccurred')], time.time() - start,
+                    viper_program=viper_text)
             # Most commonly this is a cancelled job (its actor was stopped).
             logging.debug('Verification job failed or was cancelled.', exc_info=True)
             return VerifyResult(False, [], time.time() - start, cancelled=True,
                                 viper_program=viper_text)
         finally:
+            with self._jobs_lock:
+                self._inflight -= 1
             if job_token is not None:
                 with self._jobs_lock:
                     # Only remove our own mapping; a newer run may have already

@@ -117,9 +117,14 @@ class ViperServerManager:
         return self.jvm.viper.server.core.ViperCoreServerUtils.getResultsFuture(
             self.server, job_id, self.executor)
 
-    def await_result(self, job_id):
-        """Block (concurrently across jobs) until ``job_id``'s result is ready."""
-        return self._await(self.result_future(job_id))
+    def await_result(self, job_id, timeout_ms=None):
+        """Block (concurrently across jobs) until ``job_id``'s result is ready.
+
+        With a finite ``timeout_ms`` the wait raises
+        ``java.util.concurrent.TimeoutException`` once it elapses; the caller is
+        then responsible for cancelling the job (the job itself keeps running).
+        """
+        return self._await(self.result_future(job_id), timeout_ms=timeout_ms)
 
     def cancel_job(self, job_id) -> None:
         """Precisely stop a single running job by sending its actor StopVerification."""
