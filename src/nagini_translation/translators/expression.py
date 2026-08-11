@@ -1509,6 +1509,12 @@ class ExpressionTranslator(CommonTranslator):
         elif isinstance(op, ast.IsNot):
             return ([], self.viper.NeCmp(left, right, position, info))
 
+        # TODO is this really correct?
+        if isinstance(left_type, TypeVar):
+            left_type = left_type.bound
+        if isinstance(right_type, TypeVar):
+            right_type = right_type.bound
+
         # Unbox IntEnum to int
         if left_type.python_class.enum and left_type.python_class.enum_type == INT_TYPE:
             left = self.to_int(left, ctx, left_type)
