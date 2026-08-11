@@ -47,11 +47,16 @@ def build_silicon_backend_args(viper_args: List[str], counterexample: bool,
         'viper.silver.plugin.standard.termination.TerminationPlugin:'
         'viper.silver.plugin.standard.predicateinstance.PredicateInstancePlugin',
         *(['--counterexample=native', '--proverArgs=model.partial=true'] if counterexample else []),
-        # ViperServer serves cached failures without failure contexts, so SMT
-        # state collection requires a live verification run. The diagnostics
-        # already carry the state in-band; the file dumps go to a temp dir so
-        # they don't litter the server's working directory.
-        *(['--disableCaching'] if '--smtStateOnError' in viper_args else []),
+        # ViperServer serves cached failures without failure contexts, so a
+        # cache hit on a failing member yields no SMT state even under
+        # --smtStateOnError. Caching stays enabled anyway: cached successes
+        # are the bulk of the win, and a first failure is normally a cache
+        # miss (the member just changed), so it still collects its state
+        # live. A cached failure that comes back stateless carries a
+        # diagnostic hint to re-verify with --disableCaching (per-request,
+        # cache preserved) — see service._failure_diagnostics. The file
+        # dumps go to a temp dir so they don't litter the server's working
+        # directory.
         *(['--smtStateDir', os.path.join(tempfile.gettempdir(), 'nagini-smtstate')]
           if '--smtStateOnError' in viper_args
           and not any(a.startswith('--smtStateDir') for a in viper_args) else []),

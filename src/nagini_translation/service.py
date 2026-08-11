@@ -715,7 +715,9 @@ class VerificationService:
                     errors.append(it.next())
                 try:
                     failure = Failure(errors, self.jvm, modules, self._sif)
-                    diagnostics = self._failure_diagnostics(failure, path)
+                    diagnostics = self._failure_diagnostics(
+                        failure, path,
+                        smt_state_requested='--smtStateOnError' in viper_args)
                 except Exception:
                     # Even a failed conversion must yield the raw Viper
                     # messages rather than crash the request.
@@ -766,8 +768,12 @@ class VerificationService:
                     path, 'Internal verifier error (see server log).',
                     'verifier.error')], duration, viper_program=viper_text)
             if isinstance(vresult, Failure):
-                return VerifyResult(False, self._failure_diagnostics(vresult, path),
-                                    duration, viper_program=viper_text)
+                return VerifyResult(
+                    False,
+                    self._failure_diagnostics(
+                        vresult, path,
+                        smt_state_requested='--smtStateOnError' in viper_args),
+                    duration, viper_program=viper_text)
             return VerifyResult(True, [], duration, viper_program=viper_text)
         except (TypeException, InvalidProgramException, UnsupportedException) as e:
             return VerifyResult(False, self._exception_diagnostics(e, path),
@@ -777,12 +783,30 @@ class VerificationService:
                 path, e.message + ': Translated AST contains inconsistencies.',
                 'consistency.error')], time.time() - start, translation_failed=True)
 
-    def _failure_diagnostics(self, failure: Failure, path: str) -> List[Diagnostic]:
+    # Appended to a failure diagnostic served from ViperServer's verification
+    # cache while --smtStateOnError is in effect: cache hits replay the stored
+    # errors without failure contexts, so no SMT state exists to attach.
+    CACHED_STATE_HINT = (
+        ' [note: result served from the verification cache, so no SMT state '
+        "was collected. Re-verify with viper_args=['--disableCaching'] to "
+        'run this member live and collect the state; the cache is kept.]')
+
+    def _failure_diagnostics(self, failure: Failure, path: str,
+                             smt_state_requested: bool = False) -> List[Diagnostic]:
         diagnostics = []
         seen = set()
         for error in failure.errors:
             try:
                 diag = self._error_diagnostic(error, path)
+                if smt_state_requested and diag.debug is None:
+                    jvm_error = getattr(error, '_error', None)
+                    try:
+                        cached = bool(jvm_error is not None
+                                      and jvm_error.cached())
+                    except Exception:
+                        cached = False
+                    if cached:
+                        diag.message += self.CACHED_STATE_HINT
             except Exception:
                 # Rendering a diagnostic must never lose the error itself
                 # (internal verifier exceptions produce errors without a
