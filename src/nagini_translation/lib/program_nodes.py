@@ -178,12 +178,22 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
     def get_relative_import_name(self, name: str, level: int) -> str:
         module_name = name
         if level > 0:
-            current_module_name = self.full_module_name
-            module_name_to_add = current_module_name.split(".")[:-level]
+            parts = self.full_module_name.split(".")
+            # A package's __init__ resolves relative imports against the
+            # package itself (mypy names pkg/__init__.py just 'pkg'), so it
+            # drops one component fewer than a plain module: `.helpers` inside
+            # pkg/__init__.py is pkg.helpers, inside pkg/mod.py it is also
+            # pkg.helpers (drop 'mod').
+            effective_level = level - 1 if self._is_package else level
+            module_name_to_add = parts[:len(parts) - effective_level]
             if module_name is not None:
                 module_name_to_add.append(module_name)
             module_name = ".".join(module_name_to_add)
         return module_name
+
+    @property
+    def _is_package(self) -> bool:
+        return str(self.file or '').endswith('__init__.py')
 
     def add_builtin_vars(self) -> None:
         """
