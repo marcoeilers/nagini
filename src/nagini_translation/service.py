@@ -69,9 +69,10 @@ class Diagnostic:
     vias: List[Tuple[str, str]] = field(default_factory=list)
     counterexample: Optional[str] = None
     branch_conditions: List[str] = field(default_factory=list)
+    debug: Optional[dict] = None
 
     def to_dict(self) -> dict:
-        return {
+        result = {
             'file': self.file,
             'startLine': self.start_line,
             'startCol': self.start_col,
@@ -87,6 +88,9 @@ class Diagnostic:
             'counterexample': self.counterexample,
             'branchConditions': self.branch_conditions,
         }
+        if self.debug is not None:
+            result['debug'] = self.debug
+        return result
 
 
 @dataclass
@@ -109,6 +113,59 @@ class VerifyResult:
         if self.viper_program is not None:
             result['viperProgram'] = self.viper_program
         return result
+
+
+def _scala_strings(collection) -> List[str]:
+    """Stringify the elements of any Scala collection via its iterator."""
+    out = []
+    iterator = (collection.toIterator() if hasattr(collection, 'toIterator')
+                else collection.iterator())
+    while iterator.hasNext():
+        out.append(str(iterator.next()))
+    return out
+
+
+def _debug_payload(error) -> Optional[dict]:
+    """Project Silicon's SMT state failure context into a JSON-friendly dict.
+
+    Attached only when Silicon recorded the symbolic state (its
+    ``--smtStateOnError`` option, passed through ``viper_args``); returns
+    ``None`` otherwise. Everything is stringified eagerly here — the live
+    ``state`` object itself cannot leave the JVM, so the store/heap
+    projections stand in for it.
+    """
+    try:
+        jvm_error = getattr(error, '_error', None)
+        if jvm_error is None or not hasattr(jvm_error, 'failureContexts'):
+            return None
+        contexts = jvm_error.failureContexts()
+        if not contexts.nonEmpty():
+            return None
+        ctx = contexts.head()
+        if not hasattr(ctx, 'proverEmits'):
+            return None  # plain SiliconFailureContext, no SMT state
+        payload = {
+            'failedAssertion': str(ctx.failedAssertion()),
+            'assumptions': _scala_strings(ctx.assumptions()),
+            'preambleAssumptions': _scala_strings(ctx.preambleAssumptions()),
+            'macroDecls': _scala_strings(ctx.macroDecls()),
+            'functionDecls': _scala_strings(ctx.functionDecls()),
+            'proverEmits': _scala_strings(ctx.proverEmits()),
+            'branchConditions': _scala_strings(ctx.branchConditions()),
+        }
+        if ctx.reasonUnknown().isDefined():
+            payload['reasonUnknown'] = str(ctx.reasonUnknown().get())
+        if ctx.state().isDefined():
+            state = ctx.state().get()
+            payload['state'] = {
+                'store': str(state.g().termValues()),
+                'heap': str(state.h()),
+                'oldHeaps': str(state.oldHeaps()),
+            }
+        return payload
+    except Exception:
+        logging.exception('Failed to project the SMT state failure context.')
+        return None
 
 
 class VerificationService:
@@ -581,6 +638,7 @@ class VerificationService:
             counterexample=(str(error._inputs)
                             if error._inputs is not None else None),
             branch_conditions=list(error.bcs) if error.bcs else [],
+            debug=_debug_payload(error),
         )
 
     @staticmethod

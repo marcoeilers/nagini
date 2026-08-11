@@ -6,6 +6,9 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 
+import os
+import tempfile
+
 from abc import ABCMeta
 from enum import Enum
 from typing import List
@@ -44,6 +47,14 @@ def build_silicon_backend_args(viper_args: List[str], counterexample: bool,
         'viper.silver.plugin.standard.termination.TerminationPlugin:'
         'viper.silver.plugin.standard.predicateinstance.PredicateInstancePlugin',
         *(['--counterexample=native', '--proverArgs=model.partial=true'] if counterexample else []),
+        # ViperServer serves cached failures without failure contexts, so SMT
+        # state collection requires a live verification run. The diagnostics
+        # already carry the state in-band; the file dumps go to a temp dir so
+        # they don't litter the server's working directory.
+        *(['--disableCaching'] if '--smtStateOnError' in viper_args else []),
+        *(['--smtStateDir', os.path.join(tempfile.gettempdir(), 'nagini-smtstate')]
+          if '--smtStateOnError' in viper_args
+          and not any(a.startswith('--smtStateDir') for a in viper_args) else []),
         *viper_args,
     ]
 

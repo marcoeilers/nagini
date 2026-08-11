@@ -167,6 +167,12 @@ class ErrorManager:
             iterator = bcs.toIterator()
             while iterator.hasNext():
                 bc = iterator.next()
+                if not hasattr(bc, 'pos'):
+                    # SMT-state contexts (--smtStateOnError) carry silicon
+                    # Terms, which have no source positions and cannot map to
+                    # a Python-level condition here; clients get the raw terms
+                    # via the diagnostic's debug payload instead.
+                    continue
                 bc_pos = bc.pos()
                 negated = False
                 if isinstance(bc, jvm.viper.silver.ast.Not) and bc_pos == bc.exp().pos():

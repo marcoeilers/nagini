@@ -17,6 +17,7 @@ diagnostics, and can cancel runs or flush the cache.
 
 import argparse
 import asyncio
+import json
 import logging
 import os
 import shutil
@@ -37,6 +38,91 @@ _service = None
 # Multiple verifications can run at once; the service serializes only the fast
 # translation step internally.
 _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix='nagini-verify')
+
+
+# Inline debug payloads must fit Claude Code's per-result token limit (25k
+# tokens by default) or the whole result gets file-redirected — which agents
+# in practice never read (and the redirect swallows even the diagnostic
+# message, so an oversized payload is WORSE than none). Everything dropped
+# here is still recorded server-side (--record-dir) in full.
+#
+# Strategy: measure the whole serialized result and degrade the debug
+# payloads stage by stage — least-consulted (expert-tier) fields first, as
+# observed in real agent runs — until the result fits. `reasonUnknown` (the
+# field agents actually act on), the truncation markers, and the diagnostic
+# message itself always survive.
+_BULK_DEBUG_FIELDS = ('proverEmits', 'preambleAssumptions')
+# Whole-result char budget. Silicon terms are symbol-dense (~2.5 chars/token),
+# so 50k chars keeps a comfortable margin under the 25k-token cap.
+_RESULT_BUDGET = 50_000
+_STATE_STUB_CHARS = 1_500  # per state projection (store/heap/oldHeaps)
+_BRANCH_CAP = 20           # branch conditions kept in stage 4
+_ASSERTION_STUB_CHARS = 2_000
+
+
+def _mark(dbg: dict, field: str, note) -> None:
+    dbg.setdefault('omitted', {})[field] = note
+
+
+def _degrade(dbg: dict, stage: int) -> None:
+    """Destructively degrade one debug dict to the given stage (cumulative).
+
+    Ordered by information lost per byte recovered: state stubs first (the
+    heap/store strings are almost always the byte-dominant fields, and a stub
+    still shows the store variables and heap shape), then the fields agents
+    were never observed to consult, then the progressively harsher cuts.
+    """
+    if stage >= 1 and isinstance(dbg.get('state'), dict):
+        for k, v in dbg['state'].items():
+            if isinstance(v, str) and len(v) > _STATE_STUB_CHARS:
+                dbg['state'][k] = v[:_STATE_STUB_CHARS] + '…[truncated]'
+    if stage >= 2 and ('macroDecls' in dbg or 'functionDecls' in dbg):
+        for f in ('macroDecls', 'functionDecls'):
+            if dbg.pop(f, None) is not None:
+                _mark(dbg, f, 'dropped')
+    if stage >= 3 and 'assumptions' in dbg:
+        _mark(dbg, 'assumptions', len(dbg.pop('assumptions') or []))
+    if stage >= 4 and isinstance(dbg.get('branchConditions'), list) \
+            and len(dbg['branchConditions']) > _BRANCH_CAP:
+        _mark(dbg, 'branchConditions',
+              len(dbg['branchConditions']) - _BRANCH_CAP)
+        dbg['branchConditions'] = dbg['branchConditions'][:_BRANCH_CAP]
+    if stage >= 5 and dbg.pop('state', None) is not None:
+        _mark(dbg, 'state', 'dropped')
+    if stage >= 6 and dbg.pop('branchConditions', None) is not None:
+        _mark(dbg, 'branchConditions', 'dropped')
+    if stage >= 7 and isinstance(dbg.get('failedAssertion'), str) \
+            and len(dbg['failedAssertion']) > _ASSERTION_STUB_CHARS:
+        dbg['failedAssertion'] = (dbg['failedAssertion'][:_ASSERTION_STUB_CHARS]
+                                  + '…[truncated]')
+
+
+_MAX_STAGE = 7
+
+
+def _slim_debug(result: dict) -> dict:
+    debugs = []
+    for d in result.get('diagnostics', []):
+        dbg = d.get('debug')
+        if not dbg:
+            continue
+        dbg = {k: v for k, v in dbg.items() if k not in _BULK_DEBUG_FIELDS}
+        d['debug'] = dbg
+        debugs.append(dbg)
+    if not debugs:
+        return result
+    # Degrade as little as possible: while the whole result is over budget,
+    # advance only the LARGEST remaining payload one stage — small
+    # diagnostics keep their full payloads.
+    stages = {id(dbg): 0 for dbg in debugs}
+    while len(json.dumps(result, default=str)) > _RESULT_BUDGET:
+        candidates = [dbg for dbg in debugs if stages[id(dbg)] < _MAX_STAGE]
+        if not candidates:
+            break  # nothing left to degrade (oversize is outside the payloads)
+        worst = max(candidates, key=lambda dbg: len(json.dumps(dbg, default=str)))
+        stages[id(worst)] += 1
+        _degrade(worst, stages[id(worst)])
+    return result
 
 
 async def _run(fn):
@@ -93,7 +179,7 @@ async def verify_file(path: str, method: Optional[str] = None,
         ignore_global=ignore_global, viper_args=viper_args,
         include_viper=include_viper, translate_only=translate_only,
         int_bitops_size=int_bitops_size, job_token=job_token))
-    return result.to_dict()
+    return _slim_debug(result.to_dict())
 
 
 @mcp.tool()
@@ -115,7 +201,7 @@ async def verify_method(path: str, method: str, counterexample: bool = False,
         viper_args=viper_args, include_viper=include_viper,
         translate_only=translate_only,
         int_bitops_size=int_bitops_size, job_token=job_token))
-    return result.to_dict()
+    return _slim_debug(result.to_dict())
 
 
 @mcp.tool()
@@ -141,7 +227,7 @@ async def verify_snippet(code: str, counterexample: bool = False,
             ignore_global=ignore_global, viper_args=viper_args,
             include_viper=include_viper, translate_only=translate_only,
             int_bitops_size=int_bitops_size, job_token=job_token))
-        return result.to_dict()
+        return _slim_debug(result.to_dict())
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
