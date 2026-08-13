@@ -227,16 +227,8 @@ def _debug_payload(error) -> Optional[dict]:
 HARD_DEADLINE_GRACE = 60
 
 
-def _hard_wall_seconds(backend_args) -> Optional[int]:
-    """Wall cap for one verification job, derived from the effective backend args.
-
-    Silicon's --timeout produces a TimeoutOccurred *result* at T seconds, but the
-    result is only delivered after teardown joins the worker pool — and a prover
-    stuck deep in a single hard query ignores the JVM-side interrupt, so the job
-    (and, since jobs serialize per client, every queued call behind it) can grind
-    for many extra minutes. Cap the wait at T plus a grace period; None (no
-    --timeout, or --timeout=0) means wait indefinitely.
-    """
+def _backend_timeout_seconds(backend_args) -> Optional[int]:
+    """The backend's own --timeout in seconds, or None when unset/0."""
     timeout = None
     args = list(backend_args)
     for i, arg in enumerate(args):
@@ -248,7 +240,21 @@ def _hard_wall_seconds(backend_args) -> Optional[int]:
         seconds = int(timeout)
     except (TypeError, ValueError):
         return None
-    return seconds + HARD_DEADLINE_GRACE if seconds > 0 else None
+    return seconds if seconds > 0 else None
+
+
+def _hard_wall_seconds(backend_args) -> Optional[int]:
+    """Wall cap for one verification job, derived from the effective backend args.
+
+    Silicon's --timeout produces a TimeoutOccurred *result* at T seconds, but the
+    result is only delivered after teardown joins the worker pool — and a prover
+    stuck deep in a single hard query ignores the JVM-side interrupt, so the job
+    (and, since jobs serialize per client, every queued call behind it) can grind
+    for many extra minutes. Cap the wait at T plus a grace period; None (no
+    --timeout, or --timeout=0) means wait indefinitely.
+    """
+    seconds = _backend_timeout_seconds(backend_args)
+    return seconds + HARD_DEADLINE_GRACE if seconds else None
 
 
 def _is_await_timeout(exc: Exception) -> bool:
@@ -753,9 +759,28 @@ class VerificationService:
                     '(hard wall).' % wall_cap,
                     'TimeoutOccurred')], time.time() - start,
                     viper_program=viper_text)
-            # Most commonly this is a cancelled job (its actor was stopped).
+            # Most commonly this is a cancelled job (its actor was stopped) —
+            # either explicitly via the cancel tool, or because the backend's own
+            # --timeout ended the run. Tell those apart by the elapsed time, and
+            # report the timeout as a real diagnostic instead of an inexplicable
+            # empty result: this is the whole-run budget expiring while every
+            # individual SMT check stayed within its per-check budget (otherwise
+            # a located failure would have been reported).
+            elapsed = time.time() - start
+            backend_timeout = _backend_timeout_seconds(backend_args)
+            if backend_timeout is not None and elapsed >= backend_timeout - 1:
+                logging.debug('Verification job ended by backend --timeout.',
+                              exc_info=True)
+                return VerifyResult(False, [self._point_diagnostic(
+                    path,
+                    'Timeout occurred: the whole-run --timeout=%ds expired '
+                    'before verification finished. No individual obligation '
+                    'failed or exceeded its per-check budget.'
+                    % backend_timeout,
+                    'TimeoutOccurred')], elapsed, cancelled=True,
+                    viper_program=viper_text)
             logging.debug('Verification job failed or was cancelled.', exc_info=True)
-            return VerifyResult(False, [], time.time() - start, cancelled=True,
+            return VerifyResult(False, [], elapsed, cancelled=True,
                                 viper_program=viper_text)
         finally:
             with self._jobs_lock:
