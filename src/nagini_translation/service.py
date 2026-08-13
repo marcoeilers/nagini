@@ -330,7 +330,10 @@ class VerificationService:
         self._disable_branch_conditions = disable_branch_conditions
         self._strict_int = strict_int
         self._record_dir = record_dir
-        self._record_seq = 0
+        # Continue the attempt numbering of any earlier server that recorded
+        # into the same directory (e.g. a session resume, or a harness-side
+        # sweep sharing the agent's log) instead of clobbering attempt-0001.
+        self._record_seq = self._existing_record_seq(record_dir)
         self._record_lock = threading.Lock()
         if force_obligations:
             # False instead of None: force the obligation encoding (see main.py).
@@ -443,6 +446,22 @@ class VerificationService:
                 return f.read()
         except OSError:
             return None
+
+    @staticmethod
+    def _existing_record_seq(record_dir) -> int:
+        """Highest attempt-NNNN number already present in record_dir (0 if none)."""
+        if not record_dir:
+            return 0
+        try:
+            names = os.listdir(record_dir)
+        except OSError:
+            return 0
+        seq = 0
+        for name in names:
+            m = re.fullmatch(r'attempt-(\d+)', name)
+            if m:
+                seq = max(seq, int(m.group(1)))
+        return seq
 
     def _record(self, path, selected, base_dir, viper_args, source, start,
                 result, translate_only=False) -> None:
