@@ -6,6 +6,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import ast
+import builtins
 
 from abc import ABCMeta
 from nagini_translation.lib.constants import (
@@ -398,6 +399,20 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return [decl_id]
         return []
 
+    @staticmethod
+    def _is_runtime_defined(declaration: PythonNode) -> bool:
+        """
+        True for class declarations without a defining statement in any analyzed
+        module whose name the Python runtime supplies itself (e.g. unmodeled
+        builtin exception classes like ValueError). These names are defined
+        before any module-level code runs, so definedness checks for them must
+        trivially succeed; no module's names-set ever contains them, so an
+        emitted set-membership check would be unsatisfiable instead.
+        """
+        cls = getattr(declaration, 'python_class', None)
+        return (isinstance(cls, PythonClass) and cls.node is None and
+                hasattr(builtins, cls.name))
+
     def _get_global_definedness_conditions(self, declaration: PythonNode,
                                            module: PythonModule, ref_node: ast.AST,
                                            ctx: Context) -> Tuple[Expr, Expr]:
@@ -412,9 +427,11 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         module_set = module.names_var[1]
         decl_ids = self.extract_identifiers(ref_node, pos, info)
         contains = self.viper.TrueLit(pos, info)
-        for decl_id in decl_ids:
-            contains = self.viper.And(contains, self._is_defined(decl_id, module_set, pos,
-                                                                 info), pos, info)
+        if not self._is_runtime_defined(declaration):
+            for decl_id in decl_ids:
+                contains = self.viper.And(contains,
+                                          self._is_defined(decl_id, module_set, pos,
+                                                           info), pos, info)
         deps = set()
         if isinstance(declaration, (PythonMethod, PythonClass)):
             called = declaration
@@ -426,6 +443,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         pos = self.to_position(ref_node, ctx, error_string=msg)
         deps_defined = self.viper.TrueLit(pos, info)
         for ref, decl, mod, *conds in deps:
+            if self._is_runtime_defined(decl):
+                continue
             module_set = mod.names_var[1]
             decl_ids = self.extract_identifiers(ref, pos, info)
             for decl_id in decl_ids:

@@ -381,6 +381,8 @@ class StatementTranslator(CommonTranslator):
 
         deps_defined = self.viper.TrueLit(dep_pos, info)
         for ref, decl, mod in py_node.definition_deps:
+            if self._is_runtime_defined(decl):
+                continue
             module_set = mod.names_var[1]
             decl_ids = self.extract_identifiers(ref, dep_pos, info)
             for decl_id in decl_ids:

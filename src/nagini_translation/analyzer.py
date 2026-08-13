@@ -6,6 +6,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import ast
+import builtins
 import logging
 import os
 import nagini_contracts.io_builtins
@@ -460,6 +461,16 @@ class Analyzer(ast.NodeVisitor):
         else:
             # Class doesn't exist yet, create it.
             superclass = self.global_module.classes[OBJECT_TYPE] if name != OBJECT_TYPE else None
+            builtin_val = getattr(builtins, name, None)
+            if (isinstance(builtin_val, type) and name != 'Exception' and
+                    issubclass(builtin_val, Exception) and
+                    'Exception' in self.global_module.classes):
+                # An unmodeled builtin exception class (e.g. ValueError): give it
+                # the modeled Exception as superclass so that it and its user
+                # subclasses sit inside the modeled exception hierarchy (and are
+                # caught by `except Exception`). BaseException-only descendants
+                # like KeyboardInterrupt deliberately stay below object.
+                superclass = self.global_module.classes['Exception']
             cls = self.node_factory.create_python_class(name, module,
                                                         self.node_factory,
                                                         superclass=superclass)
