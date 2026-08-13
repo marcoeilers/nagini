@@ -199,7 +199,11 @@ async def verify_file(path: str, methods: Optional[List[str]] = None,
 
     Returns structured diagnostics: a list of {file, startLine, startCol,
     endLine, endCol, severity, code, message, reason, counterexample,
-    branchConditions, vias}, plus `success` and `duration`. Optionally restrict
+    branchConditions, vias}, plus `success` and `duration` — and two abnormal-
+    end flags: `cancelled` (the job was stopped, e.g. via the `cancel` tool)
+    and `crashed` (the verification backend died with an exception, reported
+    in a `verifier.crashed` diagnostic; unlike a timeout, retrying an
+    identical crashed run is usually pointless). Optionally restrict
     to a list of `methods`; each entry is a top-level function by its bare name
     (e.g. `my_func`), a method as `ClassName.method_name` (its bare name also
     matches), or a whole class by `ClassName` to verify all its methods.

@@ -105,6 +105,11 @@ class VerifyResult:
     duration: float
     translation_failed: bool = False
     cancelled: bool = False
+    # The verification backend died with an exception (e.g. a prover crash)
+    # instead of producing a result. Deterministic for a given input more often
+    # than not — clients should not blindly retry the way they might for a
+    # timeout.
+    crashed: bool = False
     viper_program: Optional[str] = None
 
     def to_dict(self) -> dict:
@@ -112,6 +117,7 @@ class VerifyResult:
             'success': self.success,
             'translationFailed': self.translation_failed,
             'cancelled': self.cancelled,
+            'crashed': self.crashed,
             'duration': self.duration,
             'diagnostics': [d.to_dict() for d in self.diagnostics],
         }
@@ -375,10 +381,26 @@ class VerificationService:
         if config.use_viper_server:
             try:
                 from nagini_translation.viper_server import get_viper_server_manager
-                get_viper_server_manager(self.jvm).start()
+                manager = get_viper_server_manager(self.jvm)
+                self._set_journal_location(manager)
+                manager.start()
             except Exception:
                 logging.exception('ViperServer could not be started; verification '
                                   'will use the direct Silicon backend.')
+
+    def _set_journal_location(self, manager) -> None:
+        """Persist ViperServer's journal next to the recorded attempts instead
+        of a throwaway file in /tmp, so backend exception details survive the
+        environment (e.g. a container exiting)."""
+        if not self._record_dir or manager.started or manager.log_file:
+            return
+        try:
+            os.makedirs(self._record_dir, exist_ok=True)
+            manager.log_file = os.path.join(
+                os.path.abspath(self._record_dir), 'viperserver_journal.log')
+        except OSError:
+            logging.exception('Could not prepare the ViperServer journal '
+                              'location; using the default temp file.')
 
     # -- public API ---------------------------------------------------------
 
@@ -686,6 +708,18 @@ class VerificationService:
                                                      build_silicon_backend_args,
                                                      get_viper_server_manager)
         manager = get_viper_server_manager(self.jvm)
+        if (self._record_dir and not manager.started
+                and manager.log_file is None):
+            # Persist ViperServer's journal next to the recorded attempts
+            # instead of a throwaway file in /tmp, so backend exception details
+            # survive the environment (e.g. a container exiting).
+            try:
+                os.makedirs(self._record_dir, exist_ok=True)
+                manager.log_file = os.path.join(
+                    os.path.abspath(self._record_dir), 'viperserver_journal.log')
+            except OSError:
+                logging.exception('Could not prepare the ViperServer journal '
+                                  'location; using the default temp file.')
         start = time.time()
         # 1. Translate and snapshot this job's error-mapping state (serialized).
         with self._state_lock:
@@ -733,7 +767,7 @@ class VerificationService:
         with self._jobs_lock:
             self._inflight += 1
         try:
-            result = manager.await_result(
+            messages = manager.await_messages(
                 job_id, timeout_ms=wall_cap * 1000 if wall_cap else None)
         except Exception as e:
             if wall_cap is not None and _is_await_timeout(e):
@@ -793,10 +827,26 @@ class VerificationService:
                         del self._jobs[job_token]
 
         duration = time.time() - start
+        result, crash_texts = self._split_messages(messages)
         if result is None:
-            return VerifyResult(False, [self._point_diagnostic(
-                path, 'Internal verifier error (see server log).',
-                'verifier.error')], duration, viper_program=viper_text)
+            if crash_texts:
+                # The backend died with an exception instead of producing a
+                # result (e.g. a prover crash). Surface it as a distinct
+                # status: unlike a timeout, retrying is usually pointless.
+                logging.warning('Verification backend crashed for %s: %s',
+                                path, crash_texts[0])
+                more = ('' if len(crash_texts) == 1 else
+                        ' (%d further exceptions; see the ViperServer journal)'
+                        % (len(crash_texts) - 1))
+                return VerifyResult(False, [self._point_diagnostic(
+                    path, 'The verification backend crashed: %s%s'
+                    % (crash_texts[0], more),
+                    'verifier.crashed')], duration, crashed=True,
+                    viper_program=viper_text)
+            # No overall result and no reported exception: the job's actor was
+            # stopped before finishing, i.e. the job was cancelled.
+            return VerifyResult(False, [], duration, cancelled=True,
+                                viper_program=viper_text)
 
         # 3. Convert the result with this job's snapshot installed (serialized).
         is_failure = isinstance(result, self.jvm.viper.silver.verifier.Failure)
@@ -807,25 +857,64 @@ class VerificationService:
             try:
                 it = result.errors().toIterator()
                 errors = []
-                while it.hasNext():
-                    errors.append(it.next())
+                diagnostics = []
+                timeout_cls = self.jvm.viper.silver.verifier.TimeoutOccurred
+                for err in self._iterate(it):
+                    if isinstance(err, timeout_cls):
+                        # Silicon's whole-run --timeout: not attributable to a
+                        # program point; report it under the same code the
+                        # other timeout paths use.
+                        diagnostics.append(self._point_diagnostic(
+                            path, str(err.readableMessage()),
+                            'TimeoutOccurred'))
+                    else:
+                        errors.append(err)
                 try:
-                    failure = Failure(errors, self.jvm, modules, self._sif)
-                    diagnostics = self._failure_diagnostics(
-                        failure, path,
-                        smt_state_requested='--smtStateOnError' in viper_args)
+                    if errors:
+                        failure = Failure(errors, self.jvm, modules, self._sif)
+                        diagnostics.extend(self._failure_diagnostics(
+                            failure, path,
+                            smt_state_requested='--smtStateOnError' in viper_args))
                 except Exception:
                     # Even a failed conversion must yield the raw Viper
                     # messages rather than crash the request.
                     logging.exception('Failed to convert errors for %s.', path)
-                    diagnostics = [self._point_diagnostic(
+                    diagnostics.extend([self._point_diagnostic(
                         path, self._raw_error_message(e), 'verifier.error')
-                        for e in errors] or [self._point_diagnostic(
-                            path, 'Internal verifier error (see server log).',
-                            'verifier.error')]
+                        for e in errors])
+                if not diagnostics:
+                    diagnostics = [self._point_diagnostic(
+                        path, 'Internal verifier error (see server log).',
+                        'verifier.error')]
             finally:
                 error_manager.clear()
         return VerifyResult(False, diagnostics, duration, viper_program=viper_text)
+
+    @staticmethod
+    def _iterate(scala_iterator):
+        while scala_iterator.hasNext():
+            yield scala_iterator.next()
+
+    def _split_messages(self, messages) -> Tuple[object, List[str]]:
+        """Partition a finished job's reported messages into the overall
+        verification result and the texts of any reported backend exceptions.
+
+        Returns ``(result, crash_texts)`` where ``result`` is the
+        ``viper.silver.verifier.VerificationResult`` from the job's overall
+        success/failure message, or ``None`` if the job never produced one
+        (crashed or cancelled).
+        """
+        reporter = self.jvm.viper.silver.reporter
+        result = None
+        crash_texts = []
+        for msg in self._iterate(messages.iterator()):
+            if isinstance(msg, reporter.OverallFailureMessage):
+                result = msg.result()
+            elif isinstance(msg, reporter.OverallSuccessMessage):
+                result = self.jvm.viper.silver.verifier.Success
+            elif isinstance(msg, reporter.ExceptionReport):
+                crash_texts.append(str(msg.e()))
+        return result, crash_texts
 
     def _verify_serial(self, path, selected, base_dir, arp,
                        counterexample, ignore_global, viper_args,
