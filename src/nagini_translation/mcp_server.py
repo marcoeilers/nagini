@@ -100,6 +100,19 @@ def _degrade(dbg: dict, stage: int) -> None:
 _MAX_STAGE = 7
 
 
+def _as_selected(methods) -> Optional[set]:
+    """Normalize a list of method names to a set, or None for 'whole file'.
+
+    Tolerates a bare string (some MCP clients send one despite the declared
+    list schema) by treating it as a single name.
+    """
+    if not methods:
+        return None
+    if isinstance(methods, str):
+        return {methods}
+    return set(methods)
+
+
 def _slim_debug(result: dict) -> dict:
     debugs = []
     for d in result.get('diagnostics', []):
@@ -125,6 +138,7 @@ def _slim_debug(result: dict) -> dict:
     return result
 
 
+
 async def _run(fn):
     try:
         return await asyncio.get_event_loop().run_in_executor(_executor, fn)
@@ -136,7 +150,7 @@ async def _run(fn):
 
 
 @mcp.tool()
-async def verify_file(path: str, method: Optional[str] = None,
+async def verify_file(path: str, methods: Optional[List[str]] = None,
                       counterexample: bool = False,
                       ignore_global: bool = False,
                       base_dir: Optional[str] = None,
@@ -154,10 +168,13 @@ async def verify_file(path: str, method: Optional[str] = None,
     Returns structured diagnostics: a list of {file, startLine, startCol,
     endLine, endCol, severity, code, message, reason, counterexample,
     branchConditions, vias}, plus `success` and `duration`. Optionally restrict
-    to a single `method`: a top-level function by its bare name (e.g. `my_func`),
-    a method as `ClassName.method_name` (its bare name also matches), or a whole
-    class by `ClassName` to verify all its methods. Set `ignore_global` to skip
-    verification of top-level (module-global) statements.
+    to a list of `methods`; each entry is a top-level function by its bare name
+    (e.g. `my_func`), a method as `ClassName.method_name` (its bare name also
+    matches), or a whole class by `ClassName` to verify all its methods.
+    Passing several methods in one call is cheaper than one call per method:
+    the file is translated once and the selected methods are verified in
+    parallel. Set `ignore_global` to skip verification of top-level
+    (module-global) statements.
 
     `base_dir` is the package root used to resolve intra-package imports during
     type checking; set it for a file that is part of a package (so its imports
@@ -173,7 +190,7 @@ async def verify_file(path: str, method: Optional[str] = None,
     translation (mypy + Nagini-to-Viper): fast validity check that the file is
     a well-formed Nagini program; no proof obligations are checked.
     """
-    selected = {method} if method else None
+    selected = _as_selected(methods)
     result = await _run(lambda: _service.verify(
         path, selected=selected, counterexample=counterexample, base_dir=base_dir,
         ignore_global=ignore_global, viper_args=viper_args,
@@ -183,21 +200,23 @@ async def verify_file(path: str, method: Optional[str] = None,
 
 
 @mcp.tool()
-async def verify_method(path: str, method: str, counterexample: bool = False,
+async def verify_method(path: str, methods: List[str],
+                        counterexample: bool = False,
                         viper_args: Optional[List[str]] = None,
                         include_viper: bool = False,
                         translate_only: bool = False,
                         int_bitops_size: Optional[int] = None,
                         job_token: Optional[str] = None) -> dict:
-    """Verify only a single method of a file (fast, via Nagini's --select).
+    """Verify selected methods of a file (fast, via Nagini's --select).
 
-    `path` should be absolute (see `verify_file`). `method` names a top-level
-    function by its bare name (e.g. `my_func`), a method as `ClassName.method_name`
-    (its bare name also matches), or a whole class by `ClassName`. The other
-    parameters are as in `verify_file`.
+    `path` should be absolute (see `verify_file`). `methods` is a list of
+    member names: a top-level function by its bare name (e.g. `["my_func"]`),
+    a method as `ClassName.method_name` (its bare name also matches), or a
+    whole class by `ClassName`. Verifying several methods in one call is
+    cheaper than one call per method: one translation, verified in parallel.
     """
     result = await _run(lambda: _service.verify(
-        path, selected={method}, counterexample=counterexample,
+        path, selected=_as_selected(methods), counterexample=counterexample,
         viper_args=viper_args, include_viper=include_viper,
         translate_only=translate_only,
         int_bitops_size=int_bitops_size, job_token=job_token))
