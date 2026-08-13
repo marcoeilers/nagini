@@ -20,6 +20,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -51,7 +52,11 @@ _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix='nagini-verify'
 # observed in real agent runs — until the result fits. `reasonUnknown` (the
 # field agents actually act on), the truncation markers, and the diagnostic
 # message itself always survive.
-_BULK_DEBUG_FIELDS = ('proverEmits', 'preambleAssumptions')
+_BULK_DEBUG_FIELDS = ('proverEmits', 'preambleAssumptions',
+                      # 2026-08-13: across nine full benchmark runs no agent ever
+                      # consulted either of these; they remain in the recorded
+                      # result.json (--record-dir) for offline replay.
+                      'macroDecls', 'functionDecls')
 # Whole-result char budget. Silicon terms are symbol-dense (~2.5 chars/token),
 # so 50k chars keeps a comfortable margin under the 25k-token cap.
 _RESULT_BUDGET = 50_000
@@ -113,6 +118,32 @@ def _as_selected(methods) -> Optional[set]:
     return set(methods)
 
 
+_SYMBOL = re.compile(r'[A-Za-z_$][\w$]*@\d+@\d+')
+_ASSUMPTION_CAP = 40
+
+
+def _filter_assumptions(dbg: dict) -> None:
+    """Keep only the assumptions that share a symbol with the failed assertion
+    (they are the ones that can explain it), capped. The full list stays in the
+    recorded result.json. Runs before the budget loop, so relevant assumptions
+    survive slimming that would previously have dropped the whole list."""
+    assumptions = dbg.get('assumptions')
+    if not isinstance(assumptions, list) or not assumptions:
+        return
+    syms = set(_SYMBOL.findall(str(dbg.get('failedAssertion', ''))))
+    if syms:
+        relevant = [a for a in assumptions if any(s in a for s in syms)]
+    else:
+        relevant = list(assumptions)
+    if len(relevant) > _ASSUMPTION_CAP:
+        relevant = relevant[:_ASSUMPTION_CAP]
+    if len(relevant) < len(assumptions):
+        _mark(dbg, 'assumptions',
+              f'{len(assumptions) - len(relevant)} not sharing a symbol with '
+              'failedAssertion (full list in the recorded result.json)')
+    dbg['assumptions'] = relevant
+
+
 def _slim_debug(result: dict) -> dict:
     debugs = []
     for d in result.get('diagnostics', []):
@@ -120,6 +151,7 @@ def _slim_debug(result: dict) -> dict:
         if not dbg:
             continue
         dbg = {k: v for k, v in dbg.items() if k not in _BULK_DEBUG_FIELDS}
+        _filter_assumptions(dbg)
         d['debug'] = dbg
         debugs.append(dbg)
     if not debugs:

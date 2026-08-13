@@ -23,6 +23,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import signal
 import threading
 import time
@@ -129,6 +130,50 @@ def _scala_strings(collection) -> List[str]:
     return out
 
 
+def _heap_chunks(heap) -> object:
+    """Render a Silicon heap as its chunk list. ``str(heap)`` is just the Java
+    object identity (``ListBackedHeap@6798e882``) — every agent run confirmed it
+    carries zero information — while the chunks themselves print as
+    ``resource(receiver; snapshot, permission)``. Falls back to the raw string
+    on any API surprise."""
+    try:
+        return _scala_strings(heap.values())
+    except Exception:
+        return str(heap)
+
+
+def _old_heaps(old_heaps) -> object:
+    """Render Silicon's label -> heap map with the same chunk treatment."""
+    try:
+        out = {}
+        it = old_heaps.iterator()
+        while it.hasNext():
+            kv = it.next()
+            out[str(kv._1())] = _heap_chunks(kv._2())
+        return out
+    except Exception:
+        return str(old_heaps)
+
+
+_SYM_SUFFIX = re.compile(r'@\d+@\d+')
+_CHECK_DEFINED = re.compile(r'_checkDefined\(_,\s*([^,()]+),\s*\d+\)')
+
+
+def _pretty_term(term: str) -> str:
+    """Best-effort readable rendering of a Silicon term string: strip the
+    ``@line@col`` freshness suffixes (``b@13@07`` -> ``b``, matching the
+    Python-level name the store maps it from) and unwrap ``_checkDefined``
+    shims. The raw term is always preserved alongside — this is a reading
+    aid, not a replacement."""
+    term = _SYM_SUFFIX.sub('', term)
+    for _ in range(8):
+        unwrapped = _CHECK_DEFINED.sub(r'\1', term)
+        if unwrapped == term:
+            break
+        term = unwrapped
+    return term
+
+
 def _debug_payload(error) -> Optional[dict]:
     """Project Silicon's SMT state failure context into a JSON-friendly dict.
 
@@ -150,6 +195,7 @@ def _debug_payload(error) -> Optional[dict]:
             return None  # plain SiliconFailureContext, no SMT state
         payload = {
             'failedAssertion': str(ctx.failedAssertion()),
+            'failedAssertionPretty': _pretty_term(str(ctx.failedAssertion())),
             'assumptions': _scala_strings(ctx.assumptions()),
             'preambleAssumptions': _scala_strings(ctx.preambleAssumptions()),
             'macroDecls': _scala_strings(ctx.macroDecls()),
@@ -159,12 +205,16 @@ def _debug_payload(error) -> Optional[dict]:
         }
         if ctx.reasonUnknown().isDefined():
             payload['reasonUnknown'] = str(ctx.reasonUnknown().get())
+        if ctx.rlimitDelta().isDefined():
+            # Z3 rlimit units spent on the failing check itself; the unit
+            # assertTimeout budgets are enforced in (ms * z3ResourcesPerMillisecond).
+            payload['rlimitDelta'] = int(str(ctx.rlimitDelta().get()))
         if ctx.state().isDefined():
             state = ctx.state().get()
             payload['state'] = {
                 'store': str(state.g().termValues()),
-                'heap': str(state.h()),
-                'oldHeaps': str(state.oldHeaps()),
+                'heap': _heap_chunks(state.h()),
+                'oldHeaps': _old_heaps(state.oldHeaps()),
             }
         return payload
     except Exception:
