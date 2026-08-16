@@ -178,12 +178,22 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
     def get_relative_import_name(self, name: str, level: int) -> str:
         module_name = name
         if level > 0:
-            current_module_name = self.full_module_name
-            module_name_to_add = current_module_name.split(".")[:-level]
+            parts = self.full_module_name.split(".")
+            # A package's __init__ resolves relative imports against the
+            # package itself (mypy names pkg/__init__.py just 'pkg'), so it
+            # drops one component fewer than a plain module: `.helpers` inside
+            # pkg/__init__.py is pkg.helpers, inside pkg/mod.py it is also
+            # pkg.helpers (drop 'mod').
+            effective_level = level - 1 if self._is_package else level
+            module_name_to_add = parts[:len(parts) - effective_level]
             if module_name is not None:
                 module_name_to_add.append(module_name)
             module_name = ".".join(module_name_to_add)
         return module_name
+
+    @property
+    def _is_package(self) -> bool:
+        return str(self.file or '').endswith('__init__.py')
 
     def add_builtin_vars(self) -> None:
         """
@@ -785,6 +795,11 @@ class GenericType(PythonType):
 
     def __init__(self, cls: PythonClass,
                  args: List[PythonType]) -> None:
+        if not isinstance(cls, PythonClass):
+            # Callers occasionally pass an already-instantiated GenericType
+            # (e.g. when re-instantiating with fresh args); every use of
+            # self.cls assumes the underlying class.
+            cls = cls.python_class
         self.name = cls.name
         self.module = cls.module
         self.cls = cls
@@ -984,6 +999,11 @@ class OptionalType(UnionType):
 
     def substitute(self, types: Dict['TypeVar', 'PythonType']):
         return OptionalType(self.optional_type.substitute(types))
+
+    def get_bound_type_vars(self) -> Dict['TypeVar', 'PythonType']:
+        # Optional[C[T]] behaves like C[T]; the inherited implementation
+        # would zip C's type variables against this union's [None, typ].
+        return self.optional_type.get_bound_type_vars()
 
     @property
     def cls(self):
@@ -1937,9 +1957,13 @@ class ProgramNodeFactory:
 def toposort_classes(class_set: Set[PythonClass]) -> List[PythonClass]:
     """
     Topological sorting of classes in a set, ensuring that derived classes
-    precede their base classes in the returned list
+    precede their base classes in the returned list. Members are
+    canonicalized to their PythonClass: callers pass union members, which
+    include GenericType instances (e.g. from Optional[Klass[T]]), and the
+    subclass relation is class-level.
     """
     map = {}
+    class_set = {type.python_class for type in class_set}
 
     for type in class_set:
         map[type] = set(type.all_subclasses) & class_set

@@ -197,6 +197,19 @@ class StatementTranslator(CommonTranslator):
             for alias in imported_names:
                 name = alias[0]
                 as_name = alias[1]
+                if name == '$nothing':
+                    # Placeholder for a from-import whose members were all
+                    # submodules (bound via namespaces by the analyzer).
+                    continue
+                member = ctx.module.namespaces.get(as_name)
+                if (member is not None
+                        and getattr(member, 'type_prefix', None)
+                            == imported_module + '.' + name):
+                    # `from pkg import helpers`: the member is a submodule.
+                    # Import it like `import pkg.helpers as helpers` instead of
+                    # asserting it is a name defined inside the package.
+                    stmts.extend(self._import_module_by_name(as_name, node, ctx))
+                    continue
                 msg = 'name "' + name + '" is defined in imported module'
                 pos = self.to_position(node, ctx, error_string=msg)
                 if node.module not in IGNORED_IMPORTS:
@@ -243,43 +256,58 @@ class StatementTranslator(CommonTranslator):
             if name.name in IGNORED_IMPORTS:
                 continue
             imported_name = name.asname if name.asname else name.name
-            name_parts = imported_name.split('.')
-            mod = ctx.module
-            for part in name_parts:
-                mod = mod.namespaces[part]
-            module_set_type = SilverType(self.viper.SetType(self.name_type()), ctx.module)
-            new_set_var = ctx.current_function.create_variable('new_set',
-                                                               module_set_type,
-                                                               self.translator)
-            stmts.append(self._execute_module_statements(mod, node, ctx))
-            name_var_decl = self.viper.LocalVarDecl(NAME_QUANTIFIER_VAR, self.name_type(),
-                                                    pos, info)
-            name_var_ref = self.viper.LocalVar(NAME_QUANTIFIER_VAR, self.name_type(), pos,
-                                               info)
-            name_in_imported = self._is_defined(name_var_ref, mod.names_var[1], pos, info)
+            stmts.extend(self._import_module_by_name(imported_name, node, ctx))
+        return stmts
+
+    def _import_module_by_name(self, imported_name: str, node: ast.AST,
+                               ctx: Context) -> List[Stmt]:
+        """
+        Statements importing the module bound at ``imported_name`` in the
+        current module's namespaces: execute its statements (if not imported
+        before) and add its names, combined with the binding as a prefix, to
+        the current module. Shared by ``import x[.y] [as z]`` and the
+        submodule-member form ``from pkg import y [as z]``.
+        """
+        stmts = []
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        name_parts = imported_name.split('.')
+        mod = ctx.module
+        for part in name_parts:
+            mod = mod.namespaces[part]
+        module_set_type = SilverType(self.viper.SetType(self.name_type()), ctx.module)
+        new_set_var = ctx.current_function.create_variable('new_set',
+                                                           module_set_type,
+                                                           self.translator)
+        stmts.append(self._execute_module_statements(mod, node, ctx))
+        name_var_decl = self.viper.LocalVarDecl(NAME_QUANTIFIER_VAR, self.name_type(),
+                                                pos, info)
+        name_var_ref = self.viper.LocalVar(NAME_QUANTIFIER_VAR, self.name_type(), pos,
+                                           info)
+        name_in_imported = self._is_defined(name_var_ref, mod.names_var[1], pos, info)
 
 
-            combined_name = name_var_ref
-            last_part = name_var_ref
-            name_ints = []
-            for name in reversed(name_parts):
-                name_int = self.viper.IntLit(self._get_string_value(name), pos, info)
-                combined_name = self._combine_names(name_int, combined_name, pos, info)
-                last_part = self._get_name_from_combined(last_part, pos, info)
-                name_ints.append(name_int)
-            combined_part = last_part
-            for name_int in name_ints:
-                combined_part = self._combine_names(name_int, combined_part, pos, info)
-            combined_in_new = self._is_defined(combined_name, new_set_var.ref(), pos,
-                                               info)
-            impl = self.viper.EqCmp(name_in_imported, combined_in_new, pos, info)
-            trigger = self.viper.Trigger([combined_in_new], pos, info)
-            assertion = self.viper.Forall([name_var_decl], [trigger], impl, pos, info)
-            stmts.append(self.viper.Inhale(assertion, pos, info))
-            union = self.viper.AnySetUnion(ctx.module.names_var[1], new_set_var.ref(),
-                                           pos, info)
-            stmts.append(self.viper.LocalVarAssign(ctx.module.names_var[1], union, pos,
-                                                   info))
+        combined_name = name_var_ref
+        last_part = name_var_ref
+        name_ints = []
+        for name in reversed(name_parts):
+            name_int = self.viper.IntLit(self._get_string_value(name), pos, info)
+            combined_name = self._combine_names(name_int, combined_name, pos, info)
+            last_part = self._get_name_from_combined(last_part, pos, info)
+            name_ints.append(name_int)
+        combined_part = last_part
+        for name_int in name_ints:
+            combined_part = self._combine_names(name_int, combined_part, pos, info)
+        combined_in_new = self._is_defined(combined_name, new_set_var.ref(), pos,
+                                           info)
+        impl = self.viper.EqCmp(name_in_imported, combined_in_new, pos, info)
+        trigger = self.viper.Trigger([combined_in_new], pos, info)
+        assertion = self.viper.Forall([name_var_decl], [trigger], impl, pos, info)
+        stmts.append(self.viper.Inhale(assertion, pos, info))
+        union = self.viper.AnySetUnion(ctx.module.names_var[1], new_set_var.ref(),
+                                       pos, info)
+        stmts.append(self.viper.LocalVarAssign(ctx.module.names_var[1], union, pos,
+                                               info))
         return stmts
 
     def translate_stmt_FunctionDef(self, node: ast.FunctionDef,
@@ -353,6 +381,8 @@ class StatementTranslator(CommonTranslator):
 
         deps_defined = self.viper.TrueLit(dep_pos, info)
         for ref, decl, mod in py_node.definition_deps:
+            if self._is_runtime_defined(decl):
+                continue
             module_set = mod.names_var[1]
             decl_ids = self.extract_identifiers(ref, dep_pos, info)
             for decl_id in decl_ids:
@@ -369,6 +399,35 @@ class StatementTranslator(CommonTranslator):
         info = self.no_info(ctx)
         full_perm = self.viper.FullPerm(self.no_position(ctx), info)
         for t in node.targets:
+            if isinstance(t, ast.Subscript):
+                target_cls = self.get_type(t.value, ctx)
+                lhs_stmt, target_expr = self.translate_expr(t.value, ctx)
+                if isinstance(t.slice, ast.Slice):
+                    if t.slice.step:
+                        raise UnsupportedException(node, 'slice step')
+                    slice_class = ctx.module.global_module.classes['slice']
+                    null = self.viper.NullLit(self.no_position(ctx),
+                                              self.no_info(ctx))
+                    start = stop = null
+                    start_stmt = stop_stmt = []
+                    if t.slice.lower:
+                        start_stmt, start = self.translate_expr(t.slice.lower, ctx)
+                    if t.slice.upper:
+                        stop_stmt, stop = self.translate_expr(t.slice.upper, ctx)
+                    slice_expr = self.get_function_call(
+                        slice_class, '__create__', [start, stop], [None, None],
+                        t.slice, ctx)
+                    call = self.get_method_call(target_cls, '__delitem_slice__',
+                                                [target_expr, slice_expr],
+                                                [None, None], [], t, ctx)
+                    result.extend(lhs_stmt + start_stmt + stop_stmt + call)
+                    continue
+                ind_stmt, index = self.translate_expr(t.slice, ctx)
+                call = self.get_method_call(target_cls, '__delitem__',
+                                            [target_expr, index], [None, None],
+                                            [], t, ctx)
+                result.extend(lhs_stmt + ind_stmt + call)
+                continue
             target = self.get_target(t, ctx)
             if isinstance(target, PythonField):
                 pos = self.to_position(t, ctx)
@@ -387,7 +446,7 @@ class StatementTranslator(CommonTranslator):
                 may_set = self.get_may_set_predicate(receiver, python_field, ctx, pos)
                 result.append(self.viper.Inhale(may_set, pos, info))
             else:
-                raise UnsupportedException(node, 'del is only supported for object fields')
+                raise UnsupportedException(node, 'del is only supported for object fields and subscripts')
         return result
 
     def translate_stmt_AugAssign(self, node: ast.AugAssign,
@@ -608,6 +667,27 @@ class StatementTranslator(CommonTranslator):
         invariant.append(self.viper.Implies(some_error, previous_is_all, pos,
                                             info))
         invariant.append(self.viper.Implies(empty_iterator, some_error, pos, info))
+
+        if ctx.strict_int and target_var.type.name == INT_TYPE:
+            # Carry the strict element-type fact across the loop body. Without
+            # this, __next__'s `issubtype(typeof(_res), int())` postcondition
+            # cannot establish the strict `typeof(target) == int()` that the
+            # target_type invariant above requires in strict-int mode.
+            i_decl = self.viper.LocalVarDecl('__si_i', self.viper.Int, pos, info)
+            i_ref = self.viper.LocalVar('__si_i', self.viper.Int, pos, info)
+            seq_at_i = self.viper.SeqIndex(iter_acc, i_ref, pos, info)
+            bounds = self.viper.And(
+                self.viper.LeCmp(zero, i_ref, pos, info),
+                self.viper.LtCmp(i_ref, iter_list_len, pos, info),
+                pos, info)
+            int_cls = ctx.module.global_module.classes[INT_TYPE]
+            int_lit = self.type_factory.translate_type_literal(int_cls, pos, ctx)
+            typeof_eq = self.viper.EqCmp(self.type_factory.typeof(seq_at_i, ctx),
+                                         int_lit, pos, info)
+            forall_body = self.viper.Implies(bounds, typeof_eq, pos, info)
+            trigger = self.viper.Trigger([seq_at_i], pos, info)
+            invariant.append(self.viper.Forall([i_decl], [trigger], forall_body,
+                                               pos, info))
         return invariant
 
     def _get_iterator(self, iterable: Expr, iterable_type: PythonType,
@@ -1301,30 +1381,17 @@ class StatementTranslator(CommonTranslator):
                   allow_impure: bool = False) -> Tuple[List[Stmt], List[Expr]]:
         """
         Assigns the given expression ``rhs`` to the target given in ``lhs``.
-        If ``rhs_index`` is set, will only assign the element of ``rhs`` at
-        this index; if ``rhs_end`` is also set, will assign a list containing
-        the given range of elements to ``lhs`` (assuming ``lhs`` is of type
-        ast.Starred).
+        ``rhs_index`` and ``rhs_end`` are only meaningful when ``lhs`` is of
+        type ast.Starred: a list containing the elements of ``rhs`` from
+        ``rhs_index`` up to ``rhs_end`` is assigned to the starred target.
 
         In addition to assignment statements, returns a list of assertions
         which are known to hold after the assignment, to be used in loop
         invariants.
         """
-        position = self.to_position(node, ctx)
-        info = self.no_info(ctx)
         if isinstance(lhs, ast.Starred):
             return self._assign_to_starred(lhs, rhs, rhs_index, rhs_end,
                                            rhs_type, node, ctx)
-        if rhs_index is not None:
-            rhs_lit = self.viper.IntLit(rhs_index, position, info)
-            args = [rhs, rhs_lit]
-            arg_types = [rhs_type, None]
-            rhs = self.get_function_call(rhs_type, '__getitem__', args,
-                                         arg_types, node, ctx)
-            if rhs_type.name == TUPLE_TYPE and rhs_type.exact_length:
-                rhs_type = rhs_type.type_args[rhs_index]
-            else:
-                rhs_type = rhs_type.type_args[0]
         if isinstance(lhs, ast.Tuple):
             return self._assign_to_tuple(lhs, rhs, rhs_type, node, ctx)
 
@@ -1443,16 +1510,12 @@ class StatementTranslator(CommonTranslator):
         inner_if = self.viper.If(may_set, in_ex, empty_block, position, info)
         return inner_if
 
-    def _assign_with_subscript(self, lhs: ast.Tuple, rhs: Expr, node: ast.AST,
+    def _assign_with_subscript(self, lhs: ast.Subscript, rhs: Expr, node: ast.AST,
                                ctx: Context, allow_impure: bool) -> Tuple[List[Stmt],
                                                                           List[Expr]]:
         # Special treatment for subscript; instead of an assignment, we
         # need to call a setitem method.
-        if isinstance(node, ast.Assign):
-            target = node.targets[0]
-        elif isinstance(node, (ast.AnnAssign, ast.AugAssign)):
-            target = node.target
-        if isinstance(target.slice, ast.Slice):
+        if isinstance(lhs.slice, ast.Slice):
             raise UnsupportedException(node, 'assignment to slice')
         position = self.to_position(node, ctx)
         target_cls = self.get_type(lhs.value, ctx)
@@ -1487,26 +1550,62 @@ class StatementTranslator(CommonTranslator):
         stmt_result = []
         val_result = []
         has_starred_receiver = False
-        # Need to find out how many other receivers come after a starred
-        # expression (if any) to calculate the last index that should be
-        # assigned to the starred expression.
+        starred_index = None
+        # Python evaluates the entire right-hand side before assigning to
+        # any target, so first snapshot every element value into a fresh
+        # local; the targets may overlap the operands, as in
+        # xs[0], xs[1] = xs[1], xs[0].
+        elem_temps = []
         for index, e in enumerate(lhs.elts):
             if isinstance(e, ast.Starred):
                 has_starred_receiver = True
+                starred_index = index
                 no_after_starred = len(lhs.elts) - index - 1
                 next = -no_after_starred
-            else:
-                next = next + 1
-            next_expr = self.viper.IntLit(next, position, info)
+                elem_temps.append(None)
+                continue
+            next = next + 1
             if next <= 0:
-                # Calculate next index dynamically as len(rhs) + next
-                # because len(rhs) might be unknown statically.
-                len_expr = self.get_function_call(rhs_type, '__len__',
-                                                  [rhs], [None], node, ctx)
-                next_expr = self.viper.Add(len_expr, next_expr, position,
-                                           info)
-            stmt, val = self.assign_to(e, rhs, index, next_expr,
-                                       rhs_type, node, ctx)
+                # Elements after a starred receiver sit at the end of rhs,
+                # whose length may be unknown statically; address them from
+                # the back via a negative index.
+                rhs_index = next - 1
+            else:
+                rhs_index = index
+            index_lit = self.viper.IntLit(rhs_index, position, info)
+            elem = self.get_function_call(rhs_type, '__getitem__',
+                                          [rhs, index_lit], [rhs_type, None],
+                                          node, ctx)
+            if rhs_type.name == TUPLE_TYPE and rhs_type.exact_length:
+                elem_type = rhs_type.type_args[rhs_index]
+            else:
+                elem_type = rhs_type.type_args[0]
+            elem_temp = ctx.current_function.create_variable(
+                'tuple_elem', elem_type, self.translator)
+            stmt_result.append(self.viper.LocalVarAssign(elem_temp.ref(),
+                                                         elem, position,
+                                                         info))
+            val_result.append(self.viper.EqCmp(elem_temp.ref(), elem,
+                                               position, info))
+            elem_temps.append((elem_temp, elem_type))
+        if has_starred_receiver:
+            # The starred receiver takes the rhs segment from its own index
+            # up to len(rhs) - no_after_starred.
+            len_expr = self.get_function_call(rhs_type, '__len__',
+                                              [rhs], [None], node, ctx)
+            end_lit = self.viper.IntLit(-no_after_starred, position, info)
+            starred_end = self.viper.Add(len_expr, end_lit, position, info)
+            stmt, val = self.assign_to(lhs.elts[starred_index], rhs,
+                                       starred_index, starred_end, rhs_type,
+                                       node, ctx)
+            stmt_result += stmt
+            val_result += val
+        for index, e in enumerate(lhs.elts):
+            if isinstance(e, ast.Starred):
+                continue
+            elem_temp, elem_type = elem_temps[index]
+            stmt, val = self.assign_to(e, elem_temp.ref(), None, None,
+                                       elem_type, node, ctx)
             stmt_result += stmt
             val_result += val
         right_len = self.get_function_call(rhs_type, '__len__', [rhs], [None], node, ctx)
@@ -1658,7 +1757,12 @@ class StatementTranslator(CommonTranslator):
         cond_stmt, cond = self.translate_expr(node.test, ctx,
                                               target_type=self.viper.Bool)
         if cond_stmt:
-            raise InvalidProgramException(node, 'purity.violated')
+            raise InvalidProgramException(
+                node, 'purity.violated',
+                message='the while-loop condition calls an impure function or '
+                        'method; loop guards must be pure. Hoist the call: '
+                        'evaluate it into a local variable before the loop and '
+                        'again at the end of the loop body.')
         invariants, cond_low = self._translate_while_invariants(node, cond, ctx)
         if ctx.sif == 'prob':
             rule_pos = self.to_position(node.test, ctx, rules=rules.BRANCH_CONDITION_ASSERT)

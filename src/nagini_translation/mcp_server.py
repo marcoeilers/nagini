@@ -17,8 +17,10 @@ diagnostics, and can cancel runs or flush the cache.
 
 import argparse
 import asyncio
+import json
 import logging
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -39,17 +41,155 @@ _service = None
 _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix='nagini-verify')
 
 
+# Inline debug payloads must fit Claude Code's per-result token limit (25k
+# tokens by default) or the whole result gets file-redirected — which agents
+# in practice never read (and the redirect swallows even the diagnostic
+# message, so an oversized payload is WORSE than none). Everything dropped
+# here is still recorded server-side (--record-dir) in full.
+#
+# Strategy: measure the whole serialized result and degrade the debug
+# payloads stage by stage — least-consulted (expert-tier) fields first, as
+# observed in real agent runs — until the result fits. `reasonUnknown` (the
+# field agents actually act on), the truncation markers, and the diagnostic
+# message itself always survive.
+_BULK_DEBUG_FIELDS = ('proverEmits', 'preambleAssumptions',
+                      # 2026-08-13: across nine full benchmark runs no agent ever
+                      # consulted either of these; they remain in the recorded
+                      # result.json (--record-dir) for offline replay.
+                      'macroDecls', 'functionDecls')
+# Whole-result char budget. Silicon terms are symbol-dense (~2.5 chars/token),
+# so 50k chars keeps a comfortable margin under the 25k-token cap.
+_RESULT_BUDGET = 50_000
+_STATE_STUB_CHARS = 1_500  # per state projection (store/heap/oldHeaps)
+_BRANCH_CAP = 20           # branch conditions kept in stage 4
+_ASSERTION_STUB_CHARS = 2_000
+
+
+def _mark(dbg: dict, field: str, note) -> None:
+    dbg.setdefault('omitted', {})[field] = note
+
+
+def _degrade(dbg: dict, stage: int) -> None:
+    """Destructively degrade one debug dict to the given stage (cumulative).
+
+    Ordered by information lost per byte recovered: state stubs first (the
+    heap/store strings are almost always the byte-dominant fields, and a stub
+    still shows the store variables and heap shape), then the fields agents
+    were never observed to consult, then the progressively harsher cuts.
+    """
+    if stage >= 1 and isinstance(dbg.get('state'), dict):
+        for k, v in dbg['state'].items():
+            if isinstance(v, str) and len(v) > _STATE_STUB_CHARS:
+                dbg['state'][k] = v[:_STATE_STUB_CHARS] + '…[truncated]'
+    if stage >= 2 and ('macroDecls' in dbg or 'functionDecls' in dbg):
+        for f in ('macroDecls', 'functionDecls'):
+            if dbg.pop(f, None) is not None:
+                _mark(dbg, f, 'dropped')
+    if stage >= 3 and 'assumptions' in dbg:
+        _mark(dbg, 'assumptions', len(dbg.pop('assumptions') or []))
+    if stage >= 4 and isinstance(dbg.get('branchConditions'), list) \
+            and len(dbg['branchConditions']) > _BRANCH_CAP:
+        _mark(dbg, 'branchConditions',
+              len(dbg['branchConditions']) - _BRANCH_CAP)
+        dbg['branchConditions'] = dbg['branchConditions'][:_BRANCH_CAP]
+    if stage >= 5 and dbg.pop('state', None) is not None:
+        _mark(dbg, 'state', 'dropped')
+    if stage >= 6 and dbg.pop('branchConditions', None) is not None:
+        _mark(dbg, 'branchConditions', 'dropped')
+    if stage >= 7 and isinstance(dbg.get('failedAssertion'), str) \
+            and len(dbg['failedAssertion']) > _ASSERTION_STUB_CHARS:
+        dbg['failedAssertion'] = (dbg['failedAssertion'][:_ASSERTION_STUB_CHARS]
+                                  + '…[truncated]')
+
+
+_MAX_STAGE = 7
+
+
+def _as_selected(methods) -> Optional[set]:
+    """Normalize a list of method names to a set, or None for 'whole file'.
+
+    Tolerates a bare string (some MCP clients send one despite the declared
+    list schema) by treating it as a single name.
+    """
+    if not methods:
+        return None
+    if isinstance(methods, str):
+        return {methods}
+    return set(methods)
+
+
+_SYMBOL = re.compile(r'[A-Za-z_$][\w$]*@\d+@\d+')
+_ASSUMPTION_CAP = 40
+
+
+def _filter_assumptions(dbg: dict) -> None:
+    """Keep only the assumptions that share a symbol with the failed assertion
+    (they are the ones that can explain it), capped. The full list stays in the
+    recorded result.json. Runs before the budget loop, so relevant assumptions
+    survive slimming that would previously have dropped the whole list."""
+    assumptions = dbg.get('assumptions')
+    if not isinstance(assumptions, list) or not assumptions:
+        return
+    syms = set(_SYMBOL.findall(str(dbg.get('failedAssertion', ''))))
+    if syms:
+        relevant = [a for a in assumptions if any(s in a for s in syms)]
+    else:
+        relevant = list(assumptions)
+    if len(relevant) > _ASSUMPTION_CAP:
+        relevant = relevant[:_ASSUMPTION_CAP]
+    if len(relevant) < len(assumptions):
+        _mark(dbg, 'assumptions',
+              f'{len(assumptions) - len(relevant)} not sharing a symbol with '
+              'failedAssertion (full list in the recorded result.json)')
+    dbg['assumptions'] = relevant
+
+
+def _slim_debug(result: dict) -> dict:
+    debugs = []
+    for d in result.get('diagnostics', []):
+        dbg = d.get('debug')
+        if not dbg:
+            continue
+        dbg = {k: v for k, v in dbg.items() if k not in _BULK_DEBUG_FIELDS}
+        _filter_assumptions(dbg)
+        d['debug'] = dbg
+        debugs.append(dbg)
+    if not debugs:
+        return result
+    # Degrade as little as possible: while the whole result is over budget,
+    # advance only the LARGEST remaining payload one stage — small
+    # diagnostics keep their full payloads.
+    stages = {id(dbg): 0 for dbg in debugs}
+    while len(json.dumps(result, default=str)) > _RESULT_BUDGET:
+        candidates = [dbg for dbg in debugs if stages[id(dbg)] < _MAX_STAGE]
+        if not candidates:
+            break  # nothing left to degrade (oversize is outside the payloads)
+        worst = max(candidates, key=lambda dbg: len(json.dumps(dbg, default=str)))
+        stages[id(worst)] += 1
+        _degrade(worst, stages[id(worst)])
+    return result
+
+
+
 async def _run(fn):
-    return await asyncio.get_event_loop().run_in_executor(_executor, fn)
+    try:
+        return await asyncio.get_event_loop().run_in_executor(_executor, fn)
+    except Exception:
+        # The MCP layer reports tool exceptions as a bare str(e); make sure
+        # the traceback is at least recoverable from the server's stderr.
+        logging.exception('Verification tool crashed.')
+        raise
 
 
 @mcp.tool()
-async def verify_file(path: str, method: Optional[str] = None,
+async def verify_file(path: str, methods: Optional[List[str]] = None,
                       counterexample: bool = False,
                       ignore_global: bool = False,
                       base_dir: Optional[str] = None,
                       viper_args: Optional[List[str]] = None,
                       include_viper: bool = False,
+                      translate_only: bool = False,
+                      int_bitops_size: Optional[int] = None,
                       job_token: Optional[str] = None) -> dict:
     """Verify a Nagini Python file.
 
@@ -59,11 +199,18 @@ async def verify_file(path: str, method: Optional[str] = None,
 
     Returns structured diagnostics: a list of {file, startLine, startCol,
     endLine, endCol, severity, code, message, reason, counterexample,
-    branchConditions, vias}, plus `success` and `duration`. Optionally restrict
-    to a single `method`: a top-level function by its bare name (e.g. `my_func`),
-    a method as `ClassName.method_name` (its bare name also matches), or a whole
-    class by `ClassName` to verify all its methods. Set `ignore_global` to skip
-    verification of top-level (module-global) statements.
+    branchConditions, vias}, plus `success` and `duration` — and two abnormal-
+    end flags: `cancelled` (the job was stopped, e.g. via the `cancel` tool)
+    and `crashed` (the verification backend died with an exception, reported
+    in a `verifier.crashed` diagnostic; unlike a timeout, retrying an
+    identical crashed run is usually pointless). Optionally restrict
+    to a list of `methods`; each entry is a top-level function by its bare name
+    (e.g. `my_func`), a method as `ClassName.method_name` (its bare name also
+    matches), or a whole class by `ClassName` to verify all its methods.
+    Passing several methods in one call is cheaper than one call per method:
+    the file is translated once and the selected methods are verified in
+    parallel. Set `ignore_global` to skip verification of top-level
+    (module-global) statements.
 
     `base_dir` is the package root used to resolve intra-package imports during
     type checking; set it for a file that is part of a package (so its imports
@@ -75,33 +222,41 @@ async def verify_file(path: str, method: Optional[str] = None,
     e.g. `["--timeout=60"]` for a per-run verification timeout in seconds (the
     CLI's `--viper-arg`, as a list). `include_viper` returns the translated
     Viper program in `viperProgram`; even a small file translates to hundreds
-    of lines, so only request it when needed.
+    of lines, so only request it when needed. `translate_only` stops after
+    translation (mypy + Nagini-to-Viper): fast validity check that the file is
+    a well-formed Nagini program; no proof obligations are checked.
     """
-    selected = {method} if method else None
+    selected = _as_selected(methods)
     result = await _run(lambda: _service.verify(
         path, selected=selected, counterexample=counterexample, base_dir=base_dir,
         ignore_global=ignore_global, viper_args=viper_args,
-        include_viper=include_viper, job_token=job_token))
-    return result.to_dict()
+        include_viper=include_viper, translate_only=translate_only,
+        int_bitops_size=int_bitops_size, job_token=job_token))
+    return _slim_debug(result.to_dict())
 
 
 @mcp.tool()
-async def verify_method(path: str, method: str, counterexample: bool = False,
+async def verify_method(path: str, methods: List[str],
+                        counterexample: bool = False,
                         viper_args: Optional[List[str]] = None,
                         include_viper: bool = False,
+                        translate_only: bool = False,
+                        int_bitops_size: Optional[int] = None,
                         job_token: Optional[str] = None) -> dict:
-    """Verify only a single method of a file (fast, via Nagini's --select).
+    """Verify selected methods of a file (fast, via Nagini's --select).
 
-    `path` should be absolute (see `verify_file`). `method` names a top-level
-    function by its bare name (e.g. `my_func`), a method as `ClassName.method_name`
-    (its bare name also matches), or a whole class by `ClassName`. The other
-    parameters are as in `verify_file`.
+    `path` should be absolute (see `verify_file`). `methods` is a list of
+    member names: a top-level function by its bare name (e.g. `["my_func"]`),
+    a method as `ClassName.method_name` (its bare name also matches), or a
+    whole class by `ClassName`. Verifying several methods in one call is
+    cheaper than one call per method: one translation, verified in parallel.
     """
     result = await _run(lambda: _service.verify(
-        path, selected={method}, counterexample=counterexample,
+        path, selected=_as_selected(methods), counterexample=counterexample,
         viper_args=viper_args, include_viper=include_viper,
-        job_token=job_token))
-    return result.to_dict()
+        translate_only=translate_only,
+        int_bitops_size=int_bitops_size, job_token=job_token))
+    return _slim_debug(result.to_dict())
 
 
 @mcp.tool()
@@ -109,6 +264,8 @@ async def verify_snippet(code: str, counterexample: bool = False,
                          ignore_global: bool = False,
                          viper_args: Optional[List[str]] = None,
                          include_viper: bool = False,
+                         translate_only: bool = False,
+                         int_bitops_size: Optional[int] = None,
                          job_token: Optional[str] = None) -> dict:
     """Verify an inline snippet of Nagini Python code (written to a temp file).
 
@@ -123,8 +280,9 @@ async def verify_snippet(code: str, counterexample: bool = False,
         result = await _run(lambda: _service.verify(
             tmp_path, counterexample=counterexample, base_dir=tmp_dir,
             ignore_global=ignore_global, viper_args=viper_args,
-            include_viper=include_viper, job_token=job_token))
-        return result.to_dict()
+            include_viper=include_viper, translate_only=translate_only,
+            int_bitops_size=int_bitops_size, job_token=job_token))
+        return _slim_debug(result.to_dict())
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
@@ -136,7 +294,7 @@ def configure(options: dict) -> dict:
 
     Recognized keys: `verifier` ('silicon' or 'carbon'), `z3Path`, `boogiePath`,
     `mypyPath`, `sif`, `intBitopsSize`, `floatEncoding`, `useViperServer`,
-    `disableBranchConditions`. `viperJarPath` cannot be changed after startup and
+    `disableBranchConditions`, `strictInt`. `viperJarPath` cannot be changed after startup and
     is ignored. Unknown or null keys are ignored. Changing
     `sif`/`intBitopsSize`/`floatEncoding` reloads the Silver resources;
     already-running verifications are unaffected.

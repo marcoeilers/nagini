@@ -6,6 +6,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import ast
+import builtins
 import logging
 import os
 import nagini_contracts.io_builtins
@@ -23,6 +24,7 @@ from nagini_contracts.obligations import OBLIGATION_CONTRACT_FUNCS
 from nagini_translation.analyzer_io import IOOperationAnalyzer
 from nagini_translation.external.ast_util import mark_text_ranges
 from nagini_translation.lib.constants import (
+    BUILTIN_PREDICATES,
     CALLABLE_TYPE,
     EXTENDABLE_BUILTINS,
     IGNORED_IMPORTS,
@@ -197,8 +199,28 @@ class Analyzer(ast.NodeVisitor):
                 if len(stmt.names) == 1 and stmt.names[0].name == '*':
                     names = None
                 else:
-                    names = [(name.name, name.asname if name.asname else None)
-                             for name in stmt.names] # TODO rename?
+                    names = []
+                    for name in stmt.names:
+                        # A member that mypy knows as a module is a submodule
+                        # import (`from pkg import helpers`): bind it into the
+                        # importing module's namespaces — the same shape as
+                        # `import pkg.helpers as helpers` — instead of treating
+                        # it as a name defined inside the package.
+                        member_module = module_name + '.' + name.name
+                        if member_module in self.types.files:
+                            member_path = os.path.abspath(
+                                self.types.files[member_module])
+                            self.add_module(member_path, abs_path,
+                                            name.asname if name.asname
+                                            else name.name, parse_result)
+                        else:
+                            names.append((name.name,
+                                          name.asname if name.asname else None))
+                    if not names:
+                        # Every member was a submodule: keep the package itself
+                        # in from_imports (so its own statements still execute
+                        # at the import site) but let the view expose nothing.
+                        names = [('$nothing', None)]
                 self.add_module(path, abs_path, None, parse_result, names)
         self.module_index = self.module_paths.index(abs_path) + 1
 
@@ -439,6 +461,16 @@ class Analyzer(ast.NodeVisitor):
         else:
             # Class doesn't exist yet, create it.
             superclass = self.global_module.classes[OBJECT_TYPE] if name != OBJECT_TYPE else None
+            builtin_val = getattr(builtins, name, None)
+            if (isinstance(builtin_val, type) and name != 'Exception' and
+                    issubclass(builtin_val, Exception) and
+                    'Exception' in self.global_module.classes):
+                # An unmodeled builtin exception class (e.g. ValueError): give it
+                # the modeled Exception as superclass so that it and its user
+                # subclasses sit inside the modeled exception hierarchy (and are
+                # caught by `except Exception`). BaseException-only descendants
+                # like KeyboardInterrupt deliberately stay below object.
+                superclass = self.global_module.classes['Exception']
             cls = self.node_factory.create_python_class(name, module,
                                                         self.node_factory,
                                                         superclass=superclass)
@@ -712,6 +744,15 @@ class Analyzer(ast.NodeVisitor):
     def visit_ImportFrom(self, node: ast.ImportFrom):
         module_name = self.module.get_relative_import_name(node.module, node.level)
         self.analyze_import(module_name)
+        for name in node.names:
+            if name.name == '*':
+                continue
+            # Members that are submodules (`from pkg import helpers`) are
+            # bound as namespace imports during collect_imports; their
+            # contents must be analyzed like any imported module.
+            member_module = module_name + '.' + name.name
+            if member_module in self.types.files:
+                self.analyze_import(member_module)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         if self.current_function:
@@ -719,6 +760,13 @@ class Analyzer(ast.NodeVisitor):
         name = node.name
         if self._is_illegal_magic_method_name(name):
             raise InvalidProgramException(node, 'illegal.magic.method')
+        # Calls to these dispatch on the bare name, so a user definition would be
+        # silently shadowed by the built-in.
+        if name in BUILTIN_PREDICATES:
+            raise InvalidProgramException(
+                node, 'builtin.predicate.shadowed',
+                f'"{name}" is a built-in Nagini predicate name and cannot be '
+                'redefined; choose a different name.')
         assert isinstance(name, str)
         if self.is_io_operation(node):
             self.io_operation_analyzer.analyze_io_operation(node)
@@ -1098,6 +1146,15 @@ class Analyzer(ast.NodeVisitor):
                     (node.args, self._aliases.copy()))
             elif node.func.id == 'Exsures':
                 exception = self.get_target(node.args[0], self.module)
+                if exception is None:
+                    # An unresolvable exception type (e.g. a builtin like
+                    # ValueError, which Nagini does not model).
+                    raise InvalidProgramException(
+                        node, 'invalid.program',
+                        message='Exsures names an exception type Nagini '
+                                'cannot resolve: {}. Use a module-defined '
+                                'Exception subclass.'.format(
+                                    ast.unparse(node.args[0])))
                 if exception not in self.current_function.declared_exceptions:
                     self.current_function.declared_exceptions[exception] = []
                 self.current_function.declared_exceptions[exception].append(

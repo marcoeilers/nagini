@@ -8,6 +8,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """Error handling state is stored in singleton ``manager``."""
 
 
+import logging
+
 from collections import namedtuple
 from uuid import uuid1
 
@@ -56,10 +58,17 @@ class ErrorManager:
 
         It does that by wrapping in ``Error`` subclasses.
         """
-        new_errors = [
-            self._convert_error(error, jvm, modules, sif)
-            for error in errors
-        ]
+        new_errors = []
+        for error in errors:
+            try:
+                new_errors.append(self._convert_error(error, jvm, modules, sif))
+            except Exception:
+                # Error conversion must never crash the verification request:
+                # fall back to a bare wrapper that renders the raw Viper
+                # message (Error handles reason=None).
+                logging.exception('Failed to convert Viper error %s.',
+                                  error.getClass().getSimpleName())
+                new_errors.append(Error(error, {}, None))
         return new_errors
 
     def get_vias(self, node_id: str) -> List[Any]:
@@ -107,6 +116,10 @@ class ErrorManager:
 
     def transformError(self, error: 'AbstractVerificationError') -> 'AbstractVerificationError':
         """ Transform silver error to a fixpoint. """
+        if not hasattr(error, 'transformedError'):
+            # Non-verification errors (e.g. ConsistencyError) reach this path
+            # when the backend reports them inside a Failure.
+            return error
         old_error = None
         while old_error != error:
             old_error = error
@@ -122,16 +135,21 @@ class ErrorManager:
         viper_reason = error.reason() if hasattr(error, 'reason') else None
         reason_item = self._get_item(viper_reason.offendingNode().pos()) if viper_reason is not None else None
         position = error.pos()
-        rules = self._try_get_rules_workaround(
-            error.offendingNode(), jvm)
+        # ConsistencyError and other non-verification errors have no
+        # offendingNode/failureContexts; degrade instead of raising.
+        rules = None
+        if hasattr(error, 'offendingNode'):
+            rules = self._try_get_rules_workaround(
+                error.offendingNode(), jvm)
         if rules is None and viper_reason is not None:
             rules = self._try_get_rules_workaround(
                 viper_reason.offendingNode(), jvm)
         if rules is None:
             rules = {}
         error_item = self._get_item(position)
+        has_contexts = hasattr(original_error, 'failureContexts')
 
-        if (error_item is not None and original_error.failureContexts().nonEmpty() and
+        if (error_item is not None and has_contexts and original_error.failureContexts().nonEmpty() and
                 original_error.failureContexts().head().counterExample().isDefined() and isinstance(error_item.py_node, PythonMethod)):
             pymethod = error_item.py_node
             ce = original_error.failureContexts().head().counterExample().get()
@@ -142,13 +160,19 @@ class ErrorManager:
             inputs = None
 
         py_bcs = None
-        if (error_item is not None and original_error.failureContexts().nonEmpty() and
+        if (error_item is not None and has_contexts and original_error.failureContexts().nonEmpty() and
                 original_error.failureContexts().head().branchConditions().nonEmpty()):
             bcs = original_error.failureContexts().head().branchConditions()
             py_bcs = []
             iterator = bcs.toIterator()
             while iterator.hasNext():
                 bc = iterator.next()
+                if not hasattr(bc, 'pos'):
+                    # SMT-state contexts (--smtStateOnError) carry silicon
+                    # Terms, which have no source positions and cannot map to
+                    # a Python-level condition here; clients get the raw terms
+                    # via the diagnostic's debug payload instead.
+                    continue
                 bc_pos = bc.pos()
                 negated = False
                 if isinstance(bc, jvm.viper.silver.ast.Not) and bc_pos == bc.exp().pos():

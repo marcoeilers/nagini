@@ -6,6 +6,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import ast
+import builtins
 
 from abc import ABCMeta
 from nagini_translation.lib.constants import (
@@ -29,6 +30,7 @@ from nagini_translation.lib.constants import (
     PSET_TYPE,
     SET_TYPE,
     SINGLE_NAME,
+    TUPLE_TYPE,
     UNION_TYPE,
 )
 from nagini_translation.lib.context import Context
@@ -397,6 +399,20 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return [decl_id]
         return []
 
+    @staticmethod
+    def _is_runtime_defined(declaration: PythonNode) -> bool:
+        """
+        True for class declarations without a defining statement in any analyzed
+        module whose name the Python runtime supplies itself (e.g. unmodeled
+        builtin exception classes like ValueError). These names are defined
+        before any module-level code runs, so definedness checks for them must
+        trivially succeed; no module's names-set ever contains them, so an
+        emitted set-membership check would be unsatisfiable instead.
+        """
+        cls = getattr(declaration, 'python_class', None)
+        return (isinstance(cls, PythonClass) and cls.node is None and
+                hasattr(builtins, cls.name))
+
     def _get_global_definedness_conditions(self, declaration: PythonNode,
                                            module: PythonModule, ref_node: ast.AST,
                                            ctx: Context) -> Tuple[Expr, Expr]:
@@ -411,9 +427,11 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         module_set = module.names_var[1]
         decl_ids = self.extract_identifiers(ref_node, pos, info)
         contains = self.viper.TrueLit(pos, info)
-        for decl_id in decl_ids:
-            contains = self.viper.And(contains, self._is_defined(decl_id, module_set, pos,
-                                                                 info), pos, info)
+        if not self._is_runtime_defined(declaration):
+            for decl_id in decl_ids:
+                contains = self.viper.And(contains,
+                                          self._is_defined(decl_id, module_set, pos,
+                                                           info), pos, info)
         deps = set()
         if isinstance(declaration, (PythonMethod, PythonClass)):
             called = declaration
@@ -425,6 +443,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         pos = self.to_position(ref_node, ctx, error_string=msg)
         deps_defined = self.viper.TrueLit(pos, info)
         for ref, decl, mod, *conds in deps:
+            if self._is_runtime_defined(decl):
+                continue
             module_set = mod.names_var[1]
             decl_ids = self.extract_identifiers(ref, pos, info)
             for decl_id in decl_ids:
@@ -721,6 +741,56 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                   self.no_info(ctx), type, formal_args)
         return call
 
+    def strict_int_value_facts(self, value: Expr, value_type: PythonType,
+                               pos: 'silver.ast.Position',
+                               ctx: Context) -> 'Optional[Expr]':
+        """Strict-int exact-typing conjuncts for one value term, composing
+        through tuple nesting: for int, ``typeof(value) == int()``; for an
+        exact-length tuple, the conjunction over its int-bearing slots via
+        ``tuple___sil_seq__`` (tuples are heap-independent, so slot facts are
+        expressible wherever the tuple term is, e.g. under a container
+        quantifier); anything else yields None. Deeper heap containers
+        (a list inside a list) need permissions to read their contents and
+        are out of scope."""
+        if not ctx.strict_int or value_type is None:
+            return None
+        info = self.no_info(ctx)
+        if value_type.name == INT_TYPE:
+            int_cls = ctx.module.global_module.classes[INT_TYPE]
+            int_lit = self.type_factory.translate_type_literal(int_cls, pos, ctx)
+            return self.viper.EqCmp(self.type_factory.typeof(value, ctx),
+                                    int_lit, pos, info)
+        if (value_type.name == TUPLE_TYPE
+                and getattr(value_type, 'type_args', None)
+                and getattr(value_type, 'exact_length', True)):
+            tuple_class = ctx.module.global_module.classes[TUPLE_TYPE]
+            sil_seq = self.get_function_call(tuple_class, '__sil_seq__',
+                                             [value], [None], None, ctx, pos)
+            conjuncts = []
+            for i, arg_type in enumerate(value_type.type_args):
+                at_i = self.viper.SeqIndex(
+                    sil_seq, self.viper.IntLit(i, pos, info), pos, info)
+                fact = self.strict_int_value_facts(at_i, arg_type, pos, ctx)
+                if fact is not None:
+                    conjuncts.append(fact)
+            if not conjuncts:
+                return None
+            result = conjuncts[0]
+            for extra in conjuncts[1:]:
+                result = self.viper.And(result, extra, pos, info)
+            # Guard on the tuple's length: in contexts where the value's tuple
+            # type is not yet in scope (e.g. under a container quantifier),
+            # the slot indices cannot be bounds-proven — the guard makes the
+            # facts conditional, and `tuple___sil_seq__`'s own
+            # `|result| == tuple___len__(self)` postcondition discharges the
+            # bounds under it. Consumers know the length from `typeof`.
+            length = self.get_function_call(tuple_class, '__len__',
+                                            [value], [None], None, ctx, pos)
+            n_lit = self.viper.IntLit(len(value_type.type_args), pos, info)
+            guard = self.viper.EqCmp(length, n_lit, pos, info)
+            return self.viper.Implies(guard, result, pos, info)
+        return None
+
     def get_function_call(self, receiver: PythonType,
                           func_name: str, args: List[Expr],
                           arg_types: List[PythonType], node: ast.AST,
@@ -789,6 +859,9 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             func = ctx.module.methods[func_name]
         if not func:
             raise InvalidProgramException(node, 'unknown.method.called')
+        if func.interface and len(args) > len(func.get_args()):
+            raise UnsupportedException(
+                node, 'this call arity is not supported by the builtin model')
         actual_args = []
         for arg, param, _ in zip(args, func.get_args(), arg_types):
             if param.type.name == PRIMITIVE_BOOL_TYPE:

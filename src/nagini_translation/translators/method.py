@@ -73,6 +73,15 @@ class MethodTranslator(CommonTranslator):
         """
         pres = []
         for pre, aliases in method.precondition:
+            # Reject Old() in preconditions
+            for sub in ast.walk(pre):
+                if (isinstance(sub, ast.Call) and isinstance(sub.func, ast.Name)
+                        and sub.func.id == 'Old'):
+                    raise InvalidProgramException(
+                        sub, 'invalid.contract.call',
+                        'Old() appears in a precondition. There is no earlier '
+                        'state at the start of a call, so Old() is only '
+                        'meaningful in postconditions and loop invariants.')
             with ctx.additional_aliases(aliases):
                 stmt, expr = self.translate_expr(pre, ctx, self.viper.Bool, True)
             if stmt:
