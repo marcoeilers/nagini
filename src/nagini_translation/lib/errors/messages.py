@@ -90,7 +90,9 @@ ERRORS = {
     'possibilistic.sif.violated':
         lambda n: 'Possibilistic non-interference might not be satisfied.',
     'termination.failed':
-        lambda n: 'Function might not terminate.',
+        lambda n: ('Function {} might not terminate.'.format(get_target_name(n))
+                   if isinstance(n, (ast.Call, ast.FunctionDef)) else
+                   'Function might not terminate.'),
     'refute.failed':
         lambda n: 'Refute holds in all cases or could not be reached.',
     'predicateinstance.no.access':
@@ -200,9 +202,15 @@ REASONS = {
     'family.member.not.framed':
         lambda n: 'Predicate family addition might not be self-framing.',
     'tuple.false':
-        lambda n: 'Termination measure might not decrease or might not be bounded.',
+        lambda n: ('Termination measure of {} might not decrease or might not be '
+                   'bounded.'.format(get_target_name(n))
+                   if isinstance(n, (ast.Call, ast.FunctionDef)) else
+                   'Termination measure might not decrease or might not be bounded.'),
     'termination.condition.false':
-        lambda n: 'Termination condition might not hold.',
+        lambda n: ('Termination condition of {} might not hold.'
+                   .format(get_target_name(n))
+                   if isinstance(n, (ast.Call, ast.FunctionDef)) else
+                   'Termination condition might not hold.'),
     'refutation.true':
         lambda n: 'Assertion definitely holds.'
 }
