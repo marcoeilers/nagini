@@ -65,6 +65,17 @@ Execute the following commands (on Windows, you may have to use ``cmd`` and not 
 
         pytest -v -p no:faulthandler src/nagini_translation/tests.py --silicon --minimal
 
+Docker Environment
+==================
+
+A pre-built Docker container with Python 3.12, Java 17, Z3, Boogie, and Nagini is maintained at `docker-nagini <https://github.com/bigtalk-org/docker-nagini>`_ (published to GitHub Container Registry).
+
+To verify a file without installing local dependencies, run::
+
+    docker run --rm -v $(pwd):/code ghcr.io/bigtalk-org/docker-nagini path/to/file.py
+
+Images for both Silicon (``ghcr.io/bigtalk-org/docker-nagini:silicon``) and Carbon (``ghcr.io/bigtalk-org/docker-nagini:carbon``) backends are available.
+
 Command Line Usage
 ==================
 

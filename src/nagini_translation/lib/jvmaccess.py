@@ -9,6 +9,13 @@ import jpype
 import logging
 
 
+class JVMStartupError(Exception):
+    """Raised when the JVM required by the Viper backends cannot be started,
+    e.g. because no Java installation could be found. Carries a user-facing
+    message; entry points should report it without a Python traceback.
+    """
+
+
 def configure_java_logging() -> None:
     """Raise the JVM's logback root level so the Viper backends don't flood output.
 
@@ -39,9 +46,25 @@ class JVM:
         # Only one JVM can exist per process; reuse it if one is already running
         # (e.g. started by another component or the test harness).
         if not jpype.isJVMStarted():
-            jpype.startJVM(jpype.getDefaultJVMPath(),
-                           '-Djava.class.path=' + classpath, '-Xss32m',
-                           convertStrings=True)
+            try:
+                jvm_path = jpype.getDefaultJVMPath()
+            except (jpype.JVMNotFoundException,
+                    jpype.JVMNotSupportedException) as e:
+                raise JVMStartupError(
+                    'No usable Java installation was found ({}). Nagini needs '
+                    'a 64-bit Java 11 (or newer) runtime. Please install one '
+                    'and/or point the JAVA_HOME environment variable to '
+                    'it.'.format(e)) from e
+            try:
+                jpype.startJVM(jvm_path,
+                               '-Djava.class.path=' + classpath, '-Xss32m',
+                               convertStrings=True)
+            except OSError as e:
+                raise JVMStartupError(
+                    'The Java VM at {} could not be started ({}). Make sure '
+                    'it is a working 64-bit Java 11 (or newer) installation, '
+                    'or point the JAVA_HOME environment variable to '
+                    'one.'.format(jvm_path, e)) from e
         # Suppress the default DEBUG-level logback console output that
         # viperserver.jar would otherwise produce (no bundled logback.xml).
         configure_java_logging()

@@ -27,7 +27,8 @@ from nagini_translation.lib.errors.messages import invalid_program_message
 from nagini_translation.lib.jvmaccess import (
     getclass,
     getobject,
-    JVM
+    JVM,
+    JVMStartupError
 )
 from nagini_translation.lib.typedefs import Program
 from nagini_translation.lib.typeinfo import TypeException, TypeInfo
@@ -431,7 +432,11 @@ def main() -> None:
 
     logging.basicConfig(level=args.log)
 
-    jvm = JVM(config.classpath)
+    try:
+        jvm = JVM(config.classpath)
+    except JVMStartupError as e:
+        print('ERROR: {}'.format(e), file=sys.stderr)
+        sys.exit(1)
     if args.server:
         import zmq
         context = zmq.Context()
