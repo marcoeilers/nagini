@@ -72,7 +72,17 @@ def get_target(node: ast.AST,
     if isinstance(node, ast.Name):
         return find_entry(node.id, True, containers)
     elif type and isStr(node):
-        return find_entry(node.value, True, containers)
+        result = find_entry(node.value, True, containers)
+        if result is None:
+            # The string may be a type expression like 'Box[V, K]' rather
+            # than a plain name; parse it and resolve the expression.
+            try:
+                parsed = ast.parse(node.value, mode='eval').body
+            except SyntaxError:
+                return None
+            if not isStr(parsed):
+                return get_target(parsed, containers, container, True)
+        return result
     elif isinstance(node, ast.Call):
         # For calls, we return the type of the result of the call
         if isinstance(node.func, ast.Call):
@@ -159,6 +169,8 @@ def get_target(node: ast.AST,
                 return res
             if node.value.id == 'Optional':
                 option = get_target(node.slice, containers, container, True)
+                if option is None:
+                    return None
                 return OptionalType(option)
             if node.value.id == 'Union':
                 if isinstance(node.slice, ast.Tuple):

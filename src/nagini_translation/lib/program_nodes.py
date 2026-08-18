@@ -546,7 +546,8 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         """
         if name in self.fields:
             field = self.fields[name]
-            if not isinstance(field.type, TypeVar):
+            if (isinstance(field, PythonField) and
+                    not isinstance(field.type, TypeVar)):
                 assert self.types_match(field.type.try_box(), type.try_box())
         elif name in self.static_fields:
             field = self.static_fields[name]

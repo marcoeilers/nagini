@@ -1535,7 +1535,8 @@ class Analyzer(ast.NodeVisitor):
         elif self.types.is_instance_type(mypy_type):
             result = self.convert_type(mypy_type.type, node)
             if mypy_type.args:
-                args = [self.convert_type(arg, node) for arg in mypy_type.args]
+                args = [self.convert_type(arg, node, bound_type_vars)
+                        for arg in mypy_type.args]
                 if mypy_type.type.name == 'enumerate':
                     # We cheat and represent type enumerate as a list of pairs.
                     assert len(args) == 1
@@ -1562,7 +1563,7 @@ class Analyzer(ast.NodeVisitor):
                     # without falling back (it is definitely not an ADT).
                     pass
             # Regular tuple handling without falling back
-            args = [self.convert_type(arg_type, node)
+            args = [self.convert_type(arg_type, node, bound_type_vars)
                     for arg_type in mypy_type.items]
             result = GenericType(self.module.global_module.classes[TUPLE_TYPE],
                                  args)
