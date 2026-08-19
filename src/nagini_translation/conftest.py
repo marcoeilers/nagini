@@ -20,6 +20,8 @@ from typing import List
 
 _TRANSLATION_TEST_FUNCTION_NAME = 'test_translation'
 _VERIFICATION_TEST_FUNCTION_NAME = 'test_verification'
+_EXTRACTION_TEST_FUNCTION_NAME = 'test_extraction'
+_EXTRACTION_TESTS_DIR = 'tests/functional/extraction'
 
 _TRANSLATION_TESTS_SUFFIX = 'translation'
 _VERIFICATION_TESTS_SUFFIX = 'verification'
@@ -314,6 +316,16 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
                                 _pytest_config.store_viper, float_encoding, select) for verifier
                                in _pytest_config.verifiers])
         metafunc.parametrize('path,base,verifier,sif,reload_resources,arp,ignore_obligations,print,float_encoding,selection', params)
+    elif func_name == _EXTRACTION_TEST_FUNCTION_NAME:
+        # Extraction tests only make sense for the functional tests, and are run
+        # together with the translation tests.
+        translation_dir = os.path.join(_FUNCTIONAL_TESTS_DIR, _TRANSLATION_TESTS_SUFFIX)
+        if translation_dir in _pytest_config.translation_test_dirs and (
+                not _pytest_config.selected_modes or
+                'translation' in _pytest_config.selected_modes):
+            for file in _test_files(_EXTRACTION_TESTS_DIR):
+                params.append((file, _EXTRACTION_TESTS_DIR))
+        metafunc.parametrize('path,base', params)
     else:
         pytest.exit('Unrecognized test function.')
 

@@ -58,6 +58,17 @@ IO_FUNCS = [
 
 IO_DECORATORS = ['IOOperation']
 
+# IO functions which return a regular result together with a place, i.e. whose
+# return value has both a regular and a ghost component.
+IO_MIXED_RETURN_FUNCS = [
+    'Eval',
+]
+
+# Types which only exist for verification purposes, i.e. which are always ghost.
+GHOST_IO_TYPES = [
+    'Place',
+]
+
 T = TypeVar('T')
 T1 = TypeVar('T1')
 T2 = TypeVar('T2')

@@ -65,6 +65,7 @@ def tree(n : TreeNode) -> bool:
                     getParent(n.rightChild) is n))
 
 
+@Ghost
 @Pure
 def sorted(n: TreeNode, upper: Optional[int], lower: Optional[int]) -> bool:
     Requires(tree(n))

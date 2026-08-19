@@ -94,13 +94,14 @@ class AssignCollector(ast.NodeVisitor):
         self._track_assign(node.target)
 
     def _track_assign(self, target: ast.AST) -> None:
-        if isinstance(target, ast.Tuple):
-            actual_targets = target.elts
-        else:
-            actual_targets = [target]
-        for actual in actual_targets:
-            if isinstance(actual, ast.Name):
-                self.assigned_vars[actual.id] = actual
+        if isinstance(target, (ast.Tuple, ast.List)):
+            # Unpacking, which may be nested.
+            for element in target.elts:
+                self._track_assign(element)
+        elif isinstance(target, ast.Starred):
+            self._track_assign(target.value)
+        elif isinstance(target, ast.Name):
+            self.assigned_vars[target.id] = target
 
     def visit_AugAssign(self, node: ast.AugAssign) -> None:
         self._track_assign(node.target)

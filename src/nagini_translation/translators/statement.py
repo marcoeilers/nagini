@@ -7,6 +7,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import ast
 
+from nagini_translation.lib import config
 from nagini_translation.lib.constants import (
     BYTES_TYPE,
     COMBINED_NAME_ACCESSOR,
@@ -85,7 +86,11 @@ class StatementTranslator(CommonTranslator):
 
         # We add a terminating section on every ghost statement. 
         # For statements containing blocks of code (e.g. if), we do not add more terminating sections within
-        is_node_ghost = node.is_ghost if hasattr(node, 'is_ghost') else False
+        # Terminating sections are encoded using obligations, so we can only add
+        # them if the obligation encoding is enabled.
+        is_node_ghost = (getattr(node, 'needs_terminating_section', False)
+                         and ctx.current_function is not None
+                         and not config.obligation_config.disable_all)
         start_terminating_block = is_node_ghost and not self.in_terminating_block
         end_terminating_block = is_node_ghost and not self.in_terminating_block
 

@@ -35,6 +35,9 @@ Supported annotation types are:
 
 
 import abc
+import ast
+import astunparse
+import builtins
 import os
 import pytest
 import re
@@ -47,6 +50,7 @@ from nagini_translation.lib import config, jvmaccess
 from nagini_translation.lib.errors import error_manager
 from nagini_translation.lib.typeinfo import TypeException
 from nagini_translation.lib.util import InvalidProgramException, UnsupportedException
+from nagini_translation.ghost.extraction import ProgramExtractor
 from nagini_translation.main import translate, verify, TYPE_ERROR_PATTERN
 from nagini_translation.verifier import VerificationResult, ViperVerifier
 
@@ -156,7 +160,7 @@ class InvalidProgramError(Error):
 
     @property
     def line(self) -> int:
-        return self._exception.node.lineno
+        return getattr(self._exception.node, 'lineno', -1)
 
     def get_vias(self) -> List[int]:
         return []
@@ -178,7 +182,7 @@ class UnsupportedError(Error):
 
     @property
     def line(self) -> int:
-        return self._exception.node.lineno
+        return getattr(self._exception.node, 'lineno', -1)
 
     def get_vias(self) -> List[int]:
         return []
@@ -683,3 +687,80 @@ _TRANSLATION_TESTER = TranslationTest()
 def test_translation(path, base, sif, reload_resources, arp, float_encoding):
     """Execute provided translation test."""
     _TRANSLATION_TESTER.test_file(path, base, _JVM, sif, reload_resources, arp, float_encoding)
+
+
+class ExtractionTest(AnnotatedTest):
+    """Test that checks the Python program obtained by removing all ghost code.
+
+    The extracted program must be valid Python that neither refers to Nagini
+    nor to any of the removed ghost elements.
+    """
+
+    def test_file(self, path: str, base: str, jvm: jvmaccess.JVM):
+        """Test specific Python file."""
+        annotation_manager = self.get_annotation_manager(path, _BACKEND_ANY)
+        if annotation_manager.ignore_file():
+            pytest.skip('Ignored')
+        path = os.path.abspath(path)
+        base = os.path.abspath(base)
+        modules, prog = translate(path, jvm, 8, base_dir=base)
+        extracted = ProgramExtractor(modules).process()
+        text = astunparse.unparse(extracted)
+        try:
+            tree = ast.parse(text)
+        except SyntaxError as error:
+            pytest.fail('Extracted program is not valid Python: {}\n{}'.format(
+                error, text))
+        assert 'nagini_contracts' not in text, (
+            'Extracted program still refers to Nagini:\n' + text)
+        undefined = _find_undefined_names(tree)
+        assert not undefined, (
+            'Extracted program refers to removed elements {}:\n{}'.format(
+                sorted(undefined), text))
+
+
+def _find_undefined_names(tree: ast.Module) -> Set[str]:
+    """Return the names a function body reads without them being defined.
+
+    This catches the most likely extraction bug: keeping a statement that uses
+    a variable, argument or function which was removed because it was ghost.
+    """
+    global_names = set(dir(builtins))
+
+    def collect_bindings(node: ast.AST, names: Set[str]) -> None:
+        for child in ast.walk(node):
+            if isinstance(child, ast.Name) and isinstance(child.ctx,
+                                                          (ast.Store, ast.Del)):
+                names.add(child.id)
+            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                    ast.ClassDef)):
+                names.add(child.name)
+            elif isinstance(child, (ast.Import, ast.ImportFrom)):
+                for alias in child.names:
+                    names.add((alias.asname or alias.name).split('.')[0])
+            elif isinstance(child, ast.ExceptHandler) and child.name:
+                names.add(child.name)
+            elif isinstance(child, ast.arg):
+                names.add(child.arg)
+
+    collect_bindings(tree, global_names)
+    undefined = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        local_names = set()
+        collect_bindings(node, local_names)
+        known = global_names | local_names
+        for child in ast.walk(node):
+            if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Load) \
+                    and child.id not in known:
+                undefined.add(child.id)
+    return undefined
+
+
+_EXTRACTION_TESTER = ExtractionTest()
+
+
+def test_extraction(path, base):
+    """Execute provided extraction test."""
+    _EXTRACTION_TESTER.test_file(path, base, _JVM)

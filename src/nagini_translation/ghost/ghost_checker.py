@@ -5,20 +5,21 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 import ast
+from contextlib import contextmanager
 from typing import List, Optional, Union, Tuple, Callable
 
 from nagini_contracts.contracts import (
-    CONTRACT_FUNCS, GHOST_BUILTINS, CONTRACT_WRAPPER_FUNCS, 
+    CONTRACT_FUNCS, GHOST_BUILTINS, CONTRACT_WRAPPER_FUNCS,
     CONTRACT_DECORATORS, SPECIAL_PREDICATES
     )
 from nagini_contracts.io_contracts import (
-    BUILTIN_IO_OPERATIONS, IO_CONTRACT_FUNCS, 
-    IO_OPERATION_PROPERTY_FUNCS, IO_FUNCS, IO_DECORATORS
+    BUILTIN_IO_OPERATIONS, GHOST_IO_TYPES, IO_CONTRACT_FUNCS,
+    IO_MIXED_RETURN_FUNCS, IO_OPERATION_PROPERTY_FUNCS, IO_FUNCS, IO_DECORATORS
     )
 from nagini_contracts.obligations import OBLIGATION_CONTRACT_FUNCS
 from nagini_translation.lib.constants import OBJECT_TYPE, THREADING
 from nagini_translation.lib.program_nodes import (
-    PythonModule, PythonType, PythonMethod, PythonIOOperation, 
+    MethodType, PythonModule, PythonType, PythonMethod, PythonIOOperation,
     PythonVarBase, PythonClass, PythonNode, PythonField, UnionType, GenericType
     )
 from nagini_translation.lib.context import Context
@@ -36,9 +37,12 @@ annotation_t = Union[ast.Name, ast.Constant, ast.Attribute, ast.Subscript]
 
 ALL_CONTRACT_ELEMS = (CONTRACT_FUNCS + CONTRACT_WRAPPER_FUNCS +
                         IO_CONTRACT_FUNCS + IO_OPERATION_PROPERTY_FUNCS +
-                        list(BUILTIN_IO_OPERATIONS) + IO_FUNCS + SPECIAL_PREDICATES +
-                        OBLIGATION_CONTRACT_FUNCS
+                        list(BUILTIN_IO_OPERATIONS) + IO_FUNCS +
+                        SPECIAL_PREDICATES + OBLIGATION_CONTRACT_FUNCS
                         )
+
+# Names of types which are always ghost, i.e. which only exist during verification.
+ALL_GHOST_TYPE_NAMES = GHOST_BUILTINS + GHOST_IO_TYPES
 
 NAGINI_DECORATORS = CONTRACT_DECORATORS + IO_DECORATORS
 
@@ -47,12 +51,29 @@ TRANSPARENT_CALLS = {'Unfolding': 1, 'Reveal': 0}
 
 IGNORE_REG_CALLS = ['TypeVar']
 
-PURE_REG_CALLS = ['len', 'isinstance']
+# Functions which have no side effects, so that the result is ghost exactly if
+# one of the arguments is.
+PURE_REG_CALLS = ['len', 'isinstance', 'cast']
 
-# Functions with the following decorators are assumed valid or are verified later
-IGNORE_DECORATORS = ['ContractOnly', 'IOOperation', 'Predicate']
+# Decorators which mark a function that exists for verification purposes only.
+SPEC_ONLY_DECORATORS = ['IOOperation', 'Predicate']
+
+# Decorator which marks a function whose body consists of specifications only.
+CONTRACT_ONLY_DECORATOR = 'ContractOnly'
 
 NAGINI_IMPORT = 'nagini_contracts'
+
+# Marker for return type annotations of the form Tuple[<regular type>, <ghost type>],
+# i.e. return values which have both a regular and a ghost component.
+MIXED_RETURN = 'mixed'
+
+# Ghost information of a return value: None if unknown, MIXED_RETURN if the
+# return value has both a regular and a ghost component, and otherwise whether
+# the whole return value is ghost.
+return_info_t = Optional[Union[bool, str]]
+
+# Marker for return information which has not been computed yet.
+_UNCOMPUTED = object()
 
 class GhostChecker(ast.NodeVisitor):
     """
@@ -63,35 +84,158 @@ class GhostChecker(ast.NodeVisitor):
         self.modules = modules
         self.ctx = None
         self.in_ghost_ctx = False
+        # The module whose contents are currently being checked.
+        self.current_module = None
+        # True as soon as a ghost statement has been found inside a function body.
+        # Ghost statements are translated into terminating sections, which require
+        # the obligation encoding to be enabled.
+        self.has_ghost_statements = False
+
+    @property
+    def global_module(self) -> PythonModule:
+        return self.modules[0]
 
     def check(self, ctx: Context) -> None:
         """
         Checks the defined modules for valid ghost information in the given context.
-        It also stores additional ghost information on AST nodes, which is used for 
+        It also stores additional ghost information on AST nodes, which is used for
         the Termination analysis and the extraction.
         """
-        # global_module = self.modules[0]
-        main_module = self.modules[1]
         self.ctx = ctx
-        self.visit(main_module.node)
+        # Modules which correspond to directories do not have contents of their own;
+        # they share the AST of the module that imports them, so we must not visit
+        # them a second time.
+        visited_nodes = set()
+        for module in self.modules[1:]:
+            if module.node is None or id(module.node) in visited_nodes:
+                continue
+            if self.is_library_module(module):
+                # Nagini's own contract library is trusted and not checked.
+                continue
+            visited_nodes.add(id(module.node))
+            with self.module_scope(module):
+                self.in_ghost_ctx = False
+                if module is self.modules[1]:
+                    self.visit(module.node)
+                else:
+                    # Errors in imported modules have to name the module they
+                    # occur in, since positions are reported relative to the
+                    # file that is being verified.
+                    try:
+                        self.visit(module.node)
+                    except (InvalidProgramException, UnsupportedException) as error:
+                        raise self.locate_error(error, module) from error
+
+    def locate_error(self, error: Exception, module: PythonModule) -> Exception:
+        """
+        Returns a copy of the given error whose message names the module and the
+        line the error occurred in.
+        """
+        line = getattr(error.node, 'lineno', None)
+        location = f"{module.type_prefix or module.file}"
+        if line is not None:
+            location += f", line {line}"
+        if isinstance(error, InvalidProgramException):
+            message = error.message if error.message else error.code
+            return InvalidProgramException(error.node, error.code,
+                                           f"[in {location}] {message}")
+        return UnsupportedException(error.node, f"[in {location}] {error.desc}")
+
+    def is_library_module(self, module: PythonModule) -> bool:
+        """
+        Returns whether the given module is part of Nagini's contract library,
+        whose contents are trusted and therefore not ghost checked.
+        """
+        prefix = module.type_prefix
+        return bool(prefix) and prefix.split('.')[0] == NAGINI_IMPORT
+
+    @contextmanager
+    def module_scope(self, module: Optional[PythonModule]):
+        """
+        Context manager which makes the given module the one whose names are
+        used to resolve targets and annotations.
+        """
+        if module is None:
+            module = self.current_module
+        old_module = self.current_module
+        old_ctx_module = self.ctx.module
+        old_function = self.ctx.current_function
+        old_class = self.ctx.current_class
+        self.current_module = module
+        self.ctx.module = module
+        if module is not old_module:
+            # Names of the other module must not be resolved in the current scope.
+            self.ctx.current_function = None
+            self.ctx.current_class = None
+        try:
+            yield
+        finally:
+            self.current_module = old_module
+            self.ctx.module = old_ctx_module
+            self.ctx.current_function = old_function
+            self.ctx.current_class = old_class
+
+    def visit(self, node: ast.AST) -> None:
+        result = super().visit(node)
+        if isinstance(node, ast.stmt):
+            node.needs_terminating_section = self.needs_terminating_section(node)
+            if node.needs_terminating_section:
+                # Terminating sections are encoded using obligations.
+                self.has_ghost_statements = True
+        return result
+
+    def needs_terminating_section(self, node: ast.stmt) -> bool:
+        """
+        Returns whether the given statement has to be checked to terminate.
+        This is the case for ghost code, i.e. statements which are only executed
+        during verification. Declarations and specifications are excluded: they
+        cannot diverge, and their execution is checked by Nagini itself.
+        """
+        if not getattr(node, 'is_ghost', False):
+            return False
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef,
+                             ast.Import, ast.ImportFrom, ast.Pass, ast.Assert)):
+            return False
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call) and \
+                get_func_name(node.value) in ALL_CONTRACT_ELEMS:
+            # A specification, e.g. Requires(...) or Assert(...).
+            return False
+        return True
 
     def generic_visit(self, node: ast.AST) -> None:
         node.is_ghost = self.in_ghost_ctx
-        node.contains_ghost = self.in_ghost_ctx
-        super().generic_visit(node)
+        children = []
+        for _, value in ast.iter_fields(node):
+            if isinstance(value, list):
+                for item in value:
+                    if isinstance(item, ast.AST):
+                        self.visit(item)
+                        children.append(item)
+            elif isinstance(value, ast.AST):
+                self.visit(value)
+                children.append(value)
+        self.set_contains_ghost(node, self.in_ghost_ctx, *children)
+
+    def mark_ghost(self, node: ast.AST) -> None:
+        """
+        Marks the entire subtree rooted in the given node as ghost.
+        """
+        for sub_node in ast.walk(node):
+            sub_node.is_ghost = True
+            sub_node.contains_ghost = True
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
-        current_class: PythonClass = self.modules[1].classes[node.name]
+        current_class: PythonClass = self.current_module.classes[node.name]
         self.ctx.current_class = current_class
-        old_ghost_ctx = self.in_ghost_ctx #TODO: Do we need to define classes within ghost context? 
+        old_ghost_ctx = self.in_ghost_ctx #TODO: Do we need to define classes within ghost context?
         self.in_ghost_ctx = current_class.is_ghost
 
-        # Classes may only have explicit bases of the same ghost type, 
+        # Classes may only have explicit bases of the same ghost type,
         # i.e. ghost classes only have explicit ghost bases (and the implicit object base).
-        OBJECT_NAME = ast.Name(OBJECT_TYPE, None)
-        object_class = self.get_target(OBJECT_NAME, self.ctx)
+        object_class = self.global_module.classes[OBJECT_TYPE]
         superclass = current_class.superclass
-        if not (superclass == object_class or superclass.is_ghost == current_class.is_ghost):
+        if not (superclass is object_class or
+                self.is_ghost(superclass) == current_class.is_ghost):
             raise InvalidProgramException(node, "invalid.ghost.classDef")
 
         for stmt in node.body:
@@ -104,19 +248,21 @@ class GhostChecker(ast.NodeVisitor):
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         decorators = {d.id for d in node.decorator_list if isinstance(d, ast.Name)}
-        if any([dec in IGNORE_DECORATORS for dec in decorators]):
-            is_func_ghost = 'Ghost' in decorators or 'Predicate' in decorators
-            node.is_ghost = is_func_ghost
-            node.contains_ghost = True
+        if any([dec in SPEC_ONLY_DECORATORS for dec in decorators]):
+            # Predicates and IO operations only exist during verification, so
+            # everything about them is ghost.
+            self.mark_ghost(node)
             return
-        
+        # The body of a contract only function consists of specifications only.
+        contract_only = CONTRACT_ONLY_DECORATOR in decorators
+
         # Resolve defined function
         if 'property' in decorators:
             if not isinstance(self.ctx.current_class, PythonClass):
                 raise InvalidProgramException(node, 'invalid.property', "Property outside of class.")
             current_function = self.ctx.current_class.get_field(node.name)
         else:
-            scope = self.ctx.current_class if self.ctx.current_class else self.modules[1]
+            scope = self.ctx.current_class if self.ctx.current_class else self.current_module
             current_function = scope.get_func_or_method(node.name)
         if current_function is None:
             attr_decorators = [d for d in node.decorator_list if isinstance(d, ast.Attribute)]
@@ -156,38 +302,36 @@ class GhostChecker(ast.NodeVisitor):
 
             # Variadic arguments must be regular
             for arg in [node.args.vararg, node.args.kwarg]:
-                if arg is not None and arg.annotation is not None and self.check_annotation(arg.annotation):
-                    raise InvalidProgramException(arg, 'invalid.ghost.annotation')
-            
+                if arg is not None:
+                    if arg.annotation is not None and self.check_annotation(arg.annotation):
+                        raise InvalidProgramException(arg, 'invalid.ghost.annotation')
+                    arg.is_ghost = False
+
             # The return must be None, a Tuple[only_reg, only_ghost] or clearly regular or ghost
             return_ann = node.returns
-            if isinstance(return_ann, ast.Constant) and return_ann.value is None:
-                return_ann.is_ghost = False
-                return_ann.contains_ghost = False
-            elif isinstance(return_ann, ast.Subscript) and \
-                self.get_subscript_name(return_ann) == 'Tuple' and len(return_ann.slice.elts) == 2:
-                is_fst_ghost = self.check_annotation(return_ann.slice.elts[0])
-                is_snd_ghost = self.check_annotation(return_ann.slice.elts[1])
-                if is_fst_ghost and not is_snd_ghost:
-                    raise InvalidProgramException(return_ann, 'invalid.ghost.annotation')
-                return_ann.is_ghost = is_fst_ghost and is_snd_ghost
-                return_ann.contains_ghost = is_snd_ghost
-                contains_ghost = contains_ghost or is_snd_ghost
-            else:
-                ann_type = self.check_annotation(return_ann)
-                return_ann.is_ghost = ann_type
-                return_ann.contains_ghost = ann_type
-                contains_ghost = contains_ghost or ann_type
+            ret_info = self.get_return_info(current_function)
+            if return_ann is not None:
+                return_ann.is_ghost = ret_info is True
+                return_ann.contains_ghost = ret_info is not False
+                contains_ghost = contains_ghost or ret_info is not False
         else:
             # All elements must be ghost, so annotations do not need to be further analyzed.
             # However, the function may not have variadic arguments
             if node.args.vararg is not None or node.args.kwarg is not None:
                 raise InvalidProgramException(node, 'invalid.ghost.functionDef')
+            self.mark_ghost(node.args)
+            if node.returns is not None:
+                self.mark_ghost(node.returns)
             contains_ghost = True
 
-        for stmt in node.body:
-            self.visit(stmt)
-           
+        if contract_only:
+            # The body consists of specifications only.
+            for stmt in node.body:
+                self.mark_ghost(stmt)
+        else:
+            for stmt in node.body:
+                self.visit(stmt)
+
         self.ctx.current_function = None
         self.in_ghost_ctx = old_ghost_ctx
         node.is_ghost = current_function.is_ghost
@@ -201,28 +345,45 @@ class GhostChecker(ast.NodeVisitor):
             node.contains_ghost = True
         else:
             if self.in_ghost_ctx:
-                raise InvalidProgramException(node, 'invalid.ghost.return')
-            expect_ret = self.ctx.current_function.node.returns
+                raise InvalidProgramException(
+                    node, 'invalid.ghost.return',
+                    "A regular function cannot return from within ghost code.")
+            current_function = self.ctx.current_function
+            expect_ret = current_function.node.returns
+            ret_info = self.get_return_info(current_function)
             contains_ghost = False
             if node.value is None:
                 # Returning nothing cannot be invalid or mypy would throw error
-                pass  
-            elif isinstance(node.value, ast.Tuple):
-                expect_list = expect_ret.slice.elts
-                index = 0
-                for ret in node.value.elts:
-                    expect_ret = expect_list[index]
-                    expect_type = self.check_annotation(expect_ret)
-                    if not self.is_assignable(ret, expect_type):
-                        raise InvalidProgramException(node, 'invalid.ghost.return')
-                    contains_ghost = contains_ghost or expect_type
-                    index += 1
+                pass
+            elif ret_info == MIXED_RETURN:
+                contains_ghost = True
+                mixed_parts = self.get_mixed_return_parts(expect_ret)
+                if isinstance(node.value, ast.Tuple) and len(node.value.elts) == 2:
+                    for ret, expect in zip(node.value.elts, mixed_parts):
+                        expect_type = self.check_annotation(expect)
+                        if not self.is_assignable(ret, expect_type):
+                            raise InvalidProgramException(node, 'invalid.ghost.return')
+                    node.value.is_ghost = False
+                    self.set_contains_ghost(node.value, True, *node.value.elts)
+                elif isinstance(node.value, ast.Call) and \
+                        self.check_call(node.value) == (False, MIXED_RETURN):
+                    # Directly returning the result of a call with an equivalent
+                    # return type is fine as well.
+                    pass
+                else:
+                    raise InvalidProgramException(
+                        node, 'invalid.ghost.return',
+                        "A return value with a regular and a ghost part must be returned "
+                        "as a tuple of two elements or as the result of a single call.")
             else:
-                expect_type = self.check_annotation(expect_ret)
+                expect_type = ret_info is True
                 if not self.is_assignable(node.value, expect_type):
-                    raise InvalidProgramException(node, 'invalid.ghost.return')
+                    raise InvalidProgramException(
+                        node, 'invalid.ghost.return',
+                        "The returned value does not match the ghost type of the "
+                        "declared return type.")
                 contains_ghost = expect_type
-        
+
             node.is_ghost = False
             self.set_contains_ghost(node, contains_ghost, node.value)
 
@@ -263,11 +424,11 @@ class GhostChecker(ast.NodeVisitor):
     def get_all_targets(self, targets: List[ast.expr]) -> List[ast.expr]:
         all_targets = []
         for target in targets:
-            if isinstance(target, ast.Tuple):
-                all_targets.extend(target.elts)
+            if isinstance(target, (ast.Tuple, ast.List)):
+                all_targets.extend(self.get_all_targets(target.elts))
             else:
                 all_targets.append(target)
-        
+
         return all_targets
 
     def visit_AugAssign(self, node: ast.AugAssign):
@@ -313,34 +474,35 @@ class GhostChecker(ast.NodeVisitor):
     def check_assign(self, value: Union[ast.expr, bool], target: ast.expr, allow_conversion: bool =True) -> None:        
         if isinstance(target, (ast.Name, ast.Attribute)):
             if not self.is_assignable(value, target, allow_conversion):
-                raise InvalidProgramException(target, 'invalid.ghost.assign')
+                raise InvalidProgramException(
+                    target, 'invalid.ghost.assign',
+                    "Ghost values may only be assigned to ghost targets.")
         else:
             assert isinstance(target, ast.Subscript), f"Unexpected type of {type(target)}"
             # The subscript of a ghost element may only be read
             if self.is_ghost(target) or self.is_ghost(value) or self.in_ghost_ctx:
-                raise InvalidProgramException(target, 'invalid.ghost.assign')
+                raise InvalidProgramException(
+                    target, 'invalid.ghost.assign',
+                    "The elements of a ghost collection may only be read.")
 
     def check_unpacking(self, value: Union[ast.expr, bool], target: Union[ast.List, ast.Tuple]) -> None:
         unpacked = target.elts
 
         # Resolve value to multiple values
-        if isinstance(value, (ast.Tuple, ast.List, ast.Name)):
-            # Variable, Tuple or List unpacking
-            values = [self.is_ghost(value)] * len(unpacked)
-        elif isinstance(value, ast.Subscript):
-            # Tuple/List annotation from call 
-            values = value.slice.elts
-        elif isinstance(value, ast.Call):
-            is_func_ghost, ret_type = self.check_call(value)
-            if ret_type is None:
-                values = [False] * len(unpacked)
-            elif is_func_ghost:
-                values = [True] * len(ret_type.slice.elts)
+        if isinstance(value, ast.Call):
+            is_func_ghost, ret_info = self.check_call(value)
+            if is_func_ghost:
+                values = [True] * len(unpacked)
+            elif ret_info == MIXED_RETURN:
+                values = [False, True]
+            elif isinstance(ret_info, bool):
+                values = [ret_info] * len(unpacked)
             else:
-                values = ret_type.slice.elts
+                values = [False] * len(unpacked)
         else:
-            assert isinstance(value, bool), f"Unexpected type of {type(value)}"
-            values = [value] * len(unpacked)
+            # The unpacked value is either an expression which is ghost as a
+            # whole, or a boolean which already says whether it is ghost.
+            values = [self.is_ghost(value)] * len(unpacked)
         
         if any(isinstance(item, ast.Starred) for item in unpacked):
             # For simplicity, we only allow starred unpacking in regular code
@@ -372,7 +534,10 @@ class GhostChecker(ast.NodeVisitor):
             # Set is_ghost flag of all vars
             def set_var_ghost(var: PythonVarBase) -> None:
                 var.is_ghost = True
-            self.call_on_vars(node.target, set_var_ghost)
+            if not self.call_on_vars(node.target, set_var_ghost):
+                # Iterating over a ghost collection into a target that cannot be
+                # made ghost (e.g. a field or a subscript) is not allowed.
+                raise InvalidProgramException(node, 'invalid.ghost.For')
         else:
             # We do not allow loop vars to be defined ghost elsewhere
             def check_var(var: PythonVarBase) -> None:
@@ -384,15 +549,24 @@ class GhostChecker(ast.NodeVisitor):
         node.is_ghost = is_iter_ghost
         self.set_contains_ghost(node, is_iter_ghost, node.iter, *node.body, *node.orelse)
 
-    def call_on_vars(self, expr: Union[ast.Name, ast.Tuple, ast.List], f: Callable[[PythonVarBase], None]):
-        if isinstance(expr, ast.Name):
+    def call_on_vars(self, expr: ast.expr, f: Callable[[PythonVarBase], None]) -> bool:
+        """
+        Applies the given function to all variables the given target expression
+        assigns to. Returns whether all assigned targets were in fact variables.
+        """
+        if isinstance(expr, ast.Starred):
+            return self.call_on_vars(expr.value, f)
+        elif isinstance(expr, (ast.Tuple, ast.List)):
+            return all([self.call_on_vars(e, f) for e in expr.elts])
+        elif isinstance(expr, ast.Name):
             var = self.get_target(expr, self.ctx)
-            assert isinstance(var, PythonVarBase), f"Unexpected type of {type(var)}"
+            if not isinstance(var, PythonVarBase):
+                return False
             f(var)
-        else:
-            assert isinstance(expr, (ast.Tuple, ast.List)), f"Unexpected type of {type(expr)}"
-            for e in expr.elts:
-                self.call_on_vars(e, f)
+            return True
+        # Targets which are not variables (e.g. attributes or subscripts) cannot
+        # be marked as ghost.
+        return False
 
     def visit_While(self, node: ast.While):
         is_test_ghost = self.is_ghost(node.test)
@@ -426,33 +600,61 @@ class GhostChecker(ast.NodeVisitor):
         # With may only be used in and with regular code
         if self.in_ghost_ctx:
             raise InvalidProgramException(node, 'invalid.ghost.with')
-        
+
         for withitem in node.items:
-            if self.is_ghost(withitem.context_expr) or (withitem.optional_vars is not None and 
+            if self.is_ghost(withitem.context_expr) or (withitem.optional_vars is not None and
                                                         self.is_ghost(withitem.optional_vars)):
                 raise InvalidProgramException(node, 'invalid.ghost.with')
-        
+
         for stmt in node.body:
             self.visit(stmt)
-        
+
         node.is_ghost = False
-        self.set_contains_ghost(node, False)
+        self.set_contains_ghost(node, False, *node.body)
+
+    def visit_Try(self, node: ast.Try):
+        # Exception handling may only be used in regular code, since exceptions
+        # cannot be raised from ghost code.
+        if self.in_ghost_ctx:
+            raise InvalidProgramException(node, 'invalid.ghost.try')
+
+        blocks = [node.body, node.orelse, node.finalbody]
+        for handler in node.handlers:
+            for stmt in handler.body:
+                self.visit(stmt)
+            handler.is_ghost = False
+            self.set_contains_ghost(handler, False, *handler.body)
+        for block in blocks:
+            for stmt in block:
+                self.visit(stmt)
+
+        node.is_ghost = False
+        self.set_contains_ghost(node, False, *node.handlers,
+                                *[stmt for block in blocks for stmt in block])
 
     def visit_Raise(self, node: ast.Raise):
         if self.in_ghost_ctx:
             raise InvalidProgramException(node, 'invalid.ghost.raise')
+        if node.exc is not None and self.is_ghost(node.exc):
+            raise InvalidProgramException(
+                node, 'invalid.ghost.raise',
+                "Ghost code cannot raise exceptions.")
 
         node.is_ghost = False
-        self.set_contains_ghost(node, False)
+        self.set_contains_ghost(node, False, node.exc)
 
     def visit_Assert(self, node: ast.Assert):
+        # A plain assert statement is executed at runtime, so it may not talk
+        # about ghost state. Use the Assert contract function for that.
         is_test_ghost = self.is_ghost(node.test)
         is_msg_ghost = self.is_ghost(node.msg) if node.msg is not None else False
         if self.in_ghost_ctx or is_test_ghost or is_msg_ghost:
-            raise InvalidProgramException(node, 'invalid.ghost.assert', "Use the Assert contract function when working with ghost elements.")
-        
+            raise InvalidProgramException(node, 'invalid.ghost.assert',
+                                          "Use the Assert contract function when "
+                                          "working with ghost elements.")
+
         node.is_ghost = False
-        self.set_contains_ghost(node, False)
+        self.set_contains_ghost(node, False, node.test, node.msg)
 
     def visit_Expr(self, node: ast.Expr):
         is_node_ghost = self.is_ghost(node.value)
@@ -482,18 +684,22 @@ class GhostChecker(ast.NodeVisitor):
 
     def visit_Break(self, node: ast.Break):
         if self.in_ghost_ctx:
-            raise InvalidProgramException(node, 'invalid.ghost.break')
+            raise InvalidProgramException(
+                node, 'invalid.ghost.break',
+                "Ghost code cannot break out of a regular loop.")
         node.is_ghost = False
         node.contains_ghost = False
     
     def visit_Continue(self, node: ast.Continue):
         if self.in_ghost_ctx:
-            raise InvalidProgramException(node, 'invalid.ghost.continue')
+            raise InvalidProgramException(
+                node, 'invalid.ghost.continue',
+                "Ghost code cannot continue a regular loop.")
         node.is_ghost = False
         node.contains_ghost = False
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
-        if NAGINI_IMPORT in node.module.split('.'):
+        if node.module is not None and NAGINI_IMPORT in node.module.split('.'):
             node.is_ghost = True
             node.contains_ghost = True
             super().generic_visit(node)
@@ -502,25 +708,36 @@ class GhostChecker(ast.NodeVisitor):
 
     def check_annotation(self, ann: annotation_t) -> bool:
         """
-        Checks whether the annotation is valid in regards to ghost information. 
+        Checks whether the annotation is valid in regards to ghost information.
         For example, we do not allow Union[Set, PSet], as it is unclear whether the corresponding value will be ghost.
         When the annotation is valid, we return whether it denotes a ghost value.
         """
         if isinstance(ann, ast.Name):
             # Must be valid or mypy would throw error
-            return ann.id in self.modules[1].ghost_names or ann.id in GHOST_BUILTINS
+            return (self.is_ghost_name(ann.id) or
+                    self.is_ghost_type(self.get_target(ann, self.ctx)))
         elif isinstance(ann, ast.Constant):
-            # Must be valid or mypy would throw error
-            return ann.value in self.modules[1].ghost_names or ann.value in GHOST_BUILTINS
+            if ann.value is None:
+                return False
+            # A forward reference. Must be valid or mypy would throw error.
+            return (self.is_ghost_name(ann.value) or
+                    self.is_ghost_type(self.find_type(ann.value)))
         elif isinstance(ann, ast.Attribute):
             # Must be valid or mypy would throw error. Find module and check for ghost name
-            mod: Optional[PythonModule] = self.get_target(ann.value, self.ctx)
-            if mod is None:
-                raise InvalidProgramException(ann, 'invalid.ghost.annotation', f"Couldn't correctly resolve module {ann.value.id}")
-            return ann.attr in mod.ghost_names
-        else: 
+            mod: Optional[PythonNode] = self.get_target(ann.value, self.ctx)
+            if not isinstance(mod, PythonModule):
+                raise InvalidProgramException(ann, 'invalid.ghost.annotation',
+                                              "Couldn't correctly resolve module of annotation.")
+            return (ann.attr in mod.ghost_names or
+                    self.is_ghost_type(mod.classes.get(ann.attr)))
+        else:
             assert isinstance(ann, ast.Subscript), f"Unexpected type of {type(ann)}"
-            if isinstance(ann.slice, (ast.Name, ast.Constant, ast.Subscript)):
+            # A generic ghost type, e.g. PSeq[int], is ghost no matter what its
+            # type arguments are.
+            if isinstance(ann.value, (ast.Name, ast.Constant, ast.Attribute)) and \
+                    self.check_annotation(ann.value):
+                return True
+            if isinstance(ann.slice, (ast.Name, ast.Constant, ast.Subscript, ast.Attribute)):
                 return self.check_annotation(ann.slice)
             assert isinstance(ann.slice, (ast.Tuple, ast.List)), f"Unexpected type of {type(ann.slice)}"
             sub_anns = ann.slice.elts
@@ -542,66 +759,143 @@ class GhostChecker(ast.NodeVisitor):
                     raise InvalidProgramException(ann, 'invalid.ghost.annotation')
             return fst
 
-    def check_call(self, call: ast.Call) -> Tuple[bool, Optional[annotation_t]]:
+    def is_ghost_name(self, name: str) -> bool:
         """
-        Checks whether the call is valid in regards to ghost information. We also set the 'is_ghost', 'contains_ghost' 
+        Returns whether the given name refers to a ghost type in the current module.
+        """
+        return name in self.current_module.ghost_names or name in ALL_GHOST_TYPE_NAMES
+
+    def find_type(self, name: str) -> Optional[PythonType]:
+        """
+        Returns the class with the given name that is visible in the current
+        module, if there is one. Used to resolve forward references.
+        """
+        modules = [self.current_module]
+        modules.extend(self.current_module.get_included_modules(()))
+        modules.append(self.global_module)
+        for module in modules:
+            cls = getattr(module, 'classes', {}).get(name)
+            if cls is not None:
+                return cls
+        return None
+
+    def get_mixed_return_parts(self, ann: Optional[annotation_t]
+                               ) -> Optional[Tuple[annotation_t, annotation_t]]:
+        """
+        If the given return type annotation combines a regular and a ghost part,
+        i.e. if it has the form Tuple[<regular type>, <ghost type>], returns the
+        two parts. Returns None otherwise.
+        """
+        if not (isinstance(ann, ast.Subscript) and self.get_subscript_name(ann) == 'Tuple'):
+            return None
+        if not (isinstance(ann.slice, ast.Tuple) and len(ann.slice.elts) == 2):
+            return None
+        fst, snd = ann.slice.elts
+        if self.check_annotation(fst) or not self.check_annotation(snd):
+            return None
+        return fst, snd
+
+    def get_return_info(self, func: PythonMethod) -> return_info_t:
+        """
+        Returns the ghost information of the return value of the given function:
+        None if it has no return type annotation, MIXED_RETURN if the annotation
+        combines a regular and a ghost part, and otherwise whether the entire
+        returned value is ghost.
+
+        The annotation is interpreted in the module in which the function is
+        defined, and the result is cached on the function.
+        """
+        cached = getattr(func, 'ghost_return_info', _UNCOMPUTED)
+        if cached is not _UNCOMPUTED:
+            return cached
+        ann = func.node.returns if func.node is not None else None
+        if self.is_ghost(func):
+            info = True
+        elif ann is None:
+            # Interface methods have no annotation; we use the declared type.
+            info = self.is_ghost_type(getattr(func, 'type', None))
+        else:
+            with self.module_scope(func.module):
+                if self.get_mixed_return_parts(ann) is not None:
+                    info = MIXED_RETURN
+                else:
+                    info = self.check_annotation(ann)
+        func.ghost_return_info = info
+        return info
+
+    def check_call(self, call: ast.Call) -> Tuple[bool, return_info_t]:
+        """
+        Checks whether the call is valid in regards to ghost information. We also set the 'is_ghost', 'contains_ghost'
         and a 'is_pure' flag on the Call node.
 
-        If the call is valid, we return whether the called function is ghost. 
-        If the function is regular and has an annotation for its return type, we return the annotation as well.
-        """     
+        If the call is valid, we return whether the called function is ghost.
+        If the function is regular, we additionally return the ghost information
+        of its return value (see get_return_info).
+        """
         func_name = get_func_name(call)
-        if func_name in TRANSPARENT_CALLS:
+        if func_name in TRANSPARENT_CALLS and len(call.args) > TRANSPARENT_CALLS[func_name]:
             idx = TRANSPARENT_CALLS[func_name]
             res = self.is_ghost(call.args[idx]) #TODO: Should probably support keyword version
             call.is_ghost = res
             call.contains_ghost = True
             call.is_pure = True
             return res, None
-        elif func_name in ALL_CONTRACT_ELEMS:
-            call.is_ghost = True
+        elif func_name in IO_MIXED_RETURN_FUNCS:
+            # The result consists of a regular value and a place.
+            call.is_ghost = False
             call.contains_ghost = True
             call.is_pure = True
-            return True, None
+            return False, MIXED_RETURN
         elif func_name in IGNORE_REG_CALLS:
             call.is_ghost = False
             call.contains_ghost = False
             call.is_pure = False
             return False, None
-        elif func_name in PURE_REG_CALLS:
-            is_func_ghost = False
-            for arg in call.args:
-                is_func_ghost = is_func_ghost or self.is_ghost(arg)
-            for kw in call.keywords:
-                is_func_ghost = is_func_ghost or self.is_ghost(kw)
-            call.is_ghost = is_func_ghost
-            call.contains_ghost = is_func_ghost
+        elif func_name in ALL_CONTRACT_ELEMS:
+            call.is_ghost = True
+            call.contains_ghost = True
             call.is_pure = True
-            return is_func_ghost, None
-        
+            return True, None
+        elif func_name in PURE_REG_CALLS:
+            return self._check_unresolved_call(call, False)
+
+
         called_func = None
+        # A call on a ghost receiver may only happen in ghost code, since the
+        # receiver does not exist at runtime.
+        is_receiver_ghost = self.check_receiver(call)
         if isinstance(call.func, ast.Attribute):
             called_type = self.get_type(call.func.value, self.ctx)
             if isinstance(called_type, PythonClass) and called_type.name in THREADING:
-                call.is_ghost = False
-                call.contains_ghost = True
-                call.is_pure = False
-                return False, None
+                return self._check_thread_call(call)
             elif isinstance(called_type, UnionType):
-                types = called_type.get_types()
-                funcs = [t.get_func_or_method(func_name) for t in types]
-                if None in funcs:
+                types = [t for t in called_type.get_types() if t is not None]
+                funcs = [t.get_func_or_method(func_name) or t.get_predicate(func_name)
+                         for t in types]
+                if not funcs or None in funcs:
                     raise InvalidProgramException(call, 'invalid.ghost.call', f"Cannot resolve {func_name} of all possible types.")
                 if not self.only_equivalent_signatures(funcs):
                     raise InvalidProgramException(call, 'invalid.ghost.call', "Call of function with multiple possible signatures.")
                 called_func = funcs[0]
-        
+
+        if isinstance(call.func, ast.Subscript):
+            # A generic class is instantiated, e.g. Cell[int](5). We cannot check
+            # the arguments against the parameters, since their types depend on
+            # the type arguments, so we only take the class itself into account.
+            if self.is_ghost_type(self.get_target(call.func.value, self.ctx)):
+                return self._check_ghost_func(call)
+            return self._check_unresolved_call(call, is_receiver_ghost)
+
         if called_func is None:
             called_func = self.get_target(call.func, self.ctx)
 
+        if isinstance(called_func, PythonIOOperation):
+            # IO operations only exist during verification.
+            return self._check_ghost_func(call)
+
         if isinstance(called_func, (PythonClass, PythonVarBase)):
             if isinstance(called_func, PythonVarBase):
-                # Function stored in var is called. 
+                # Function stored in var is called.
                 # Currently, this should only be calling classmethod's cls element
                 curr_cls = self.ctx.current_class
             else:
@@ -609,81 +903,105 @@ class GhostChecker(ast.NodeVisitor):
                 curr_cls = called_func
 
             # We resolve this as a call to __init__
-            while curr_cls is not None:
-                if curr_cls.name == OBJECT_TYPE:
-                    # Empty object init
-                    res = self.is_ghost(called_func)
-                    call.is_ghost = res
-                    call.contains_ghost = res
-                    call.is_pure = True
-                    return res, None
+            init = None
+            while curr_cls is not None and curr_cls.name != OBJECT_TYPE:
                 init = curr_cls.get_func_or_method('__init__')
-                if init is None:
-                    curr_cls = curr_cls.superclass
-                else:
-                    called_func = init
+                if init is not None:
                     break
+                curr_cls = curr_cls.superclass
+            if init is None:
+                # Empty object init
+                res = self.is_ghost(called_func) or self.in_ghost_ctx or is_receiver_ghost
+                call.is_ghost = res
+                call.contains_ghost = res
+                call.is_pure = True
+                return res, None
+            # Constructor calls return an instance of the class, not the result
+            # of __init__, so we remember the ghost information of the class here.
+            is_class_ghost = self.is_ghost(called_func)
+            called_func = init
+        else:
+            is_class_ghost = False
 
         if not isinstance(called_func, PythonMethod):
-            raise InvalidProgramException(call, 'invalid.ghost.call', f"Couldn't correctly resolve function {func_name}")
+            # Nagini resolves some calls (e.g. to builtins) only during translation.
+            # We conservatively treat those as pure regular functions, i.e. the call
+            # is ghost exactly if one of its arguments or its receiver is ghost.
+            return self._check_unresolved_call(call, is_receiver_ghost)
 
-        is_func_ghost = self.is_ghost(called_func)
+        is_func_ghost = self.is_ghost(called_func) or is_class_ghost
         is_func_pure = called_func.pure
         call.is_pure = is_func_pure
 
-        # We cannot call an impure regular function in a ghost context
-        if self.in_ghost_ctx:
+        # We cannot call an impure regular function in a ghost context, since
+        # removing the ghost code would remove its effect as well.
+        if self.in_ghost_ctx or is_receiver_ghost:
             if not is_func_ghost and not is_func_pure:
-                raise InvalidProgramException(call, 'invalid.ghost.call')
+                current_function = self.ctx.current_function
+                if current_function is not None and current_function.pure:
+                    # Report the more specific error Nagini uses for this case.
+                    raise InvalidProgramException(call, 'purity.violated')
+                raise InvalidProgramException(
+                    call, 'invalid.ghost.call',
+                    f"Cannot call the impure function {func_name} in ghost code.")
             # The function is either already ghost or is pure and now used as ghost
             is_func_ghost = True
 
         if is_func_ghost:
             return self._check_ghost_func(call)
-        
+
         contains_ghost = False
 
         # Get expected parameters
-        params = called_func.args
-        if called_func.cls is not None:
+        params = OrderedDict(called_func.args)
+        if called_func.cls is not None and not called_func.method_type == MethodType.static_method \
+                and params:
             # class function: ignore self argument
-            params = OrderedDict(params)
             params.popitem(last=False)
-        if len(called_func.special_args) > 0:
-            # Function has variadic parameters
-            # TODO: Support
-            raise UnsupportedException(call, "Unsupported calling of function with variadic parameters")
-        
+        # Arguments which are passed to a variadic parameter must all be regular,
+        # which is already guaranteed by the check of the function definition.
+        has_variadic_params = len(called_func.special_args) > 0
+
         # Get actual arguments
         args: list[ast.expr | bool] = []
         for arg in call.args:
             if isinstance(arg, ast.Starred):
-                if isinstance(arg.value, ast.Name):
-                    #TODO: We currently assume the starred object to be a variable. This is not necessarily true
-                    var: PythonVarBase = self.get_target(arg.value, self.ctx)
-                    assert var.type.name in ['tuple', 'list']
-                    is_var_ghost = self.is_ghost(var)
-                    for _ in range(len(var.type.type_args)):
-                        args.append(is_var_ghost)
-                    arg.is_ghost = is_var_ghost
-                    arg.contains_ghost = is_var_ghost
-                elif isinstance(arg.value, ast.Call):
+                if isinstance(arg.value, ast.Call):
                     raise InvalidProgramException(arg, 'invalid.ghost.starred', "Do not use a star to unpack calls. Use an assignment instead.")
                     #TODO: Allow reg only and maybe ghost only returns to be unpacked with *
-                else:
-                    raise UnsupportedException(arg, f"Starred argument of type {type(arg)}")
+                #TODO: We currently assume the starred object to be a variable. This is not necessarily true
+                is_var_ghost = self.is_ghost(arg.value)
+                var_type = self.get_type(arg.value, self.ctx)
+                nof_elements = len(var_type.type_args) if isinstance(var_type, GenericType) else 1
+                for _ in range(nof_elements):
+                    args.append(is_var_ghost)
+                arg.is_ghost = is_var_ghost
+                arg.contains_ghost = is_var_ghost
             else:
                 args.append(arg)
-        
+
+        if len(args) > len(params) and not has_variadic_params:
+            # More arguments than parameters can only happen for calls which
+            # Nagini rejects later on; nothing to check here.
+            args = args[:len(params)]
+
         # Check positional arguments
-        for arg, param in zip(args, params.values()):
+        for index, arg in enumerate(args):
+            if index >= len(params):
+                # Argument is passed to a variadic parameter, which is always regular.
+                if self.is_ghost(arg):
+                    raise InvalidProgramException(call, 'invalid.ghost.call')
+                continue
+            param = list(params.values())[index]
             is_param_ghost = self.is_ghost(param)
             if is_param_ghost:
                 old_ctx = self.in_ghost_ctx
                 self.in_ghost_ctx = True
             if not self.is_assignable(arg, param):
-                # Reg input was expected but got ghost input. 
+                # Reg input was expected but got ghost input.
                 # If func is pure, we use it as ghost. Otherwise, the call is invalid
+                if is_param_ghost:
+                    self.in_ghost_ctx = old_ctx
                 if is_func_pure:
                     return self._check_ghost_func(call)
                 else:
@@ -691,12 +1009,14 @@ class GhostChecker(ast.NodeVisitor):
             if is_param_ghost:
                 self.in_ghost_ctx = old_ctx
                 contains_ghost = True
-        
+
         # Check keyword arguments
         for kw in call.keywords:
-            if kw.arg is None:
-                # Assume **kwargs
-                raise UnsupportedException(kw, "Giving variadic keywords") #TODO
+            if kw.arg is None or kw.arg not in params:
+                # Variadic keywords, which are always regular.
+                if self.is_ghost(kw.value):
+                    raise InvalidProgramException(call, 'invalid.ghost.call')
+                continue
             param = params[kw.arg]
 
             is_param_ghost = self.is_ghost(param)
@@ -704,8 +1024,10 @@ class GhostChecker(ast.NodeVisitor):
                 old_ctx = self.in_ghost_ctx
                 self.in_ghost_ctx = True
             if not self.is_assignable(kw.value, param):
-                # Reg input was expected but got ghost input. 
+                # Reg input was expected but got ghost input.
                 # If func is pure, we use it as ghost. Otherwise, the call is invalid
+                if is_param_ghost:
+                    self.in_ghost_ctx = old_ctx
                 if is_func_pure:
                     return self._check_ghost_func(call)
                 else:
@@ -717,38 +1039,81 @@ class GhostChecker(ast.NodeVisitor):
         call.is_ghost = False
         call.contains_ghost = contains_ghost
 
-        # Find the return type
-        ret_type = called_func.node.returns if called_func.node is not None else None
-        return False, ret_type
-        
+        return False, self.get_return_info(called_func)
+
+    def _check_thread_call(self, call: ast.Call) -> Tuple[bool, return_info_t]:
+        """
+        Handles calls of the methods of Thread objects, which Nagini translates
+        specially. Their arguments must all be regular.
+        """
+        contains_ghost = False
+        arguments = list(call.args) + [kw.value for kw in call.keywords]
+        for argument in arguments:
+            if self.is_ghost(argument):
+                raise InvalidProgramException(
+                    call, 'invalid.ghost.call',
+                    "Threads cannot be used with ghost values.")
+            contains_ghost = contains_ghost or argument.contains_ghost
+        call.is_ghost = False
+        call.contains_ghost = contains_ghost
+        call.is_pure = False
+        return False, None
+
+    def check_receiver(self, call: ast.Call) -> bool:
+        """
+        Determines whether the receiver of the given call (if any) is ghost.
+        Module qualified calls like 'mod.foo()' do not have a receiver.
+        """
+        if not isinstance(call.func, ast.Attribute):
+            return False
+        receiver = call.func.value
+        if isinstance(receiver, (ast.Name, ast.Attribute)) and \
+                isinstance(self.get_target(receiver, self.ctx), PythonModule):
+            return False
+        return self.is_ghost(receiver)
+
+    def _check_unresolved_call(self, call: ast.Call,
+                               is_receiver_ghost: bool) -> Tuple[bool, return_info_t]:
+        """
+        Handles calls whose target Nagini only resolves during translation, e.g.
+        calls to some builtins. We treat them like pure regular functions.
+        """
+        is_func_ghost = is_receiver_ghost or self.in_ghost_ctx
+        for arg in call.args:
+            is_func_ghost = self.is_ghost(arg) or is_func_ghost
+        for kw in call.keywords:
+            is_func_ghost = self.is_ghost(kw.value) or is_func_ghost
+        call.is_ghost = is_func_ghost
+        call.contains_ghost = is_func_ghost
+        call.is_pure = True
+        return is_func_ghost, None
+
     def only_equivalent_signatures(self, funcs: List[PythonMethod]) -> bool:
+        """
+        Returns whether all given functions agree on the ghost information of
+        their arguments and of their return value, so that a call which may
+        dispatch to any of them can be checked against the first one.
+        """
         if len(funcs) < 2:
             return True
         fst = funcs[0]
         is_fst_ghost = self.is_ghost(fst)
-        fst_returns = fst.node.returns
-        is_fst_return_ghost = is_fst_ghost or self.check_annotation(fst_returns)
+        fst_return_info = self.get_return_info(fst)
         for next_func in funcs[1:]:
             # Compare ghost type and args of funcs
             if is_fst_ghost != self.is_ghost(next_func) or len(fst.args) != len(next_func.args):
                 return False
-            for fst_arg, next_arg in zip(fst.args, next_func.args):
+            for fst_arg, next_arg in zip(fst.args.values(), next_func.args.values()):
                 if self.is_ghost(fst_arg) != self.is_ghost(next_arg):
                     return False
-            
+
             # Compare returns of funcs
-            next_returns = next_func.node.returns
-            if not is_fst_ghost:
-                if isinstance(fst_returns, ast.Tuple) and len(fst_returns.elts) == 2:
-                    for fst_ret, next_ret in zip(fst_returns.elts, next_returns.elts):
-                        if self.check_annotation(fst_ret) != self.check_annotation(next_ret):
-                            return False
-                elif (is_fst_return_ghost != self.check_annotation(next_returns)):
-                    return False
+            if not is_fst_ghost and fst_return_info != self.get_return_info(next_func):
+                return False
 
         return True
 
-    def _check_ghost_func(self, call: ast.Call) -> Tuple[bool, Optional[annotation_t]]:
+    def _check_ghost_func(self, call: ast.Call) -> Tuple[bool, return_info_t]:
         # Ghost func calls accept all arguments and have no (informative) return.
         # However, we still need to check that there are no impure regular function calls in its arguments.
         old_ctx = self.in_ghost_ctx
@@ -795,16 +1160,55 @@ class GhostChecker(ast.NodeVisitor):
         If given an AST node, this function also sets a "is_ghost" and a "contains_ghost" flag on it, 
         which are used for the termination analysis and the extraction.
         """
-        if isinstance(elem, (PythonVarBase, PythonMethod, PythonClass, PythonField)) or (
-            isinstance(elem, ast.AST) and hasattr(elem, 'is_ghost')):
+        if isinstance(elem, bool):
+            return elem
+        elif isinstance(elem, PythonVarBase):
+            # A variable is ghost if it was declared as such or if its type only
+            # exists during verification.
+            return elem.is_ghost or self.is_ghost_type(elem.type)
+        elif isinstance(elem, PythonField):
+            # A field is ghost if it was declared as such, if its type only
+            # exists during verification, or if its class is ghost.
+            return (elem.is_ghost or self.is_ghost_type(elem.type) or
+                    (elem.cls is not None and elem.cls.is_ghost))
+        elif isinstance(elem, PythonMethod):
+            if self.is_library_module(elem.module):
+                # Nagini's contract library uses the Ghost decorator with its
+                # original meaning, i.e. only to indicate that calls have no
+                # effect at runtime. Its functions are not ghost code.
+                return False
+            return elem.is_ghost
+        elif isinstance(elem, PythonIOOperation):
+            # IO operations only exist during verification.
+            return True
+        elif isinstance(elem, PythonType):
+            return self.is_ghost_type(elem)
+        elif isinstance(elem, PythonModule):
+            return False
+        elif isinstance(elem, ast.AST) and hasattr(elem, 'is_ghost'):
             return elem.is_ghost
         elif isinstance(elem, ast.expr):
             return self._is_expr_ghost(elem)
-        elif isinstance(elem, GenericType):
-            return False #TODO: May not always be regular
-        elif isinstance(elem, bool):
-            return elem
         raise UnsupportedException(elem, f"Unsupported Ghost resolution of type {type(elem)}")
+
+    def is_ghost_type(self, type: Optional[PythonType]) -> bool:
+        """
+        Returns whether values of the given type only exist during verification,
+        i.e. whether the type is a ghost class or one of Nagini's built-in ghost
+        types like PSeq.
+        """
+        if type is None:
+            return False
+        if isinstance(type, UnionType):
+            return any([self.is_ghost_type(t) for t in type.get_types() if t is not None])
+        if isinstance(type, GenericType):
+            # A container of ghost values is itself ghost.
+            if any([self.is_ghost_type(arg) for arg in type.type_args]):
+                return True
+            type = type.python_class
+        if isinstance(type, PythonClass):
+            return type.is_ghost or type.name in ALL_GHOST_TYPE_NAMES
+        return False
 
     def _is_expr_ghost(self, expr: ast.Expr) -> bool:
         if isinstance(expr, ast.BoolOp):
@@ -868,34 +1272,32 @@ class GhostChecker(ast.NodeVisitor):
             items = [expr.left] + expr.comparators
             res = any([self.is_ghost(e) for e in items])
         elif isinstance(expr, ast.Call):
-            is_func_ghost, ret_type = self.check_call(expr)
-            if is_func_ghost:
-                return True
-            elif ret_type is None:
-                return False
-            else:
-                return self.is_ghost(ret_type)
+            is_func_ghost, ret_info = self.check_call(expr)
+            # A return value which has a ghost part may only be used as a whole
+            # in ghost code.
+            return is_func_ghost or ret_info is True or ret_info == MIXED_RETURN
         elif isinstance(expr, ast.Constant):
             items = []
             res = False
         elif isinstance(expr, ast.Attribute):
-            attr = self.get_target(expr, self.ctx)
-            if attr is None:
-                raise InvalidProgramException(expr, 'invalid.ghost.attribute', f"Couldn't correctly resolve attribute {expr.attr}")
-            res = self.is_ghost(attr)
             items = []
+            res = self.resolve_target_ghost(expr)
         elif isinstance(expr, ast.Subscript):
             name = self.get_subscript_name(expr)
-            if name in ["Union", "Tuple"]:
+            if name in ["Union", "Tuple"] and isinstance(expr.slice, ast.Tuple):
                 items = expr.slice.elts
                 res = any([self.is_ghost(e) for e in items])
             elif name in ["Optional", "List"]:
                 items = [expr.slice]
                 res = self.is_ghost(expr.slice)
             else:
-                assert isinstance(expr.value, (ast.Name, ast.Attribute, ast.Call)), f"Unexpected type of {type(expr.value)}"
-                items = [expr.value]
-                res = self.is_ghost(expr.value)
+                # Subscripting a ghost collection, or indexing with a ghost
+                # value, yields a ghost value.
+                items = [expr.value, expr.slice]
+                res = any([self.is_ghost(e) for e in items])
+        elif isinstance(expr, ast.Slice):
+            items = [e for e in (expr.lower, expr.upper, expr.step) if e is not None]
+            res = any([self.is_ghost(e) for e in items])
         elif isinstance(expr, ast.Starred):
             if isinstance(expr.value, ast.Call):
                 raise InvalidProgramException(expr, 'invalid.ghost.starred', "Do not use a star to unpack calls. Use an assignment instead.")
@@ -903,15 +1305,12 @@ class GhostChecker(ast.NodeVisitor):
             res = self.is_ghost(expr.value)
         elif isinstance(expr, ast.Name):
             items = []
-            if expr.id in self.modules[1].ghost_names or expr.id in GHOST_BUILTINS:
+            if self.is_ghost_name(expr.id):
                 res = True
-            elif expr.id in self.modules[1].type_vars:
+            elif expr.id in self.current_module.type_vars:
                 res = False
             else:
-                obj = self.get_target(expr, self.ctx)
-                if obj is None:
-                    raise InvalidProgramException(expr, 'invalid.ghost.name', f"Couldn't correctly resolve name {expr.id}")
-                res = self.is_ghost(obj)
+                res = self.resolve_target_ghost(expr)
         elif isinstance(expr, (ast.List, ast.Tuple)):
             items = expr.elts
             res = any([self.is_ghost(e) for e in items])
@@ -921,6 +1320,18 @@ class GhostChecker(ast.NodeVisitor):
         expr.is_ghost = res
         self.set_contains_ghost(expr, res, *items)
         return res
+
+    def resolve_target_ghost(self, expr: Union[ast.Name, ast.Attribute]) -> bool:
+        """
+        Returns whether the given name or attribute refers to a ghost element.
+        Some elements (e.g. exception variables or builtins) are only resolved
+        during translation; for those we fall back to the static type of the
+        expression.
+        """
+        target = self.get_target(expr, self.ctx)
+        if target is not None:
+            return self.is_ghost(target)
+        return self.is_ghost_type(self.get_type(expr, self.ctx))
 
     def set_contains_ghost(self, node: ast.AST, is_node_ghost: bool, *sub_exprs: ast.AST) -> None:
         node.contains_ghost = is_node_ghost or any(

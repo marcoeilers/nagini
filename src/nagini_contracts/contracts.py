@@ -53,7 +53,14 @@ GComplex = complex
 GBool = bool
 GStr = str
 
-def MarkGhost(t: Type[T]) -> None:
+def MarkGhost(t: object) -> None:
+    """
+    Marks the given type alias as a ghost type, i.e. values of that type only
+    exist during verification. It's a no-op.
+
+    The argument must be a type alias, which Nagini checks itself; the parameter
+    is therefore not declared as a type.
+    """
     pass
 
 def Requires(expr: bool) -> bool:

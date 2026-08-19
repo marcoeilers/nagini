@@ -54,6 +54,7 @@ def memcmp_ct(l1: List[int], l2: List[int], i: int, n: int) -> int:
     else:
         return False
 
+@Ghost
 @Pure
 def abs_max_list(s: PSeq[int]) -> int:
     Requires(len(s) > 0)

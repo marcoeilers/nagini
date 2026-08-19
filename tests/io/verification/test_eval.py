@@ -60,7 +60,7 @@ def write_int(t1: Place, value: int) -> Place:
     )
 
 
-def use(t1: Place, a: A, b: A) -> Tuple[Place, int]:
+def use(t1: Place, a: A, b: A) -> Tuple[int, Place]:
     IOExists3(Place, Place, int)(
         lambda t2, t_post, result: (
             Requires(
@@ -70,8 +70,8 @@ def use(t1: Place, a: A, b: A) -> Tuple[Place, int]:
             ),
             Ensures(
                 token(t_post) and
-                t_post == Result()[0] and
-                result == Result()[1]
+                t_post == Result()[1] and
+                result == Result()[0]
             ),
         )
     )
@@ -80,10 +80,10 @@ def use(t1: Place, a: A, b: A) -> Tuple[Place, int]:
     assert r == getv(a)
     unlock_a(a)
     t = write_int(t, r)
-    return t, r
+    return r, t
 
 
-def use_ctoken(t1: Place, a: A, b: A) -> Tuple[Place, int]:
+def use_ctoken(t1: Place, a: A, b: A) -> Tuple[int, Place]:
     IOExists3(Place, Place, int)(
         lambda t2, t_post, result: (
             Requires(
@@ -93,8 +93,8 @@ def use_ctoken(t1: Place, a: A, b: A) -> Tuple[Place, int]:
             ),
             Ensures(
                 token(t_post) and
-                t_post == Result()[0] and
-                result == Result()[1]
+                t_post == Result()[1] and
+                result == Result()[0]
             ),
         )
     )
@@ -103,10 +103,10 @@ def use_ctoken(t1: Place, a: A, b: A) -> Tuple[Place, int]:
     assert r == getv(a)
     unlock_a(a)
     t = write_int(t, r)
-    return t, r
+    return r, t
 
 
-def wrong_func(t1: Place, a: A, b: A) -> Tuple[Place, int]:
+def wrong_func(t1: Place, a: A, b: A) -> Tuple[int, Place]:
     IOExists3(Place, Place, int)(
         lambda t2, t_post, result: (
             Requires(
@@ -116,8 +116,8 @@ def wrong_func(t1: Place, a: A, b: A) -> Tuple[Place, int]:
             ),
             Ensures(
                 token(t_post) and
-                t_post == Result()[0] and
-                result == Result()[1]
+                t_post == Result()[1] and
+                result == Result()[0]
             ),
         )
     )
@@ -126,10 +126,10 @@ def wrong_func(t1: Place, a: A, b: A) -> Tuple[Place, int]:
     r, t = Eval(t1, getv_2, a)
     unlock_a(a)
     t = write_int(t, r)
-    return t, r
+    return r, t
 
 
-def wrong_arg(t1: Place, a: A, b: A) -> Tuple[Place, int]:
+def wrong_arg(t1: Place, a: A, b: A) -> Tuple[int, Place]:
     IOExists3(Place, Place, int)(
         lambda t2, t_post, result: (
             Requires(
@@ -139,8 +139,8 @@ def wrong_arg(t1: Place, a: A, b: A) -> Tuple[Place, int]:
             ),
             Ensures(
                 token(t_post) and
-                t_post == Result()[0] and
-                result == Result()[1]
+                t_post == Result()[1] and
+                result == Result()[0]
             ),
         )
     )
@@ -149,10 +149,10 @@ def wrong_arg(t1: Place, a: A, b: A) -> Tuple[Place, int]:
     r, t = Eval(t1, getv, b)
     unlock_a(b)
     t = write_int(t, r)
-    return t, r
+    return r, t
 
 
-def no_token(t1: Place, a: A, b: A) -> Tuple[Place, int]:
+def no_token(t1: Place, a: A, b: A) -> Tuple[int, Place]:
     IOExists3(Place, Place, int)(
         lambda t2, t_post, result: (
             Requires(
@@ -161,8 +161,8 @@ def no_token(t1: Place, a: A, b: A) -> Tuple[Place, int]:
             ),
             Ensures(
                 token(t_post) and
-                t_post == Result()[0] and
-                result == Result()[1]
+                t_post == Result()[1] and
+                result == Result()[0]
             ),
         )
     )
@@ -171,7 +171,7 @@ def no_token(t1: Place, a: A, b: A) -> Tuple[Place, int]:
     r, t = Eval(t1, getv, a)
     unlock_a(a)
     t = write_int(t, r)
-    return t, r
+    return r, t
 
 
 def no_io_perm(t1: Place, a: A, b: A) -> None:
@@ -190,7 +190,7 @@ def no_io_perm(t1: Place, a: A, b: A) -> None:
     r, t = Eval(t1, getv, a)
 
 
-def no_func_perm(t1: Place, a: A, b: A) -> Tuple[Place, int]:
+def no_func_perm(t1: Place, a: A, b: A) -> Tuple[int, Place]:
     IOExists3(Place, Place, int)(
         lambda t2, t_post, result: (
             Requires(
@@ -201,11 +201,11 @@ def no_func_perm(t1: Place, a: A, b: A) -> Tuple[Place, int]:
             Ensures(
                 #:: ExpectedOutput(carbon)(postcondition.violated:insufficient.permission)
                 token(t_post) and
-                t_post == Result()[0] and
-                result == Result()[1]
+                t_post == Result()[1] and
+                result == Result()[0]
             ),
         )
     )
     #:: ExpectedOutput(application.precondition:insufficient.permission)
     r, t = Eval(t1, getv, a)
-    return t, r
+    return r, t

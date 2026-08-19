@@ -147,12 +147,6 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
     else:
         translator = Translator(jvm, path, types, viper_ast)
     analyzer.process(translator)
-    if not analyzer.enable_obligations and config.obligation_config.disable_all is None:
-        # only override the default, which is None; if the encoding is forced on or off, it'll be True or False
-        config.obligation_config.disable_all = True
-    if 'sil_programs' not in globals() or reload_resources:
-        global sil_programs
-        sil_programs = load_sil_files(jvm, bv_size, sif, float_encoding)
     modules = [main_module.global_module] + list(analyzer.modules.values())
     ghost_checker = GhostChecker(modules)
     ghost_ctx = Context()
@@ -160,6 +154,16 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
     ghost_ctx.current_function = None
     ghost_ctx.module = modules[1]
     ghost_checker.check(ghost_ctx)
+
+    # Ghost statements are translated into terminating sections, which are
+    # encoded using obligations.
+    needs_obligations = analyzer.enable_obligations or ghost_checker.has_ghost_statements
+    if not needs_obligations and config.obligation_config.disable_all is None:
+        # only override the default, which is None; if the encoding is forced on or off, it'll be True or False
+        config.obligation_config.disable_all = True
+    if 'sil_programs' not in globals() or reload_resources:
+        global sil_programs
+        sil_programs = load_sil_files(jvm, bv_size, sif, float_encoding)
 
     if extraction:
         program_extractor = ProgramExtractor(modules)
@@ -376,7 +380,7 @@ def main() -> None:
     )
     parser.add_argument(
         '--skip-verification',
-        help='Skip verification of the program (check types only).',
+        help='Only type check and translate the program, do not verify it.',
         action='store_true',
         default=False
     )
@@ -512,8 +516,8 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                     issue += e.args[0]
                 else:
                     issue += astunparse.unparse(e.node)
-            line = str(e.node.lineno)
-            col = str(e.node.col_offset)
+            line = str(getattr(e.node, 'lineno', '?'))
+            col = str(getattr(e.node, 'col_offset', '?'))
             print(issue + ' (' + python_file + '@' + line + '.' + col + ')')
         if isinstance(e, TypeException):
             for msg in e.messages:
