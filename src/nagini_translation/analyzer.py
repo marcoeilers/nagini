@@ -160,7 +160,15 @@ class Analyzer(ast.NodeVisitor):
             return
         with tokenize.open(abs_path) as file:
             text = file.read()
-        parse_result = ast.parse(text)
+        try:
+            # Type comments are needed to extract a program which still type
+            # checks; they are ignored everywhere else, since Nagini gets its
+            # type information from mypy.
+            parse_result = ast.parse(text, type_comments=True)
+        except SyntaxError:
+            # An invalid type comment must not prevent us from analyzing the
+            # program; mypy reports the problem anyway.
+            parse_result = ast.parse(text)
         try:
             mark_text_ranges(parse_result, text)
         except Exception:

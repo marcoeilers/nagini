@@ -34,7 +34,47 @@ class ProgramExtractor:
         new_body = self._extract_body(node.body)
         new_body = self._restore_needed_imports(node.body, new_body)
 
-        return ast.Module(new_body, []) #TODO: Handle TypeIgnores?
+        return self._restore_type_comments(ast.Module(new_body, []))
+
+    def _restore_type_comments(self, node: ast.Module) -> ast.Module:
+        """
+        Turns assignments with a type comment into annotated assignments, e.g.
+        'x = []  # type: List[int]' into 'x: List[int] = []'.
+
+        Comments are lost when the extracted program is unparsed, so the type
+        information would otherwise be missing from it.
+        """
+        # The extracted program shares nodes with the original one, which is
+        # still needed for the translation, so we must not modify them.
+        result = copy.deepcopy(node)
+        for parent in ast.walk(result):
+            for _, value in ast.iter_fields(parent):
+                if not isinstance(value, list):
+                    continue
+                for index, statement in enumerate(value):
+                    annotated = self._to_annotated_assign(statement)
+                    if annotated is not None:
+                        value[index] = annotated
+        return result
+
+    def _to_annotated_assign(self, node: ast.AST) -> Optional[ast.AnnAssign]:
+        """
+        Returns the annotated assignment corresponding to the given assignment
+        with a type comment, or None if there is no such correspondence.
+        """
+        if not (isinstance(node, ast.Assign) and node.type_comment and
+                len(node.targets) == 1):
+            return None
+        target = node.targets[0]
+        if not isinstance(target, (ast.Name, ast.Attribute)):
+            # Only a single target can carry an annotation.
+            return None
+        try:
+            annotation = ast.parse(node.type_comment, mode='eval').body
+        except SyntaxError:
+            return None
+        return ast.AnnAssign(target, annotation, node.value,
+                             1 if isinstance(target, ast.Name) else 0)
 
     def _restore_needed_imports(self, body: List[ast.stmt],
                                 new_body: List[ast.stmt]) -> List[ast.stmt]:
