@@ -37,10 +37,11 @@ Supported annotation types are:
 import abc
 import ast
 import astunparse
-import builtins
+import mypy.api
 import os
 import pytest
 import re
+import tempfile
 import tokenize
 from collections import Counter
 from typing import Any, Dict, List, Optional, Set
@@ -692,8 +693,8 @@ def test_translation(path, base, sif, reload_resources, arp, float_encoding):
 class ExtractionTest(AnnotatedTest):
     """Test that checks the Python program obtained by removing all ghost code.
 
-    The extracted program must be valid Python that neither refers to Nagini
-    nor to any of the removed ghost elements.
+    The extracted program must be a valid Python program which type checks and
+    which no longer refers to Nagini.
     """
 
     def test_file(self, path: str, base: str, jvm: jvmaccess.JVM):
@@ -704,58 +705,50 @@ class ExtractionTest(AnnotatedTest):
         path = os.path.abspath(path)
         base = os.path.abspath(base)
         modules, prog = translate(path, jvm, 8, base_dir=base)
-        extracted = ProgramExtractor(modules).process()
-        text = astunparse.unparse(extracted)
+        text = astunparse.unparse(ProgramExtractor(modules).process())
         try:
-            tree = ast.parse(text)
+            ast.parse(text)
         except SyntaxError as error:
             pytest.fail('Extracted program is not valid Python: {}\n{}'.format(
                 error, text))
         assert 'nagini_contracts' not in text, (
             'Extracted program still refers to Nagini:\n' + text)
-        undefined = _find_undefined_names(tree)
-        assert not undefined, (
-            'Extracted program refers to removed elements {}:\n{}'.format(
-                sorted(undefined), text))
+        errors = _type_check(text, path, base)
+        assert not errors, (
+            'Extracted program does not type check:\n{}\n{}'.format(errors, text))
 
 
-def _find_undefined_names(tree: ast.Module) -> Set[str]:
-    """Return the names a function body reads without them being defined.
+def _type_check(text: str, path: str, base: str) -> str:
+    """Type check the given program with mypy, and return the reported errors.
 
-    This catches the most likely extraction bug: keeping a statement that uses
-    a variable, argument or function which was removed because it was ghost.
+    Removing ghost code must not invalidate the program: this catches references
+    to removed elements as well as calls whose arguments no longer match.
+
+    We use the same options Nagini uses to check the original program, so that
+    only differences introduced by the extraction are reported. In particular,
+    unparsing the extracted program drops type comments, so we cannot ask mypy
+    to infer the types of empty collection literals.
     """
-    global_names = set(dir(builtins))
-
-    def collect_bindings(node: ast.AST, names: Set[str]) -> None:
-        for child in ast.walk(node):
-            if isinstance(child, ast.Name) and isinstance(child.ctx,
-                                                          (ast.Store, ast.Del)):
-                names.add(child.id)
-            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef,
-                                    ast.ClassDef)):
-                names.add(child.name)
-            elif isinstance(child, (ast.Import, ast.ImportFrom)):
-                for alias in child.names:
-                    names.add((alias.asname or alias.name).split('.')[0])
-            elif isinstance(child, ast.ExceptHandler) and child.name:
-                names.add(child.name)
-            elif isinstance(child, ast.arg):
-                names.add(child.arg)
-
-    collect_bindings(tree, global_names)
-    undefined = set()
-    for node in ast.walk(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        local_names = set()
-        collect_bindings(node, local_names)
-        known = global_names | local_names
-        for child in ast.walk(node):
-            if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Load) \
-                    and child.id not in known:
-                undefined.add(child.id)
-    return undefined
+    directory = os.path.dirname(path)
+    old_mypy_path = os.environ.get('MYPYPATH')
+    with tempfile.TemporaryDirectory() as cache_dir:
+        handle, file_name = tempfile.mkstemp(suffix='.py', prefix='extracted_',
+                                             dir=directory)
+        try:
+            with os.fdopen(handle, 'w') as file:
+                file.write(text)
+            os.environ['MYPYPATH'] = base
+            output, _, status = mypy.api.run(
+                [file_name, '--no-incremental', '--cache-dir', cache_dir,
+                 '--no-strict-optional', '--no-warn-no-return',
+                 '--allow-untyped-globals'])
+        finally:
+            os.remove(file_name)
+            if old_mypy_path is None:
+                os.environ.pop('MYPYPATH', None)
+            else:
+                os.environ['MYPYPATH'] = old_mypy_path
+    return output if status != 0 else ''
 
 
 _EXTRACTION_TESTER = ExtractionTest()
