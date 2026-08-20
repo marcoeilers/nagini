@@ -1146,9 +1146,15 @@ class Analyzer(ast.NodeVisitor):
                     (node.args, self._aliases.copy()))
             elif node.func.id == 'Exsures':
                 exception = self.get_target(node.args[0], self.module)
+                if exception is None and isinstance(node.args[0], ast.Name):
+                    builtin_val = getattr(builtins, node.args[0].id, None)
+                    if (isinstance(builtin_val, type)
+                            and issubclass(builtin_val, Exception)):
+                        # Builtin exception: create it under the modeled
+                        # Exception, like except-handler analysis does.
+                        exception = self.find_or_create_class(node.args[0].id)
                 if exception is None:
-                    # An unresolvable exception type (e.g. a builtin like
-                    # ValueError, which Nagini does not model).
+                    # Unresolvable (a BaseException-only builtin, or a typo).
                     raise InvalidProgramException(
                         node, 'invalid.program',
                         message='Exsures names an exception type Nagini '
@@ -1826,6 +1832,17 @@ class Analyzer(ast.NodeVisitor):
         try_block.finally_name = finally_name
         self.stmt_container.labels.append(finally_name)
         self.stmt_container.try_blocks.append(try_block)
+
+    def visit_Raise(self, node: ast.Raise) -> None:
+        # Raising a builtin exception must create its class in the modeled
+        # hierarchy, like except-handler analysis does.
+        target = node.exc.func if isinstance(node.exc, ast.Call) else node.exc
+        if isinstance(target, ast.Name):
+            builtin_val = getattr(builtins, target.id, None)
+            if (isinstance(builtin_val, type)
+                    and issubclass(builtin_val, Exception)):
+                self.find_or_create_class(target.id)
+        self.visit_default(node)
 
     def visit_Try(self, node: ast.Try) -> None:
         """

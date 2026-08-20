@@ -1272,10 +1272,11 @@ class CallTranslator(CommonTranslator):
                 if (isinstance(builtin_target, type) and
                         issubclass(builtin_target, BaseException)):
                     raise UnsupportedException(
-                        node, 'constructors of builtin exception types '
-                              '({}) are not modeled. Define a module-level '
-                              'subclass of Exception and raise '
-                              'that instead.'.format(node.func.id))
+                        node, 'builtin exceptions ({}) can only be '
+                              'constructed in a raise statement, Exsures, or '
+                              'except clause. Raise it directly, or define a '
+                              'module-level subclass of Exception '
+                              'instead.'.format(node.func.id))
             if func_name == 'pow' and len(node.args) == 3:
                 raise UnsupportedException(
                     node, 'the 3-argument form of pow() is not modeled; '
