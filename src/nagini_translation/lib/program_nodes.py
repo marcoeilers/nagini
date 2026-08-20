@@ -166,6 +166,7 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
         self.file = file
         self.defined_var = None
         self.names_var = None
+        self.ghost_names = types.ghost_names[type_prefix] if type_prefix in types.ghost_names else set()
         if global_module and type_prefix != '__main__':
             self.add_builtin_vars()
 
@@ -423,6 +424,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self.is_adt = name == 'ADT' # This flag is set when the class is
         # defining an algebraic data type or one of its constructors.
         # This flag is set transitively across subclasses.
+        self.is_ghost = False # infer
 
     def get_bound_type_vars(self) -> Dict['TypeVar', 'PythonType']:
         if self.superclass:
@@ -1099,6 +1101,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.definition_deps = set()
         self.call_deps = set()
         self.decreases_clauses = []
+        self.is_ghost = False # infer
 
     def add_all_call_deps(self, res: Set[Tuple[ast.AST, PythonNode, PythonModule]],
                           prefix: Tuple[PythonNode, ...]=()) -> None:
@@ -1603,6 +1606,7 @@ class PythonVarBase(PythonNode):
         self.default_expr = None
         self.default_factory = None
         self.show_in_ce = True
+        self.is_ghost = False # infer
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -1704,6 +1708,7 @@ class PythonIOExistentialVar(PythonVarBase):
         super().__init__(name, node, type)
         self._ref = None
         self._old_ref = None
+        self.is_ghost = True
 
     def is_defined(self) -> bool:
         """
@@ -1835,6 +1840,7 @@ class PythonField(PythonNode):
         self._sil_field = None
         self.reads = []  # direct
         self.writes = []  # direct
+        self.is_ghost = False # infer
 
     @property
     def sil_field(self) -> 'silver.ast.Field':

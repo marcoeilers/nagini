@@ -16,7 +16,7 @@ from nagini_translation.mypy_patches.visitor import TraverserVisitor
 from nagini_translation.lib.util import (
     construct_lambda_prefix,
 )
-from typing import List, Optional
+from typing import List, Optional, Union
 
 
 logger = logging.getLogger('nagini_translation.lib.typeinfo')
@@ -41,6 +41,7 @@ class TypeVisitor(TraverserVisitor):
         self.prefix = []
         self.all_types = {}
         self.alt_types = {}
+        self.ghost_names = {}
         self.type_map = type_map
         self.path = path
         self.ignored_lines = ignored_lines
@@ -215,6 +216,22 @@ class TypeVisitor(TraverserVisitor):
             return
         if isinstance(node.callee, mypy.nodes.NameExpr) and node.callee.name == 'ResultT':
             return
+        if isinstance(node.callee, mypy.nodes.NameExpr) and node.callee.name == 'MarkGhost':
+            # Verify MarkGhost call and collect ghost names
+            if len(node.args) != 1:
+                msg = self.path + ':' + str(node.line) + ': error: MarkGhost may only define one ghost name at a time.'
+                raise TypeException([msg])
+            ghost_type = node.args[0]
+            if not isinstance(ghost_type.node, mypy.nodes.TypeAlias):
+                msg = self.path + ':' + str(node.line) + ': error: MarkGhost takes only Type aliases.'
+                raise TypeException([msg])
+            if not self.path in self.ghost_names:
+                self.ghost_names[self.path] = set()
+            curr_set = self.ghost_names[self.path]
+            if ghost_type.name in curr_set:
+                msg = self.path + ':' + str(node.line) + ': error: MarkGhost may only define ghost names once.'
+                raise TypeException([msg])
+            curr_set.add(ghost_type.name)
         for a in node.args:
             self.visit(a)
         self.visit(node.callee)
@@ -278,6 +295,7 @@ class TypeInfo:
         self.files = {}
         self.type_aliases = {}
         self.type_vars = {}
+        self.ghost_names = {}
         self.module_name = None
 
     def _create_options(self, strict_optional: bool):
@@ -326,6 +344,7 @@ class TypeInfo:
                     relpath = relpath[:-4]
                 module_name = relpath
         self.module_name = module_name
+        old_find_cache_meta = mypy.build.find_cache_meta
         try:
             options_strict = self._create_options(True)
 
@@ -335,7 +354,6 @@ class TypeInfo:
             # So: We monkey-patch the function that tries to find cached type information for the given file s.t.
             # it returns None (= no cached info to use) for all files transitively imported from __main__, ignoring
             # modules in IGNORED_IMPORTS and everything imported solely by those.
-            old_find_cache_meta = mypy.build.find_cache_meta
             directly_imported = set()
             imports_not_handled = set()
             def my_find_cache_meta(id, path, mgr):
@@ -405,9 +423,15 @@ class TypeInfo:
                 self.alt_types.update(visitor.alt_types)
                 self.type_aliases.update(visitor.type_aliases)
                 self.type_vars.update(visitor.type_vars)
+                self.ghost_names.update(visitor.ghost_names)
             return True
         except mypy.errors.CompileError as e:
             report_errors(e.messages)
+        finally:
+            # Undo the patch: otherwise every call would wrap the function
+            # installed by the previous one, and looking up a single cache entry
+            # would recurse through all of them.
+            mypy.build.find_cache_meta = old_find_cache_meta
 
     def get_type_prefix(self, name: str) -> str:
         name = os.path.abspath(name)

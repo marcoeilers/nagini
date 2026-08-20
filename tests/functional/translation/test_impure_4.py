@@ -15,8 +15,8 @@ class A:
 
 
 def m(a: A) -> int:
-    #:: ExpectedOutput(invalid.program:invalid.contract.position)
     if (True and a.p()):
+        #:: ExpectedOutput(invalid.program:invalid.ghost.return)
         return 4
     else:
         return 6

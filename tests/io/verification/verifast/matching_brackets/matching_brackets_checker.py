@@ -66,7 +66,7 @@ class Matcher:
         Ensures(Acc(self.c))
         self.c = None   # type: Optional[str]
 
-    def pop_read_ahead(self, t1: Place) -> Tuple[Place, Optional[str]]:
+    def pop_read_ahead(self, t1: Place) -> Tuple[Optional[str], Place]:
         IOExists3(str, bool, Place)(
             lambda new_char, success, t2: (
                 Requires(
@@ -77,15 +77,15 @@ class Matcher:
                 Ensures(
                     Acc(self.c) and
                     self.c is new_char and
-                    Old(self.c) is Result()[1] and
+                    Old(self.c) is Result()[0] and
                     token(t2) and
-                    t2 == Result()[0]
+                    t2 == Result()[1]
                 )
             )
         )
         c_copy = self.c
-        self.c, success, t2 = getchar(t1)
-        return (t2, c_copy)
+        (self.c, success), t2 = getchar(t1)
+        return (c_copy, t2)
 
     def peek_read_ahead(self) -> Optional[str]:
         Requires(Acc(self.c, 1/2))
@@ -93,7 +93,7 @@ class Matcher:
         Ensures(Acc(self.c, 1/2) and Result() is self.c)
         return self.c
 
-    def brackets(self, t_read1: Place) -> Tuple[Place, bool]:
+    def brackets(self, t_read1: Place) -> Tuple[bool, Place]:
         IOExists3(str, bool, Place)(
             lambda read5, valid, t_read5: (
                 Requires(
@@ -105,29 +105,29 @@ class Matcher:
                     Acc(self.c) and
                     self.c is read5 and
                     token(t_read5) and
-                    t_read5 == Result()[0] and
-                    valid == Result()[1]
+                    t_read5 == Result()[1] and
+                    valid == Result()[0]
                 ),
             )
         )
 
         Open(brackets_io(t_read1, self.c))
         if self.peek_read_ahead() is '(':
-            t_read2, _ = self.pop_read_ahead(t_read1)
-            t_read3, brackets1 = self.brackets(t_read2)
-            t_read4, c = self.pop_read_ahead(t_read3)
+            _, t_read2 = self.pop_read_ahead(t_read1)
+            brackets1, t_read3 = self.brackets(t_read2)
+            c, t_read4 = self.pop_read_ahead(t_read3)
             should_be_close = (c is ')')
-            t_read5, brackets2 = self.brackets(t_read4)
-            return t_read5, (brackets1 and should_be_close and brackets2)
+            brackets2, t_read5 = self.brackets(t_read4)
+            return (brackets1 and should_be_close and brackets2), t_read5
         else:
             i = self.peek_read_ahead()
             t_read2 = NoOp(t_read1)
             if i is None:
-                return t_read2, True    # Empty string because of read EOF.
+                return True, t_read2    # Empty string because of read EOF.
             elif self.peek_read_ahead() is ')':
-                return t_read2, True    # Match empty string because read ')'.
+                return True, t_read2    # Match empty string because read ')'.
             else:
-                return t_read2, False   # No match because read invalid
+                return False, t_read2   # No match because read invalid
                                         # character.
 
 
@@ -150,8 +150,8 @@ def main(t1: Place) -> Place:
     )
 
     m = Matcher()
-    m.c, success, t2 = getchar(t1)
-    t3, match = m.brackets(t2)
+    (m.c, success), t2 = getchar(t1)
+    match, t3 = m.brackets(t2)
     if match:
         success, t4 = putchar('1', t3)
     else:

@@ -13,9 +13,10 @@ import nagini_contracts.lock
 import tokenize
 
 from collections import OrderedDict
-from nagini_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
+from nagini_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS, GHOST_BUILTINS
 from nagini_contracts.io_contracts import (
     BUILTIN_IO_OPERATIONS,
+    GHOST_IO_TYPES,
     IO_CONTRACT_FUNCS,
     IO_OPERATION_PROPERTY_FUNCS
 )
@@ -72,6 +73,9 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 
 logger = logging.getLogger('nagini_translation.analyzer')
+
+# Names of types which only exist during verification, i.e. which are ghost.
+ALL_GHOST_TYPE_NAMES = GHOST_BUILTINS + GHOST_IO_TYPES
 
 
 class Analyzer(ast.NodeVisitor):
@@ -157,7 +161,15 @@ class Analyzer(ast.NodeVisitor):
             return
         with tokenize.open(abs_path) as file:
             text = file.read()
-        parse_result = ast.parse(text)
+        try:
+            # Type comments are needed to extract a program which still type
+            # checks; they are ignored everywhere else, since Nagini gets its
+            # type information from mypy.
+            parse_result = ast.parse(text, type_comments=True)
+        except SyntaxError:
+            # An invalid type comment must not prevent us from analyzing the
+            # program; mypy reports the problem anyway.
+            parse_result = ast.parse(text)
         try:
             mark_text_ranges(parse_result, text)
         except Exception:
@@ -307,6 +319,9 @@ class Analyzer(ast.NodeVisitor):
                     if_cls['extends'], module=self.module.global_module)
                 cls.superclass = superclass
                 superclass.direct_subclasses.append(cls)
+            if 'ghost_alias' in if_cls:
+                alias_name = if_cls['ghost_alias']
+                cls.module.classes[alias_name] = cls
 
         for method_name in if_cls.get('methods', []):
             if_method = if_cls['methods'][method_name]
@@ -352,6 +367,75 @@ class Analyzer(ast.NodeVisitor):
             cont.functions[method_name] = method
         else:
             cont.methods[method_name] = method
+
+    def defines_ghost(self, node: Union[ast.ClassDef, ast.FunctionDef, 
+                                        ast.arg, ast.AnnAssign, ast.Assign]) -> bool:
+        """
+        Returns whether the given node defines a ghost element.
+        """
+        in_ghost_class = self.current_class is not None and self.current_class.is_ghost
+        in_ghost_func = self.current_function is not None and self.current_function.is_ghost
+
+        if isinstance(node, ast.ClassDef):
+            decorators = {d.id for d in node.decorator_list if isinstance(d, ast.Name)}
+            return "Ghost" in decorators or 'Predicate' in decorators
+        elif isinstance(node, ast.FunctionDef):
+            decorators = {d.id for d in node.decorator_list if isinstance(d, ast.Name)}
+            return in_ghost_class or "Ghost" in decorators or 'Predicate' in decorators
+        elif isinstance(node, (ast.arg, ast.AnnAssign)):
+            ann_as_ghost = self.is_ghost_annotation(node.annotation)
+            return in_ghost_class or in_ghost_func or ann_as_ghost
+        else: # 
+            assert isinstance(node, ast.Assign), f"Unexpected type of {type(node)}"
+            return in_ghost_class or in_ghost_func
+   
+    def is_ghost_annotation(self, ann: Optional[ast.expr]) -> bool:
+        """
+        Returns whether the given type annotation denotes a ghost type. The
+        soundness of the annotation itself is checked later by the GhostChecker,
+        so for composite annotations we just look at the first relevant part.
+        """
+        if isinstance(ann, ast.Constant):
+            if isinstance(ann.value, str):
+                # A forward reference.
+                return self.is_ghost_type_name(ann.value)
+            else:
+                # assume None
+                return False
+        elif isinstance(ann, ast.Name):
+            return self.is_ghost_type_name(ann.id)
+        elif isinstance(ann, ast.Attribute):
+            # A type defined in another module, e.g. mod.GhostAlias.
+            module = self.get_namespace(ann.value)
+            return module is not None and ann.attr in module.ghost_names
+        elif isinstance(ann, ast.Subscript):
+            if self.is_ghost_annotation(ann.value):
+                # Nagini Generic, e.g. PSeq
+                return True
+            if isinstance(ann.slice, (ast.Name, ast.Constant, ast.Attribute, ast.Subscript)):
+                return self.is_ghost_annotation(ann.slice)
+            elif isinstance(ann.slice, (ast.Tuple, ast.List)) and ann.slice.elts:
+                sub_ann = ann.slice.elts[0]
+                if isinstance(sub_ann, ast.Constant) and sub_ann.value is None \
+                        and len(ann.slice.elts) > 1:
+                    sub_ann = ann.slice.elts[1]
+                return self.is_ghost_annotation(sub_ann)
+        return False
+
+    def is_ghost_type_name(self, name: str) -> bool:
+        return name in self.module.ghost_names or name in ALL_GHOST_TYPE_NAMES
+
+    def get_namespace(self, node: ast.expr) -> Optional[PythonModule]:
+        """
+        Resolves the given expression to a module imported into the current one,
+        or returns None if it does not refer to such a module.
+        """
+        if isinstance(node, ast.Name):
+            return self.module.namespaces.get(node.id)
+        if isinstance(node, ast.Attribute):
+            outer = self.get_namespace(node.value)
+            return outer.namespaces.get(node.attr) if outer is not None else None
+        return None
 
     def visit_module(self, module: PythonModule) -> None:
         self.visit(module.node, None)
@@ -546,6 +630,7 @@ class Analyzer(ast.NodeVisitor):
         cls = self.find_or_create_class(name)
         cls.defined = True
         cls.node = node
+        cls.is_ghost = self.defines_ghost(node)
         self.current_class = cls
         actual_bases = []
         current_index = 0
@@ -678,21 +763,26 @@ class Analyzer(ast.NodeVisitor):
                 return True
         return False
 
+    def find_module(self, module_name: str) -> Optional[PythonModule]:
+        """
+        Returns the analyzed module with the given (fully qualified) name.
+        """
+        main_module = None
+        for mod in self.modules.values():
+            if mod.type_prefix == module_name:
+                return mod
+            if mod.type_prefix == '__main__':
+                main_module = mod
+        # The type prefix of the main module is __main__, therefore isn't found.
+        return main_module
+
     def analyze_import(self, module_name: str) -> None:
         """
         Visits the given module if it hasn't already been visited.
         """
         if module_name in IGNORED_IMPORTS:
             return
-        for mod in self.modules.values():
-            if mod.type_prefix == module_name:
-                module = mod
-                break
-            if mod.type_prefix == '__main__':
-                main_module = mod
-        else:
-            # type prefix of the main module is __main__, therefore isn't found.
-            module = main_module
+        module = self.find_module(module_name)
 
         if module in self.visited_modules:
             return
@@ -711,6 +801,19 @@ class Analyzer(ast.NodeVisitor):
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
         module_name = self.module.get_relative_import_name(node.module, node.level)
+
+        if module_name in IGNORED_IMPORTS:
+            return
+        imp_mod = self.find_module(module_name)
+        if imp_mod is not None:
+            # Capture imported ghost names
+            for name in node.names:
+                if name.name == '*':
+                    self.module.ghost_names.update(imp_mod.ghost_names)
+                elif name.name in imp_mod.ghost_names:
+                    new_ghost_name = name.asname if name.asname is not None else name.name
+                    self.module.ghost_names.add(new_ghost_name)
+
         self.analyze_import(module_name)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
@@ -748,6 +851,7 @@ class Analyzer(ast.NodeVisitor):
             func.opaque = self.is_opaque(node)
             func.node = node
             func.superscope = scope_container
+            func.is_ghost = self.defines_ghost(node)
         else:
             pure = is_property_getter or self.is_pure(node)
             opaque = self.is_opaque(node)
@@ -758,6 +862,7 @@ class Analyzer(ast.NodeVisitor):
             func = self.node_factory.create_python_method(
                 name, node, self.current_class, scope_container, pure,
                 contract_only, self.node_factory, opaque=opaque)
+            func.is_ghost = self.defines_ghost(node)
             if is_property_setter:
                 container[name].setter = func
             else:
@@ -911,6 +1016,10 @@ class Analyzer(ast.NodeVisitor):
                 raise InvalidProgramException(node, 'local.typevar')
         else:
             self.visit_default(node)
+            # Handle ghost assignment
+            if self.defines_ghost(node):
+                for target in node.targets:
+                    self.set_ghost_if_var(target)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
         is_alias = False
@@ -929,6 +1038,33 @@ class Analyzer(ast.NodeVisitor):
                 raise InvalidProgramException(node, 'local.typevar')
         else:
             self.visit_default(node)
+            # Handle ghost assignment
+            if self.defines_ghost(node):
+                self.set_ghost_if_var(node.target)
+
+    def set_ghost_if_var(self, target: ast.expr) -> None:
+        """
+        Marks the local variables assigned to by the given target as ghost.
+        """
+        if isinstance(target, (ast.Tuple, ast.List)):
+            for element in target.elts:
+                self.set_ghost_if_var(element)
+        elif isinstance(target, ast.Starred):
+            self.set_ghost_if_var(target.value)
+        elif isinstance(target, ast.Name):
+            if self.current_function is not None:
+                var = self.current_function.locals.get(target.id)
+            elif self.current_class is not None:
+                var = self.current_class.static_fields.get(target.id)
+            else:
+                var = self.module.global_vars.get(target.id)
+            if var is not None:
+                var.is_ghost = True
+        elif isinstance(target, ast.Attribute):
+            container = self.current_function if self.current_function else self.module
+            field = self.get_target(target, container)
+            if isinstance(field, (PythonField, PythonGlobalVar)):
+                field.is_ghost = True
 
     def visit_arguments(self, node: ast.arguments) -> None:
         assert self.current_function is not None
@@ -949,12 +1085,14 @@ class Analyzer(ast.NodeVisitor):
             annotated_type.exact_length = False
             var_arg = self.node_factory.create_python_var(arg.arg, arg,
                                                           annotated_type)
+            var_arg.is_ghost = self.defines_ghost(arg)
             self.current_function.var_arg = var_arg
         if node.kwarg:
             arg = node.kwarg
             annotated_type = self.typeof(arg)
             kw_arg = self.node_factory.create_python_var(arg.arg, arg,
                                                          annotated_type)
+            kw_arg.is_ghost = self.defines_ghost(arg)
             self.current_function.kw_arg = kw_arg
 
     def visit_ListComp(self, node: ast.Lambda) -> None:
@@ -963,6 +1101,7 @@ class Analyzer(ast.NodeVisitor):
         local_name = name + '$' + target.id
         var = self.node_factory.create_python_var(
             target.id, target, self.typeof(target))
+        # We do not infer var.is_ghost as it does not matter
         self.current_function.special_vars[local_name] = var
         self.visit_but_ignore(node, node._parent)
         return
@@ -993,6 +1132,7 @@ class Analyzer(ast.NodeVisitor):
             else:
                 var = self.node_factory.create_python_var(
                     arg.arg, arg, self.typeof(arg))
+            var.is_ghost = True
             alts = self.get_alt_types(node)
             var.alt_types = alts
             local_name = name + '$' + arg.arg
@@ -1013,6 +1153,7 @@ class Analyzer(ast.NodeVisitor):
             self.node_factory.create_python_var(node.arg, node, node_type)
         # If we just introduced new type variables, create the expression that
         # represents their value.
+        self.current_function.args[node.arg].is_ghost = self.defines_ghost(node)
         for type_var in self.current_function.type_vars.values():
             if type_var.type_expr:
                 continue
@@ -1809,6 +1950,9 @@ class Analyzer(ast.NodeVisitor):
         self.visit_default(node)
 
     def _class_incompatible_decorators(self, decorators: set[str]) -> bool:
+        # Ghost only marks the class as existing for verification purposes, so it
+        # can be combined with any other class decorator.
+        decorators = decorators - {'Ghost'}
         return ((('dataclass' in decorators) and (len(decorators) != 1)) or
                 (('dataclass' not in decorators) and (len(decorators) > 0))
                 )

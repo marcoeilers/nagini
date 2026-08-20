@@ -80,12 +80,16 @@ class A:
 
 def test_calls(input: int, a: A) -> None:
     Requires(input > 0)
-    Assert(a.foo() == 1)
+    foo_result = a.foo()
+    Assert(foo_result == 1)
 
-    Assert(power3_A(input) == power3_B(input))
+    power_a = power3_A(input)
+    power_b = power3_B(input)
+    Assert(power_a == power_b)
 
+    bar_result = a.bar()
     #:: ExpectedOutput(assert.failed:assertion.false)
-    Assert(a.bar() == 1)
+    Assert(bar_result == 1)
 
 @Inline
 def plus_two(i: int) -> int:
@@ -99,9 +103,11 @@ def plus_seven(i: int) -> int:
     return b + 3
 
 def nested_caller() -> None:
-    Assert(plus_seven(9) == 16)
+    nine = plus_seven(9)
+    Assert(nine == 16)
+    five = plus_seven(5)
     #:: ExpectedOutput(assert.failed:assertion.false)
-    Assert(plus_seven(5) == 13)
+    Assert(five == 13)
 
 @Inline
 def raises(a: int) -> None:

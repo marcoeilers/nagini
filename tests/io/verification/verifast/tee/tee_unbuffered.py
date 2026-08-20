@@ -76,7 +76,7 @@ def main(t1: Place) -> Place:
             else token(t_loop) and no_op_io(t_loop, t2)
         )
         Open(tee_io(t_loop))
-        c, success, t_loop = getchar(t_loop)
+        (c, success), t_loop = getchar(t_loop)
         if success:
             t_loop = tee_out(t_loop, c)
     return NoOp(t_loop)

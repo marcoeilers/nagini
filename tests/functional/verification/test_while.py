@@ -2,6 +2,7 @@
 # http://creativecommons.org/publicdomain/zero/1.0/
 
 from nagini_contracts.contracts import *
+from typing import Tuple
 
 
 def method_with_loop() -> int:
@@ -101,3 +102,34 @@ def nested_loop_fail(arg: int) -> int:
         i += toadd
         j -= 1
     return i + 198
+
+
+def pair() -> Tuple[Tuple[int, bool], int]:
+    Ensures(Result()[0][0] == 3 and Result()[0][1] and Result()[1] == 4)
+    return (3, True), 4
+
+
+def loop_with_nested_target() -> int:
+    Ensures(Result() == 3)
+    i = 0
+    ok = True
+    while i < 3:
+        Invariant(0 <= i and i <= 3)
+        Invariant(ok)
+        # Variables assigned through a nested target have to stay defined.
+        (n, ok), m = pair()
+        Assert(n == 3 and m == 4)
+        i += 1
+    return i
+
+
+def loop_with_nested_target_havoc() -> None:
+    n = 7
+    i = 0
+    while i < 3:
+        Invariant(0 <= i and i <= 3)
+        # Variables assigned through a nested target have to be havocked.
+        (n, ok), m = pair()
+        i += 1
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    Assert(n == 7)

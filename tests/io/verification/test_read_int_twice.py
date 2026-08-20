@@ -53,7 +53,7 @@ def write_int_twice_io(
     )
 
 
-def read_int_twice1(t1: Place) -> Tuple[Place, int, int]:
+def read_int_twice1(t1: Place) -> Tuple[Tuple[int, int], Place]:
     IOExists3(Place, int, int)(
         lambda t2, value1, value2: (
         Requires(
@@ -62,22 +62,22 @@ def read_int_twice1(t1: Place) -> Tuple[Place, int, int]:
         ),
         Ensures(
             token(t2) and
-            t2 == Result()[0] and
-            value1 == Result()[1] and
-            value2 == Result()[2]
+            t2 == Result()[1] and
+            value1 == Result()[0][0] and
+            value2 == Result()[0][1]
         ),
         )
     )
 
     Open(read_int_twice_io(t1))
 
-    t2, number1 = read_int(t1)
-    t3, number2 = read_int(t2)
+    number1, t2 = read_int(t1)
+    number2, t3 = read_int(t2)
 
-    return t3, number1, number2
+    return (number1, number2), t3
 
 
-def read_int_twice2(t1: Place) -> Tuple[Place, int, int]:
+def read_int_twice2(t1: Place) -> Tuple[Tuple[int, int], Place]:
     IOExists3(Place, int, int)(
         lambda t2, value1, value2: (
         Requires(
@@ -87,22 +87,22 @@ def read_int_twice2(t1: Place) -> Tuple[Place, int, int]:
         Ensures(
             #:: ExpectedOutput(postcondition.violated:assertion.false)
             token(t2) and
-            t2 == Result()[0] and
-            value1 == Result()[1] and
-            value2 == Result()[2]
+            t2 == Result()[1] and
+            value1 == Result()[0][0] and
+            value2 == Result()[0][1]
         ),
         )
     )
 
     Open(read_int_twice_io(t1))
 
-    t2, number1 = read_int(t1)
-    t3, number2 = read_int(t2)
+    number1, t2 = read_int(t1)
+    number2, t3 = read_int(t2)
 
-    return t3, number2, number1
+    return (number2, number1), t3
 
 
-def read_int_twice3(t1: Place) -> Tuple[Place, int, int]:
+def read_int_twice3(t1: Place) -> Tuple[Tuple[int, int], Place]:
     IOExists3(Place, int, int)(
         lambda t2, value1, value2: (
         Requires(
@@ -111,22 +111,22 @@ def read_int_twice3(t1: Place) -> Tuple[Place, int, int]:
         ),
         Ensures(
             token(t2) and
-            t2 == Result()[0] and
-            value1 == Result()[1] and
-            value2 == Result()[2]
+            t2 == Result()[1] and
+            value1 == Result()[0][0] and
+            value2 == Result()[0][1]
         ),
         )
     )
 
     Open(read_int_twice_io(t1))
 
-    t2, number2 = read_int(t1)
-    t3, number1 = read_int(t2)
+    number2, t2 = read_int(t1)
+    number1, t3 = read_int(t2)
 
-    return t3, number2, number1
+    return (number2, number1), t3
 
 
-def read_int_twice4(t1: Place) -> Tuple[Place, int, int]:
+def read_int_twice4(t1: Place) -> Tuple[Tuple[int, int], Place]:
     IOExists3(Place, int, int)(
         lambda t2, value1, value2: (
         Requires(
@@ -135,19 +135,19 @@ def read_int_twice4(t1: Place) -> Tuple[Place, int, int]:
         ),
         Ensures(
             token(t2) and
-            t2 == Result()[0] and
-            value1 == Result()[1] and
-            value2 == Result()[2]
+            t2 == Result()[1] and
+            value1 == Result()[0][0] and
+            value2 == Result()[0][1]
         ),
         )
     )
 
     Open(read_int_twice_io(t1))
 
-    t2, value1 = read_int(t1)
-    t3, value2 = read_int(t2)
+    value1, t2 = read_int(t1)
+    value2, t3 = read_int(t2)
 
-    return t3, value1, value2
+    return (value1, value2), t3
 
 
 # Read and write.
@@ -170,8 +170,8 @@ def read_write_int_twice1(t1: Place) -> Place:
 
     Open(read_int_twice_io(t1))
 
-    t2, number1 = read_int(t1)
-    t3, number2 = read_int(t2)
+    number1, t2 = read_int(t1)
+    number2, t3 = read_int(t2)
 
     Open(write_int_twice_io(t3, number1, number2))
 
@@ -198,8 +198,8 @@ def read_write_int_twice2(t1: Place) -> Place:
 
     Open(read_int_twice_io(t1))
 
-    t2, number1 = read_int(t1)
-    t3, number2 = read_int(t2)
+    number1, t2 = read_int(t1)
+    number2, t3 = read_int(t2)
 
     #:: ExpectedOutput(exhale.failed:insufficient.permission)
     Open(write_int_twice_io(t3, number2, number1))
@@ -227,8 +227,8 @@ def read_write_int_twice3(t1: Place) -> Place:
 
     Open(read_int_twice_io(t1))
 
-    t2, number1 = read_int(t1)
-    t3, number2 = read_int(t2)
+    number1, t2 = read_int(t1)
+    number2, t3 = read_int(t2)
 
     #:: ExpectedOutput(call.precondition:insufficient.permission)
     t4 = write_int(t3, number1)
@@ -254,8 +254,8 @@ def read_write_int_twice4(t1: Place) -> Place:
 
     Open(read_int_twice_io(t1))
 
-    t2, number1 = read_int(t1)
-    t3, number2 = read_int(t2)
+    number1, t2 = read_int(t1)
+    number2, t3 = read_int(t2)
 
     Open(write_int_twice_io(t3, number1, number2))
 

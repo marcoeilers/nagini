@@ -102,7 +102,7 @@ def test_list_ref() -> None:
 
     l.append(4)
     assert len(f.arr) == 4
-    assert ToSeq(f.arr) == PSeq(1,2,3,4)
+    Assert(ToSeq(f.arr) == PSeq(1,2,3,4))
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert f.arr[0] == 5
 
@@ -111,7 +111,7 @@ def test_list_conditions(l: list[int]) -> None:
     Requires(Forall(l, lambda i: 0 <= i and i < 10))
 
     f = ListClass(l)
-    assert Forall(f.arr, lambda i: 0 <= i and i < 10)
+    Assert(Forall(f.arr, lambda i: 0 <= i and i < 10))
 
 def test_list_eq(left: ListClass, right: ListClass) -> None:
     Requires(list_pred(left.arr))

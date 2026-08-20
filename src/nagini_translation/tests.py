@@ -35,9 +35,12 @@ Supported annotation types are:
 
 
 import abc
+import ast
+import mypy.api
 import os
 import pytest
 import re
+import tempfile
 import tokenize
 from collections import Counter
 from typing import Any, Dict, List, Optional, Set
@@ -47,6 +50,7 @@ from nagini_translation.lib import config, jvmaccess
 from nagini_translation.lib.errors import error_manager
 from nagini_translation.lib.typeinfo import TypeException
 from nagini_translation.lib.util import InvalidProgramException, UnsupportedException
+from nagini_translation.ghost.extraction import ProgramExtractor
 from nagini_translation.main import translate, verify, TYPE_ERROR_PATTERN
 from nagini_translation.verifier import VerificationResult, ViperVerifier
 
@@ -156,7 +160,7 @@ class InvalidProgramError(Error):
 
     @property
     def line(self) -> int:
-        return self._exception.node.lineno
+        return getattr(self._exception.node, 'lineno', -1)
 
     def get_vias(self) -> List[int]:
         return []
@@ -178,7 +182,7 @@ class UnsupportedError(Error):
 
     @property
     def line(self) -> int:
-        return self._exception.node.lineno
+        return getattr(self._exception.node, 'lineno', -1)
 
     def get_vias(self) -> List[int]:
         return []
@@ -683,3 +687,72 @@ _TRANSLATION_TESTER = TranslationTest()
 def test_translation(path, base, sif, reload_resources, arp, float_encoding):
     """Execute provided translation test."""
     _TRANSLATION_TESTER.test_file(path, base, _JVM, sif, reload_resources, arp, float_encoding)
+
+
+class ExtractionTest(AnnotatedTest):
+    """Test that checks the Python program obtained by removing all ghost code.
+
+    The extracted program must be a valid Python program which type checks and
+    which no longer refers to Nagini.
+    """
+
+    def test_file(self, path: str, base: str, jvm: jvmaccess.JVM):
+        """Test specific Python file."""
+        annotation_manager = self.get_annotation_manager(path, _BACKEND_ANY)
+        if annotation_manager.ignore_file():
+            pytest.skip('Ignored')
+        path = os.path.abspath(path)
+        base = os.path.abspath(base)
+        modules, prog = translate(path, jvm, 8, base_dir=base)
+        text = ast.unparse(ProgramExtractor(modules).process())
+        try:
+            ast.parse(text)
+        except SyntaxError as error:
+            pytest.fail('Extracted program is not valid Python: {}\n{}'.format(
+                error, text))
+        assert 'nagini_contracts' not in text, (
+            'Extracted program still refers to Nagini:\n' + text)
+        errors = _type_check(text, path, base)
+        assert not errors, (
+            'Extracted program does not type check:\n{}\n{}'.format(errors, text))
+
+
+def _type_check(text: str, path: str, base: str) -> str:
+    """Type check the given program with mypy, and return the reported errors.
+
+    Removing ghost code must not invalidate the program: this catches references
+    to removed elements as well as calls whose arguments no longer match.
+
+    We use the same options Nagini uses to check the original program, so that
+    only differences introduced by the extraction are reported. In particular,
+    unparsing the extracted program drops type comments, so we cannot ask mypy
+    to infer the types of empty collection literals.
+    """
+    directory = os.path.dirname(path)
+    old_mypy_path = os.environ.get('MYPYPATH')
+    with tempfile.TemporaryDirectory() as cache_dir:
+        handle, file_name = tempfile.mkstemp(suffix='.py', prefix='extracted_',
+                                             dir=directory)
+        try:
+            with os.fdopen(handle, 'w') as file:
+                file.write(text)
+            os.environ['MYPYPATH'] = base
+            output, _, status = mypy.api.run(
+                [file_name, '--no-incremental', '--cache-dir', cache_dir,
+                 '--no-strict-optional', '--no-warn-no-return',
+                 '--allow-untyped-globals'])
+        finally:
+            os.remove(file_name)
+            if old_mypy_path is None:
+                os.environ.pop('MYPYPATH', None)
+            else:
+                os.environ['MYPYPATH'] = old_mypy_path
+    return output if status != 0 else ''
+
+
+_EXTRACTION_TESTER = ExtractionTest()
+
+
+def test_extraction(path, base):
+    """Execute provided extraction test."""
+    _EXTRACTION_TESTER.test_file(path, base, _JVM)

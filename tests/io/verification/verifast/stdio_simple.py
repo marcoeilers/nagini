@@ -76,7 +76,7 @@ def read_char_io(
 
 
 @ContractOnly
-def getchar(t1: Place) -> Tuple[str, bool, Place]:
+def getchar(t1: Place) -> Tuple[Tuple[str, bool], Place]:
     IOExists3(str, bool, Place)(
         lambda c, success, t2: (
             Requires(
@@ -84,9 +84,9 @@ def getchar(t1: Place) -> Tuple[str, bool, Place]:
                 read_char_io(t1, stdin, c, success, t2)
             ),
             Ensures(
-                c is Result()[0] and
-                success == Result()[1] and
-                t2 == Result()[2] and
+                c is Result()[0][0] and
+                success == Result()[0][1] and
+                t2 == Result()[1] and
                 token(t2) and
                 (len(c) == 1 if success else len(c) == 0)
             ),

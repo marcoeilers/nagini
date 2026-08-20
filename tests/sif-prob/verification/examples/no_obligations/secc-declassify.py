@@ -112,6 +112,7 @@ def io_trace_seq() -> PSeq[Pair]:
 def safe_to_declassify_2() -> bool:
     return io_trace() and len(io_trace_seq()) > 0
 
+@Ghost
 @Pure
 def safe_to_declassify_2_x() -> int:
     Requires(safe_to_declassify_2())
@@ -181,6 +182,7 @@ def consumed_inputs() -> bool:
 def consumed_inputs_inps() -> PSeq[int]:
     Requires(Rd(consumed_inputs()))
 
+@Ghost
 @Pure
 def ssum(xs: PSeq[int]) -> int:
     if len(xs) == 0:
@@ -237,6 +239,7 @@ def avg_inc_min_thread(st: AvgState, l: StateLock) -> None:
 
 
 
+@Ghost
 def avg_state_correct_implies(s: int, c: int, xs: PSeq[int]) -> None:
     Requires(avg_state_correct(s, c, xs))
     Requires(type(c) == int and type(s) == int)
@@ -255,6 +258,7 @@ def avg_state_correct_implies(s: int, c: int, xs: PSeq[int]) -> None:
         Fold(avg_state_correct2(s, c, xs))
 
 
+@Ghost
 def avg_state_correct2_implies(s: int, c: int, xs: PSeq[int]) -> None:
     Requires(avg_state_correct2(s, c, xs))
     Ensures(avg_state_correct(s, c, xs))

@@ -19,6 +19,9 @@ import traceback
 
 from jpype._jexception import JException
 from nagini_translation.analyzer import Analyzer
+from nagini_translation.ghost.ghost_checker import GhostChecker
+from nagini_translation.ghost.extraction import ProgramExtractor
+from nagini_translation.lib.context import Context
 from nagini_translation.sif_translator import SIFTranslator
 from nagini_translation.lib import config
 from nagini_translation.lib.constants import DEFAULT_SERVER_SOCKET
@@ -110,8 +113,8 @@ def load_sil_files(jvm: JVM, bv_size: int, sif: bool = False, float_option: str 
 
 def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), base_dir: str = None,
               sif: bool = False, arp: bool = False, ignore_global: bool = False,
-              reload_resources: bool = False, verbose: bool = False,
-              check_consistency: bool = False, float_encoding: str = None,
+              reload_resources: bool = False, verbose: bool = False, skip_verification: bool = False,
+              extraction: bool = False, check_consistency: bool = False, float_encoding: str = None,
               counterexample: bool = False) -> Tuple[List['PythonModule'], Program]:
     """
     Translates the Python module at the given path to a Viper program
@@ -147,15 +150,34 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
     else:
         translator = Translator(jvm, path, types, viper_ast)
     analyzer.process(translator)
-    if not analyzer.enable_obligations and config.obligation_config.disable_all is None:
+    modules = [main_module.global_module] + list(analyzer.modules.values())
+    ghost_checker = GhostChecker(modules)
+    ghost_ctx = Context()
+    ghost_ctx.current_class = None
+    ghost_ctx.current_function = None
+    ghost_ctx.module = modules[1]
+    ghost_checker.check(ghost_ctx)
+
+    # Ghost statements are translated into terminating sections, which are
+    # encoded using obligations.
+    needs_obligations = analyzer.enable_obligations or ghost_checker.has_ghost_statements
+    if not needs_obligations and config.obligation_config.disable_all is None:
         # only override the default, which is None; if the encoding is forced on or off, it'll be True or False
         config.obligation_config.disable_all = True
     if 'sil_programs' not in globals() or reload_resources:
         global sil_programs
         sil_programs = load_sil_files(jvm, bv_size, sif, float_encoding)
-    modules = [main_module.global_module] + list(analyzer.modules.values())
+
+    if extraction:
+        program_extractor = ProgramExtractor(modules)
+        extr_prog = program_extractor.process()
+        as_text = ast.unparse(extr_prog)
+        print(as_text)
+
     prog = translator.translate_program(modules, sil_programs, selected,
                                         arp=arp, ignore_global=ignore_global, sif=sif, float_encoding=float_encoding)
+    if skip_verification:
+        return modules, None
     if sif:
         set_all_low_methods(jvm, viper_ast.all_low_methods)
         set_preserves_low_methods(jvm, viper_ast.preserves_low_methods)
@@ -391,6 +413,18 @@ def main() -> None:
         action='store_true',
         default=False,
     )
+    parser.add_argument(
+        '--skip-verification',
+        help='Only type check and translate the program, do not verify it.',
+        action='store_true',
+        default=False,
+    )
+    parser.add_argument(
+        '--extraction',
+        help='Extract the python program without Nagini code.',
+        action='store_true',
+        default=False,
+    )
     args = parser.parse_args()
 
     config.classpath = args.viper_jar_path
@@ -510,8 +544,8 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
         if selected is None:
             selected = set(args.select.split(',')) if args.select else set()
         modules, prog = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif, base_dir=base_dir,
-                                  ignore_global=args.ignore_global, arp=arp, verbose=args.verbose,
-                                  counterexample=args.counterexample, float_encoding=args.float_encoding)
+                                  ignore_global=args.ignore_global, arp=arp, verbose=args.verbose, skip_verification=args.skip_verification,
+                                  extraction=args.extraction, counterexample=args.counterexample, float_encoding=args.float_encoding)
         if args.print_viper:
             if args.verbose:
                 print('Result:')
@@ -537,6 +571,9 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                 print("{}, {}, {}, {}, {}".format(
                     i, args.benchmark, start, end, end - start))
         else:
+            if args.skip_verification:
+                return True
+
             submitter = None
             if args.submit_for_evaluation:
                 submitter = jvm.viper.silver.utility.ManualProgramSubmitter(True, "", "Nagini", backend.name.capitalize(), viper_args)
@@ -570,9 +607,11 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                     issue += e.args[0]
                 else:
                     issue += ast.unparse(e.node)
+            # Some errors do not carry an AST node, e.g. those about elements
+            # which only exist in Nagini's own data structures.
             print(format_translation_error(
-                args.ide_mode, python_file, issue, e.node.lineno,
-                e.node.col_offset, getattr(e.node, 'end_lineno', None),
+                args.ide_mode, python_file, issue, getattr(e.node, 'lineno', 0),
+                getattr(e.node, 'col_offset', 0), getattr(e.node, 'end_lineno', None),
                 getattr(e.node, 'end_col_offset', None)))
         if isinstance(e, TypeException):
             for msg in e.messages:

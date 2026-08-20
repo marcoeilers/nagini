@@ -12,7 +12,7 @@ def m() -> None:
     assert b[0] == 1
     assert len(b) == 5
     assert b[3] == 4
-    assert ToSeq(a) == ToSeq(b)
+    Assert(ToSeq(a) == ToSeq(b))
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert False
 
@@ -47,7 +47,7 @@ def m_tuple() -> None:
     assert b[0] == 1
     assert len(b) == 5
     assert b[3] == 4
-    assert ToSeq(a) == ToSeq(b)
+    Assert(ToSeq(a) == ToSeq(b))
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert False
 
@@ -119,7 +119,7 @@ def m_range() -> None:
     assert b[0] == 1
     assert len(b) == 5
     assert b[3] == 4
-    assert ToSeq(a) == ToSeq(b)
+    Assert(ToSeq(a) == ToSeq(b))
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert False
 

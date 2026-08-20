@@ -7,6 +7,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import ast
 
+from nagini_translation.lib import config
 from nagini_translation.lib.constants import (
     BOOL_TYPE,
     BYTES_TYPE,
@@ -77,6 +78,7 @@ class StatementTranslator(CommonTranslator):
         # Keep track of the end and after labels of loops we are currently in.
         self.loops = {}
         self.imported_modules = set()
+        self.in_terminating_block = False
 
     def translate_stmt(self, node: ast.AST, ctx: Context) -> List[Stmt]:
         """
@@ -84,7 +86,56 @@ class StatementTranslator(CommonTranslator):
         """
         method = 'translate_stmt_' + node.__class__.__name__
         visitor = getattr(self, method, self.translate_generic)
-        return visitor(node, ctx)
+
+        # We add a terminating section on every ghost statement. 
+        # For statements containing blocks of code (e.g. if), we do not add more terminating sections within
+        # Terminating sections are encoded using obligations, so we can only add
+        # them if the obligation encoding is enabled.
+        is_node_ghost = (getattr(node, 'needs_terminating_section', False)
+                         and ctx.current_function is not None
+                         and not config.obligation_config.disable_all)
+        start_terminating_block = is_node_ghost and not self.in_terminating_block
+        end_terminating_block = is_node_ghost and not self.in_terminating_block
+
+        res = []
+
+        if start_terminating_block:
+            self.in_terminating_block = True
+            bool_type = ctx.module.global_module.classes[PRIMITIVE_BOOL_TYPE]
+            added_obl_var = ctx.current_function.create_variable('added_term_obl', bool_type, self.translator)
+            pos = self.no_position(ctx)
+            info = self.no_info(ctx)
+            term_pred = self.get_must_terminate(ctx).translate(self, ctx, pos, info)
+            cur_perm = self.viper.CurrentPerm(term_pred, pos, info)
+            any_cur_perm = self.viper.PermGtCmp(cur_perm, self.viper.NoPerm(pos, info), pos, info)
+            obl_var_assign = self.viper.LocalVarAssign(added_obl_var.ref(ctx=ctx), any_cur_perm, pos, info)
+            cond_perm = self.viper.Implies(self.viper.Not(added_obl_var.ref(ctx=ctx), pos, info),
+                                           self.viper.PredicateAccessPredicate(term_pred,
+                                                                               self.viper.FullPerm(pos, info),
+                                                                               pos, info),
+                                           pos, info)
+            cond_inhale = self.viper.Inhale(cond_perm, pos, info)
+            res.extend([obl_var_assign, cond_inhale])
+            ctx.terminating_block_var = added_obl_var
+
+        res.extend(visitor(node, ctx))
+
+        if end_terminating_block:
+            self.in_terminating_block = False
+            pos = self.no_position(ctx)
+            info = self.no_info(ctx)
+            term_pred = self.get_must_terminate(ctx).translate(self, ctx, pos, info)
+            added_obl_var = ctx.terminating_block_var
+            cond_perm = self.viper.Implies(self.viper.Not(added_obl_var.ref(ctx=ctx), pos, info),
+                                           self.viper.PredicateAccessPredicate(term_pred,
+                                                                               self.viper.FullPerm(pos, info),
+                                                                               pos, info),
+                                           pos, info)
+            cond_exhale = self.viper.Exhale(cond_perm, pos, info)
+            res.append(cond_exhale)
+            ctx.terminating_block_var = None
+
+        return res
 
     def _execute_module_statements(self, module: PythonModule, import_stmt: ast.AST,
                                    ctx: Context) -> Stmt:
