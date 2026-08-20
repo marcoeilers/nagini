@@ -251,6 +251,10 @@ INVALID_PROGRAM_MESSAGES = {
         'expressions (e.g. 1/1000, n/2) — a name bound to a float or other '
         'non-int value (e.g. FRAC = 1 / 1000) is not supported; write the '
         'fraction literally at the use site.',
+    'empty.literal.argument':
+        'the element type of an empty collection literal cannot be inferred '
+        'in argument position. Bind it to an annotated local first and pass '
+        'that (e.g. e: List[int] = [] then f(e)).',
     'invalid.contract.position':
         'a contract expression (Requires/Ensures/Invariant/...) appears '
         'outside its designated position: pre- and postconditions at the '

@@ -461,6 +461,13 @@ def _get_collection_literal_type(node: ast.AST, arg_fields: List[str],
                          getattr(node, arg_field)]
             args.append(common_supertype(arg_types))
     else:
+        parent = getattr(node, '_parent', None)
+        if (isinstance(parent, ast.Call)
+                and any(node is arg for arg in parent.args)):
+            # An empty literal in argument position would silently type as
+            # e.g. List[object], leaving the callee's typeof obligation
+            # unprovable with no located hint. Reject it up front instead.
+            raise InvalidProgramException(node, 'empty.literal.argument')
         object_class = module.global_module.classes[OBJECT_TYPE]
         args = [object_class for arg_field in arg_fields]
     return GenericType(module.global_module.classes[coll_type],
