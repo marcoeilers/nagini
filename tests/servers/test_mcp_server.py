@@ -12,6 +12,8 @@ import os
 import sys
 import tempfile
 
+from concurrent.futures import Future
+
 import pytest
 
 pytest.importorskip("mcp")
@@ -21,6 +23,13 @@ from nagini_translation import mcp_server
 
 _DIAG_KEYS = {"file", "startLine", "startCol", "endLine", "endCol", "severity",
               "code", "source", "message"}
+
+
+def _install_service(service):
+    """Install a booted service as if the background boot had completed."""
+    future = Future()
+    future.set_result(service)
+    mcp_server._service_future = future
 
 
 def _tool_result_payload(result):
@@ -92,7 +101,7 @@ def test_stdio_transport_end_to_end_and_clean_shutdown(pass_file):
 
 
 def test_verify_file_reports_structured_failure(service, fail_file):
-    mcp_server._service = service
+    _install_service(service)
     result = asyncio.run(mcp_server.verify_file(fail_file))
     assert result["success"] is False
     assert result["diagnostics"]
@@ -103,14 +112,14 @@ def test_verify_file_reports_structured_failure(service, fail_file):
 
 
 def test_verify_file_success(service, pass_file):
-    mcp_server._service = service
+    _install_service(service)
     result = asyncio.run(mcp_server.verify_file(pass_file))
     assert result["success"] is True
     assert result["diagnostics"] == []
 
 
 def test_verify_method_restricts_to_one_method(service, fail_file):
-    mcp_server._service = service
+    _install_service(service)
     result = asyncio.run(mcp_server.verify_method(fail_file, "add"))
     assert "success" in result
     assert "diagnostics" in result
@@ -118,7 +127,7 @@ def test_verify_method_restricts_to_one_method(service, fail_file):
 
 def test_verify_method_excludes_error_outside_selection(service, mixed_file):
     """Selecting a method must ignore verification errors in other methods."""
-    mcp_server._service = service
+    _install_service(service)
     # Baseline: verifying the whole file surfaces the error in `failing`.
     full = asyncio.run(mcp_server.verify_file(mixed_file))
     assert full["success"] is False
@@ -134,23 +143,29 @@ def test_verify_method_excludes_error_outside_selection(service, mixed_file):
 
 
 def test_verify_snippet_inline_code(service, pass_src):
-    mcp_server._service = service
+    _install_service(service)
     result = asyncio.run(mcp_server.verify_snippet(pass_src))
     assert result["success"] is True
 
 
 def test_verify_snippet_inline_failure(service, fail_src):
-    mcp_server._service = service
+    _install_service(service)
     result = asyncio.run(mcp_server.verify_snippet(fail_src))
     assert result["success"] is False
     assert any("postcondition" in d["code"] for d in result["diagnostics"])
 
 
 def test_flush_cache_and_cancel_are_callable(service):
-    mcp_server._service = service
+    _install_service(service)
     assert mcp_server.flush_cache() == {"flushed": True}
     cancelled = mcp_server.cancel()
     assert cancelled["cancelled"] is True
+
+
+def test_flush_cache_and_cancel_report_noop_while_booting():
+    mcp_server._service_future = Future()  # boot still in flight
+    assert mcp_server.cancel()["cancelled"] is False
+    assert mcp_server.flush_cache()["flushed"] is False
 
 
 def test_options_to_kwargs_maps_and_filters():
@@ -162,10 +177,12 @@ def test_options_to_kwargs_maps_and_filters():
 
 
 def test_configure_switches_backend_and_service_stays_usable(service, pass_src):
-    mcp_server._service = service
+    _install_service(service)
     try:
-        assert mcp_server.configure({"verifier": "carbon"})["verifier"] == "carbon"
-        assert mcp_server.configure({"verifier": "silicon"})["verifier"] == "silicon"
+        assert asyncio.run(
+            mcp_server.configure({"verifier": "carbon"}))["verifier"] == "carbon"
+        assert asyncio.run(
+            mcp_server.configure({"verifier": "silicon"}))["verifier"] == "silicon"
     finally:
         # Restore the shared session service for other tests.
         service.reconfigure(verifier_backend="silicon")
@@ -175,8 +192,8 @@ def test_configure_switches_backend_and_service_stays_usable(service, pass_src):
 
 
 def test_configure_ignores_unknown_and_null_options(service):
-    mcp_server._service = service
-    effective = mcp_server.configure({"unknownKey": 1, "z3Path": None})
+    _install_service(service)
+    effective = asyncio.run(mcp_server.configure({"unknownKey": 1, "z3Path": None}))
     # Returns the effective configuration without error; nothing changed.
     assert effective["verifier"] == "silicon"
 
@@ -184,10 +201,10 @@ def test_configure_ignores_unknown_and_null_options(service):
 def test_configure_reload_option_then_verify(service, pass_file, fail_file):
     # A reload-triggering option via the configure tool, then verification still
     # produces correct results.
-    mcp_server._service = service
+    _install_service(service)
     original = service.current_options()
     try:
-        effective = mcp_server.configure({"intBitopsSize": 16})
+        effective = asyncio.run(mcp_server.configure({"intBitopsSize": 16}))
         assert effective["intBitopsSize"] == 16
         assert asyncio.run(mcp_server.verify_file(pass_file))["success"] is True
         assert asyncio.run(mcp_server.verify_file(fail_file))["success"] is False
@@ -205,7 +222,7 @@ _BRANCH_ERROR_SRC = (
 
 
 def test_verify_ignore_global_via_tool(service):
-    mcp_server._service = service
+    _install_service(service)
     # Top-level statements verified by default -> the false assert fails.
     assert asyncio.run(mcp_server.verify_snippet(_TOPLEVEL_ASSERT_SRC))["success"] is False
     # ignore_global param skips them -> verifies.
@@ -214,7 +231,7 @@ def test_verify_ignore_global_via_tool(service):
 
 
 def test_verify_viper_args_and_include_viper_via_tool(service, pass_src):
-    mcp_server._service = service
+    _install_service(service)
     result = asyncio.run(mcp_server.verify_snippet(
         pass_src, viper_args=["--timeout=300"], include_viper=True))
     assert result["success"] is True
@@ -224,15 +241,15 @@ def test_verify_viper_args_and_include_viper_via_tool(service, pass_src):
 
 
 def test_configure_disable_branch_conditions_via_tool(service):
-    mcp_server._service = service
+    _install_service(service)
     original = service.current_options()
     try:
-        mcp_server.configure({"disableBranchConditions": False})
+        asyncio.run(mcp_server.configure({"disableBranchConditions": False}))
         on = asyncio.run(mcp_server.verify_snippet(_BRANCH_ERROR_SRC))
         assert on["success"] is False
         assert any(d["branchConditions"] for d in on["diagnostics"])
 
-        mcp_server.configure({"disableBranchConditions": True})
+        asyncio.run(mcp_server.configure({"disableBranchConditions": True}))
         off = asyncio.run(mcp_server.verify_snippet(_BRANCH_ERROR_SRC))
         assert off["success"] is False
         assert all(not d["branchConditions"] for d in off["diagnostics"])
