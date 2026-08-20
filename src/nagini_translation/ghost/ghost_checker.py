@@ -1240,11 +1240,15 @@ class GhostChecker(ast.NodeVisitor):
             items = expr.elts
             res = any([self.is_ghost(e) for e in items])
         elif isinstance(expr, (ast.DictComp, ast.ListComp, ast.SetComp, ast.GeneratorExp)):
-            if len(expr.generators) != 1:
-                raise UnsupportedException(expr, 'Multiple generators in list comprehension.')
-            if expr.generators[0].ifs:
-                raise UnsupportedException(expr, 'Filter in list comprehension.')
-            
+            if len(expr.generators) != 1 or expr.generators[0].ifs:
+                # Nagini does not support these and reports that itself; we only
+                # have to be conservative about the ghost information here.
+                items = [generator.iter for generator in expr.generators]
+                res = any([self.is_ghost(item) for item in items])
+                expr.is_ghost = res
+                self.set_contains_ghost(expr, res, *items)
+                return res
+
             # Create alias for loop variable
             name = construct_lambda_prefix(expr.lineno, expr.col_offset)
             target = expr.generators[0].target
@@ -1265,6 +1269,13 @@ class GhostChecker(ast.NodeVisitor):
 
             self.ctx.remove_alias(target.id)
             res = is_gen_ghost or is_elt_ghost
+        elif isinstance(expr, ast.JoinedStr):
+            # A formatted string is ghost if one of its interpolated values is.
+            items = expr.values
+            res = any([self.is_ghost(e) for e in items])
+        elif isinstance(expr, ast.FormattedValue):
+            items = [e for e in (expr.value, expr.format_spec) if e is not None]
+            res = any([self.is_ghost(e) for e in items])
         elif isinstance(expr, ast.Await):
             items = [expr.value]
             res = self.is_ghost(expr.value)

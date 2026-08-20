@@ -97,7 +97,7 @@ def and_3a(a: int, b: bool, c: int) -> None:
 
 def and_4(a: int, b: bool, c: int) -> None:
     Requires(a > -100 and a < 100)
-    Requires(c > -130 and c < 127)
+    Requires(c > -260 and c < 127)
     #:: ExpectedOutput(application.precondition:assertion.false)
     intint = a & c
 
@@ -133,7 +133,7 @@ def or_3a(a: int, b: bool, c: int) -> None:
 
 def or_4(a: int, b: bool, c: int) -> None:
     Requires(a > -100 and a < 100)
-    Requires(c > -130 and c < 127)
+    Requires(c > -260 and c < 127)
     #:: ExpectedOutput(application.precondition:assertion.false)
     intint = a | c
 
@@ -169,6 +169,121 @@ def xor_3a(a: int, b: bool, c: int) -> None:
 
 def xor_4(a: int, b: bool, c: int) -> None:
     Requires(a > -100 and a < 100)
-    Requires(c >= -128 and c < 129)
+    Requires(c >= -128 and c < 257)
     #:: ExpectedOutput(application.precondition:assertion.false)
     intint = a ^ c
+        
+def lshift_general(a: int, b: int) -> None:
+    Requires(a > -128 and a <= 127)
+    Requires(b >=0 and b <= 127)
+    
+    shift = a << b
+
+    if b <= 8:
+        lshift_unlimited(a, b)
+
+    if b == 9:
+        assert shift == a * 512
+
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert shift == 1
+
+def lshift_unlimited(a: int, b: int) -> None:
+    Requires(b >= 0 and b <= 64)
+
+    shift = a << b
+    
+    # Unfortunately we cannot prove the equivalence shift == a * (2**b)
+    if b == 0:
+        assert shift == a
+    if b == 1:
+        assert shift == a * 2
+    if b == 2:
+        assert shift == a * 4
+    if b == 3:
+        assert shift == a * 8
+    if b == 4:
+        assert shift == a * 16
+    if b == 5:
+        assert shift == a * 32
+    if b == 6:
+        assert shift == a * 64
+    if b == 7:
+        assert shift == a * 128
+    if b == 8:
+        assert shift == a * 256
+    if b == 32:
+        assert shift == a * 4_294_967_296
+    if b == 33:
+        assert shift == a * 8_589_934_592
+    
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert shift == 1
+
+def lshift_neg(a: int, b: int) -> None:
+    Requires(a > -128 and a <= 127)
+    Requires(b >= -128 and b <= 127)
+    
+    #:: ExpectedOutput(application.precondition:assertion.false)
+    shift = a << b
+        
+def rshift_general(a: int, b: int) -> None:
+    Requires(a >= -128 and a <= 127)
+    Requires(b >=0 and b <= 127)
+    
+    shift = a >> b
+    
+    if b <= 8:
+        rshift_unlimited(a, b)
+
+    if b == 9:
+        assert shift == a // 512
+
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert shift == 1
+
+def rshift_unlimited(a: int, b: int) -> None:
+    Requires(b >= 0 and b <= 8)
+
+    shift = a >> b
+
+    # Unfortunately we cannot prove the equivalence shift == a // (2 ** b)
+    if b == 0:
+        assert shift == a
+    if b == 1:
+        assert shift == a // 2
+    if b == 2:
+        assert shift == a // 4
+    if b == 3:
+        assert shift == a // 8
+    if b == 4:
+        assert shift == a // 16
+    if b == 5:
+        assert shift == a // 32
+    if b == 6:
+        assert shift == a // 64
+    if b == 7:
+        assert shift == a // 128
+    if b == 8:
+        assert shift == a // 256
+
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert shift == 1
+
+def int_bit_length() -> None:
+
+    assert (0).bit_length() == 0
+    assert (1).bit_length() == 1
+    assert (3).bit_length() == 2
+    assert (7).bit_length() == 3
+    assert (15).bit_length() == 4
+
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert (3245).bit_length() == 6
+
+def int_bit_length_general(a: int) -> None:
+    Requires(a >= 0 and a < (1 << 64))
+
+    if a > 2:
+        assert a.bit_length() == (a >> 1).bit_length() + 1
+    

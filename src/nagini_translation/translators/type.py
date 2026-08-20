@@ -44,6 +44,7 @@ class TypeTranslator(CommonTranslator):
         return {'builtins.int': self.viper.Int,
                 'builtins.bool': self.viper.Bool,
                 'builtins.PSeq': self.viper.SeqType(self.viper.Ref),
+                'builtins.PSeqInt': self.viper.SeqType(self.viper.Int),
                 'builtins.PSet': self.viper.SetType(self.viper.Ref),
                 'builtins.PMultiset': self.viper.MultisetType(self.viper.Ref),
                 }

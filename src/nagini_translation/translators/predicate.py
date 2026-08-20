@@ -83,6 +83,7 @@ class PredicateTranslator(CommonTranslator):
         name = root.sil_name
         args = []
         self_var_ref = root.args[next(iter(root.args))].ref()
+        unknown_type_pos = self.to_position(root.node, ctx, error_string="self has unknown type")
         true_lit = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
         arg_types = true_lit
         self.bind_type_vars(root, ctx)
@@ -92,7 +93,7 @@ class PredicateTranslator(CommonTranslator):
                                        self.no_position(ctx), ctx)
             arg_types = self.viper.And(arg_types, arg_type,
                                        self.no_position(ctx), self.no_info(ctx))
-        unknown_type_condition = true_lit
+        unknown_type_condition = self.viper.TrueLit(unknown_type_pos, self.no_info(ctx))
         self_framing_check_methods = []
 
         body = None
@@ -141,13 +142,15 @@ class PredicateTranslator(CommonTranslator):
                 raise InvalidProgramException(instance.node,
                                               'invalid.predicate')
             instance_pos = self.to_position(instance.node, ctx)
-            has_type = self.type_factory.type_check(self_var_ref, instance.cls, instance_pos, ctx)
+            instance_type_pos = self.to_position(instance.node, ctx,
+                                                 error_string="isinstance(self, {0})".format(instance.cls.name))
+            has_type = self.type_factory.type_check(self_var_ref, instance.cls, instance_type_pos, ctx)
             implication = self.viper.Implies(has_type, current, instance_pos, no_info)
             self_var_type_expr = self.type_factory.typeof(self_var_ref, ctx)
             instance_type = self.type_factory.translate_type_literal(instance.cls, instance_pos, ctx,
                                                                      alias=self_var_type_expr)
             type_not_instance = self.viper.NeCmp(self_var_type_expr, instance_type, instance_pos, no_info)
-            unknown_type_condition = self.viper.And(unknown_type_condition, type_not_instance, instance_pos, no_info)
+            unknown_type_condition = self.viper.And(unknown_type_condition, type_not_instance, unknown_type_pos, no_info)
             ctx.current_function = None
             if body:
                 body = self.viper.And(body, implication,

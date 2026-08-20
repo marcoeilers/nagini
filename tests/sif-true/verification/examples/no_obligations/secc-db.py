@@ -109,6 +109,7 @@ def sum_all_rec(elems: List[Elem], from_: int, l: int, key: int, init: int) -> i
     Requires(Forall(int, lambda i: Implies(type(i) == int and i >= 0 and i < len(elems),
                                            Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value)))))
     Ensures(Acc(list_pred(elems)))
+    Ensures(ToSeq(elems) == Old(ToSeq(elems)))
     Ensures(Forall(int, lambda i: Implies(type(i) == int and i >= 0 and i < len(elems),
                                           Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value)))))
     Ensures(Low(Result()))

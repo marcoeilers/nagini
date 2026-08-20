@@ -14,7 +14,7 @@ class A:
         return self.SOME_CONST
 
     def a_2(self) -> int:
-        #:: ExpectedOutput(postcondition.violated:assertion.false)|ExpectedOutput(postcondition.violated:assertion.false,L1)
+        #:: ExpectedOutput(postcondition.violated:assertion.false)||ExpectedOutput(postcondition.violated:assertion.false,L1)
         Ensures(Result() > 24)
         return self.SOME_CONST
 

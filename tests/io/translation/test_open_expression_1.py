@@ -28,7 +28,7 @@ def test(t1: Place) -> None:
     IOExists3(Place, int, int)(
         lambda t2, value1, value2: (
         Requires(
-            #:: ExpectedOutput(type.error:"Open" does not return a value)
+            #:: ExpectedOutput(type.error:"Open" does not return a value  [func-returns-value])
             Open(read_int_io2(t1))
         ),
         )

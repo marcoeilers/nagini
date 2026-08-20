@@ -12,7 +12,7 @@ Python source file with annotations that specify the expected behaviour.
 The goal of the test suite is to catch changes in the behaviour,
 therefore, annotations must be always up-to-date. Annotations are
 written in Python comments that start with ``::``. Multiple annotations
-on the same line are separated by ``|``.
+on the same line are separated by ``||``.
 
 Supported annotation types are:
 
@@ -36,7 +36,6 @@ Supported annotation types are:
 
 import abc
 import ast
-import astunparse
 import mypy.api
 import os
 import pytest
@@ -450,7 +449,7 @@ class AnnotationManager:
             r'\('
             # Error message, or label id. Matches everything except
             # comma.
-            r'(?P<id>[a-zA-Z\.\(\)_\[\]\-:;\d ?\'"]+)'
+            r'(?P<id>[a-zA-Z\.\(\)_\[\]\|<>\-:;\d ?\'"]+)'
             # Issue id in the issue tracker.
             r'(,(?P<issue_id>\d+))?'
             # Labels. Note that label must start with a letter.
@@ -544,7 +543,7 @@ class AnnotationManager:
     def extract_annotations(self, token: tokenize.TokenInfo) -> None:
         """Extract annotations mentioned in the token."""
         content = token.string.strip()[3:]
-        stripped_list = [part.strip() for part in content.split('|')]
+        stripped_list = [part.strip() for part in content.split('||')]
         for part in stripped_list:
             self._create_annotation(part, token)
 
@@ -705,7 +704,7 @@ class ExtractionTest(AnnotatedTest):
         path = os.path.abspath(path)
         base = os.path.abspath(base)
         modules, prog = translate(path, jvm, 8, base_dir=base)
-        text = astunparse.unparse(ProgramExtractor(modules).process())
+        text = ast.unparse(ProgramExtractor(modules).process())
         try:
             ast.parse(text)
         except SyntaxError as error:

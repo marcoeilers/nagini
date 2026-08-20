@@ -34,7 +34,10 @@ class ProgramExtractor:
         new_body = self._extract_body(node.body)
         new_body = self._restore_needed_imports(node.body, new_body)
 
-        return self._restore_type_comments(ast.Module(new_body, []))
+        result = self._restore_type_comments(ast.Module(new_body, []))
+        # The nodes we created have no position information, which unparsing the
+        # result requires.
+        return ast.fix_missing_locations(result)
 
     def _restore_type_comments(self, node: ast.Module) -> ast.Module:
         """

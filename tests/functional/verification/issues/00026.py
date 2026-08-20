@@ -12,7 +12,7 @@ def test(a: int, b: int) -> Tuple[int, int]:
         ((True and
         True) and
         True) and
-        #:: ExpectedOutput(postcondition.violated:assertion.false)|MissingOutput(postcondition.violated:assertion.false,26)
+        #:: ExpectedOutput(postcondition.violated:assertion.false)||MissingOutput(postcondition.violated:assertion.false,26)
         (Result()[0] == a and
         Result()[1] == b)
         )

@@ -26,5 +26,5 @@ def read_int_io2(
 
 def test(t1: Place) -> None:
 
-    #:: ExpectedOutput(type.error:Missing positional argument "t_pre" in call to "read_int_io2")
+    #:: ExpectedOutput(type.error:Missing positional argument "t_pre" in call to "read_int_io2"  [call-arg])
     Open(read_int_io2())

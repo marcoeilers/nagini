@@ -17,6 +17,7 @@ from nagini_translation.lib.errors.wrappers import Error
 from nagini_translation.lib.errors.rules import Rules
 from nagini_translation.lib.jvmaccess import JVM
 from nagini_translation.lib.program_nodes import PythonMethod, PythonNode
+from nagini_translation.lib.util import pprint
 from nagini_translation.models.extractor import Extractor
 
 
@@ -115,15 +116,17 @@ class ErrorManager:
     def _convert_error(
             self, original_error: 'AbstractVerificationError',
             jvm: JVM, modules, sif) -> Error:
+        if 'Timeout' in original_error.getClass().getSimpleName():
+            return Error(original_error, {}, None)
         error = self.transformError(original_error)
-        reason_pos = error.reason().offendingNode().pos()
-        reason_item = self._get_item(reason_pos)
+        viper_reason = error.reason() if hasattr(error, 'reason') else None
+        reason_item = self._get_item(viper_reason.offendingNode().pos()) if viper_reason is not None else None
         position = error.pos()
         rules = self._try_get_rules_workaround(
             error.offendingNode(), jvm)
-        if rules is None:
+        if rules is None and viper_reason is not None:
             rules = self._try_get_rules_workaround(
-                error.reason().offendingNode(), jvm)
+                viper_reason.offendingNode(), jvm)
         if rules is None:
             rules = {}
         error_item = self._get_item(position)
@@ -138,11 +141,42 @@ class ErrorManager:
         else:
             inputs = None
 
+        py_bcs = None
+        if (error_item is not None and original_error.failureContexts().nonEmpty() and
+                original_error.failureContexts().head().branchConditions().nonEmpty()):
+            bcs = original_error.failureContexts().head().branchConditions()
+            py_bcs = []
+            iterator = bcs.toIterator()
+            while iterator.hasNext():
+                bc = iterator.next()
+                bc_pos = bc.pos()
+                negated = False
+                if isinstance(bc, jvm.viper.silver.ast.Not) and bc_pos == bc.exp().pos():
+                    negated = True
+                    bc = bc.exp()
+                    bc_pos = bc.pos()
+                bc_item = self._get_item(bc_pos)
+                if not bc_item:
+                    continue
+                condition = (bc_item.reason_string or pprint(bc_item.node))
+                if negated:
+                    if condition.startswith('(not ') and condition.endswith(')'):
+                        condition = condition[5:-1]
+                    else:
+                        condition = '(not {0})'.format(condition)
+                pos = str(bc_pos)
+                if '.sil' in pos:
+                    continue
+                if pos == '<no position>':
+                    pos = ''
+                else:
+                    pos = ' at ' + pos
+                py_bcs.append("{0}{1}".format(condition, pos))
         if error_item:
             return Error(error, rules, reason_item, error_item.node,
-                         error_item.vias, inputs=inputs)
+                         error_item.vias, inputs=inputs, bcs=py_bcs)
         else:
-            return Error(error, rules, reason_item, inputs=inputs)
+            return Error(error, rules, reason_item, inputs=inputs, bcs=py_bcs)
 
 
 

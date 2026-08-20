@@ -6,27 +6,37 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import argparse
+import json
 import zmq
 
 from nagini_translation.lib.constants import DEFAULT_CLIENT_SOCKET
 
+
 def main():
-        context = zmq.Context()
+    context = zmq.Context()
 
-        socket = context.socket(zmq.REQ)
-        socket.connect(DEFAULT_CLIENT_SOCKET)
+    socket = context.socket(zmq.REQ)
+    socket.connect(DEFAULT_CLIENT_SOCKET)
 
-        parser = argparse.ArgumentParser()
-        parser.add_argument(
-                'python_file',
-                help='Python file to verify')
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        'python_file',
+        help='Python file to verify')
+    parser.add_argument(
+        '--select',
+        default=None,
+        help='select specific methods or classes to verify, separated by commas')
 
-        args = parser.parse_args()
+    args = parser.parse_args()
 
-        socket.send_string(args.python_file)
-        response = socket.recv_string()
+    request = {'file': args.python_file}
+    if args.select:
+        request['select'] = args.select
+    socket.send_string(json.dumps(request))
+    response = socket.recv_string()
 
-        print(response)
+    print(response)
+
 
 if __name__ == '__main__':
     main()

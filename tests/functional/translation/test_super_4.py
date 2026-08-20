@@ -14,5 +14,5 @@ class Sub(Super):
     def some_method(self) -> int:
         Ensures(Result() >= 15)
         a = self
-        #:: ExpectedOutput(type.error:Argument 1 for "super" must be a type object; got a non-type instance)
+        #:: ExpectedOutput(type.error:Argument 1 for "super" must be a type object; got a non-type instance  [arg-type])
         return 1 + super(a, Sub).some_method()

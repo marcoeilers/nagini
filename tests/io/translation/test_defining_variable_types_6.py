@@ -31,7 +31,7 @@ def test(t1: Place) -> C2:
     IOExists1(C1)(
         lambda value: (
         Requires(
-            #:: ExpectedOutput(type.error:Argument 2 to "do_io" has incompatible type "C1"; expected "C2")
+            #:: ExpectedOutput(type.error:Argument 2 to "do_io" has incompatible type "C1"; expected "C2"  [arg-type])
             do_io(t1, value)
         ),
         Ensures(

@@ -6,7 +6,6 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import ast
-import astunparse
 
 from typing import (
     Any,
@@ -55,6 +54,8 @@ class UnsupportedException(Exception):
 
     def __init__(self, ast_element: ast.AST, desc=""):
         self.node = ast_element
+        if not desc:
+            desc = type(ast_element).__name__
         self.desc = desc
         super().__init__(desc)
 
@@ -328,10 +329,8 @@ def pprint(node) -> str:
     if isinstance(node, str):
         return node
     if isinstance(node, ast.FunctionDef):
-        # Mainly for debugging, whenever this happens it's almost certainly
-        # wrong.
-        raise ValueError(node)
-    res = astunparse.unparse(node)
+        return "unknown node in function " + node.name
+    res = ast.unparse(node)
     res = res.replace('\n', '')
     return res
 

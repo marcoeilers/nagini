@@ -8,7 +8,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import ast
 
 DEFAULT_CLIENT_SOCKET = "tcp://localhost:5555"
-DEFAULT_SERVER_SOCKET = "tcp://*:5555"
+# Bind to loopback only so the server is not reachable from the network.
+DEFAULT_SERVER_SOCKET = "tcp://127.0.0.1:5555"
 
 
 LITERALS = ['True', 'False', 'None']
@@ -25,24 +26,28 @@ BUILTINS = ['cast',
             'range',
             'type',
             'list',
-            'enumerate']
+            'enumerate',
+            'bytearray']
 
 EXTENDABLE_BUILTINS = [
     'object',
     'Exception',
     'Lock',
-    'int'
+    'int',
+    'IntEnum'
 ]
 
 THREADING = ['Thread']
 
-BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred', 'MayStart', 'ThreadPost']
+BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred', 'bytearray_pred', 'MayStart', 'ThreadPost']
 
 FUNCTION_DOMAIN_NAME = 'Function'
 
 MAY_SET_PRED = '_MaySet'
 
 IS_DEFINED_FUNC = '_isDefined'
+
+ASSUMING_FUNC = '_assuming'
 
 ASSERTING_FUNC = '_asserting'
 
@@ -143,7 +148,9 @@ INTERNAL_NAMES = [
     'Low',
     'key',
     'guard',
-    'value'
+    'value',
+    ASSUMING_FUNC,
+    ASSERTING_FUNC
 ]
 
 VIPER_KEYWORDS = [
@@ -258,11 +265,15 @@ LEGAL_MAGIC_METHODS = {
     '__ror__',
 
     '__init__',
+    '__post_init__',
     '__enter__',
     '__exit__',
     '__str__',
+    '__repr__',
     '__len__',
     '__bool__',
+    '__format__',
+    '__hash__',
 
     '__getitem__',
     '__setitem__',
@@ -294,6 +305,8 @@ RANGE_TYPE = 'range'
 
 PSEQ_TYPE = 'PSeq'
 
+PBYTESEQ_TYPE = 'PByteSeq'
+
 PSET_TYPE = 'PSet'
 
 PMSET_TYPE = 'PMultiset'
@@ -309,6 +322,8 @@ SET_TYPE = 'set'
 STRING_TYPE = 'str'
 
 BYTES_TYPE = 'bytes'
+
+BYTEARRAY_TYPE = 'bytearray'
 
 INT_TYPE = 'int'
 
@@ -361,6 +376,8 @@ EVAL_IO_SIGNATURE = ('eval_io', 'func', 'arg', 'result')
 IGNORED_IMPORTS = {'_importlib_modulespec',
                    'abc',
                    'builtins',
+                   'dataclasses',
+                   'enum',
                    'nagini_contracts',
                    'nagini_contracts.adt',
                    'nagini_contracts.contracts',
@@ -377,6 +394,8 @@ IGNORED_MODULE_NAMES = {
     '_importlib_modulespec': [],
     'abc': [],
     'builtins': [],
+    'dataclasses': [],
+    'enum': [],
     'nagini_contracts': [],
     'nagini_contracts.contracts': [],
     'nagini_contracts.io_contracts': [],

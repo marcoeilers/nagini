@@ -7,8 +7,8 @@ from nagini_contracts.contracts import *
 
 
 class TreeNode:
-    def __init__(self, key: int, val: str, left:'TreeNode'=None,
-                 right:'TreeNode'=None, parent:'TreeNode'=None) -> None:
+    def __init__(self, key: int, val: str, left:Optional['TreeNode']=None,
+                 right:Optional['TreeNode']=None, parent:Optional['TreeNode']=None) -> None:
         self.key = key
         self.payload = val
         self.leftChild = left

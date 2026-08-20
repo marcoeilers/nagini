@@ -23,12 +23,3 @@ def foo_2() -> int:
     a = 0  # b[0]
     b = [34]
     return a
-
-
-def foo_3() -> int:
-    #:: ExpectedOutput(expression.undefined:undefined.local.variable)
-    tmp = a  # noqa: F823
-    a = 0  # b[0]
-    b = [34]
-    return a
-

@@ -6,16 +6,12 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import logging
-import sys
-
 import mypy.build
 import os
 
 from mypy.build import BuildSource
-from nagini_translation.lib import config
 from nagini_translation.lib.constants import IGNORED_IMPORTS, LITERALS
 from nagini_translation.mypy_patches.visitor import TraverserVisitor
-# from mypy.traverser import TraverserVisitor
 
 from nagini_translation.lib.util import (
     construct_lambda_prefix,
@@ -95,7 +91,12 @@ class TypeVisitor(TraverserVisitor):
                 if isinstance(t, mypy.types.TypeType):
                     continue
                 if not hasattr(t, 'type'):
-                    t = t.partial_fallback   # 'TupleType' object has no attribute 'type'
+                    if hasattr(t, 'partial_fallback'):
+                        t = t.partial_fallback
+                    elif hasattr(t, 'fallback'):
+                        t = t.fallback
+                    else:
+                        continue
                 if isinstance(t, mypy.types.Instance) and t.type.fullname.startswith('builtins.'):
                     continue
                 self.set_type(t.type.fullname.split('.') + [node.name],
@@ -114,16 +115,13 @@ class TypeVisitor(TraverserVisitor):
         super().visit_try_stmt(node)
 
     def visit_assignment_stmt(self, node: mypy.nodes.AssignmentStmt):
-        if (isinstance(node.rvalue, mypy.nodes.IndexExpr) and
-                isinstance(node.rvalue.analyzed, mypy.nodes.TypeAliasExpr)):
-            # If it's a type alias, process it as such.
+        analyzed = getattr(node.rvalue, "analyzed", None)
+        if isinstance(analyzed, mypy.nodes.TypeAliasExpr):
             key = tuple(self.prefix + [node.lvalues[0].name])
-            self.type_aliases[key] = node.rvalue.analyzed.type
-        elif (isinstance(node.rvalue, mypy.nodes.CallExpr) and
-                isinstance(node.rvalue.analyzed, mypy.nodes.TypeVarExpr)):
-            key = tuple(self.prefix + [node.rvalue.analyzed._name])
-            self.type_vars[key] = (node.rvalue.analyzed.upper_bound,
-                                   node.rvalue.analyzed.values)
+            self.type_aliases[key] = analyzed.node.target
+        elif isinstance(analyzed, mypy.nodes.TypeVarExpr):
+            key = tuple(self.prefix + [analyzed.name])
+            self.type_vars[key] = (analyzed.upper_bound, analyzed.values)
         else:
             super().visit_assignment_stmt(node)
 
@@ -221,17 +219,17 @@ class TypeVisitor(TraverserVisitor):
         if isinstance(node.callee, mypy.nodes.NameExpr) and node.callee.name == 'MarkGhost':
             # Verify MarkGhost call and collect ghost names
             if len(node.args) != 1:
-                msg = self.path + ':' + str(node.get_line()) + ': error: MarkGhost may only define one ghost name at a time.'
+                msg = self.path + ':' + str(node.line) + ': error: MarkGhost may only define one ghost name at a time.'
                 raise TypeException([msg])
             ghost_type = node.args[0]
             if not isinstance(ghost_type.node, mypy.nodes.TypeAlias):
-                msg = self.path + ':' + str(node.get_line()) + ': error: MarkGhost takes only Type aliases.'
+                msg = self.path + ':' + str(node.line) + ': error: MarkGhost takes only Type aliases.'
                 raise TypeException([msg])
             if not self.path in self.ghost_names:
                 self.ghost_names[self.path] = set()
             curr_set = self.ghost_names[self.path]
             if ghost_type.name in curr_set:
-                msg = self.path + ':' + str(node.get_line()) + ': error: MarkGhost may only define ghost names once.'
+                msg = self.path + ':' + str(node.line) + ': error: MarkGhost may only define ghost names once.'
                 raise TypeException([msg])
             curr_set.add(ghost_type.name)
         for a in node.args:
@@ -262,6 +260,8 @@ class TypeVisitor(TraverserVisitor):
         if node in self.type_map:
             result = self.type_map[node]
             return result
+        if hasattr(node, 'node') and isinstance(node.node, mypy.nodes.TypeAlias):
+            return node.fullname
         elif hasattr(node, 'fullname'):
             fullname = node.fullname.split('.')
             if self.real_path is not None:
@@ -270,7 +270,7 @@ class TypeVisitor(TraverserVisitor):
             if tuple(fullname) in self.type_vars:
                 result = self.type_vars[tuple(fullname)]
                 return result
-        msg = self.path + ':' + str(node.get_line()) + ': error: '
+        msg = self.path + ':' + str(node.line) + ': error: '
         if isinstance(node, mypy.nodes.FuncDef):
             msg += 'Encountered Any type. Type annotation missing?'
         else:
@@ -307,13 +307,16 @@ class TypeInfo:
         """
         result = mypy.options.Options()
         result.strict_optional = strict_optional
-        result.show_none_errors = strict_optional
         result.show_traceback = True
+        # Emit "file:line:col:end_line:end_col: error: msg" so that reported type
+        # errors carry a real source range (start and end) instead of only a
+        # line, matching the format Nagini produces for verification errors.
+        # show_error_end implies show_column_numbers.
+        result.show_column_numbers = True
+        result.show_error_end = True
         result.export_types = True
         result.preserve_asts = True
         result.warn_no_return = False
-        # Incremental mode in Python 3.9 leads to problems
-        result.incremental = sys.version_info[1] > 9
         # Since we run mypy twice with different options, we use different cache dirs for different configurations,
         # otherwise Mypy throws away the cache every time.
         result.cache_dir = '.mypy_cache_strict' if strict_optional else '.mypy_cache_nonstrict'
@@ -377,9 +380,7 @@ class TypeInfo:
                 if prefix.replace(os.sep, '.') not in directly_imported:
                     return old_find_cache_meta(id, path, mgr)
                 return None
-            if sys.version_info[1] > 9:
-                # In Python 3.9 or newer, we use the incremental mode, and we have to monkey-patch mypy.
-                mypy.build.find_cache_meta = my_find_cache_meta
+            mypy.build.find_cache_meta = my_find_cache_meta
 
             sources = [BuildSource(filename, module_name, None, base_dir=base_dir)]
 
@@ -480,6 +481,9 @@ class TypeInfo:
     def is_instance_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.Instance)
 
+    def is_literal_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.LiteralType)
+
     def is_tuple_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.TupleType)
 
@@ -501,6 +505,9 @@ class TypeInfo:
     def is_partial_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.PartialType)
 
+    def is_uninhabited_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.UninhabitedType)
+
     def is_any_type_from_error(self, type: mypy.types.Type) -> bool:
         if isinstance(type, mypy.types.AnyType):
             if type.type_of_any == mypy.types.TypeOfAny.from_error:
@@ -514,3 +521,6 @@ class TypeInfo:
 
     def is_none_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.NoneTyp)
+
+    def is_literal_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.LiteralType)

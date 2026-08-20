@@ -42,7 +42,7 @@ class ThingWithCell:
         Requires(Rd(self.l) and Rd(self.c) and self.l.get_locked() is self.c)
         Requires(WaitLevel() < Level(self.l))
         Ensures(Rd(self.l) and Rd(self.c))
-        #:: ExpectedOutput(postcondition.violated:assertion.false)|MissingOutput(postcondition.violated:assertion.false,320)
+        #:: ExpectedOutput(postcondition.violated:assertion.false)||MissingOutput(postcondition.violated:assertion.false,320)
         Ensures(False)
         self.l.acquire()
         self.c.n += 1

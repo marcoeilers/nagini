@@ -17,14 +17,15 @@ from nagini_translation.lib.constants import (
     INT_TYPE,
     IS_DEFINED_FUNC,
     LIST_TYPE,
+    BYTEARRAY_TYPE,
     MAIN_METHOD_NAME,
     MAY_SET_PRED,
     NAME_DOMAIN,
     OBJECT_TYPE,
     PRIMITIVE_BOOL_TYPE,
     PRIMITIVE_INT_TYPE,
-    RANGE_TYPE,
     PSEQ_TYPE,
+    PBYTESEQ_TYPE,
     PSET_TYPE,
     SET_TYPE,
     SINGLE_NAME,
@@ -78,7 +79,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         Visitor that is used if no other visitor is implemented.
         Simply raises an exception.
         """
-        raise UnsupportedException(node)
+        raise UnsupportedException(node, f'unsupported Python construct: {node.__class__.__name__}')
 
     def translate_block(self, stmtlist: List['silver.ast.Stmt'],
                         position: 'silver.ast.Position',
@@ -186,7 +187,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                             position=e.pos())
         return result
 
-    def to_int(self, e: Expr, ctx: Context) -> Expr:
+    def to_int(self, e: Expr, ctx: Context,
+              python_type: 'PythonType' = None) -> Expr:
         """
         Converts the given expression to an expression of the Silver type Int
         if it isn't already, either by unboxing a reference or undoing a
@@ -204,10 +206,16 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                     e.funcname() == '__prim__int___box__'):
             return e.args().head()
         result = e
-        int_type = ctx.module.global_module.classes[INT_TYPE]
-        result = self.get_function_call(int_type, '__unbox__',
-                                        [result], [None], None, ctx,
-                                        position=e.pos())
+        if python_type and python_type.python_class.enum and python_type.python_class.enum_type == INT_TYPE:
+            unbox_name = python_type.python_class.functions['__int__'].sil_name
+            result = self.viper.FuncApp(unbox_name, [result],
+                                        e.pos(), self.no_info(ctx),
+                                        self.viper.Int)
+        else:
+            int_type = ctx.module.global_module.classes[INT_TYPE]
+            result = self.get_function_call(int_type, '__unbox__',
+                                            [result], [None], None, ctx,
+                                            position=e.pos())
         return result
 
     def unwrap(self, e: Expr) -> Expr:
@@ -490,6 +498,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                                        self.viper.Bool, pos,
                                                        info)
         var_param_decl = self.viper.LocalVarDecl('val', self.viper.Ref, pos, info)
+        # We use an asserting function instead of Viper's asserting expression because that gives us
+        # a better error message (directly on the function application, not on the surrounding statement).
         deps_func = self.viper.FuncApp(ASSERTING_FUNC, [val, deps], deps_pos, info,
                                        self.viper.Ref, [var_param_decl,
                                                         assertion_param_decl])
@@ -555,7 +565,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
 
     def get_quantifier_lhs(self, in_expr: Expr, dom_type: PythonType, dom_arg: Expr,
                            node: ast.AST, ctx: Context, position: Position,
-                           force_trigger=False) -> Expr:
+                           force_trigger=False) -> (Expr, Expr):
         """
         Returns a contains-expression representing whether in_expr is in dom_arg.
         To be used on the left hand side of quantifiers (and in the corresponding
@@ -565,76 +575,107 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         forall x: <quantifier_lhs> ==> e
         Defaults to in_expr in type___sil_seq__, but used simpler expressions for known
         types to improve performance/triggering.
+        Returns two expressions (trigger_lhs, body_lhs), where trigger_lhs is well-suited
+        to be a trigger and body_lhs is well suited to be the the lhs of an implication
+        inside a quantifier (see https://github.com/marcoeilers/nagini/pull/289).
         """
         position = position if position else self.to_position(node, ctx)
         info = self.no_info(ctx)
-        res = None
+        res_trigger = None
+        res_contains = None
         if not (isinstance(dom_type, UnionType) or isinstance(dom_type, OptionalType)):
             if dom_type.name in (DICT_TYPE, SET_TYPE, PSEQ_TYPE, PSET_TYPE):
-                contains_constructor = self.viper.AnySetContains
+                contains_constructor_trigger = self.viper.AnySetContains
                 if dom_type.name == DICT_TYPE:
-                    contains_constructor = self.viper.MapContains
+                    contains_constructor_trigger = self.viper.MapContains
                     map_ref_ref = self.viper.MapType(self.viper.Ref, self.viper.Ref)
                     field = self.viper.Field('dict_acc', map_ref_ref, position, info)
-                    res = self.viper.FieldAccess(dom_arg, field, position, info)
+                    res_trigger = self.viper.FieldAccess(dom_arg, field, position, info)
                 elif dom_type.name == SET_TYPE:
                     set_ref = self.viper.SetType(self.viper.Ref)
                     field = self.viper.Field('set_acc', set_ref, position, info)
-                    res = self.viper.FieldAccess(dom_arg, field, position, info)
+                    res_trigger = self.viper.FieldAccess(dom_arg, field, position, info)
                 elif dom_type.name == PSET_TYPE:
-                    res = self.get_function_call(dom_type, '__unbox__', [dom_arg],
+                    res_trigger = self.get_function_call(dom_type, '__unbox__', [dom_arg],
                                                  [None], node, ctx, position)
                 else:
                     # PSEQ_TYPE
-                    contains_constructor = self.viper.SeqContains
-                    res = self.get_function_call(dom_type, '__sil_seq__', [dom_arg],
+                    contains_constructor_trigger = self.viper.SeqContains
+                    res_trigger = self.get_function_call(dom_type, '__sil_seq__', [dom_arg],
                                                  [None], node, ctx, position)
-            if False and (dom_type.name == RANGE_TYPE and isinstance(node.func, ast.Name) and
-                        node.func.id == 'range'):
-                left = node.args[0]
-                right = node.args[1]
-                _, left_expr = self.translate_expr(left, ctx)
-                _, right_expr = self.translate_expr(right, ctx)
-                int_class = ctx.module.global_module.classes[INT_TYPE]
-                left_bound = self.get_function_call(int_class, '__ge__',
-                                                    [in_expr, left], [None, None],
-                                                    node, ctx, position)
-                right_bound = self.get_function_call(int_class, '__lt__',
-                                                    [in_expr, right], [None, None],
-                                                    node, ctx, position)
-                if force_trigger:
-                    return None
-                else:
-                    return self.viper.And(left_bound, right_bound, position, info)
-        if res is None:
-            contains_constructor = self.viper.SeqContains
-            res = self.get_sequence(dom_type, dom_arg, None, node, ctx, position)
-        return contains_constructor(in_expr, res, position, info)
+        contains_constructor = self.viper.SeqContains
+        res_contains_trigger, res_contains_lhs = self.get_sequence(dom_type, dom_arg, None, node, ctx, position)
+
+        body_result = contains_constructor(in_expr, res_contains_lhs, position, info)
+        if res_trigger:
+            trigger_result = contains_constructor_trigger(in_expr, res_trigger, position, info)
+        else:
+            trigger_result = contains_constructor(in_expr, res_contains_trigger, position, info)
+        return (trigger_result, body_result)
 
     def get_sequence(self, receiver: PythonType, arg: Expr, arg_type: PythonType,
                      node: ast.AST, ctx: Context,
-                     position: Position = None) -> Expr:
+                     position: Position = None) -> (Expr, Expr):
         """
         Returns a sequence (Viper type Seq[Ref]) representing the contents of arg.
+        Defaults to type___sil_seq__, but used simpler expressions for known types
+        to improve performance/triggering.
+        Returns two versions, one well-suited for use in a trigger, one just a
+        standard expression (see https://github.com/marcoeilers/nagini/pull/289).
+        """
+        position = position if position else self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        res_trigger = None
+        if not isinstance(receiver, UnionType) or isinstance(receiver, OptionalType):
+            if receiver.name == LIST_TYPE:
+                seq_ref = self.viper.SeqType(self.viper.Ref)
+                field = self.viper.Field('list_acc', seq_ref, position, info)
+                res_trigger = self.viper.FieldAccess(arg, field, position, info)
+            if receiver.name == PSEQ_TYPE:
+                if (isinstance(arg, self.viper.ast.FuncApp) and
+                            arg.funcname() == 'PSeq___create__'):
+                    args = self.viper.to_list(arg.args())
+                    return args[0], args[0]
+        res = self.get_function_call(receiver, '__sil_seq__', [arg], [arg_type],
+                                      node, ctx, position)
+        if not res_trigger:
+            res_trigger = res
+        return res_trigger, res
+
+    def get_int_sequence(self, receiver: PythonType, arg: Expr,
+                     node: ast.AST, ctx: Context,
+                     position: Position = None) -> Expr:
+        """
+        Returns a sequence (Viper type Seq[Int]) representing the contents of arg.
         Defaults to type___sil_seq__, but used simpler expressions for known types
         to improve performance/triggering.
         """
         position = position if position else self.to_position(node, ctx)
         info = self.no_info(ctx)
+        int_type = INT_TYPE
         if not isinstance(receiver, UnionType) or isinstance(receiver, OptionalType):
-            if receiver.name == LIST_TYPE:
-                seq_ref = self.viper.SeqType(self.viper.Ref)
-                field = self.viper.Field('list_acc', seq_ref, position, info)
+            if receiver.name == BYTEARRAY_TYPE:
+                seq_int = self.viper.SeqType(self.viper.Int)
+                field = self.viper.Field('bytearray_acc', seq_int, position, info)
                 res = self.viper.FieldAccess(arg, field, position, info)
                 return res
-            if receiver.name == PSEQ_TYPE:
+            if receiver.name == PBYTESEQ_TYPE:
                 if (isinstance(arg, self.viper.ast.FuncApp) and
-                            arg.funcname() == 'PSeq___create__'):
+                            arg.funcname() == 'PByteSeq___create__'):
                     args = self.viper.to_list(arg.args())
                     return args[0]
-        return self.get_function_call(receiver, '__sil_seq__', [arg], [arg_type],
+            int_seq_op = getattr(receiver.cls, '__sil_int_seq__', None)
+            if callable(int_seq_op):
+                self.get_function_call(receiver, '__sil_int_seq__', [arg], [None], 
+                                       node, ctx, position)
+                
+        # Fallback to getting a Seq[Ref] and then converting to Seq[Int]
+        PByteSeq_class = ctx.module.global_module.classes[PBYTESEQ_TYPE]
+        seq_ref_exp = self.get_function_call(receiver, '__sil_seq__', [arg], [None],
                                       node, ctx, position)
-
+        return self.get_function_call(PByteSeq_class, '__seq_ref_to_seq_int__', [seq_ref_exp], [None],
+                                      node, ctx, position)
+    
     def _get_function_call(self, receiver: PythonType,
                           func_name: str, args: List[Expr],
                           arg_types: List[PythonType], node: ast.AST,

@@ -12,6 +12,7 @@ from nagini_translation.lib.constants import (
     BOOL_TYPE,
     BUILTINS,
     BYTES_TYPE,
+    BYTEARRAY_TYPE,
     DICT_TYPE,
     ELLIPSIS_TYPE,
     FLOAT_TYPE,
@@ -22,6 +23,7 @@ from nagini_translation.lib.constants import (
     RIGHT_OPERATOR_FUNCTIONS,
     PMSET_TYPE,
     PSEQ_TYPE,
+    PBYTESEQ_TYPE,
     PSET_TYPE,
     RANGE_TYPE,
     SET_TYPE,
@@ -297,6 +299,8 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
             return module.global_module.classes[ELLIPSIS_TYPE]
         else:
             raise UnsupportedException(node, f"Unsupported constant value type {type(node.value)}")
+    if isinstance(node, (ast.JoinedStr, ast.FormattedValue)):
+        return module.global_module.classes[STRING_TYPE]
     if isNum(node):
         if isinstance(node.value, int):
             return module.global_module.classes[INT_TYPE]
@@ -383,18 +387,21 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
     elif isinstance(node, ast.Call):
         return _get_call_type(node, module, current_function, containers,
                               container)
-    elif isinstance(node, ast.ListComp):
+    elif isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp)):
+        expected = {ast.ListComp: LIST_TYPE, ast.SetComp: SET_TYPE,
+                    ast.DictComp: DICT_TYPE}[type(node)]
         if (node._parent and isinstance(node._parent, (ast.Assign, ast.AnnAssign)) and
                     node is node._parent.value):
             # Constructor is assigned to variable;
-            # we get the type of the list from the type of the
+            # we get the type of the collection from the type of the
             # variable it's assigned to.
             trgt = node._parent.targets[0] if isinstance(node._parent, ast.Assign) else node._parent.target
             ann_type = get_type(trgt, containers, container)
-            if isinstance(ann_type, GenericType) and ann_type.python_class.name == 'list':
+            if isinstance(ann_type, GenericType) and ann_type.python_class.name == expected:
                 return ann_type
-        raise UnsupportedException(node, 'List comprehensions must be directly '
-                                       'assigned to a local variable.')
+        raise UnsupportedException(node, 'Comprehensions must be directly '
+                                       'assigned to a local variable of the '
+                                       'matching collection type.')
     else:
         raise UnsupportedException(node)
 
@@ -457,8 +464,8 @@ def _get_call_type(node: ast.Call, module: PythonModule,
         return _get_collection_literal_type(node, ['args'], PMSET_TYPE, module,
                                             containers, container)
     if func_name == 'enumerate':
-        if len(node.args) != 1:
-            raise UnsupportedException(node, 'enumerate only supported with single arg.')
+        if len(node.args) not in (1, 2):
+            raise UnsupportedException(node, 'enumerate only supported with one or two args.')
         list_type = module.global_module.classes[LIST_TYPE]
         int_type = module.global_module.classes[INT_TYPE]
         tuple_type = module.global_module.classes[TUPLE_TYPE]
@@ -494,6 +501,8 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 seq_class = module.global_module.classes[PSEQ_TYPE]
                 content_type = _get_iteration_type(arg_type, module, node)
                 return GenericType(seq_class, [content_type])
+            elif node.func.id == 'ToByteSeq':
+                return module.global_module.classes[PBYTESEQ_TYPE]
             elif node.func.id == 'ToMS':
                 arg_type = get_type(node.args[0], containers, container)
                 ms_class = module.global_module.classes[PMSET_TYPE]
@@ -601,7 +610,7 @@ def _get_subscript_type(value_type: PythonType, module: PythonModule,
         # FIXME: This is very unfortunate, but right now we cannot handle this
         # generically, so we have to hard code these two cases for the moment.
         return value_type.type_args[1]
-    elif value_type.name in (RANGE_TYPE, BYTES_TYPE):
+    elif value_type.name in (RANGE_TYPE, BYTES_TYPE, BYTEARRAY_TYPE, PBYTESEQ_TYPE):
         return module.global_module.classes[INT_TYPE]
     elif value_type.name == PSEQ_TYPE:
         return value_type.type_args[0]

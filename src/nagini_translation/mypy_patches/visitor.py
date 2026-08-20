@@ -13,9 +13,13 @@ from mypy.nodes import (
     TryStmt, WithStmt, NameExpr, MemberExpr, OpExpr, SliceExpr, CastExpr, RevealExpr,
     UnaryExpr, ListExpr, TupleExpr, DictExpr, SetExpr, IndexExpr, AssignmentExpr,
     GeneratorExpr, ListComprehension, SetComprehension, DictionaryComprehension,
-    ConditionalExpr, TypeApplication, ExecStmt, Import, ImportFrom,
+    ConditionalExpr, TypeApplication, Import, ImportFrom,
     LambdaExpr, ComparisonExpr, OverloadedFuncDef, YieldFromExpr,
-    YieldExpr, StarExpr, BackquoteExpr, AwaitExpr, PrintStmt, SuperExpr, Node, REVEAL_TYPE,
+    YieldExpr, StarExpr, AwaitExpr, SuperExpr, Node, REVEAL_TYPE, MatchStmt,
+)
+from mypy.patterns import (
+    AsPattern, ClassPattern, MappingPattern, OrPattern, SequencePattern,
+    SingletonPattern, StarredPattern, ValuePattern,
 )
 
 
@@ -277,9 +281,6 @@ class TraverserVisitor:
     def visit_star_expr(self, o: StarExpr) -> None:
         self.visit(o.expr)
 
-    def visit_backquote_expr(self, o: BackquoteExpr) -> None:
-        self.visit(o.expr)
-
     def visit_await_expr(self, o: AwaitExpr) -> None:
         self.visit(o.expr)
 
@@ -290,17 +291,53 @@ class TraverserVisitor:
         for a in o.assignments:
             self.visit(a)
 
+    def visit_match_stmt(self, o: MatchStmt) -> None:
+        self.visit(o.subject)
+        for i in range(len(o.patterns)):
+            self.visit(o.patterns[i])
+            if o.guards[i] is not None:
+                self.visit(o.guards[i])
+            self.visit(o.bodies[i])
+
+    def visit_as_pattern(self, o: AsPattern) -> None:
+        if o.pattern is not None:
+            self.visit(o.pattern)
+        if o.name is not None:
+            self.visit(o.name)
+
+    def visit_or_pattern(self, o: OrPattern) -> None:
+        for p in o.patterns:
+            self.visit(p)
+
+    def visit_value_pattern(self, o: ValuePattern) -> None:
+        self.visit(o.expr)
+
+    def visit_singleton_pattern(self, o: SingletonPattern) -> None:
+        pass
+
+    def visit_sequence_pattern(self, o: SequencePattern) -> None:
+        for p in o.patterns:
+            self.visit(p)
+
+    def visit_starred_pattern(self, o: StarredPattern) -> None:
+        if o.capture is not None:
+            self.visit(o.capture)
+
+    def visit_mapping_pattern(self, o: MappingPattern) -> None:
+        for key in o.keys:
+            self.visit(key)
+        for value in o.values:
+            self.visit(value)
+        if o.rest is not None:
+            self.visit(o.rest)
+
+    def visit_class_pattern(self, o: ClassPattern) -> None:
+        self.visit(o.class_ref)
+        for p in o.positionals:
+            self.visit(p)
+        for v in o.keyword_values:
+            self.visit(v)
+
     def visit_import_from(self, o: ImportFrom) -> None:
         for a in o.assignments:
             self.visit(a)
-
-    def visit_print_stmt(self, o: PrintStmt) -> None:
-        for arg in o.args:
-            self.visit(arg)
-
-    def visit_exec_stmt(self, o: ExecStmt) -> None:
-        self.visit(o.expr)
-        if o.globals:
-            self.visit(o.globals)
-        if o.locals:
-            self.visit(o.locals)

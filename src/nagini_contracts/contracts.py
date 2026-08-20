@@ -27,12 +27,13 @@ GHOST_PREFIX = "_gh_"
 
 CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant', 'Decreases']
 
-GHOST_BUILTINS = ['PSeq', 'PSet', 'PMultiset', 'GInt', 'GFloat', 'GComplex', 'GBool', 'GStr']
+GHOST_BUILTINS = ['PSeq', 'PByteSeq', 'PSet', 'PMultiset', 'GInt', 'GFloat', 'GComplex',
+                  'GBool', 'GStr']
 
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'ResultT', 'Implies', 'Forall', 'IOForall', 'Forall2', 'Forall3', 'Forall6',
                   'Exists', 'Low', 'LowVal', 'LowEvent', 'Declassify', 'TerminatesSif',
                   'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding', 'Previous',
-                  'RaisedException', 'ToSeq', 'ToMS', 'MaySet', 'MayCreate',
+                  'RaisedException', 'ToSeq', 'ToByteSeq', 'ToMS', 'MaySet', 'MayCreate',
                   'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',
                   'LowExit', 'Refute', 'isNaN', 'Reveal', 'MarkGhost'] + GHOST_BUILTINS
 
@@ -286,6 +287,66 @@ class PSeq(Generic[T], Sized, Iterable[T]):
         can be used as arguments for Forall.
         """
 
+class PByteSeq(Sized, Iterable[int]):
+    """
+    A PByteSeq represents a pure sequence of instances of int, and
+    is translated to native Viper sequences.
+    """
+
+    def __init__(self, *args: int) -> None:
+        """
+        ``PByteSeq(a, b, c)`` creates a PByteSeq instance containing the objects
+        a, b and c in that order.
+        """
+
+    def __contains__(self, item: object) -> bool:
+        """
+        True iff this PByteSeq contains the given object (not taking ``__eq__``
+        into account).
+        """
+
+    def __getitem__(self, item: int) -> int:
+        """
+        Returns the item at the given position.
+        """
+
+    def __len__(self) -> int:
+        """
+        Returns the length of this PByteSeq.
+        """
+
+    def __add__(self, other: 'PByteSeq') -> 'PByteSeq':
+        """
+        Concatenates two PByteSeqs to get a new PByteSeq.
+        """
+
+    def take(self, until: int) -> 'PByteSeq':
+        """
+        Returns a new PByteSeq containing all elements starting
+        from the beginning until the given index. ``PByteSeq(3,2,5,6).take(3)``
+        is equal to ``PByteSeq(3,2,5)``.
+        """
+
+    def drop(self, until: int) -> 'PByteSeq':
+        """
+        Returns a new PByteSeq containing all elements starting
+        from the given index (i.e., drops all elements until that index).
+        ``PByteSeq(2,3,5,6).drop(2)`` is equal to ``PByteSeq(5,6)``.
+        """
+
+    def update(self, index: int, new_val: int) -> 'PByteSeq':
+        """
+        Returns a new PByteSeq, containing the same elements
+        except for the element at index ``index``, which is replaced by
+        ``new_val``.
+        """
+
+    def __iter__(self) -> Iterator[int]:
+        """
+        PByteSeqs can be quantified over; this is only here so thatPByteSeqs
+        can be used as arguments for Forall.
+        """
+
 def Previous(it: T) -> PSeq[T]:
     """
     Within the body of a loop 'for x in xs', Previous(x) represents the list of
@@ -376,6 +437,12 @@ def ToSeq(l: Iterable[T]) -> PSeq[T]:
     """
     Converts the given iterable of a built-in type (list, set, dict, range) to
     a pure PSeq.
+    """
+    
+def ToByteSeq(l: Iterable[int]) -> PByteSeq:
+    """
+    Converts the given iterable of a compatible built-in type (bytearray) to
+    a pure PByteSeq.
     """
 
 
@@ -547,6 +614,13 @@ def dict_pred(d: object) -> bool:
     be folded or unfolded.
     """
 
+def bytearray_pred(d: object) -> bool:
+    """
+    Special, predefined predicate that represents the permissions belonging
+    to a bytearray. To be used like normal predicates, except it does not need to
+    be folded or unfolded.
+    """
+
 def isNaN(f: float) -> bool:
     pass
 
@@ -599,10 +673,13 @@ __all__ = [
         'list_pred',
         'dict_pred',
         'set_pred',
+        'bytearray_pred',
         'PSeq',
+        'PByteSeq',
         'PSet',
         'PMultiset',
         'ToSeq',
+        'ToByteSeq',
         'ToMS',
         'MaySet',
         'MayCreate',

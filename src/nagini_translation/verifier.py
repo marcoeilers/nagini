@@ -23,6 +23,47 @@ class ViperVerifier(Enum):
     carbon = 'carbon'
 
 
+def build_silicon_backend_args(viper_args: List[str], counterexample: bool,
+                               disable_branch_conditions: bool) -> List[str]:
+    """The Silicon command line used by Nagini.
+
+    Shared by the direct Silicon backend and the ViperServer-based one so the
+    two always use identical arguments.
+    """
+    return [
+        '--assumeInjectivityOnInhale',
+        '--z3Exe', config.z3_path,
+        '--disableCatchingExceptions',
+        '--exhaleMode=2',
+        '--alternativeFunctionVerificationOrder',
+        '--z3ResourcesPerMillisecond=9000',
+        '--disableDefaultPlugins',
+        *(['--enableBranchconditionReporting'] if not disable_branch_conditions else []),
+        '--plugin=viper.silver.plugin.standard.refute.RefutePlugin:'
+        'viper.silver.plugin.standard.termination.TerminationPlugin:'
+        'viper.silver.plugin.standard.predicateinstance.PredicateInstancePlugin',
+        *(['--counterexample=native', '--proverArgs=model.partial=true'] if counterexample else []),
+        *viper_args,
+    ]
+
+
+def build_carbon_backend_args(viper_args: List[str]) -> List[str]:
+    """The Carbon command line used by Nagini.
+
+    Shared by the direct Carbon backend and the ViperServer-based one.
+    """
+    return [
+        '--assumeInjectivityOnInhale',
+        '--boogieExe', config.boogie_path,
+        '--z3Exe', config.z3_path,
+        '--disableDefaultPlugins',
+        '--plugin=viper.silver.plugin.standard.refute.RefutePlugin:'
+        'viper.silver.plugin.standard.termination.TerminationPlugin:'
+        'viper.silver.plugin.standard.predicateinstance.PredicateInstancePlugin',
+        *viper_args,
+    ]
+
+
 class VerificationResult(metaclass=ABCMeta):
     pass
 
@@ -106,27 +147,16 @@ class Silicon:
     Provides access to the Silicon verifier
     """
 
-    def __init__(self, jvm: JVM, filename: str, viper_args: List[str], counterexample: bool):
+    def __init__(self, jvm: JVM, filename: str, viper_args: List[str], counterexample: bool,
+                 disable_branch_conditions: bool):
         self.jvm = jvm
         self.silver = jvm.viper.silver
         if not jvm.is_known_class(jvm.viper.silicon, 'Silicon'):
             raise Exception('Silicon backend not found on classpath.')
         reporter = getobject(jvm.java, jvm.viper.silver.reporter, 'NoopReporter')
         self.silicon = jvm.viper.silicon.MinimalSiliconFrontendAPI(reporter)
-        args = [
-            '--assumeInjectivityOnInhale',
-            '--z3Exe', config.z3_path,
-            '--disableCatchingExceptions',
-            '--exhaleMode=2',
-            '--alternativeFunctionVerificationOrder',
-            '--z3ResourcesPerMillisecond=9000',
-            '--disableDefaultPlugins',
-            '--plugin=viper.silver.plugin.standard.refute.RefutePlugin:'
-            'viper.silver.plugin.standard.termination.TerminationPlugin:'
-            'viper.silver.plugin.standard.predicateinstance.PredicateInstancePlugin',
-            *(['--counterexample=native', '--proverArgs=model.partial=true'] if counterexample else []),
-            *viper_args,
-        ]
+        args = build_silicon_backend_args(viper_args, counterexample,
+                                          disable_branch_conditions)
         args_seq = list_to_seq(args, jvm, jvm.java.lang.String)
         self.silicon.initialize(args_seq)
 
@@ -146,9 +176,15 @@ class Silicon:
         else:
             return Success()
 
-    def __del__(self):
+    def stop(self):
         if hasattr(self, 'silicon') and self.silicon:
-            self.silicon.stop()
+            try:
+                self.silicon.stop()
+            except Exception:
+                pass
+
+    def __del__(self):
+        self.stop()
 
 
 class Carbon:
@@ -164,16 +200,7 @@ class Carbon:
             raise Exception('Boogie not found.')
         reporter = getobject(jvm.java, jvm.viper.silver.reporter, 'NoopReporter')
         self.carbon = jvm.viper.carbon.MinimalCarbonFrontendAPI(reporter)
-        args = [
-            '--assumeInjectivityOnInhale',
-            '--boogieExe', config.boogie_path,
-            '--z3Exe', config.z3_path,
-            '--disableDefaultPlugins',
-            '--plugin=viper.silver.plugin.standard.refute.RefutePlugin:'
-            'viper.silver.plugin.standard.termination.TerminationPlugin:'
-            'viper.silver.plugin.standard.predicateinstance.PredicateInstancePlugin',
-            *viper_args
-        ]
+        args = build_carbon_backend_args(viper_args)
         args_seq = list_to_seq(args, jvm, jvm.java.lang.String)
         self.carbon.initialize(args_seq)
         self.jvm = jvm
@@ -194,3 +221,10 @@ class Carbon:
             return Failure(errors, self.jvm, modules, sif)
         else:
             return Success()
+
+    def stop(self):
+        if hasattr(self, 'carbon') and self.carbon:
+            try:
+                self.carbon.stop()
+            except Exception:
+                pass
