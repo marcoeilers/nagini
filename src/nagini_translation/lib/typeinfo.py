@@ -344,6 +344,7 @@ class TypeInfo:
                     relpath = relpath[:-4]
                 module_name = relpath
         self.module_name = module_name
+        old_find_cache_meta = mypy.build.find_cache_meta
         try:
             options_strict = self._create_options(True)
 
@@ -353,7 +354,6 @@ class TypeInfo:
             # So: We monkey-patch the function that tries to find cached type information for the given file s.t.
             # it returns None (= no cached info to use) for all files transitively imported from __main__, ignoring
             # modules in IGNORED_IMPORTS and everything imported solely by those.
-            old_find_cache_meta = mypy.build.find_cache_meta
             directly_imported = set()
             imports_not_handled = set()
             def my_find_cache_meta(id, path, mgr):
@@ -427,6 +427,11 @@ class TypeInfo:
             return True
         except mypy.errors.CompileError as e:
             report_errors(e.messages)
+        finally:
+            # Undo the patch: otherwise every call would wrap the function
+            # installed by the previous one, and looking up a single cache entry
+            # would recurse through all of them.
+            mypy.build.find_cache_meta = old_find_cache_meta
 
     def get_type_prefix(self, name: str) -> str:
         name = os.path.abspath(name)
