@@ -64,7 +64,6 @@ class Context:
         self.sif = False
         self.allow_statements = False
         self.float_encoding = None
-        self.strict_int = False
 
     def get_fresh_int(self) -> int:
         """

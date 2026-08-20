@@ -312,7 +312,6 @@ class VerificationService:
                  verifier_backend: str = 'silicon', sif=False,
                  float_encoding: str = None,
                  disable_branch_conditions: bool = False,
-                 strict_int: bool = False,
                  force_obligations: bool = False,
                  default_viper_args: List[str] = None,
                  record_dir: str = None):
@@ -340,7 +339,6 @@ class VerificationService:
         self._float_encoding = float_encoding
         self._bv_size = int_bitops_size
         self._disable_branch_conditions = disable_branch_conditions
-        self._strict_int = strict_int
         self._record_dir = record_dir
         # Continue the attempt numbering of any earlier server that recorded
         # into the same directory (e.g. a session resume, or a harness-side
@@ -540,7 +538,6 @@ class VerificationService:
                 'baseDir': base_dir,
                 'effectiveViperArgs': viper_args,
                 'backend': self._backend,
-                'strictInt': self._strict_int,
                 'intBitopsSize': self._bv_size,
                 'sourceSha256': (hashlib.sha256(source).hexdigest()
                                  if source is not None else None),
@@ -644,7 +641,6 @@ class VerificationService:
             'floatEncoding': self._float_encoding,
             'useViperServer': config.use_viper_server,
             'disableBranchConditions': self._disable_branch_conditions,
-            'strictInt': self._strict_int,
             'z3Path': config.z3_path,
             'boogiePath': config.boogie_path,
             'mypyPath': config.mypy_path,
@@ -678,8 +674,6 @@ class VerificationService:
             if options.get('disable_branch_conditions') is not None:
                 self._disable_branch_conditions = bool(
                     options['disable_branch_conditions'])
-            if options.get('strict_int') is not None:
-                self._strict_int = bool(options['strict_int'])
             reload_needed = False
             if options.get('sif') is not None and options['sif'] != self._sif:
                 self._sif = options['sif']
@@ -730,8 +724,7 @@ class VerificationService:
                     path, self.jvm, self._bv_size,
                     selected=set(selected) if selected else set(), sif=False,
                     base_dir=base_dir, arp=False, counterexample=counterexample,
-                    ignore_global=ignore_global, float_encoding=self._float_encoding,
-                    strict_int=self._strict_int)
+                    ignore_global=ignore_global, float_encoding=self._float_encoding)
             except (TypeException, InvalidProgramException, UnsupportedException) as e:
                 return VerifyResult(False, self._exception_diagnostics(e, path),
                                     time.time() - start, translation_failed=True)
@@ -929,8 +922,7 @@ class VerificationService:
                 path, self.jvm, self._bv_size, selected=selected_set,
                 sif=self._sif, base_dir=base_dir, arp=arp,
                 counterexample=counterexample, ignore_global=ignore_global,
-                float_encoding=self._float_encoding,
-                strict_int=self._strict_int)
+                float_encoding=self._float_encoding)
             if translated is None:
                 return VerifyResult(False, [self._point_diagnostic(
                     path, 'Type checking failed.', 'type.error')],
@@ -1106,7 +1098,6 @@ OPTION_TO_KWARG = {
     'floatEncoding': 'float_encoding',
     'useViperServer': 'use_viper_server',
     'disableBranchConditions': 'disable_branch_conditions',
-    'strictInt': 'strict_int',
 }
 
 
@@ -1143,9 +1134,6 @@ def add_service_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentP
                              'errors (Silicon backend)')
     parser.add_argument('--no-viper-server', action='store_true',
                         help='disable the in-process ViperServer backend')
-    parser.add_argument('--strict-int', action='store_true', default=False,
-                        help='require exact int type (type(x) == int) rather '
-                             'than subtype (isinstance(x, int)) in many places')
     parser.add_argument('--force-obligations', action='store_true', default=False,
                         help='force use of the obligations encoding used to '
                              'verify liveness properties')
@@ -1175,7 +1163,7 @@ def service_kwargs_from_args(args: argparse.Namespace) -> dict:
         use_viper_server=not args.no_viper_server, verifier_backend=args.verifier,
         sif=args.sif, float_encoding=args.float_encoding,
         disable_branch_conditions=args.disable_branch_conditions,
-        strict_int=args.strict_int, force_obligations=args.force_obligations,
+        force_obligations=args.force_obligations,
         default_viper_args=args.viper_arg.split(',') if args.viper_arg else None,
         record_dir=args.record_dir)
 
