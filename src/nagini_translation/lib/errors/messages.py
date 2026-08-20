@@ -245,6 +245,12 @@ INVALID_PROGRAM_MESSAGES = {
         'an impure construct (e.g. a call to a non-@Pure function or method) '
         'appears where only pure expressions are allowed, such as contracts '
         'or loop guards. Evaluate it into a local variable first.',
+    'invalid.perm.amount':
+        'this expression cannot be used as a permission amount. Permission '
+        'amounts must be built from integer literals and int-typed '
+        'expressions (e.g. 1/1000, n/2) — a name bound to a float or other '
+        'non-int value (e.g. FRAC = 1 / 1000) is not supported; write the '
+        'fraction literally at the use site.',
     'invalid.contract.position':
         'a contract expression (Requires/Ensures/Invariant/...) appears '
         'outside its designated position: pre- and postconditions at the '
