@@ -34,6 +34,7 @@ from nagini_translation.lib.constants import (
     THREAD_START_PRED,
 )
 from nagini_translation.lib.program_nodes import (
+    OptionalType,
     PythonField,
     PythonGlobalVar,
     PythonMethod,
@@ -192,8 +193,11 @@ class ContractTranslator(CommonTranslator):
         if not ctx.strict_int:
             return None
         list_type = self.get_type(list_py_node, ctx)
+        # When the permission holds, an Optional[List[...]] receiver is a list.
+        if isinstance(list_type, OptionalType):
+            list_type = list_type.optional_type
         # The argument may not be a list at all (list_pred dispatches on the bare
-        # name), and Optional/union type_args contain None placeholders.
+        # name).
         if (list_type is None or list_type.name != LIST_TYPE
                 or not getattr(list_type, 'type_args', None)):
             return None
@@ -232,8 +236,11 @@ class ContractTranslator(CommonTranslator):
         if not ctx.strict_int:
             return None
         dict_type = self.get_type(dict_py_node, ctx)
+        # When the permission holds, an Optional[Dict[...]] receiver is a dict.
+        if isinstance(dict_type, OptionalType):
+            dict_type = dict_type.optional_type
         # The argument may not be a dict at all (dict_pred dispatches on the bare
-        # name), and Optional/union type_args contain None placeholders.
+        # name).
         if (dict_type is None or dict_type.name != DICT_TYPE
                 or not getattr(dict_type, 'type_args', None)
                 or len(dict_type.type_args) < 2):
@@ -814,6 +821,10 @@ class ContractTranslator(CommonTranslator):
     def translate_to_sequence(self, node: ast.Call,
                               ctx: Context) -> StmtsAndExpr:
         coll_type = self.get_type(node.args[0], ctx)
+        if isinstance(coll_type, OptionalType):
+            # An Optional's type_args are [None, typ]; element types must come
+            # from the underlying collection type.
+            coll_type = coll_type.optional_type
         stmt, arg = self.translate_expr(node.args[0], ctx)
         # Use the same sequence conversion as for iterating over the
         # iterable (which gives no information about order for unordered types).
@@ -834,6 +845,8 @@ class ContractTranslator(CommonTranslator):
     def translate_to_int_sequence(self, node: ast.Call,
                               ctx: Context) -> StmtsAndExpr:
         coll_type = self.get_type(node.args[0], ctx)
+        if isinstance(coll_type, OptionalType):
+            coll_type = coll_type.optional_type
         stmt, arg = self.translate_expr(node.args[0], ctx)
         
         seq_call = self.get_int_sequence(coll_type, arg, node, ctx)
