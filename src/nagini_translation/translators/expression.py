@@ -1054,7 +1054,7 @@ class ExpressionTranslator(CommonTranslator):
         else:
             type_type = ctx.module.global_module.classes[TYPE_TYPE]
             receiver_is_type = self.type_check(receiver, type_type, position, ctx)
-            type_arg = self.to_type(self.viper.CondExp(receiver_is_type, receiver,
+            type_arg = self.to_pytype(self.viper.CondExp(receiver_is_type, receiver,
                                                        self.to_ref(self.type_factory.typeof(receiver, ctx), ctx),
                                                        position, self.no_info(ctx)),
                                     ctx)

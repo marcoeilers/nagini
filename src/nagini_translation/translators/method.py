@@ -238,7 +238,7 @@ class MethodTranslator(CommonTranslator):
                             cls_arg, type_type, self.no_position(ctx), ctx)
                         pres.append(type_check)
                         type_check = self.type_factory.subtype_check(
-                            self.to_type(cls_arg, ctx), func.cls, self.no_position(ctx), ctx)
+                            self.to_pytype(cls_arg, ctx), func.cls, self.no_position(ctx), ctx)
                         pres.append(type_check)
                         continue
                 type_check = self.get_parameter_typeof(arg, ctx)

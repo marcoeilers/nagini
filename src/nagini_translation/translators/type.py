@@ -101,5 +101,5 @@ class TypeTranslator(CommonTranslator):
 
     def subtype_check(self, obj: Expr, type_expr: Expr, position: 'silver.ast.Position', ctx: Context) -> Expr:
         obj_type = self.type_factory.typeof(self.to_ref(obj, ctx), ctx)
-        rhs_type = self.to_type(type_expr, ctx)
+        rhs_type = self.to_pytype(type_expr, ctx)
         return self.type_factory._issubtype(obj_type, rhs_type, ctx, position=position)

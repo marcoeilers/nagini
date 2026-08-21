@@ -108,7 +108,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         elif target_type == self.viper.Int:
             result = self.to_int(e, ctx)
         elif target_type == self.type_factory.type_type():
-            result = self.to_type(e, ctx)
+            result = self.to_pytype(e, ctx)
         return result
 
     def _is_pure(self, e: Expr) -> bool:
@@ -231,7 +231,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                             position=e.pos())
         return result
 
-    def to_type(self, e: Expr, ctx: Context) -> Expr:
+    def to_pytype(self, e: Expr, ctx: Context) -> Expr:
         """
         Converts the given expression to an expression of the Silver type PyType
         if it isn't already, either by unboxing a reference or undoing a
@@ -747,7 +747,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             elif param.type.name == PRIMITIVE_INT_TYPE:
                 actual_arg = self.to_int(arg, ctx)
             elif param.type.name == PRIMITIVE_TYPE_TYPE:
-                actual_arg = self.to_type(arg, ctx)
+                actual_arg = self.to_pytype(arg, ctx)
             else:
                 actual_arg = self.to_ref(arg, ctx)
             actual_args.append(actual_arg)

@@ -1845,7 +1845,7 @@ class CallTranslator(CommonTranslator):
 
         type_stmt, dynamic_type = self.translate_expr(node.func, ctx)
         assert not type_stmt
-        result_has_type = self.viper.EqCmp(self.type_factory.typeof(res_var.ref(), ctx), self.to_type(dynamic_type, ctx),
+        result_has_type = self.viper.EqCmp(self.type_factory.typeof(res_var.ref(), ctx), self.to_pytype(dynamic_type, ctx),
                                            self.to_position(node, ctx), self.no_info(ctx))
         # Inhale the type information about the newly created object
         # so that it's already present when calling __init__.

@@ -591,5 +591,8 @@ function type___unbox__(box: Ref): PyType
 function type___eq__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), type())
-    requires issubtype(typeof(other), type())
-    ensures result == (type___unbox__(self) == type___unbox__(other))
+    // Comparing a type against a non-type is legal in Python and simply yields
+    // False, so this must not require `other` to be a type.
+    ensures issubtype(typeof(other), type()) ==>
+        result == (type___unbox__(self) == type___unbox__(other))
+    ensures !issubtype(typeof(other), type()) ==> !result
