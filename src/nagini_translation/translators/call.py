@@ -625,7 +625,11 @@ class CallTranslator(CommonTranslator):
             
         if method_name:
             target_method = bytearray_class.get_method(method_name)
-            arg_stmts, arg_vals, arg_types = self.translate_args(target_method, node.args, node.keywords, node, ctx)
+            # The __initFrom*__ factories take no receiver, although the call
+            # node syntactically is a constructor call.
+            arg_stmts, arg_vals, arg_types = self.translate_args(
+                target_method, node.args, node.keywords, node, ctx,
+                implicit_receiver=False)
             constr_call = self.get_method_call(bytearray_class, method_name, arg_vals, arg_types, targets, node, ctx)
             return arg_stmts + constr_call, res_var.ref(node, ctx)
 
