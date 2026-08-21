@@ -292,3 +292,28 @@ class Derived(Base):
         Requires(t == MyClass)
         Ensures(Result())
         return True
+
+
+# A list declared as List[Type[MyClass]]. mypy accepts storing class objects of
+# strict subclasses here, because Type is covariant, so this must be supported.
+def tester25(o: object) -> None:
+    ls: List[Type[MyClass]] = [MyClass, MyOtherClass]
+    t = ls[0]
+    if isinstance(o, t):
+        # This works because the contents of the list literal are known, not
+        # because of the declared element type; see tester25f.
+        mc = cast(MyClass, o)
+
+
+# KNOWN LIMITATION, the container counterpart of tester21: with the contents of
+# the list unknown, the declared element type Type[MyClass] carries no
+# information about t, so o cannot be shown to be a MyClass. Note that this case
+# is not fixed by strengthening the type invariant of Type[C]-typed expressions;
+# it needs type() itself to become generic.
+def tester25f(ls: List[Type[MyClass]], o: object) -> None:
+    Requires(Acc(list_pred(ls)))
+    Requires(len(ls) > 0)
+    t = ls[0]
+    if isinstance(o, t):
+        #:: ExpectedOutput(application.precondition:assertion.false)
+        mc = cast(MyClass, o)
