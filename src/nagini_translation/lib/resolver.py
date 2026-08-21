@@ -459,14 +459,8 @@ def _get_collection_literal_type(node: ast.AST, arg_fields: List[str],
                          getattr(node, arg_field)]
             args.append(common_supertype(arg_types))
     else:
-        parent = getattr(node, '_parent', None)
-        if isinstance(parent, ast.keyword):
-            parent = getattr(parent, '_parent', None)
-        if isinstance(parent, ast.Call):
-            # An empty literal passed to a parameter without a matching
-            # collection type would be typed e.g. List[object] and fail the
-            # callee's type obligation with no located hint; reject instead.
-            raise InvalidProgramException(node, 'generic.constructor.without.type')
+        # No elements and no typed context (e.g. `len([])`, or a parameter
+        # typed object): the element type is object.
         object_class = module.global_module.classes[OBJECT_TYPE]
         args = [object_class for arg_field in arg_fields]
     return GenericType(module.global_module.classes[coll_type],

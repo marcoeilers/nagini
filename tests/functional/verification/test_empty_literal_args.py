@@ -75,3 +75,13 @@ def call_constructors() -> None:
     takes_set(set())
     takes_seq(PSeq())
     takes_set(s=set())
+
+
+def takes_obj(o: object) -> None:
+    pass
+
+
+def no_parameter_type() -> None:
+    # No typed context: the literal is a List[object], as before.
+    takes_obj([])
+    Assert(len([]) == 0)
