@@ -241,3 +241,37 @@ def tester21(t: Type[MyClass], o: object) -> None:
     if isinstance(o, t):
         #:: ExpectedOutput(application.precondition:assertion.false)
         mc = cast(MyClass, o)
+
+
+# Type objects in the specification-level containers.
+def tester22(o: object) -> None:
+    Requires(isinstance(o, PSeq(int, MyClass)[1]))
+    Assert(PSeq(int, MyClass)[1] == MyClass)
+    Assert(isinstance(o, MyClass))
+
+
+def tester23(t: type) -> None:
+    Requires(t in PSet(int, MyClass))
+    Assert(t == int or t == MyClass)
+
+
+# The mirror image of tester15: a type object on the right hand side of a
+# comparison whose left hand side is not a type.
+def tester24(o: object) -> None:
+    b = o == MyClass
+
+
+# A type-typed parameter in an overridden method, so that the behavioural
+# subtyping check has to relate two type-typed arguments.
+class Base:
+    def m(self, t: type) -> bool:
+        Requires(t == MyClass)
+        Ensures(Result())
+        return True
+
+
+class Derived(Base):
+    def m(self, t: type) -> bool:
+        Requires(t == MyClass)
+        Ensures(Result())
+        return True
