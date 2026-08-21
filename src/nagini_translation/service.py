@@ -24,7 +24,9 @@ import json
 import logging
 import os
 import re
+import shutil
 import signal
+import tempfile
 import threading
 import time
 
@@ -215,6 +217,10 @@ def _debug_payload(error) -> Optional[dict]:
             # Z3 rlimit units spent on the failing check itself; the unit
             # assertTimeout budgets are enforced in (ms * z3ResourcesPerMillisecond).
             payload['rlimitDelta'] = int(str(ctx.rlimitDelta().get()))
+        if hasattr(ctx, 'sessionLog') and ctx.sessionLog().isDefined():
+            # Path of the prover session log this failure's .smt2 bundle is
+            # copied from (see the smtstate dir for the replayable bundle).
+            payload['sessionLog'] = str(ctx.sessionLog().get())
         if ctx.state().isDefined():
             state = ctx.state().get()
             payload['state'] = {
@@ -433,6 +439,19 @@ class VerificationService:
             given = {a.split('=', 1)[0] for a in viper_args}
             viper_args = [a for a in self._default_viper_args
                           if a.split('=', 1)[0] not in given] + viper_args
+        # Per-request dir for the backend's SMT state bundles, adopted into
+        # the attempt record when a diagnostic is canceled (see _record).
+        # Staged inside the record dir so adoption is a same-filesystem rename
+        # and nothing lands in the system temp dir.
+        smtstate_dir = None
+        if ('--smtStateOnError' in viper_args
+                and not any(a.startswith('--smtStateDir')
+                            for a in viper_args)):
+            if self._record_dir:
+                os.makedirs(self._record_dir, exist_ok=True)
+            smtstate_dir = tempfile.mkdtemp(
+                prefix='.smtstate-', dir=self._record_dir or None)
+            viper_args.append('--smtStateDir=' + smtstate_dir)
         # Snapshot the source before verification: the agent may edit the file
         # while the run is in flight, and the record must show what was verified.
         source = self._read_source(path)
@@ -462,7 +481,9 @@ class VerificationService:
                 'log).'.format(type(e).__name__, e), 'internal.error')],
                 time.time() - start)
         self._record(path, selected, base_dir, viper_args, source, start,
-                     result, translate_only)
+                     result, translate_only, smtstate_dir=smtstate_dir)
+        if smtstate_dir and os.path.isdir(smtstate_dir):
+            shutil.rmtree(smtstate_dir, ignore_errors=True)
         return result
 
     @staticmethod
@@ -490,7 +511,7 @@ class VerificationService:
         return seq
 
     def _record(self, path, selected, base_dir, viper_args, source, start,
-                result, translate_only=False) -> None:
+                result, translate_only=False, smtstate_dir=None) -> None:
         """Archive one verification attempt under the service's record dir.
 
         Server-side only — nothing about the recording is visible through the
@@ -498,10 +519,11 @@ class VerificationService:
         content hashes of the project's .py files for attempt-series
         attribution) and result.json (full structured result incl. debug
         payloads). Full file contents (the verified file plus its sibling
-        .py files) are archived only when a diagnostic carries
-        reasonUnknown == 'canceled': those are the budget-exhausted queries
-        worth replaying in later SMT experiments. Recording failures must
-        never affect verification.
+        .py files) and the backend's SMT state bundles (``smtstate_dir``,
+        with per-failure replayable .smt2 sessions) are archived only when a
+        diagnostic carries reasonUnknown == 'canceled': those are the
+        budget-exhausted queries worth replaying in later SMT experiments.
+        Recording failures must never affect verification.
         """
         if not self._record_dir:
             return
@@ -531,6 +553,9 @@ class VerificationService:
             if has_canceled and source is not None:
                 with open(os.path.join(attempt, 'source.py'), 'wb') as f:
                     f.write(source)
+            if (has_canceled and smtstate_dir and os.path.isdir(smtstate_dir)
+                    and os.listdir(smtstate_dir)):
+                shutil.move(smtstate_dir, os.path.join(attempt, 'smtstate'))
             meta = {
                 'seq': seq,
                 'path': path,
