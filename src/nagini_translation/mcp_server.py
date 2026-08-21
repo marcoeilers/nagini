@@ -144,7 +144,16 @@ def _filter_assumptions(dbg: dict) -> None:
     dbg['assumptions'] = relevant
 
 
+# --no-inline-debug: tool responses carry plain diagnostics only; the debug
+# payloads are still collected and recorded server-side (--record-dir).
+_inline_debug = True
+
+
 def _slim_debug(result: dict) -> dict:
+    if not _inline_debug:
+        for d in result.get('diagnostics', []):
+            d.pop('debug', None)
+        return result
     debugs = []
     for d in result.get('diagnostics', []):
         dbg = d.get('debug')
@@ -320,9 +329,13 @@ def main():
     parser = argparse.ArgumentParser(description='Nagini MCP server (stdio).')
     add_service_arguments(parser)
     parser.add_argument('--log', default='WARNING')
+    parser.add_argument('--no-inline-debug', action='store_true',
+                        help='omit SMT debug payloads from tool responses '
+                             '(they are still recorded under --record-dir)')
     args = parser.parse_args()
     logging.basicConfig(level=getattr(logging, args.log.upper(), logging.WARNING))
-    global _service
+    global _service, _inline_debug
+    _inline_debug = not args.no_inline_debug
     _service = make_service(args)
     try:
         mcp.run()
