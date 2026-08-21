@@ -220,6 +220,17 @@ def _debug_payload(error) -> Optional[dict]:
             # Z3 rlimit units spent on the failing check itself; the unit
             # assertTimeout budgets are enforced in (ms * z3ResourcesPerMillisecond).
             payload['rlimitDelta'] = int(str(ctx.rlimitDelta().get()))
+        if ctx.failingCheck().isDefined():
+            # The prover query that produced this failure (absent when the
+            # error was raised without one, e.g. a missing permission).
+            check = ctx.failingCheck().get()
+            payload['failingCheck'] = {
+                'ordinal': int(str(check.ordinal())),
+                'kind': str(check.kind()),
+                'answer': str(check.answer()),
+                'ms': int(str(check.ms())),
+                'budgetMs': int(str(check.budgetMs())),
+            }
         if hasattr(ctx, 'sessionLog') and ctx.sessionLog().isDefined():
             # Path of the prover session log this failure's .smt2 bundle is
             # copied from (see the smtstate dir for the replayable bundle).
@@ -524,10 +535,12 @@ class VerificationService:
         content hashes of the project's .py files for attempt-series
         attribution) and result.json (full structured result incl. debug
         payloads). Full file contents (the verified file plus its sibling
-        .py files) and the backend's SMT state bundles (``smtstate_dir``,
-        with per-failure replayable .smt2 sessions) are archived only when a
-        diagnostic carries reasonUnknown == 'canceled': those are the
-        budget-exhausted queries worth replaying in later SMT experiments.
+        .py files) and the backend's SMT state bundles (``smtstate_dir``:
+        replayable .smt2 sessions cut at canceled failures and at slow checks,
+        plus every verifier's session log) are archived when the attempt is
+        worth replaying in later SMT experiments: a diagnostic is canceled, a
+        slow-check bundle was written, or the whole run timed out (the session
+        logs then end at the in-flight checks).
         Recording failures must never affect verification.
         """
         if not self._record_dir:
@@ -538,9 +551,14 @@ class VerificationService:
                 seq = self._record_seq
             attempt = os.path.join(self._record_dir, 'attempt-%04d' % seq)
             os.makedirs(attempt, exist_ok=True)
-            has_canceled = any(
-                (d.debug or {}).get('reasonUnknown') == 'canceled'
-                for d in result.diagnostics)
+            bundles = (os.listdir(smtstate_dir)
+                       if smtstate_dir and os.path.isdir(smtstate_dir) else [])
+            has_canceled = (
+                any((d.debug or {}).get('reasonUnknown') == 'canceled'
+                    or d.code == 'TimeoutOccurred'
+                    for d in result.diagnostics)
+                or any(b.startswith('smtslow-') or '-canceled-' in b
+                       for b in bundles))
             src_dir = os.path.dirname(path)
             project_files = {}
             for name in sorted(os.listdir(src_dir) or []):
@@ -558,8 +576,7 @@ class VerificationService:
             if has_canceled and source is not None:
                 with open(os.path.join(attempt, 'source.py'), 'wb') as f:
                     f.write(source)
-            if (has_canceled and smtstate_dir and os.path.isdir(smtstate_dir)
-                    and os.listdir(smtstate_dir)):
+            if has_canceled and bundles:
                 shutil.move(smtstate_dir, os.path.join(attempt, 'smtstate'))
             meta = {
                 'seq': seq,
