@@ -84,7 +84,9 @@ def get_target(node: ast.AST,
         func_name = get_func_name(node)
         if (container and func_name == 'Result' and
                 isinstance(container, PythonMethod)):
-            # In this case the immediate container must be a method, and we
+            # Result() does not refer to a declaration. It used to return the
+            # method's return type here, but now that types are ordinary
+            # objects that would make Result() translate to a type literal.
             return None
         elif (container and func_name == 'super' and
                   isinstance(container, PythonMethod)):

@@ -97,9 +97,6 @@ class CallTranslator(CommonTranslator):
         type_stmt = []
         if isinstance(target, PythonType):
             check = self.type_check(obj, target, pos, ctx, inhale_exhale=False)
-        elif False and isinstance(target, PythonVar):
-            check = self.type_factory.dynamic_type_check(obj, target.ref(), pos,
-                                                         ctx)
         elif type_arg_type.name == TYPE_TYPE:
             type_stmt, type_obj = self.translate_expr(node.args[1], ctx)
             check = self.subtype_check(obj, type_obj, pos, ctx)
@@ -128,7 +125,9 @@ class CallTranslator(CommonTranslator):
                 else:
                     raise UnsupportedException(node, "isinstance with unknown-length tuple argument is currently not supported")
         else:
-            print("++")
+            raise UnsupportedException(
+                node, 'isinstance is only supported with a type literal, an '
+                      'expression of type "type", or a tuple of those')
         return stmt + type_stmt, check
 
     def _translate_type_func(self, node: ast.Call,

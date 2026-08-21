@@ -782,14 +782,6 @@ class TypeDomainFactory:
     def extends_func(self, ctx: Context) -> 'silver.ast.DomainFunc':
         return self.subtype_func('extends_', ctx)
 
-    def dynamic_type_check(self, lhs: 'Expr',
-                           type: 'Expr', position: 'silver.ast.Position',
-                           ctx: Context):
-        type_func = self.typeof(lhs, ctx)
-        result = self.viper.EqCmp(type_func, type, self.no_position(ctx),
-                                  self.no_info(ctx))
-        return result
-
     def subtype_check(self, type_func: 'Expr', type: 'PythonType',
                       position: 'silver.ast.Position',
                       ctx: Context, concrete: bool = False) -> Expr:

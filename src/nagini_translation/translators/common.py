@@ -246,7 +246,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         if e.typ() != self.viper.Ref:
             e = self.to_ref(e, ctx)
         if (isinstance(e, self.viper.ast.FuncApp) and
-                    e.funcname() == 'PyType__box__'):
+                    e.funcname() == 'PyType___box__'):
             return e.args().head()
         result = e
         type_type = ctx.module.global_module.classes[TYPE_TYPE]
