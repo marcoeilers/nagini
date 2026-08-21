@@ -57,7 +57,7 @@ class JVM:
                     'it.'.format(e)) from e
             try:
                 jpype.startJVM(jvm_path,
-                               '-Djava.class.path=' + classpath, '-Xss32m',
+                               '-Djava.class.path=' + classpath, '-Xss128m',
                                convertStrings=True)
             except OSError as e:
                 raise JVMStartupError(
