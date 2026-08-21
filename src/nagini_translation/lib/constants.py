@@ -336,6 +336,10 @@ BOOL_TYPE = 'bool'
 ELLIPSIS_TYPE = 'EllipsisType'
 TYPE_TYPE = 'type'
 
+# Type constructors whose type arguments are covariant rather than invariant:
+# Tuple[A, B] and Type[C] both accept subtypes in argument position.
+COVARIANT_TYPES = {TUPLE_TYPE, TYPE_TYPE}
+
 PRIMITIVE_PREFIX = '__prim__'
 
 PRIMITIVE_INT_TYPE = PRIMITIVE_PREFIX + INT_TYPE

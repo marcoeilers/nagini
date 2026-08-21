@@ -580,19 +580,19 @@ function EllipsisType___create__(): Ref
     ensures forall r: Ref :: { issubtype(typeof(r), EllipsisType()) } issubtype(typeof(r), EllipsisType()) ==> r == result
 function PyType___box__(prim: PyType): Ref
     decreases _
-    ensures typeof(result) == type()
+    ensures typeof(result) == type(prim)
     ensures type___unbox__(result) == prim
 
 function type___unbox__(box: Ref): PyType
     decreases _
-    requires issubtype(typeof(box), type())
+    requires issubtype(typeof(box), type(object()))
     ensures PyType___box__(result) == box
 
 function type___eq__(self: Ref, other: Ref): Bool
     decreases _
-    requires issubtype(typeof(self), type())
+    requires issubtype(typeof(self), type(object()))
     // Comparing a type against a non-type is legal in Python and simply yields
     // False, so this must not require `other` to be a type.
-    ensures issubtype(typeof(other), type()) ==>
+    ensures issubtype(typeof(other), type(object())) ==>
         result == (type___unbox__(self) == type___unbox__(other))
-    ensures !issubtype(typeof(other), type()) ==> !result
+    ensures !issubtype(typeof(other), type(object())) ==> !result

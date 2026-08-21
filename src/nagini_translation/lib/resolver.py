@@ -9,6 +9,7 @@ import ast
 
 from nagini_contracts.contracts import CONTRACT_FUNCS
 from nagini_translation.lib.constants import (
+    COVARIANT_TYPES,
     BOOL_TYPE,
     BUILTINS,
     BYTES_TYPE,
@@ -278,7 +279,8 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                 else:
                     error = 'generic.constructor.without.type'
                     raise InvalidProgramException(node, error)
-            return module.global_module.classes[TYPE_TYPE]
+            type_class = module.global_module.classes[TYPE_TYPE]
+            return GenericType(type_class, [target])
     if isinstance(node, (ast.Attribute, ast.Name)):
         if isinstance(node, ast.Attribute):
             lhs = _do_get_type(node.value, containers, container)
@@ -452,6 +454,14 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                    containers: List[ContainerInterface],
                    container: PythonNode) -> PythonType:
     call_target = get_target(node.func, containers, container)
+    if (isinstance(call_target, PythonClass) and
+            call_target is module.global_module.classes[TYPE_TYPE] and
+            len(node.args) == 1 and not node.keywords):
+        # type(x) is the built-in that yields x's runtime type, not a call to
+        # the constructor of the generic class `type`. The runtime type of x is
+        # x's static type or a subclass of it, i.e. the result is Type[type(x)].
+        arg_type = get_type(node.args[0], containers, container)
+        return GenericType(call_target, [arg_type])
     if isinstance(call_target, PythonMethod):
         if isinstance(node.func, ast.Attribute):
             rec_target = get_target(node.func.value, containers, container)
@@ -706,6 +716,16 @@ def pairwise_supertype(t1: PythonType, t2: PythonType) -> Optional[PythonType]:
         return t2
     if t2.issubtype(t1):
         return t1
+    if (isinstance(t1, GenericType) and isinstance(t2, GenericType) and
+            t1.python_class is t2.python_class and
+            t1.python_class.name in COVARIANT_TYPES and
+            len(t1.type_args) == len(t2.type_args)):
+        # For a covariant constructor the supertype can be formed argument-wise,
+        # e.g. the common supertype of Type[bool] and Type[str] is Type[object].
+        args = [pairwise_supertype(a1, a2)
+                for a1, a2 in zip(t1.type_args, t2.type_args)]
+        if all(arg is not None for arg in args):
+            return GenericType(t1.python_class, args)
     if (not t1.superclass and not t2.superclass):
         return None
     if not t1.superclass:

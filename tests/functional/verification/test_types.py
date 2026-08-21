@@ -13,6 +13,9 @@ class MyOtherClass(MyClass):
 class MyThirdClass(MyClass):
     pass
 
+class Unrelated:
+    pass
+
 def tester1(o: object) -> None:
     if type(o) == MyClass:
         mc = cast(MyClass, o)
@@ -250,14 +253,18 @@ def tester20f(t: Type[MyClass]) -> None:
     Assert(t == MyClass)
 
 
-# KNOWN LIMITATION: a Type[MyClass] annotation carries no information relating
-# the value of t to MyClass, so isinstance(o, t) does not establish that o is a
-# MyClass. Encoding that would require type() to become a generic PyType. If
-# this is ever fixed, this test starts failing and should become a positive one.
+# A Type[MyClass] annotation constrains the value of t to MyClass or a subclass,
+# so isinstance(o, t) does establish that o is a MyClass.
 def tester21(t: Type[MyClass], o: object) -> None:
     if isinstance(o, t):
-        #:: ExpectedOutput(application.precondition:assertion.false)
         mc = cast(MyClass, o)
+
+
+def tester21f(t: Type[MyClass], o: object) -> None:
+    if isinstance(o, t):
+        # t may be a strict subclass, so nothing follows about Unrelated.
+        #:: ExpectedOutput(application.precondition:assertion.false)
+        u = cast(Unrelated, o)
 
 
 # Type objects in the specification-level containers.
@@ -300,20 +307,29 @@ def tester25(o: object) -> None:
     ls: List[Type[MyClass]] = [MyClass, MyOtherClass]
     t = ls[0]
     if isinstance(o, t):
-        # This works because the contents of the list literal are known, not
-        # because of the declared element type; see tester25f.
         mc = cast(MyClass, o)
 
 
-# KNOWN LIMITATION, the container counterpart of tester21: with the contents of
-# the list unknown, the declared element type Type[MyClass] carries no
-# information about t, so o cannot be shown to be a MyClass. Note that this case
-# is not fixed by strengthening the type invariant of Type[C]-typed expressions;
-# it needs type() itself to become generic.
-def tester25f(ls: List[Type[MyClass]], o: object) -> None:
+# The container counterpart of tester21: the contents of the list are unknown,
+# so this relies purely on the declared element type Type[MyClass].
+def tester26(ls: List[Type[MyClass]], o: object) -> None:
+    Requires(Acc(list_pred(ls)))
+    Requires(len(ls) > 0)
+    t = ls[0]
+    if isinstance(o, t):
+        mc = cast(MyClass, o)
+
+
+def tester26f(ls: List[Type[MyClass]], o: object) -> None:
     Requires(Acc(list_pred(ls)))
     Requires(len(ls) > 0)
     t = ls[0]
     if isinstance(o, t):
         #:: ExpectedOutput(application.precondition:assertion.false)
-        mc = cast(MyClass, o)
+        u = cast(Unrelated, o)
+
+
+# Covariance: a List[Type[MyClass]] accepts class objects of subclasses.
+def tester27() -> None:
+    ls: List[Type[MyClass]] = [MyClass, MyOtherClass]
+    ls.append(MyOtherClass)

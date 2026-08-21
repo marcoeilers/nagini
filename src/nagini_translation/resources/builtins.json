@@ -854,6 +854,7 @@
             "requires": ["__unbox__"]
         }
     },
+    "type_vars": 1,
     "extends": "object"
 },
 "PSeq": {

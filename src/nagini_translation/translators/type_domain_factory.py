@@ -8,6 +8,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import ast
 
 from nagini_translation.lib.constants import (
+    COVARIANT_TYPES,
     OBJECT_TYPE,
     TUPLE_TYPE,
     TYPE_TYPE,
@@ -248,7 +249,11 @@ class TypeDomainFactory:
         type_nargs = len(cls.type_vars) if cls.name != TUPLE_TYPE else -1
         type_funcs = self.create_type_function(cls.sil_name, type_nargs,
                                                position, info, ctx)
-        if (cls.interface and not cls.superclass) or cls.name == TUPLE_TYPE:
+        if (cls.interface and not cls.superclass) or cls.name in COVARIANT_TYPES:
+            # A covariant constructor's instances are subtypes of one another,
+            # so they cannot all be declared direct children of their
+            # superclass: issubtype_exclusion would then make them pairwise
+            # unrelated. Their relation to object is stated by hand instead.
             subtype_axiom = None
         else:
             subtype_axiom = self.create_subtype_axiom(cls, supertype,
@@ -306,7 +311,7 @@ class TypeDomainFactory:
             current_arg = self.viper.DomainFuncApp(cls.sil_name + '_arg', args,
                                                    self.type_type(), position,
                                                    info, self.type_domain)
-            if cls.name == TUPLE_TYPE:
+            if cls.name in COVARIANT_TYPES:
                 args = [current_arg, type_args[i]]
                 rhs = self._issubtype(current_arg, type_args[i], ctx)
             else:
@@ -852,16 +857,22 @@ class TypeDomainFactory:
         if type is None:
             type = ctx.module.global_module.classes['NoneType']
         args = []
-        if isinstance(type, GenericType) and type.python_class.name == TYPE_TYPE and type.python_class.interface:
-            type = type.python_class
         if isinstance(type, GenericType):
             for arg in type.type_args:
                 args.append(self.translate_type_literal(arg, position, ctx))
         elif isinstance(type, PythonClass) and type.type_vars:
-            if not alias:
-                raise UnsupportedException(node, "Unsupported reference to generic type without type arguments.")
-            for index, arg in enumerate(type.type_vars):
-                args.append(self.get_type_arg(alias, type, index, ctx))
+            if type.name == TYPE_TYPE:
+                # A bare `type` means Type[object]; unlike other generic
+                # classes it has a meaningful default argument, so it does not
+                # need an alias to recover one from.
+                object_class = ctx.module.global_module.classes[OBJECT_TYPE]
+                args.append(self.translate_type_literal(object_class, position,
+                                                        ctx))
+            else:
+                if not alias:
+                    raise UnsupportedException(node, "Unsupported reference to generic type without type arguments.")
+                for index, arg in enumerate(type.type_vars):
+                    args.append(self.get_type_arg(alias, type, index, ctx))
         if type.python_class.name == TUPLE_TYPE:
             if isinstance(type, GenericType) and not type.exact_length:
                 seq_arg = args[0]
