@@ -15,7 +15,7 @@ class A:
 
 
 def m(a: A) -> int:
-    #:: ExpectedOutput(invalid.program:invalid.contract.position)
+    #:: ExpectedOutput(invalid.program:permission.in.pure.context)
     if (True and a.p()):
         return 4
     else:

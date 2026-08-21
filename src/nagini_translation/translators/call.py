@@ -1386,7 +1386,7 @@ class CallTranslator(CommonTranslator):
                 target_name = family_root.get_predicate(name).sil_name
             perm = self.viper.FullPerm(position, self.no_info(ctx))
             if not impure:
-                raise InvalidProgramException(node, 'invalid.contract.position')
+                raise InvalidProgramException(node, 'permission.in.pure.context')
             return arg_stmts, self.create_predicate_access(target_name, args,
                                                            perm, node, ctx)
         elif target.pure:

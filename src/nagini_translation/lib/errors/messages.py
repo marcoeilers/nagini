@@ -251,6 +251,14 @@ INVALID_PROGRAM_MESSAGES = {
         'expressions (e.g. 1/1000, n/2) — a name bound to a float or other '
         'non-int value (e.g. FRAC = 1 / 1000) is not supported; write the '
         'fraction literally at the use site.',
+    'permission.in.pure.context':
+        'a permission expression (Acc/Rd/Wildcard or a predicate instance) '
+        'appears in a position that only accepts pure boolean expressions: '
+        'the postcondition of a @Pure function, an Assume, the body of an '
+        'Unfolding, a branch or loop condition, or under a negation. '
+        'Permissions are allowed in the contracts and loop invariants of '
+        'impure methods, in @Pure preconditions, in Assert, and in '
+        'predicate bodies.',
     'invalid.contract.position':
         'a contract expression (Requires/Ensures/Invariant/...) appears '
         'outside its designated position: pre- and postconditions at the '
