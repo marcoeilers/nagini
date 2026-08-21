@@ -263,6 +263,11 @@ INVALID_PROGRAM_MESSAGES = {
         'a contract expression (Requires/Ensures/Invariant/...) appears '
         'outside its designated position: pre- and postconditions at the '
         'start of a body, invariants at the start of a loop body.',
+    'invalid.trigger':
+        'invalid trigger: a trigger list must be a list of lists of terms, '
+        'and each term must be a function or predicate application, a field '
+        'access, or a membership test (`x in xs`); a bare variable is not a '
+        'valid trigger term.',
     'invalid.contract.call':
         'a contract-only construct (e.g. Result, Old, Acc) is used outside '
         'a contract expression.',

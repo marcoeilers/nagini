@@ -624,6 +624,8 @@ class ContractTranslator(CommonTranslator):
                 if not isinstance(el, ast.List):
                     raise InvalidProgramException(el, 'invalid.trigger')
                 for inner in el.elts:
+                    if isinstance(inner, ast.Name):
+                        raise InvalidProgramException(inner, 'invalid.trigger')
                     if (isinstance(inner, ast.Compare) and len(inner.ops) == 1 and
                             isinstance(inner.ops[0], ast.In)):
                         # Use the less complex and more efficient trigger translation we
