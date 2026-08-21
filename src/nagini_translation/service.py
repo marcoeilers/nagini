@@ -33,7 +33,7 @@ import time
 from dataclasses import dataclass, field
 from typing import List, Optional, Set, Tuple
 
-from nagini_translation.lib import config
+from nagini_translation.lib import config, phases
 from nagini_translation.lib.errors import error_manager
 from nagini_translation.lib.errors.messages import invalid_program_message
 from nagini_translation.lib.jvmaccess import JVM
@@ -113,6 +113,8 @@ class VerifyResult:
     # timeout.
     crashed: bool = False
     viper_program: Optional[str] = None
+    # Seconds per pipeline phase (typecheck, translate, chop, verify).
+    timings: Optional[dict] = None
 
     def to_dict(self) -> dict:
         result = {
@@ -121,6 +123,7 @@ class VerifyResult:
             'cancelled': self.cancelled,
             'crashed': self.crashed,
             'duration': self.duration,
+            'timings': self.timings or {},
             'diagnostics': [d.to_dict() for d in self.diagnostics],
         }
         if self.viper_program is not None:
@@ -431,6 +434,7 @@ class VerificationService:
         """
         path = os.path.abspath(path)
         start = time.time()
+        phases.reset()
         viper_args = list(viper_args) if viper_args else []
         # Server-default backend args (the CLI's --viper-arg, given at service
         # launch), applied to every request. The request's own viper_args win:
@@ -480,6 +484,7 @@ class VerificationService:
                 path, 'Internal Nagini error: {}: {} (traceback in server '
                 'log).'.format(type(e).__name__, e), 'internal.error')],
                 time.time() - start)
+        result.timings = phases.phases()
         self._record(path, selected, base_dir, viper_args, source, start,
                      result, translate_only, smtstate_dir=smtstate_dir)
         if smtstate_dir and os.path.isdir(smtstate_dir):
@@ -569,6 +574,7 @@ class VerificationService:
                 'projectFiles': project_files,
                 'startTime': start,
                 'duration': result.duration,
+                'timings': result.timings,
                 'success': result.success,
                 'cancelled': result.cancelled,
                 'translationFailed': result.translation_failed,
@@ -784,6 +790,7 @@ class VerificationService:
         wall_cap = _hard_wall_seconds(backend_args)
         with self._jobs_lock:
             self._inflight += 1
+        verify_start = time.time()
         try:
             messages = manager.await_messages(
                 job_id, timeout_ms=wall_cap * 1000 if wall_cap else None)
@@ -806,9 +813,10 @@ class VerificationService:
                 finally:
                     if alone:
                         _kill_child_provers()
+                phases.record('verify', time.time() - verify_start)
                 return VerifyResult(False, [self._point_diagnostic(
                     path, 'Timeout occurred: verification exceeded %s second(s) '
-                    '(hard wall).' % wall_cap,
+                    '(hard wall). Phases: %s.' % (wall_cap, phases.summary()),
                     'TimeoutOccurred')], time.time() - start,
                     viper_program=viper_text)
             # Most commonly this is a cancelled job (its actor was stopped) —
@@ -819,6 +827,7 @@ class VerificationService:
             # individual SMT check stayed within its per-check budget (otherwise
             # a located failure would have been reported).
             elapsed = time.time() - start
+            phases.record('verify', time.time() - verify_start)
             backend_timeout = _backend_timeout_seconds(backend_args)
             if backend_timeout is not None and elapsed >= backend_timeout - 1:
                 logging.debug('Verification job ended by backend --timeout.',
@@ -827,8 +836,8 @@ class VerificationService:
                     path,
                     'Timeout occurred: the whole-run --timeout=%ds expired '
                     'before verification finished. No individual obligation '
-                    'failed or exceeded its per-check budget.'
-                    % backend_timeout,
+                    'failed or exceeded its per-check budget. Phases: %s.'
+                    % (backend_timeout, phases.summary()),
                     'TimeoutOccurred')], elapsed, cancelled=True,
                     viper_program=viper_text)
             logging.debug('Verification job failed or was cancelled.', exc_info=True)
@@ -845,6 +854,7 @@ class VerificationService:
                         del self._jobs[job_token]
 
         duration = time.time() - start
+        phases.record('verify', time.time() - verify_start)
         result, crash_texts = self._split_messages(messages)
         if result is None:
             if crash_texts:
@@ -883,7 +893,8 @@ class VerificationService:
                         # program point; report it under the same code the
                         # other timeout paths use.
                         diagnostics.append(self._point_diagnostic(
-                            path, str(err.readableMessage()),
+                            path, '%s Phases: %s.' % (err.readableMessage(),
+                                                      phases.summary()),
                             'TimeoutOccurred'))
                     else:
                         errors.append(err)
@@ -959,10 +970,11 @@ class VerificationService:
                                     viper_program=viper_text)
             backend = (ViperVerifier.silicon if self._backend == 'silicon'
                        else ViperVerifier.carbon)
-            vresult = verify_program(
-                modules, prog, path, self.jvm, viper_args, backend=backend,
-                arp=arp, counterexample=counterexample, sif=self._sif,
-                disable_branch_conditions=self._disable_branch_conditions)
+            with phases.phase('verify'):
+                vresult = verify_program(
+                    modules, prog, path, self.jvm, viper_args, backend=backend,
+                    arp=arp, counterexample=counterexample, sif=self._sif,
+                    disable_branch_conditions=self._disable_branch_conditions)
             duration = time.time() - start
             if vresult is None:
                 # main.verify swallows JVM exceptions and returns None.
