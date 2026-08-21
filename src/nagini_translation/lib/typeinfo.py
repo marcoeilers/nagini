@@ -136,7 +136,12 @@ class TypeVisitor(TraverserVisitor):
                 break
         if (node.name not in LITERALS and not is_alias):
             name_type = self.type_of(node)
-            if not isinstance(name_type, mypy.types.CallableType):
+            # References to functions are not recorded, but a class object is
+            # also typed as a callable (its constructor), and those are
+            # ordinary values that do need a recorded type.
+            is_function_ref = (isinstance(name_type, mypy.types.CallableType) and
+                               not name_type.is_type_obj())
+            if not is_function_ref:
                 self.set_type(self.prefix + [node.name], name_type,
                               node.line, col(node))
 
@@ -503,6 +508,9 @@ class TypeInfo:
 
     def is_type_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.TypeType)
+
+    def is_overloaded_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.Overloaded)
 
     def is_type_alias_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.TypeAliasType)

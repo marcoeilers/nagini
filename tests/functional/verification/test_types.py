@@ -107,12 +107,29 @@ def tester7(o: object) -> None:
         mc = cast(MyClass, o)
 
 
-# Same, for a tuple. The annotation is required: without it mypy infers
-# Tuple[Type[int], Type[MyClass]] and the element types cannot be translated.
+# Same, for a tuple whose element types are declared as plain `type`.
 def tester8(o: object) -> None:
     tp: Tuple[type, type] = (int, MyClass)
     t = tp[1]
     Assert(t == MyClass)
+    if isinstance(o, t):
+        mc = cast(MyClass, o)
+
+
+# Same again without the annotation. Here mypy infers the precise element types
+# Tuple[Type[int], Type[MyClass]], where Type[int] is an overloaded callable
+# (int has several constructor overloads) rather than a TypeType.
+def tester8a(o: object) -> None:
+    tp = (int, MyClass)
+    t = tp[1]
+    Assert(t == MyClass)
+    if isinstance(o, t):
+        mc = cast(MyClass, o)
+
+
+def tester8b(o: object) -> None:
+    ls = [MyClass, MyOtherClass]
+    t = ls[0]
     if isinstance(o, t):
         mc = cast(MyClass, o)
 
