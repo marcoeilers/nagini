@@ -65,6 +65,20 @@ domain type_types {
         (forall t: PyType :: { type(t) } issubtype(type(t), type(object())))
     }
 
+    // Because type(..) values have no extends_ fact (see above), the standard
+    // single-inheritance exclusion cannot separate them from ordinary class
+    // types. This states that separation directly, exactly as
+    // tuple_type_basic_1 does for tuples: whatever is a class object is not
+    // also an instance of some unrelated class, and vice versa. Sound because
+    // `type` is not in EXTENDABLE_BUILTINS, so no user class can subclass it.
+    axiom type_type_basic {
+        (forall t: PyType, Z: PyType, arg1: PyType ::
+          { issubtype(Z, type(t)), issubtype(Z, arg1) }
+          issubtype(Z, type(t)) && issubtype(Z, arg1) ==>
+          get_basic(arg1) == type_basic() ||
+          (get_basic(arg1) == object() || get_basic(arg1) == union_basic()))
+    }
+
     // Type[C] is covariant: a class object for a subclass of C can be used
     // wherever a class object for C is expected.
     axiom subtype_type_self {

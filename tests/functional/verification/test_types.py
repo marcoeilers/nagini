@@ -333,3 +333,20 @@ def tester26f(ls: List[Type[MyClass]], o: object) -> None:
 def tester27() -> None:
     ls: List[Type[MyClass]] = [MyClass, MyOtherClass]
     ls.append(MyOtherClass)
+
+
+# Class objects must stay separated from ordinary instances. type(..) values
+# carry no extends_ fact, so this separation comes from the type_type_basic
+# axiom rather than from the usual single-inheritance exclusion.
+def tester28(t: type) -> None:
+    Assert(t is not None)
+    Assert(not isinstance(t, MyClass))
+
+
+def tester29(o: MyClass) -> None:
+    Assert(not isinstance(o, type))
+
+
+def tester30(t: type, o: object) -> None:
+    Requires(isinstance(o, MyClass))
+    Assert(o is not t)
