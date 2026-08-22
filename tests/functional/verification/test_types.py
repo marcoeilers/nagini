@@ -1,7 +1,7 @@
 # Any copyright is dedicated to the Public Domain.
 # http://creativecommons.org/publicdomain/zero/1.0/
 
-from typing import Type, cast, Dict, List, Tuple
+from typing import Type, cast, Dict, List, Optional, Tuple, Union
 from nagini_contracts.contracts import *
 
 class MyClass:
@@ -350,3 +350,28 @@ def tester29(o: MyClass) -> None:
 def tester30(t: type, o: object) -> None:
     Requires(isinstance(o, MyClass))
     Assert(o is not t)
+
+
+# A Type[C] annotation must resolve to a type, not to None. It used to resolve
+# to None, which made any Optional or Union containing it crash the translation
+# before verification even started.
+def tester31(t: Optional[Type[MyClass]], o: object) -> None:
+    if t is not None and isinstance(o, t):
+        mc = cast(MyClass, o)
+
+
+def tester32(u: Union[Type[MyClass], Type[int]]) -> None:
+    Assert(u is not None)
+
+
+def tester33(t: Type[MyClass] = MyClass) -> None:
+    Assert(t is not None)
+
+
+# A type object read back out of a dict whose value type is Type[MyClass].
+def tester34(m: Dict[str, Type[MyClass]], o: object) -> None:
+    Requires(Acc(dict_pred(m)))
+    Requires('k' in m)
+    t = m['k']
+    if isinstance(o, t):
+        mc = cast(MyClass, o)

@@ -148,6 +148,10 @@ def get_target(node: ast.AST,
                 type_class = module.global_module.classes[LIST_TYPE]
             if node.value.id == 'Tuple':
                 type_class = module.global_module.classes[TUPLE_TYPE]
+            if node.value.id == 'Type':
+                # typing.Type[C]; the lower case type[C] resolves through the
+                # generic lookup below, since `type` is an actual class.
+                type_class = module.global_module.classes[TYPE_TYPE]
             if not type_class:
                 possible_class = get_target(node.value, containers, container)
                 if isinstance(possible_class, PythonType):

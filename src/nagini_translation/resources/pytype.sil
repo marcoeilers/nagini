@@ -65,6 +65,15 @@ domain type_types {
         (forall t: PyType :: { type(t) } issubtype(type(t), type(object())))
     }
 
+    // For an invariant constructor, injectivity follows from the generated arg
+    // axiom (issubtype(Z, list(a)) ==> list_arg(Z, 0) == a) instantiated at
+    // Z == list(a). The covariant version only yields issubtype(type_arg(Z, 0),
+    // a), so injectivity would otherwise only be forced indirectly, via the
+    // covariance axiom plus issubtype_exclusion_2. State it directly instead.
+    axiom type_arg_def {
+        (forall t: PyType :: { type(t) } type_arg(type(t), 0) == t)
+    }
+
     // Because type(..) values have no extends_ fact (see above), the standard
     // single-inheritance exclusion cannot separate them from ordinary class
     // types. This states that separation directly, exactly as

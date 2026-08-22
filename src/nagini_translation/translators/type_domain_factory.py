@@ -56,6 +56,7 @@ class TypeDomainFactory:
             self.create_null_type_axiom(ctx),
             self.create_union_basic_axiom(ctx),
             self.create_object_subtype_axiom(ctx),
+            self.create_object_basic_axiom(ctx),
             self.create_subtype_exclusion_axiom(ctx),
             self.create_subtype_exclusion_axiom_2(ctx),
             self.create_subtype_exclusion_propagation_axiom(ctx),
@@ -718,6 +719,28 @@ class TypeDomainFactory:
                                  position, info)
         return self.viper.DomainAxiom('issubtype_reflexivity', body,
                                       position, info, self.type_domain)
+
+    def create_object_basic_axiom(self,
+                                  ctx: Context) -> 'silver.ast.DomainAxiom':
+        """
+        Creates the axiom get_basic(object()) == object().
+
+        Every other class gets this as part of its subtype axiom, but object
+        has no superclass, so create_type generates no subtype axiom for it and
+        get_basic(object()) would otherwise be unconstrained. That matters
+        because the axioms that separate the covariant constructors from
+        ordinary class types (tuple_type_basic_1/2, type_type_basic) list
+        get_basic(arg1) == object() as one of their permitted cases.
+        """
+        position, info = self.no_position(ctx), self.no_info(ctx)
+        object_type = self.viper.DomainFuncApp('object', [], self.type_type(),
+                                               position, info, self.type_domain)
+        object_basic = self.viper.DomainFuncApp('get_basic', [object_type],
+                                                self.type_type(), position,
+                                                info, self.type_domain)
+        body = self.viper.EqCmp(object_basic, object_type, position, info)
+        return self.viper.DomainAxiom('object_basic', body, position, info,
+                                      self.type_domain)
 
     def create_object_subtype_axiom(self,
                                     ctx: Context) -> 'silver.ast.DomainAxiom':
