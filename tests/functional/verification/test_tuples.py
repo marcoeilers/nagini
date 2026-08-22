@@ -115,3 +115,18 @@ def dynamic_index2(t: Tuple[int, bool, int], i: int) -> int:
   j: int = t[i]
   k: bool = t[i] == 34
   return j + 5
+
+
+# The empty tuple type. Its annotation has no type arguments at all, which used
+# to make the ghost checker index into an empty list and crash the translation.
+def empty_tuple_arg(t: Tuple[()]) -> None:
+  Assert(len(t) == 0)
+
+
+def empty_tuple_result() -> Tuple[()]:
+  Ensures(len(Result()) == 0)
+  return ()
+
+
+def empty_tuple_distinct(t: Tuple[()], u: Tuple[int, str]) -> None:
+  Assert(t is not u)

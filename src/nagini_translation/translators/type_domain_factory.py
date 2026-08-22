@@ -7,15 +7,20 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import ast
 
-from nagini_translation.lib.constants import OBJECT_TYPE, TUPLE_TYPE
+from nagini_translation.lib.constants import (
+    COVARIANT_TYPES,
+    OBJECT_TYPE,
+    TUPLE_TYPE,
+    TYPE_TYPE,
+)
 from nagini_translation.lib.program_nodes import (
     GenericType,
     OptionalType,
     PythonClass,
     PythonType,
     TypeVar,
-    UnionType,
 )
+from nagini_translation.lib.util import UnsupportedException
 from nagini_translation.lib.viper_ast import ViperAST
 from nagini_translation.translators.abstract import Context, Expr
 from typing import List, Tuple
@@ -51,6 +56,7 @@ class TypeDomainFactory:
             self.create_null_type_axiom(ctx),
             self.create_union_basic_axiom(ctx),
             self.create_object_subtype_axiom(ctx),
+            self.create_object_basic_axiom(ctx),
             self.create_subtype_exclusion_axiom(ctx),
             self.create_subtype_exclusion_axiom_2(ctx),
             self.create_subtype_exclusion_propagation_axiom(ctx),
@@ -244,7 +250,11 @@ class TypeDomainFactory:
         type_nargs = len(cls.type_vars) if cls.name != TUPLE_TYPE else -1
         type_funcs = self.create_type_function(cls.sil_name, type_nargs,
                                                position, info, ctx)
-        if (cls.interface and not cls.superclass) or cls.name == TUPLE_TYPE:
+        if (cls.interface and not cls.superclass) or cls.name in COVARIANT_TYPES:
+            # A covariant constructor's instances are subtypes of one another,
+            # so they cannot all be declared direct children of their
+            # superclass: issubtype_exclusion would then make them pairwise
+            # unrelated. Their relation to object is stated by hand instead.
             subtype_axiom = None
         else:
             subtype_axiom = self.create_subtype_axiom(cls, supertype,
@@ -302,7 +312,7 @@ class TypeDomainFactory:
             current_arg = self.viper.DomainFuncApp(cls.sil_name + '_arg', args,
                                                    self.type_type(), position,
                                                    info, self.type_domain)
-            if cls.name == TUPLE_TYPE:
+            if cls.name in COVARIANT_TYPES:
                 args = [current_arg, type_args[i]]
                 rhs = self._issubtype(current_arg, type_args[i], ctx)
             else:
@@ -710,6 +720,28 @@ class TypeDomainFactory:
         return self.viper.DomainAxiom('issubtype_reflexivity', body,
                                       position, info, self.type_domain)
 
+    def create_object_basic_axiom(self,
+                                  ctx: Context) -> 'silver.ast.DomainAxiom':
+        """
+        Creates the axiom get_basic(object()) == object().
+
+        Every other class gets this as part of its subtype axiom, but object
+        has no superclass, so create_type generates no subtype axiom for it and
+        get_basic(object()) would otherwise be unconstrained. That matters
+        because the axioms that separate the covariant constructors from
+        ordinary class types (tuple_type_basic_1/2, type_type_basic) list
+        get_basic(arg1) == object() as one of their permitted cases.
+        """
+        position, info = self.no_position(ctx), self.no_info(ctx)
+        object_type = self.viper.DomainFuncApp('object', [], self.type_type(),
+                                               position, info, self.type_domain)
+        object_basic = self.viper.DomainFuncApp('get_basic', [object_type],
+                                                self.type_type(), position,
+                                                info, self.type_domain)
+        body = self.viper.EqCmp(object_basic, object_type, position, info)
+        return self.viper.DomainAxiom('object_basic', body, position, info,
+                                      self.type_domain)
+
     def create_object_subtype_axiom(self,
                                     ctx: Context) -> 'silver.ast.DomainAxiom':
         """
@@ -778,14 +810,6 @@ class TypeDomainFactory:
     def extends_func(self, ctx: Context) -> 'silver.ast.DomainFunc':
         return self.subtype_func('extends_', ctx)
 
-    def dynamic_type_check(self, lhs: 'Expr',
-                           type: 'Expr', position: 'silver.ast.Position',
-                           ctx: Context):
-        type_func = self.typeof(lhs, ctx)
-        result = self.viper.EqCmp(type_func, type, self.no_position(ctx),
-                                  self.no_info(ctx))
-        return result
-
     def subtype_check(self, type_func: 'Expr', type: 'PythonType',
                       position: 'silver.ast.Position',
                       ctx: Context, concrete: bool = False) -> Expr:
@@ -836,7 +860,7 @@ class TypeDomainFactory:
                                   concrete=concrete)
 
     def translate_type_literal(self, type: 'PythonType', position: 'Position',
-                               ctx: Context, alias: Expr = None) -> Expr:
+                               ctx: Context, alias: Expr = None, node: ast.AST = None) -> Expr:
         """
         Translates the given type to a type literal. If the given type is
         a generic type with missing type argument information, the type
@@ -860,9 +884,18 @@ class TypeDomainFactory:
             for arg in type.type_args:
                 args.append(self.translate_type_literal(arg, position, ctx))
         elif isinstance(type, PythonClass) and type.type_vars:
-            assert alias
-            for index, arg in enumerate(type.type_vars):
-                args.append(self.get_type_arg(alias, type, index, ctx))
+            if type.name == TYPE_TYPE:
+                # A bare `type` means Type[object]; unlike other generic
+                # classes it has a meaningful default argument, so it does not
+                # need an alias to recover one from.
+                object_class = ctx.module.global_module.classes[OBJECT_TYPE]
+                args.append(self.translate_type_literal(object_class, position,
+                                                        ctx))
+            else:
+                if not alias:
+                    raise UnsupportedException(node, "Unsupported reference to generic type without type arguments.")
+                for index, arg in enumerate(type.type_vars):
+                    args.append(self.get_type_arg(alias, type, index, ctx))
         if type.python_class.name == TUPLE_TYPE:
             if isinstance(type, GenericType) and not type.exact_length:
                 seq_arg = args[0]

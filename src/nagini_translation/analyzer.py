@@ -1656,7 +1656,8 @@ class Analyzer(ast.NodeVisitor):
             return self._convert_type_var(mypy_type, node, bound_type_vars)
         elif self.types.is_type_type(mypy_type):
             return self._convert_type_type(mypy_type, node)
-        elif self.types.is_callable_type(mypy_type):
+        elif (self.types.is_callable_type(mypy_type) or
+                  self.types.is_overloaded_type(mypy_type)):
             return self._convert_callable_type(mypy_type, node)
         elif self.types.is_type_alias_type(mypy_type):
             return self.convert_type(mypy_type.alias.target, node)
@@ -1707,6 +1708,15 @@ class Analyzer(ast.NodeVisitor):
         return result
 
     def _convert_callable_type(self, mypy_type, node) -> PythonType:
+        if mypy_type.is_type_obj():
+            # A reference to a class itself. mypy types such an expression as
+            # its constructor, i.e. as a callable whose fallback is
+            # builtins.type; if the constructor has several overloads (as for
+            # int) it is an Overloaded rather than a CallableType. Either way
+            # the value is a type object, so translate it as type[C].
+            type_class = self.module.global_module.classes['type']
+            return GenericType(type_class,
+                               [self.convert_type(mypy_type.type_object(), node)])
         return self.find_or_create_class(CALLABLE_TYPE, module=self.module.global_module)
 
     def _convert_union_type(self, mypy_type, node, bound_type_vars: Dict[str, PythonType] = None) -> PythonType:

@@ -9,6 +9,7 @@ import ast
 
 from nagini_contracts.contracts import CONTRACT_FUNCS
 from nagini_translation.lib.constants import (
+    COVARIANT_TYPES,
     BOOL_TYPE,
     BUILTINS,
     BYTES_TYPE,
@@ -29,6 +30,7 @@ from nagini_translation.lib.constants import (
     SET_TYPE,
     STRING_TYPE,
     TUPLE_TYPE,
+    TYPE_TYPE,
 )
 from nagini_translation.lib.program_nodes import (
     ContainerInterface,
@@ -83,16 +85,22 @@ def get_target(node: ast.AST,
         func_name = get_func_name(node)
         if (container and func_name == 'Result' and
                 isinstance(container, PythonMethod)):
-            # In this case the immediate container must be a method, and we
-            # return its result type
-            return container.type
+            # Result() does not refer to a declaration. It used to return the
+            # method's return type here, but now that types are ordinary
+            # objects that would make Result() translate to a type literal.
+            return None
         elif (container and func_name == 'super' and
                   isinstance(container, PythonMethod)):
             # Return the type of the current method's superclass
             return container.cls.superclass
         elif func_name == 'cast':
             return None
-        return get_target(node.func, containers, container)
+        func_target = get_target(node.func, containers, container)
+        if isinstance(func_target, PythonType):
+            # this is a constructor call, it's not pointing at an actual PythonNode
+            return None
+        else:
+            return func_target
     elif isinstance(node, ast.Attribute):
         # Find the type of the LHS, so that we can look through its members.
         lhs = get_type(node.value, containers, container)
@@ -107,6 +115,8 @@ def get_target(node: ast.AST,
             # defined in the class. So instead of type[C], we want to look in
             # class C directly here.
             lhs = lhs.type_args[0]
+        if isinstance(lhs, PythonClass) and lhs.name == TYPE_TYPE:
+            lhs = get_target(node.value, containers, container)
         if isinstance(lhs, GenericType):
             # Use the class, since we want to look for members.
             lhs = lhs.cls
@@ -138,6 +148,10 @@ def get_target(node: ast.AST,
                 type_class = module.global_module.classes[LIST_TYPE]
             if node.value.id == 'Tuple':
                 type_class = module.global_module.classes[TUPLE_TYPE]
+            if node.value.id == 'Type':
+                # typing.Type[C]; the lower case type[C] resolves through the
+                # generic lookup below, since `type` is an actual class.
+                type_class = module.global_module.classes[TYPE_TYPE]
             if not type_class:
                 possible_class = get_target(node.value, containers, container)
                 if isinstance(possible_class, PythonType):
@@ -269,7 +283,8 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                 else:
                     error = 'generic.constructor.without.type'
                     raise InvalidProgramException(node, error)
-            return target
+            type_class = module.global_module.classes[TYPE_TYPE]
+            return GenericType(type_class, [target])
     if isinstance(node, (ast.Attribute, ast.Name)):
         if isinstance(node, ast.Attribute):
             lhs = _do_get_type(node.value, containers, container)
@@ -442,6 +457,53 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                    current_function: PythonMethod,
                    containers: List[ContainerInterface],
                    container: PythonNode) -> PythonType:
+    call_target = get_target(node.func, containers, container)
+    if (isinstance(call_target, PythonClass) and
+            call_target is module.global_module.classes[TYPE_TYPE] and
+            len(node.args) == 1 and not node.keywords):
+        # type(x) is the built-in that yields x's runtime type, not a call to
+        # the constructor of the generic class `type`. The runtime type of x is
+        # x's static type or a subclass of it, i.e. the result is Type[type(x)].
+        arg_type = get_type(node.args[0], containers, container)
+        return GenericType(call_target, [arg_type])
+    if isinstance(call_target, PythonMethod):
+        if isinstance(node.func, ast.Attribute):
+            rec_target = get_target(node.func.value, containers, container)
+            if not isinstance(rec_target, PythonModule):
+                rectype = get_type(node.func.value, containers, container)
+                if call_target.generic_type != -1:
+                    if call_target.generic_type == -2:
+                        return rectype
+                    return rectype.type_args[call_target.generic_type]
+                if isinstance(call_target.type, TypeVar):
+                    while rectype.python_class is not call_target.cls:
+                        rectype = rectype.superclass
+                    name_list = list(rectype.python_class.type_vars.keys())
+                    index = name_list.index(call_target.type.name)
+                    return rectype.type_args[index]
+    if (isinstance(call_target, PythonClass) and
+            call_target.type_vars):
+        # This is a call to a constructor of a generic class; it's not
+        # enough to just return the class, we need the entire type with
+        # type arguments. We only support that if we can get it directly
+        # from mypy, i.e., when the result is assigned to a variable
+        # and we can get the variable type.
+        if hasattr(node, '_parent') and node._parent and isinstance(node._parent, (ast.Assign, ast.AnnAssign)):
+            trgt = node._parent.targets[0] if isinstance(node._parent, ast.Assign) else node._parent.target
+            ann_type = get_type(trgt, containers, container)
+            if isinstance(ann_type, GenericType) and ann_type.python_class == call_target:
+                return ann_type
+        if (call_target.name in (PSEQ_TYPE, PSET_TYPE, PMSET_TYPE) and
+                isinstance(node, ast.Call) and node.args):
+            arg_types = [get_type(arg, containers, container)
+                         for arg in node.args]
+            return GenericType(call_target, [common_supertype(arg_types)])
+        else:
+            error = 'generic.constructor.without.type'
+            raise InvalidProgramException(node, error)
+    if isinstance(call_target, PythonType):
+        # constructor call
+        return call_target
     func_name = get_func_name(node)
     if func_name == 'super':
         if len(node.args) == 2:
@@ -533,7 +595,7 @@ def _get_call_type(node: ast.Call, module: PythonModule,
             else:
                 raise UnsupportedException(node)
         if node.func.id in module.classes:
-            return module.global_module.classes[node.func.id]
+            return module.classes[node.func.id]
         elif module.get_func_or_method(node.func.id) is not None:
             target = module.get_func_or_method(node.func.id)
             return target.type
@@ -658,6 +720,16 @@ def pairwise_supertype(t1: PythonType, t2: PythonType) -> Optional[PythonType]:
         return t2
     if t2.issubtype(t1):
         return t1
+    if (isinstance(t1, GenericType) and isinstance(t2, GenericType) and
+            t1.python_class is t2.python_class and
+            t1.python_class.name in COVARIANT_TYPES and
+            len(t1.type_args) == len(t2.type_args)):
+        # For a covariant constructor the supertype can be formed argument-wise,
+        # e.g. the common supertype of Type[bool] and Type[str] is Type[object].
+        args = [pairwise_supertype(a1, a2)
+                for a1, a2 in zip(t1.type_args, t2.type_args)]
+        if all(arg is not None for arg in args):
+            return GenericType(t1.python_class, args)
     if (not t1.superclass and not t2.superclass):
         return None
     if not t1.superclass:
