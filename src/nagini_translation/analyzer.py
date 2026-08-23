@@ -140,11 +140,13 @@ class Analyzer(ast.NodeVisitor):
             cls = container.classes[name]
             if cls.defined:
                 raise InvalidProgramException(node, 'multiple.definitions')
-        if isinstance(container, PythonModule):
-            if (name in container.global_vars and
-                    hasattr(container.global_vars[name], 'value') and
-                    isinstance(node, (ast.FunctionDef, ast.ClassDef))):
-                raise InvalidProgramException(node, 'multiple.definitions')
+        # Static fields are to a class what global variables are to a module.
+        variables = (container.global_vars if isinstance(container, PythonModule)
+                     else container.static_fields)
+        if (name in variables and
+                hasattr(variables[name], 'value') and
+                isinstance(node, (ast.FunctionDef, ast.ClassDef))):
+            raise InvalidProgramException(node, 'multiple.definitions')
         if (name in container.functions or
                 name in container.methods or
                 name in container.predicates or

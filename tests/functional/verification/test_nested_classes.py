@@ -116,3 +116,28 @@ def forward_reference_to_nested_f(h: Holder) -> None:
     a = h.make()
     #:: ExpectedOutput(assert.failed:assertion.false)
     Assert(isinstance(a, Thing))
+
+
+# Static fields in an enclosing and a nested class, which must keep working:
+# only a name clash between a static field and a method or class is rejected.
+class WithStatics:
+    limit = 10
+
+    class Nested:
+        size = 3
+
+        def get(self) -> int:
+            Ensures(Result() == 3)
+            return WithStatics.Nested.size
+
+    def under(self, v: int) -> bool:
+        Ensures(Result() == (v < 10))
+        return v < WithStatics.limit
+
+
+def static_fields_in_nested_classes() -> None:
+    Assert(WithStatics.limit == 10)
+    Assert(WithStatics.Nested.size == 3)
+    n = WithStatics.Nested()
+    g = n.get()
+    Assert(g == 3)
