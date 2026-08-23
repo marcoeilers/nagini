@@ -640,11 +640,15 @@ class MethodTranslator(CommonTranslator):
         error_cond = self.viper.GtCmp(code_var.ref(), one, self.no_position(ctx), info)
         error_case = []
         no_error_case = []
-        # FIXME: Cannot currently assign None to type variable, because types
-        # aren't objects.
         for var in [value_var, traceback_var]:
             assign = self.viper.LocalVarAssign(var.ref(), null, pos, info)
             no_error_case.append(assign)
+        # Types are objects, so the type variable can be assigned as well; it
+        # gets the type of the (absent) exception, i.e. NoneType. Leaving it
+        # unassigned would leave a value that need not be a type object at all.
+        no_error_type = self.to_ref(self.type_factory.typeof(null, ctx), ctx)
+        no_error_case.append(self.viper.LocalVarAssign(type_var.ref(),
+                                                       no_error_type, pos, info))
 
         value_assign = self.viper.LocalVarAssign(value_var.ref(),
                                                  block.error_var.ref(), pos,

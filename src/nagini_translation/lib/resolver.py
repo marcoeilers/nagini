@@ -283,6 +283,11 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                 else:
                     error = 'generic.constructor.without.type'
                     raise InvalidProgramException(node, error)
+            if isinstance(node, ast.Call) or isinstance(target, PythonModule):
+                # Only a reference to a class is a class object. A call yields
+                # whatever the call returns, and a module is not a type at all,
+                # so neither may be wrapped in Type[...] here.
+                return target
             type_class = module.global_module.classes[TYPE_TYPE]
             return GenericType(type_class, [target])
     if isinstance(node, (ast.Attribute, ast.Name)):
