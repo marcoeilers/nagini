@@ -496,7 +496,8 @@ class Analyzer(ast.NodeVisitor):
             containers.extend(container.get_included_modules(()))
         return do_get_target(node, containers, container)
 
-    def find_or_create_class(self, name: str, module=None) -> PythonClass:
+    def find_or_create_class(self, name: str, module=None,
+                             defining: bool = False) -> PythonClass:
         """
         Gets the class with the given 'name' from the given 'module' (or the
         current module if none is provided). If no such class exists, one will
@@ -522,10 +523,21 @@ class Analyzer(ast.NodeVisitor):
         while isinstance(class_scope, PythonClass):
             if class_scope.name == name:
                 return class_scope
+            if name in class_scope.classes:
+                # A nested class of an enclosing class. Without this, the
+                # lookup below would find a same-named class in some visible
+                # module instead, and the nested class created here would never
+                # be found again.
+                return class_scope.classes[name]
             class_scope = class_scope.superscope
 
-        # Check all imported modules for the class.
-        for visible_module in module.get_included_modules((), True):
+        if defining and isinstance(superscope, PythonClass):
+            # A class declared inside another class belongs to that class; it
+            # must not resolve to a same-named class in some visible module.
+            visible_modules = []
+        else:
+            visible_modules = module.get_included_modules((), True)
+        for visible_module in visible_modules:
             if name in visible_module.classes:
                 cls = visible_module.classes[name]
                 break
@@ -637,7 +649,7 @@ class Analyzer(ast.NodeVisitor):
         name = node.name
         container = self.module if self.current_class is None else self.current_class
         self.define_new(container, name, node)
-        cls = self.find_or_create_class(name)
+        cls = self.find_or_create_class(name, defining=True)
         cls.defined = True
         cls.node = node
         cls.is_ghost = self.defines_ghost(node)

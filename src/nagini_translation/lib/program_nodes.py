@@ -179,7 +179,9 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
     @property
     def full_name(self) -> List[str]:
         if self.type_prefix is None:
-            return []  # ????
+            # Only the global module has no prefix; its members are named by
+            # themselves, without any module part.
+            return []
         return self.type_prefix.split(".")
 
     def get_relative_import_name(self, name: str, level: int) -> str:
