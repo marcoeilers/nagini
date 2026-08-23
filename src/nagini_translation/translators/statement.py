@@ -362,7 +362,8 @@ class StatementTranslator(CommonTranslator):
         """
         assert self.is_main_method(ctx)
         # static field definitions
-        cls = ctx.module.classes[node.name]
+        container = ctx.current_class or ctx.module
+        cls = container.classes[node.name]
         stmts = []
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
@@ -375,6 +376,7 @@ class StatementTranslator(CommonTranslator):
                 stmts.extend(self.assert_global_defined(decl, ctx.module, base, ctx,
                                                         call_deps=False))
 
+        old_class = ctx.current_class
         ctx.current_class = cls
         full_perm = self.viper.FullPerm(pos, info)
         for field in cls.static_fields.values():
@@ -387,7 +389,9 @@ class StatementTranslator(CommonTranslator):
 
         for stmt in node.body:
             stmts.extend(self.translate_stmt(stmt, ctx))
-        ctx.current_class = None
+        # Restore rather than clear: a class body may contain further class
+        # definitions, and the enclosing one is still current afterwards.
+        ctx.current_class = old_class
         return stmts + [self.set_global_defined(cls, ctx.module, node, ctx)]
 
     def _check_dependencies_defined(self, py_node: PythonNode, node: ast.AST,

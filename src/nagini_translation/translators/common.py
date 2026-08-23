@@ -352,8 +352,19 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
         module_set = module.names_var[1]
-        decl_id = self.viper.IntLit(self._get_string_value(declaration.name), pos,
-                                    info)
+        # A nested class is referred to as Outer.Inner, and that is the
+        # combined name extract_identifiers builds for the dependency check, so
+        # it has to be defined under that name rather than under 'Inner'.
+        name_parts = [declaration.name]
+        scope = getattr(declaration, 'superscope', None)
+        while isinstance(scope, PythonClass):
+            name_parts.append(scope.name)
+            scope = scope.superscope
+        decl_id = None
+        for name in name_parts:
+            current = self.viper.IntLit(self._get_string_value(name), pos, info)
+            decl_id = (current if decl_id is None
+                       else self._combine_names(current, decl_id, pos, info))
         return self._set_global_defined(decl_id, module_set, pos, info)
 
     def _set_global_defined(self, decl_int: Expr, module_var: Expr, pos: Position,
@@ -984,8 +995,13 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
     def get_target(self, node: ast.AST, ctx: Context) -> PythonModule:
         container = ctx.actual_function if ctx.actual_function else ctx.module
         containers = [ctx]
-        if ctx.current_class:
-            containers.append(ctx.current_class)
+        current_class = ctx.current_class
+        class_scopes = []
+        while current_class:
+            class_scopes.append(current_class)
+            current_class = current_class.superscope if isinstance(current_class.superscope, PythonClass) else None
+        # Innermost first, so that a nested class shadows an enclosing one.
+        containers[1:1] = class_scopes
         if isinstance(container, (PythonMethod, PythonIOOperation)):
             containers.append(container)
             containers.extend(container.module.get_included_modules())

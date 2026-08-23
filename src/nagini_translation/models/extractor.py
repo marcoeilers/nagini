@@ -85,8 +85,14 @@ class Extractor:
             # Special handling,
             pyfield = field_name
         else:
-            pyfield = [f for mod in modules for c in mod.classes.values() for f in c.python_class.fields.values()
-                       if f.sil_name == field_name][0]
+            # all_classes rather than classes, so that fields of nested classes
+            # are found too.
+            pyfields = [f for mod in modules for c in mod.all_classes.values()
+                        for f in c.python_class.fields.values()
+                        if f.sil_name == field_name]
+            if not pyfields:
+                return
+            pyfield = pyfields[0]
 
         target[(recv_val, pyfield)] = value
 
@@ -98,7 +104,8 @@ class Extractor:
             pypreds = [p for mod in modules for p in mod.predicates.values()
                        if p.sil_name == pred_name]
             if not pypreds:
-                pypreds = [p for mod in modules for c in mod.classes.values() for p in c.predicates.values()
+                pypreds = [p for mod in modules for c in mod.all_classes.values()
+                           for p in c.predicates.values()
                            if p.sil_name == pred_name]
                 if not pypreds:
                     pypreds = [o for mod in modules for o in mod.io_operations.values()

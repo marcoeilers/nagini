@@ -360,7 +360,7 @@ class Converter:
                     field_name_int_term = self.evaluate_term(smt_args[1])
                     field_name_int = int(field_name_int_term)
                     field_name = int_to_string(field_name_int)
-                    pyfield = [f for mod in self.modules for c in mod.classes.values()
+                    pyfield = [f for mod in self.modules for c in mod.all_classes.values()
                                for f in c.fields.values() if f.sil_name == field_name][0]
                     receiver_term = self.evaluate_term(smt_args[0])
                     receiver_val = self.convert_value(receiver_term, pyfield.cls)

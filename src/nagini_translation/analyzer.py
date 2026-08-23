@@ -133,15 +133,20 @@ class Analyzer(ast.NodeVisitor):
         ``container``. Checks there is any existing element with the
         same name, and raises an exception in that case.
         """
-        if isinstance(container, PythonModule):
-            if name in container.classes:
-                cls = container.classes[name]
-                if cls.defined:
-                    raise InvalidProgramException(node, 'multiple.definitions')
-            if (name in container.global_vars and
-                    hasattr(container.global_vars[name], 'value') and
-                    isinstance(node, (ast.FunctionDef, ast.ClassDef))):
+        # Both modules and classes can contain classes. A class that is not yet
+        # defined is a placeholder created by a forward reference, not a
+        # competing declaration.
+        if name in container.classes:
+            cls = container.classes[name]
+            if cls.defined:
                 raise InvalidProgramException(node, 'multiple.definitions')
+        # Static fields are to a class what global variables are to a module.
+        variables = (container.global_vars if isinstance(container, PythonModule)
+                     else container.static_fields)
+        if (name in variables and
+                hasattr(variables[name], 'value') and
+                isinstance(node, (ast.FunctionDef, ast.ClassDef))):
+            raise InvalidProgramException(node, 'multiple.definitions')
         if (name in container.functions or
                 name in container.methods or
                 name in container.predicates or
@@ -496,7 +501,8 @@ class Analyzer(ast.NodeVisitor):
             containers.extend(container.get_included_modules(()))
         return do_get_target(node, containers, container)
 
-    def find_or_create_class(self, name: str, module=None) -> PythonClass:
+    def find_or_create_class(self, name: str, module=None,
+                             defining: bool = False) -> PythonClass:
         """
         Gets the class with the given 'name' from the given 'module' (or the
         current module if none is provided). If no such class exists, one will
@@ -513,20 +519,59 @@ class Analyzer(ast.NodeVisitor):
         name = aliases.get(name, name)
         if self.current_class and name in self.current_class.type_vars:
             return self.current_class.type_vars[name]
-        if not module:
+        if module and module != self.module:
+            superscope = module
+        else:
+            superscope = self.current_class or self.module
             module = self.module
-        # Check all imported modules for the class.
-        for visible_module in module.get_included_modules((), True):
+        class_scope = superscope
+        while isinstance(class_scope, PythonClass):
+            if class_scope.name == name:
+                return class_scope
+            if name in class_scope.classes:
+                # A nested class of an enclosing class. Without this, the
+                # lookup below would find a same-named class in some visible
+                # module instead, and the nested class created here would never
+                # be found again.
+                return class_scope.classes[name]
+            class_scope = class_scope.superscope
+
+        # Only a class declaration creates a class inside another class. A mere
+        # reference, e.g. a forward reference in an annotation to a class
+        # declared later in the file, must create its placeholder in the
+        # module; creating it in the enclosing class would leave the later
+        # declaration to create a second, unrelated class of the same name.
+        nested_declaration = defining and isinstance(superscope, PythonClass)
+        creation_scope = superscope if nested_declaration else module
+        if nested_declaration:
+            # A reference cannot tell whether the class it names will turn out
+            # to be nested, so its placeholder was created in the module. Now
+            # that we know, adopt it instead of creating a second class. An
+            # already defined class of the same name is a genuine module level
+            # class, not a placeholder, and must be left alone.
+            placeholder = module.classes.get(name)
+            if (placeholder is not None and placeholder.name == name and
+                    not placeholder.defined):
+                del module.classes[name]
+                placeholder.superscope = superscope
+                superscope.classes[name] = placeholder
+                return placeholder
+            # A class declared inside another class must not resolve to a
+            # same-named class in some visible module.
+            visible_modules = []
+        else:
+            visible_modules = module.get_included_modules((), True)
+        for visible_module in visible_modules:
             if name in visible_module.classes:
                 cls = visible_module.classes[name]
                 break
         else:
             # Class doesn't exist yet, create it.
             superclass = self.global_module.classes[OBJECT_TYPE] if name != OBJECT_TYPE else None
-            cls = self.node_factory.create_python_class(name, module,
+            cls = self.node_factory.create_python_class(name, creation_scope,
                                                         self.node_factory,
                                                         superclass=superclass)
-            module.classes[name] = cls
+            creation_scope.classes[name] = cls
         return cls
 
     def find_or_create_target_class(self, node: ast.AST) -> PythonClass:
@@ -623,14 +668,16 @@ class Analyzer(ast.NodeVisitor):
         return actual_bases
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
-        if self.current_function or self.current_class:
+        if self.current_function:
             raise InvalidProgramException(node, 'nested.class.declaration')
         name = node.name
-        self.define_new(self.module, name, node)
-        cls = self.find_or_create_class(name)
+        container = self.module if self.current_class is None else self.current_class
+        self.define_new(container, name, node)
+        cls = self.find_or_create_class(name, defining=True)
         cls.defined = True
         cls.node = node
         cls.is_ghost = self.defines_ghost(node)
+        old_class = self.current_class
         self.current_class = cls
         actual_bases = []
         current_index = 0
@@ -687,8 +734,8 @@ class Analyzer(ast.NodeVisitor):
             self.visit(member, node)
         if cls.dataclass and "__init__" not in cls.methods.keys():
             self._add_dataclass_init_method(node)
-            
-        self.current_class = None
+
+        self.current_class = old_class
 
     def _add_dataclass_init_method(self, node: ast.ClassDef) -> None:
         """Adds the implicit __init__ method for dataclasses"""
@@ -1586,6 +1633,10 @@ class Analyzer(ast.NodeVisitor):
                 receiver = self.typeof(node.value)
                 if isinstance(receiver, PythonClass) and receiver.is_adt:
                     return
+                if (isinstance(receiver, PythonType) and
+                        node.attr in receiver.python_class.classes):
+                    # The attribute names a nested class, not a field.
+                    return
                 if (isinstance(receiver, UnionType) and
                         not isinstance(receiver, OptionalType)):
                     for type in receiver.get_types() - {None}:
@@ -1685,7 +1736,10 @@ class Analyzer(ast.NodeVisitor):
                     name = node.value.id + "." + name
             elif isinstance(node, ast.arg):
                 name = node.arg
-            msg = 'Unsupported type: {} for node {} of type {}'.format(mypy_type.__class__.__name__, name, type(node))
+            if mypy_type is None:
+                msg = 'Internal error: could not determine the type of {} of type {}'.format(name, type(node))
+            else:
+                msg = 'Unsupported type: {} for node {} of type {}'.format(mypy_type.__class__.__name__, name, type(node))
             raise UnsupportedException(node, desc=msg)
         return result
 
@@ -1698,11 +1752,35 @@ class Analyzer(ast.NodeVisitor):
             name = 'list'
         if prefix.endswith('.' + name):
             prefix = prefix[:-(len(name) + 1)]
-        target_module = self.module
+        target_module = None
+        # The class lives either in a module whose name is exactly the prefix,
+        # or, if it is a nested class, in one whose name is a proper prefix of
+        # it; the remainder then names the chain of enclosing classes.
+        best_fit = None
         for module in self.modules.values():
-            if module.type_prefix == prefix:
+            m_name = module.full_module_name or module.type_prefix
+            if m_name is None:
+                continue
+            if m_name == prefix or module.type_prefix == prefix:
                 target_module = module
                 break
+            if prefix.startswith(m_name + '.'):
+                if best_fit is None or len(m_name) > len(best_fit[1]):
+                    best_fit = (module, m_name)
+        if target_module is None:
+            if prefix in IGNORED_IMPORTS:
+                target_module = self.module.global_module
+            elif best_fit is not None:
+                container = best_fit[0]
+                for part in prefix[len(best_fit[1]) + 1:].split('.'):
+                    if part not in container.classes:
+                        break
+                    container = container.classes[part]
+                if name in container.classes:
+                    return container.classes[name]
+                target_module = best_fit[0]
+            else:
+                target_module = self.module
         result = self.find_or_create_class(name,
                                            module=target_module)
         return result
@@ -1792,8 +1870,8 @@ class Analyzer(ast.NodeVisitor):
             if node.id in self.module.classes:
                 return self.module.classes[node.id]
             context = []
-            if self.current_class is not None:
-                context.append(self.current_class.name)
+            if self.current_class:
+                context.extend(self.current_class.full_name)
             if self.current_function is not None:
                 context.append(self.current_function.name)
             context.extend(self.current_scopes)
@@ -1804,6 +1882,8 @@ class Analyzer(ast.NodeVisitor):
             return self.convert_type(type, node)
         elif isinstance(node, ast.Attribute):
             receiver = self.typeof(node.value)
+            if isinstance(receiver, PythonType) and node.attr in receiver.python_class.classes:
+                return receiver.python_class.classes[node.attr]
             if isinstance(receiver, OptionalType):
                 receiver = receiver.optional_type
             if isinstance(receiver, UnionType) and not isinstance(receiver, OptionalType):
@@ -1818,15 +1898,15 @@ class Analyzer(ast.NodeVisitor):
                 return UnionType(list(set_of_types)) if len(set_of_types) > 1 else set_of_types.pop()
             contexts = []
             if isinstance(receiver, OptionalType):
-                contexts.append([receiver.optional_type.name])
+                contexts.append(receiver.optional_type.python_class.full_name)
                 rec_super = receiver.optional_type.superclass
                 module = receiver.optional_type.module
             else:
-                contexts.append([receiver.name])
+                contexts.append(receiver.python_class.full_name)
                 rec_super = receiver.superclass
                 module = receiver.module
             while rec_super is not None:
-                contexts.append([rec_super.name])
+                contexts.append(rec_super.python_class.full_name)
                 rec_super = rec_super.superclass
             bound_type_vars = None
             if isinstance(receiver, GenericType) or (isinstance(receiver, OptionalType) and isinstance(receiver.optional_type, GenericType)):
@@ -1848,8 +1928,8 @@ class Analyzer(ast.NodeVisitor):
                     cls = self.module.global_module.classes['type']
                     return GenericType(cls, [self.current_class])
             context = []
-            if self.current_class is not None:
-                context.append(self.current_class.name)
+            if self.current_class:
+                context.extend(self.current_class.full_name)
             context.append(self.current_function.name)
             context.extend(self.current_scopes)
             type, _ = self.module.get_type(context, node.arg)

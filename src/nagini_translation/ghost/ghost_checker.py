@@ -225,7 +225,10 @@ class GhostChecker(ast.NodeVisitor):
             sub_node.contains_ghost = True
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
-        current_class: PythonClass = self.current_module.classes[node.name]
+        # A nested class is a member of the enclosing class, not of the module.
+        container = self.ctx.current_class if self.ctx.current_class else self.current_module
+        current_class: PythonClass = container.classes[node.name]
+        old_class = self.ctx.current_class
         self.ctx.current_class = current_class
         old_ghost_ctx = self.in_ghost_ctx #TODO: Do we need to define classes within ghost context?
         self.in_ghost_ctx = current_class.is_ghost
@@ -242,7 +245,7 @@ class GhostChecker(ast.NodeVisitor):
             self.visit(stmt)
 
         self.in_ghost_ctx = old_ghost_ctx
-        self.ctx.current_class = None
+        self.ctx.current_class = old_class
         node.is_ghost = current_class.is_ghost
         self.set_contains_ghost(node, current_class.is_ghost, *node.body)
 
@@ -723,13 +726,16 @@ class GhostChecker(ast.NodeVisitor):
             return (self.is_ghost_name(ann.value) or
                     self.is_ghost_type(self.find_type(ann.value)))
         elif isinstance(ann, ast.Attribute):
-            # Must be valid or mypy would throw error. Find module and check for ghost name
-            mod: Optional[PythonNode] = self.get_target(ann.value, self.ctx)
-            if not isinstance(mod, PythonModule):
-                raise InvalidProgramException(ann, 'invalid.ghost.annotation',
-                                              "Couldn't correctly resolve module of annotation.")
-            return (ann.attr in mod.ghost_names or
-                    self.is_ghost_type(mod.classes.get(ann.attr)))
+            # Must be valid or mypy would throw error. Either module.Class or,
+            # for a nested class, Class.Nested.
+            target: Optional[PythonNode] = self.get_target(ann.value, self.ctx)
+            if isinstance(target, PythonModule):
+                return (ann.attr in target.ghost_names or
+                        self.is_ghost_type(target.classes.get(ann.attr)))
+            if isinstance(target, PythonClass):
+                return self.is_ghost_type(target.classes.get(ann.attr))
+            raise InvalidProgramException(ann, 'invalid.ghost.annotation',
+                                          "Couldn't correctly resolve module of annotation.")
         else:
             assert isinstance(ann, ast.Subscript), f"Unexpected type of {type(ann)}"
             # A generic ghost type, e.g. PSeq[int], is ghost no matter what its

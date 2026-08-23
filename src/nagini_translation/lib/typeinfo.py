@@ -36,6 +36,30 @@ class TypeException(Exception):
         self.messages = messages
 
 
+def absolute_import_id(importer: 'mypy.nodes.MypyFile', imp) -> str:
+    """
+    Returns the absolute module id an ImportFrom or ImportAll node refers to.
+
+    ``imp.id`` is the name as written, so for a relative import it is missing
+    the package part ('A' for ``from .A import A``, and '' for
+    ``from . import x``). Resolve it against the importing module the way
+    Python does: one leading dot means the package containing the importer,
+    which for a package's own __init__ is that package itself, and each further
+    dot strips one more level.
+    """
+    relative = getattr(imp, 'relative', 0)
+    if not relative:
+        return imp.id
+    parts = importer.fullname.split('.')
+    if not importer.is_package_init_file():
+        parts = parts[:-1]
+    if relative > 1:
+        parts = parts[:-(relative - 1)]
+    if imp.id:
+        parts = parts + imp.id.split('.')
+    return '.'.join(parts)
+
+
 class TypeVisitor(TraverserVisitor):
     def __init__(self, type_map, path, ignored_lines, real_path):
         self.prefix = []
@@ -253,6 +277,11 @@ class TypeVisitor(TraverserVisitor):
             key = (node.name,)
             if key in self.all_types:
                 return self.all_types[key]
+            # Note: do not fall back to a previously recorded type for the
+            # qualified name here. mypy's own type for this node reflects
+            # narrowing by isinstance, whereas the recorded one is whatever the
+            # name had at its first occurrence, so preferring it would stop alt
+            # types from ever being collected.
         elif isinstance(node, mypy.nodes.CallExpr):
             if isinstance(node.callee, mypy.nodes.NameExpr) and node.callee.name == 'Result':
                 key = tuple(self.prefix)
@@ -367,22 +396,26 @@ class TypeInfo:
                 for i in to_handle:
                     if i in fl:
                         imports_not_handled.remove(i)
-                        for ii in fl[i][0].imports:
+                        importer = fl[i][0]
+                        for ii in importer.imports:
                             ids = []
                             if isinstance(ii, mypy.build.Import):
-                                ids.extend([id for id, _ in ii.ids])
+                                ids.extend([imported_id for imported_id, _ in ii.ids])
                             else:
-                                ids.append(ii.id)
-                            for id in ids:
-                                if id not in IGNORED_IMPORTS:
-                                    imports_not_handled.add(id)
-                                    directly_imported.add(id)
+                                # ImportFrom and ImportAll may be relative, in
+                                # which case ii.id is not the name mypy asks
+                                # about later ('A' rather than 'pkg.A'), so the
+                                # module would keep its cached, stripped tree.
+                                ids.append(absolute_import_id(importer, ii))
+                            for imported_id in ids:
+                                if imported_id not in IGNORED_IMPORTS:
+                                    imports_not_handled.add(imported_id)
+                                    directly_imported.add(imported_id)
                 if id == '__main__' or id == module_name:
                     imports_not_handled.add(id)
                     directly_imported.add(id)
 
-                prefix = os.path.join(*id.split('.'))
-                if prefix.replace(os.sep, '.') not in directly_imported:
+                if id not in directly_imported:
                     return old_find_cache_meta(id, path, mgr)
                 return None
             mypy.build.find_cache_meta = my_find_cache_meta
