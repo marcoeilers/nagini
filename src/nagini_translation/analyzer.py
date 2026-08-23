@@ -531,9 +531,16 @@ class Analyzer(ast.NodeVisitor):
                 return class_scope.classes[name]
             class_scope = class_scope.superscope
 
-        if defining and isinstance(superscope, PythonClass):
-            # A class declared inside another class belongs to that class; it
-            # must not resolve to a same-named class in some visible module.
+        # Only a class declaration creates a class inside another class. A mere
+        # reference, e.g. a forward reference in an annotation to a class
+        # declared later in the file, must create its placeholder in the
+        # module; creating it in the enclosing class would leave the later
+        # declaration to create a second, unrelated class of the same name.
+        nested_declaration = defining and isinstance(superscope, PythonClass)
+        creation_scope = superscope if nested_declaration else module
+        if nested_declaration:
+            # A class declared inside another class must not resolve to a
+            # same-named class in some visible module.
             visible_modules = []
         else:
             visible_modules = module.get_included_modules((), True)
@@ -544,10 +551,10 @@ class Analyzer(ast.NodeVisitor):
         else:
             # Class doesn't exist yet, create it.
             superclass = self.global_module.classes[OBJECT_TYPE] if name != OBJECT_TYPE else None
-            cls = self.node_factory.create_python_class(name, superscope,
+            cls = self.node_factory.create_python_class(name, creation_scope,
                                                         self.node_factory,
                                                         superclass=superclass)
-            superscope.classes[name] = cls
+            creation_scope.classes[name] = cls
         return cls
 
     def find_or_create_target_class(self, node: ast.AST) -> PythonClass:
