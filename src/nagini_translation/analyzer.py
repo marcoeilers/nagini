@@ -1715,36 +1715,35 @@ class Analyzer(ast.NodeVisitor):
             name = 'list'
         if prefix.endswith('.' + name):
             prefix = prefix[:-(len(name) + 1)]
-        best_module_fit = None
+        target_module = None
+        # The class lives either in a module whose name is exactly the prefix,
+        # or, if it is a nested class, in one whose name is a proper prefix of
+        # it; the remainder then names the chain of enclosing classes.
+        best_fit = None
         for module in self.modules.values():
             m_name = module.full_module_name or module.type_prefix
+            if m_name is None:
+                continue
             if m_name == prefix or module.type_prefix == prefix:
                 target_module = module
                 break
-            if prefix.startswith(m_name):
-                if best_module_fit is None or len(m_name) > len(best_module_fit.full_module_name):
-                    best_module_fit = module
-        else:
+            if prefix.startswith(m_name + '.'):
+                if best_fit is None or len(m_name) > len(best_fit[1]):
+                    best_fit = (module, m_name)
+        if target_module is None:
             if prefix in IGNORED_IMPORTS:
                 target_module = self.module.global_module
+            elif best_fit is not None:
+                container = best_fit[0]
+                for part in prefix[len(best_fit[1]) + 1:].split('.'):
+                    if part not in container.classes:
+                        break
+                    container = container.classes[part]
+                if name in container.classes:
+                    return container.classes[name]
+                target_module = best_fit[0]
             else:
-                if best_module_fit:
-                    best_fit_name = best_module_fit.full_module_name or best_module_fit.type_prefix
-                    remaining_prefix = prefix[len(best_fit_name) + 1:]
-                    remaining_parts = remaining_prefix.split('.')
-                    best_fit_container = best_module_fit
-                    while remaining_parts:
-                        if remaining_parts[0] in best_fit_container.classes:
-                            best_fit_container = best_fit_container.classes[remaining_parts[0]]
-                            if len(remaining_parts) == 1:
-                                break
-                            else:
-                                remaining_parts.pop(0)
-                        else:
-                            break
-                    if best_fit_container and name in best_fit_container.classes:
-                        return best_fit_container.classes[name]
-                raise Exception("Internal error: Could not find module for type.")
+                target_module = self.module
         result = self.find_or_create_class(name,
                                            module=target_module)
         return result
