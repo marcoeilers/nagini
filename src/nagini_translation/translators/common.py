@@ -315,8 +315,19 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
         module_set = module.names_var[1]
-        decl_id = self.viper.IntLit(self._get_string_value(declaration.name),
-                                    pos, info)
+        # A nested class is referred to as Outer.Inner, and that is the
+        # combined name extract_identifiers builds for the dependency check, so
+        # it has to be defined under that name rather than under 'Inner'.
+        name_parts = [declaration.name]
+        scope = getattr(declaration, 'superscope', None)
+        while isinstance(scope, PythonClass):
+            name_parts.append(scope.name)
+            scope = scope.superscope
+        decl_id = None
+        for name in name_parts:
+            current = self.viper.IntLit(self._get_string_value(name), pos, info)
+            decl_id = (current if decl_id is None
+                       else self._combine_names(current, decl_id, pos, info))
         return self._set_global_defined(decl_id, module_set, pos, info)
 
     def _set_global_defined(self, decl_int: Expr, module_var: Expr, pos: Position,

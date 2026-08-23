@@ -726,13 +726,16 @@ class GhostChecker(ast.NodeVisitor):
             return (self.is_ghost_name(ann.value) or
                     self.is_ghost_type(self.find_type(ann.value)))
         elif isinstance(ann, ast.Attribute):
-            # Must be valid or mypy would throw error. Find module and check for ghost name
-            mod: Optional[PythonNode] = self.get_target(ann.value, self.ctx)
-            if not isinstance(mod, PythonModule):
-                raise InvalidProgramException(ann, 'invalid.ghost.annotation',
-                                              "Couldn't correctly resolve module of annotation.")
-            return (ann.attr in mod.ghost_names or
-                    self.is_ghost_type(mod.classes.get(ann.attr)))
+            # Must be valid or mypy would throw error. Either module.Class or,
+            # for a nested class, Class.Nested.
+            target: Optional[PythonNode] = self.get_target(ann.value, self.ctx)
+            if isinstance(target, PythonModule):
+                return (ann.attr in target.ghost_names or
+                        self.is_ghost_type(target.classes.get(ann.attr)))
+            if isinstance(target, PythonClass):
+                return self.is_ghost_type(target.classes.get(ann.attr))
+            raise InvalidProgramException(ann, 'invalid.ghost.annotation',
+                                          "Couldn't correctly resolve module of annotation.")
         else:
             assert isinstance(ann, ast.Subscript), f"Unexpected type of {type(ann)}"
             # A generic ghost type, e.g. PSeq[int], is ghost no matter what its
