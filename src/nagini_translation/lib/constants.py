@@ -32,6 +32,7 @@ BUILTINS = ['cast',
 EXTENDABLE_BUILTINS = [
     'object',
     'Exception',
+    'BaseLock',
     'Lock',
     'int',
     'IntEnum'

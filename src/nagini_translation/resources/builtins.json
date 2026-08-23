@@ -1146,6 +1146,7 @@
 "IntEnum": {
     "extends": "int"
 },
+"BaseLock": {},
 "global": {
     "functions": {
         "max": {
