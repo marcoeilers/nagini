@@ -741,6 +741,10 @@ class GhostChecker(ast.NodeVisitor):
                 return self.check_annotation(ann.slice)
             assert isinstance(ann.slice, (ast.Tuple, ast.List)), f"Unexpected type of {type(ann.slice)}"
             sub_anns = ann.slice.elts
+            if not sub_anns:
+                # The empty tuple type, Tuple[()]. There are no type arguments,
+                # so nothing here can make the annotation ghost.
+                return False
             if len(sub_anns) == 1:
                 return self.check_annotation(sub_anns[0])
 

@@ -23,4 +23,4 @@ jobs:
         pip install ".[test,lsp,mcp]"
     - name: Test with pytest
       run: |
-        pytest tests/servers
+        pytest -p no:faulthandler tests/servers
