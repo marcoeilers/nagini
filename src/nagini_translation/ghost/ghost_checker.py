@@ -225,7 +225,10 @@ class GhostChecker(ast.NodeVisitor):
             sub_node.contains_ghost = True
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
-        current_class: PythonClass = self.current_module.classes[node.name]
+        # A nested class is a member of the enclosing class, not of the module.
+        container = self.ctx.current_class if self.ctx.current_class else self.current_module
+        current_class: PythonClass = container.classes[node.name]
+        old_class = self.ctx.current_class
         self.ctx.current_class = current_class
         old_ghost_ctx = self.in_ghost_ctx #TODO: Do we need to define classes within ghost context?
         self.in_ghost_ctx = current_class.is_ghost
@@ -242,7 +245,7 @@ class GhostChecker(ast.NodeVisitor):
             self.visit(stmt)
 
         self.in_ghost_ctx = old_ghost_ctx
-        self.ctx.current_class = None
+        self.ctx.current_class = old_class
         node.is_ghost = current_class.is_ghost
         self.set_contains_ghost(node, current_class.is_ghost, *node.body)
 

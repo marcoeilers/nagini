@@ -315,9 +315,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
         module_set = module.names_var[1]
-        string_value = self._get_string_value(declaration.name)
-        decl_id = self.viper.IntLit(string_value, pos, info)
-        print("setting defined: " + declaration.name + ", " + str(string_value))
+        decl_id = self.viper.IntLit(self._get_string_value(declaration.name),
+                                    pos, info)
         return self._set_global_defined(decl_id, module_set, pos, info)
 
     def _set_global_defined(self, decl_int: Expr, module_var: Expr, pos: Position,
