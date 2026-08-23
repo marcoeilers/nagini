@@ -272,9 +272,11 @@ class TypeVisitor(TraverserVisitor):
             key = (node.name,)
             if key in self.all_types:
                 return self.all_types[key]
-            full_key = tuple(self.prefix) + key
-            if full_key in self.all_types:
-                return self.all_types[full_key]
+            # Note: do not fall back to a previously recorded type for the
+            # qualified name here. mypy's own type for this node reflects
+            # narrowing by isinstance, whereas the recorded one is whatever the
+            # name had at its first occurrence, so preferring it would stop alt
+            # types from ever being collected.
         elif isinstance(node, mypy.nodes.CallExpr):
             if isinstance(node.callee, mypy.nodes.NameExpr) and node.callee.name == 'Result':
                 key = tuple(self.prefix)
