@@ -133,11 +133,14 @@ class Analyzer(ast.NodeVisitor):
         ``container``. Checks there is any existing element with the
         same name, and raises an exception in that case.
         """
+        # Both modules and classes can contain classes. A class that is not yet
+        # defined is a placeholder created by a forward reference, not a
+        # competing declaration.
+        if name in container.classes:
+            cls = container.classes[name]
+            if cls.defined:
+                raise InvalidProgramException(node, 'multiple.definitions')
         if isinstance(container, PythonModule):
-            if name in container.classes:
-                cls = container.classes[name]
-                if cls.defined:
-                    raise InvalidProgramException(node, 'multiple.definitions')
             if (name in container.global_vars and
                     hasattr(container.global_vars[name], 'value') and
                     isinstance(node, (ast.FunctionDef, ast.ClassDef))):
