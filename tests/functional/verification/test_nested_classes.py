@@ -76,3 +76,43 @@ def nested_field_fails() -> None:
     n = Outer.Inner(7)
     #:: ExpectedOutput(assert.failed:assertion.false)
     Assert(n.x == 8)
+
+
+# A reference cannot tell whether the name it uses will turn out to be a nested
+# class, so the placeholder it creates has to be adopted by the declaration.
+class Holder:
+    def make(self) -> 'Thing':
+        Ensures(Acc(Result().n) and Result().n == 1)
+        return Holder.Thing()
+
+    class Thing:
+        def __init__(self) -> None:
+            self.n = 1
+            Ensures(Acc(self.n) and self.n == 1)
+
+
+# Declared after Holder.Thing, and unrelated to it. Inside Holder the name
+# Thing refers to the nested class, which is what mypy resolves it to as well.
+class Thing:
+    def __init__(self) -> None:
+        self.m = 2
+        Ensures(Acc(self.m) and self.m == 2)
+
+
+def forward_reference_to_nested(h: Holder) -> None:
+    a = h.make()
+    Assert(a.n == 1)
+    Assert(isinstance(a, Holder.Thing))
+    Assert(not isinstance(a, Thing))
+
+
+def module_level_stays_separate() -> None:
+    b = Thing()
+    Assert(b.m == 2)
+    Assert(not isinstance(b, Holder.Thing))
+
+
+def forward_reference_to_nested_f(h: Holder) -> None:
+    a = h.make()
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    Assert(isinstance(a, Thing))

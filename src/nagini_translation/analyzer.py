@@ -539,6 +539,18 @@ class Analyzer(ast.NodeVisitor):
         nested_declaration = defining and isinstance(superscope, PythonClass)
         creation_scope = superscope if nested_declaration else module
         if nested_declaration:
+            # A reference cannot tell whether the class it names will turn out
+            # to be nested, so its placeholder was created in the module. Now
+            # that we know, adopt it instead of creating a second class. An
+            # already defined class of the same name is a genuine module level
+            # class, not a placeholder, and must be left alone.
+            placeholder = module.classes.get(name)
+            if (placeholder is not None and placeholder.name == name and
+                    not placeholder.defined):
+                del module.classes[name]
+                placeholder.superscope = superscope
+                superscope.classes[name] = placeholder
+                return placeholder
             # A class declared inside another class must not resolve to a
             # same-named class in some visible module.
             visible_modules = []
