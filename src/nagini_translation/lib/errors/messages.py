@@ -271,6 +271,10 @@ INVALID_PROGRAM_MESSAGES = {
     'invalid.contract.call':
         'a contract-only construct (e.g. Result, Old, Acc) is used outside '
         'a contract expression.',
+    'old.in.pure':
+        'Old() is used inside a @Pure function or @Predicate. These have no '
+        'pre-state to refer to; Old() is only meaningful in method contracts, '
+        'loop invariants and method bodies.',
     'invalid.override':
         'this override is incompatible with the member it overrides: '
         'parameter names, defaults and count must match, and an override '

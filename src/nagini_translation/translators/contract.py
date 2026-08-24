@@ -406,6 +406,10 @@ class ContractTranslator(CommonTranslator):
             if key in ctx.old_expr_aliases:
                 return [], ctx.old_expr_aliases[key]
 
+        if ctx.actual_function and (ctx.actual_function.pure or
+                                    ctx.actual_function.predicate):
+            raise InvalidProgramException(node, 'old.in.pure')
+
         stmt, exp = self.translate_expr(node.args[0], ctx)
         res = self.viper.Old(exp, self.to_position(node, ctx),
                              self.no_info(ctx))
