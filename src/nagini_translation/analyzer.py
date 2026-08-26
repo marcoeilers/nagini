@@ -461,6 +461,7 @@ class Analyzer(ast.NodeVisitor):
         else:
             # Class doesn't exist yet, create it.
             superclass = self.global_module.classes[OBJECT_TYPE] if name != OBJECT_TYPE else None
+            target_module = module
             builtin_val = getattr(builtins, name, None)
             if (isinstance(builtin_val, type) and name != 'Exception' and
                     issubclass(builtin_val, Exception) and
@@ -470,11 +471,16 @@ class Analyzer(ast.NodeVisitor):
                 # subclasses sit inside the modeled exception hierarchy (and are
                 # caught by `except Exception`). BaseException-only descendants
                 # like KeyboardInterrupt deliberately stay below object.
+                # Register it in the global module: the name is process-global,
+                # so every referencing module must resolve to the same class —
+                # per-module copies are distinct nominal types, making a
+                # cross-module Exsures/except pair unprovable.
                 superclass = self.global_module.classes['Exception']
-            cls = self.node_factory.create_python_class(name, module,
+                target_module = self.global_module
+            cls = self.node_factory.create_python_class(name, target_module,
                                                         self.node_factory,
                                                         superclass=superclass)
-            module.classes[name] = cls
+            target_module.classes[name] = cls
         return cls
 
     def find_or_create_target_class(self, node: ast.AST) -> PythonClass:

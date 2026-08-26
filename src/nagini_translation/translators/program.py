@@ -6,6 +6,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import ast
+import builtins
 from collections import OrderedDict
 from typing import List, Set, Tuple
 
@@ -1297,7 +1298,13 @@ class ProgramTranslator(CommonTranslator):
         instances of their own.
         """
         if module is module.global_module:
-            return False
+            # Modeled builtins compare by value — except the runtime-defined
+            # builtin exception classes the analyzer registers globally, which
+            # keep object's identity __eq__.
+            builtin_val = getattr(builtins, cls.name, None)
+            if not (cls.node is None and isinstance(builtin_val, type) and
+                    cls.name != 'Exception' and issubclass(builtin_val, Exception)):
+                return False
         if cls.interface or cls.enum or cls.is_adt or cls.type_vars:
             return False
         eq = cls.get_function('__eq__')
