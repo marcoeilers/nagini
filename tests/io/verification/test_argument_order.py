@@ -23,7 +23,7 @@ def read_something_io(
 
 
 @ContractOnly
-def read_something(t1: Place) -> Tuple[Place, int, bool]:
+def read_something(t1: Place) -> Tuple[Tuple[int, bool], Place]:
     IOExists3(Place, int, bool)(
         lambda t2, value1, value2: (
         Requires(
@@ -32,9 +32,9 @@ def read_something(t1: Place) -> Tuple[Place, int, bool]:
         ),
         Ensures(
             token(t2) and
-            Result()[0] == t2 and
-            Result()[1] == value1 and
-            Result()[2] == value2
+            Result()[1] == t2 and
+            Result()[0][0] == value1 and
+            Result()[0][1] == value2
         ),
         )
     )

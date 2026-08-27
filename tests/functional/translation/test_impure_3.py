@@ -15,5 +15,5 @@ class A:
 
 
 def m(a: A) -> None:
-    #:: ExpectedOutput(invalid.program:invalid.contract.position)
+    #:: ExpectedOutput(invalid.program:invalid.ghost.assign)
     t = a.p()

@@ -36,6 +36,38 @@ IO_CONTRACT_FUNCS = [
     'eval_io',
 ]
 
+IO_FUNCS = [
+    'IOForall',
+    'IOExists',
+    'IOExists1',
+    'IOExists2',
+    'IOExists3',
+    'IOExists4',
+    'IOExists5',
+    'IOExists6',
+    'IOExists7',
+    'IOExists8',
+    'IOExists9',
+    'IOExists10',
+    'IOExists11',
+    'IOExists12',
+    'IOExists13',
+    'IOExists14',
+    'IOExists15',
+]
+
+IO_DECORATORS = ['IOOperation']
+
+# IO functions which return a regular result together with a place, i.e. whose
+# return value has both a regular and a ghost component.
+IO_MIXED_RETURN_FUNCS = [
+    'Eval',
+]
+
+# Types which only exist for verification purposes, i.e. which are always ghost.
+GHOST_IO_TYPES = [
+    'Place',
+]
 
 T = TypeVar('T')
 T1 = TypeVar('T1')

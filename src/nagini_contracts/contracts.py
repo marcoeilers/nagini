@@ -27,12 +27,19 @@ GHOST_PREFIX = "_gh_"
 
 CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant', 'Decreases']
 
+GHOST_BUILTINS = ['PSeq', 'PByteSeq', 'PSet', 'PMultiset', 'GInt', 'GFloat', 'GComplex',
+                  'GBool', 'GStr']
+
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'ResultT', 'Implies', 'Forall', 'IOForall', 'Forall2', 'Forall3', 'Forall6',
                   'Exists', 'Low', 'LowVal', 'LowEvent', 'Declassify', 'TerminatesSif',
                   'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding', 'Previous',
-                  'RaisedException', 'PSeq', 'PByteSeq', 'PSet', 'ToSeq', 'ToByteSeq', 'ToMS', 'MaySet', 'MayCreate',
+                  'RaisedException', 'ToSeq', 'ToByteSeq', 'ToMS', 'MaySet', 'MayCreate',
                   'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',
-                  'PMultiset', 'LowExit', 'Refute', 'isNaN', 'Reveal']
+                  'LowExit', 'Refute', 'isNaN', 'Reveal', 'MarkGhost'] + GHOST_BUILTINS
+
+CONTRACT_DECORATORS = ['Pure', 'Opaque', 'Predicate', 'Inline', 'Ghost', 'ContractOnly']
+
+SPECIAL_PREDICATES = ['list_pred', 'dict_pred', 'set_pred']
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -41,6 +48,21 @@ U2 = TypeVar('U2')
 U3 = TypeVar('U3')
 U4 = TypeVar('U4')
 
+GInt = int
+GFloat = float
+GComplex = complex
+GBool = bool
+GStr = str
+
+def MarkGhost(t: object) -> None:
+    """
+    Marks the given type alias as a ghost type, i.e. values of that type only
+    exist during verification. It's a no-op.
+
+    The argument must be a type alias, which Nagini checks itself; the parameter
+    is therefore not declared as a type.
+    """
+    pass
 
 def Requires(expr: bool) -> bool:
     pass
@@ -567,22 +589,6 @@ def ContractOnly(func: T) -> T:
     return func
 
 
-def GhostReturns(start_index: int) -> Callable[[T], T]:
-    """
-    Decorator for functions which specifies which return values are ghost
-    returns, starting at index 0. It's a no-op.
-    If a function returns an n-tuple, @GhostReturns(k) means that
-    elements 0 to k-1 are normal return values, elements k to n-1 are ghost
-    return values. k must be less than n. If the function returns a value
-    that is not a tuple, start_index can only be 0 (meaning that the only value
-    that is returned is a ghost value). Using this decorator on functions which
-    do not return anything is not allowed.
-    """
-    def wrap(func: T) -> T:
-        return func
-    return wrap
-
-
 def list_pred(l: object) -> bool:
     """
     Special, predefined predicate that represents the permissions belonging
@@ -664,7 +670,6 @@ __all__ = [
         'Inline',
         'Ghost',
         'ContractOnly',
-        'GhostReturns',
         'list_pred',
         'dict_pred',
         'set_pred',
@@ -678,5 +683,11 @@ __all__ = [
         'ToMS',
         'MaySet',
         'MayCreate',
-        'isNaN'
+        'isNaN',
+        'MarkGhost',
+        'GInt', 
+        'GFloat', 
+        'GComplex', 
+        'GBool', 
+        'GStr'
         ]

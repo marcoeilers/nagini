@@ -25,11 +25,13 @@ from nagini_translation.lib.constants import (
     OBJECT_TYPE,
     PRIMITIVE_BOOL_TYPE,
     PRIMITIVE_INT_TYPE,
+    PRIMITIVE_TYPE_TYPE,
     PSEQ_TYPE,
     PBYTESEQ_TYPE,
     PSET_TYPE,
     SET_TYPE,
     SINGLE_NAME,
+    TYPE_TYPE,
     UNION_TYPE,
 )
 from nagini_translation.lib.context import Context
@@ -106,6 +108,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             result = self.to_bool(e, ctx, node)
         elif target_type == self.viper.Int:
             result = self.to_int(e, ctx)
+        elif target_type == self.type_factory.type_type():
+            result = self.to_pytype(e, ctx)
         return result
 
     def _is_pure(self, e: Expr) -> bool:
@@ -150,6 +154,15 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             else:
                 prim_bool = ctx.module.global_module.classes[PRIMITIVE_BOOL_TYPE]
                 result = self.get_function_call(prim_bool, '__box__',
+                                                [result], [None], None, ctx,
+                                                position=e.pos())
+        elif e.typ() == self.type_factory.type_type():
+            if (isinstance(e, self.viper.ast.FuncApp) and
+                    e.funcname() == 'type___unbox__'):
+                result = e.args().head()
+            else:
+                prim_type = ctx.module.global_module.classes[PRIMITIVE_TYPE_TYPE]
+                result = self.get_function_call(prim_type, '__box__',
                                                 [result], [None], None, ctx,
                                                 position=e.pos())
         return result
@@ -217,6 +230,30 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             result = self.get_function_call(int_type, '__unbox__',
                                             [result], [None], None, ctx,
                                             position=e.pos())
+        return result
+
+    def to_pytype(self, e: Expr, ctx: Context) -> Expr:
+        """
+        Converts the given expression to an expression of the Silver type PyType
+        if it isn't already, either by unboxing a reference or undoing a
+        previous boxing operation.
+        """
+        # Avoid wrapping non-pure expressions (leads to errors within Silver's
+        # Consistency object)
+        if not self._is_pure(e):
+            return e
+        if e.typ() == self.type_factory.type_type():
+            return e
+        if e.typ() != self.viper.Ref:
+            e = self.to_ref(e, ctx)
+        if (isinstance(e, self.viper.ast.FuncApp) and
+                    e.funcname() == 'PyType___box__'):
+            return e.args().head()
+        result = e
+        type_type = ctx.module.global_module.classes[TYPE_TYPE]
+        result = self.get_function_call(type_type, '__unbox__',
+                                        [result], [None], None, ctx,
+                                        position=e.pos())
         return result
 
     def unwrap(self, e: Expr) -> Expr:
@@ -316,8 +353,19 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
         module_set = module.names_var[1]
-        decl_id = self.viper.IntLit(self._get_string_value(declaration.name), pos,
-                                    info)
+        # A nested class is referred to as Outer.Inner, and that is the
+        # combined name extract_identifiers builds for the dependency check, so
+        # it has to be defined under that name rather than under 'Inner'.
+        name_parts = [declaration.name]
+        scope = getattr(declaration, 'superscope', None)
+        while isinstance(scope, PythonClass):
+            name_parts.append(scope.name)
+            scope = scope.superscope
+        decl_id = None
+        for name in name_parts:
+            current = self.viper.IntLit(self._get_string_value(name), pos, info)
+            decl_id = (current if decl_id is None
+                       else self._combine_names(current, decl_id, pos, info))
         return self._set_global_defined(decl_id, module_set, pos, info)
 
     def _set_global_defined(self, decl_int: Expr, module_var: Expr, pos: Position,
@@ -724,10 +772,12 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         assert len(args) == len(func.get_args())
         for arg, param, type in zip(args, func.get_args(), arg_types):
             formal_args.append(param.decl)
-            if param.type.name == '__prim__bool':
+            if param.type.name == PRIMITIVE_BOOL_TYPE:
                 actual_arg = self.to_bool(arg, ctx)
-            elif param.type.name == '__prim__int':
+            elif param.type.name == PRIMITIVE_INT_TYPE:
                 actual_arg = self.to_int(arg, ctx)
+            elif param.type.name == PRIMITIVE_TYPE_TYPE:
+                actual_arg = self.to_pytype(arg, ctx)
             else:
                 actual_arg = self.to_ref(arg, ctx)
             actual_args.append(actual_arg)
@@ -967,8 +1017,13 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
     def get_target(self, node: ast.AST, ctx: Context) -> PythonModule:
         container = ctx.actual_function if ctx.actual_function else ctx.module
         containers = [ctx]
-        if ctx.current_class:
-            containers.append(ctx.current_class)
+        current_class = ctx.current_class
+        class_scopes = []
+        while current_class:
+            class_scopes.append(current_class)
+            current_class = current_class.superscope if isinstance(current_class.superscope, PythonClass) else None
+        # Innermost first, so that a nested class shadows an enclosing one.
+        containers[1:1] = class_scopes
         if isinstance(container, (PythonMethod, PythonIOOperation)):
             containers.append(container)
             containers.extend(container.module.get_included_modules())

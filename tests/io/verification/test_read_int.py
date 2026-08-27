@@ -31,12 +31,12 @@ def read_int1(t1: Place) -> Tuple[int, Place]:
         )
     )
 
-    t2, number = read_int(t1)
+    number, t2 = read_int(t1)
 
     return number, t2
 
 
-def read_int2(t1: Place) -> Tuple[int, int, Place]:
+def read_int2(t1: Place) -> Tuple[Tuple[int, int], Place]:
     IOExists4(Place, Place, int, int)(
         lambda t3, t2, value1, value2: (
         Requires(
@@ -46,20 +46,20 @@ def read_int2(t1: Place) -> Tuple[int, int, Place]:
         ),
         Ensures(
             token(t3) and
-            t3 == Result()[2] and
-            value1 == Result()[0] and
-            value2 == Result()[1]
+            t3 == Result()[1] and
+            value1 == Result()[0][0] and
+            value2 == Result()[0][1]
         ),
         )
     )
 
-    t2, number1 = read_int(t1)
-    t3, number2 = read_int(t2)
+    number1, t2 = read_int(t1)
+    number2, t3 = read_int(t2)
 
-    return number1, number2, t3
+    return (number1, number2), t3
 
 
-def read_int3(t1: Place) -> Tuple[int, int, Place]:
+def read_int3(t1: Place) -> Tuple[Tuple[int, int], Place]:
     IOExists4(Place, Place, int, int)(
         lambda t3, t2, value1, value2: (
         Requires(
@@ -70,17 +70,17 @@ def read_int3(t1: Place) -> Tuple[int, int, Place]:
         Ensures(
             #:: ExpectedOutput(postcondition.violated:assertion.false)
             token(t3) and
-            t3 == Result()[2] and
-            value1 == Result()[0] and
-            value2 == Result()[1]
+            t3 == Result()[1] and
+            value1 == Result()[0][0] and
+            value2 == Result()[0][1]
         ),
         )
     )
 
-    t2, number1 = read_int(t1)
-    t3, number2 = read_int(t2)
+    number1, t2 = read_int(t1)
+    number2, t3 = read_int(t2)
 
-    return number2, number1, t3
+    return (number2, number1), t3
 
 
 # Read and write.
@@ -101,7 +101,7 @@ def read_write_int1(t1: Place) -> Place:
         )
     )
 
-    t2, number = read_int(t1)
+    number, t2 = read_int(t1)
     t3 = write_int(t2, number)
 
     return t3
@@ -124,8 +124,8 @@ def read_write_int2(t1: Place) -> Place:
         )
     )
 
-    t2, number1 = read_int(t1)
-    t3, number2 = read_int(t2)
+    number1, t2 = read_int(t1)
+    number2, t3 = read_int(t2)
     t4 = write_int(t3, number1)
     t5 = write_int(t4, number2)
 
@@ -149,8 +149,8 @@ def read_write_int3(t1: Place) -> Place:
         )
     )
 
-    t2, number1 = read_int(t1)
-    t3, number2 = read_int(t2)
+    number1, t2 = read_int(t1)
+    number2, t3 = read_int(t2)
     #:: ExpectedOutput(call.precondition:insufficient.permission)
     t4 = write_int(t3, number2)
     #:: ExpectedOutput(carbon)(call.precondition:insufficient.permission)

@@ -10,9 +10,11 @@ class A:
 
 
 def test() -> None:
-    Assert(A(5).value == 5)
+    a = A(5)
+    Assert(a.value == 5)
 
 
 def test2() -> None:
+    a = A(3)
     #:: ExpectedOutput(assert.failed:assertion.false)
-    Assert(A(3).value == 5)
+    Assert(a.value == 5)

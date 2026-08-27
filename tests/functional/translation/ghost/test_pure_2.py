@@ -1,0 +1,14 @@
+# Any copyright is dedicated to the Public Domain.
+# http://creativecommons.org/publicdomain/zero/1.0/
+
+from nagini_contracts.contracts import *
+
+
+g_counter: GInt = 0
+
+
+@Pure
+def leak() -> int:
+    # Ghost state must not leak into a regular result.
+    #:: ExpectedOutput(invalid.program:invalid.ghost.return)
+    return g_counter

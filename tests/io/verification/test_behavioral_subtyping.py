@@ -38,7 +38,7 @@ class SuperA:
             )
         )
 
-        t2, number = read_int(t1)
+        number, t2 = read_int(t1)
 
         return number, t2
 
@@ -104,7 +104,7 @@ class SubA0(SuperA):
             )
         )
 
-        t2, number = read_int(t1)
+        number, t2 = read_int(t1)
 
         return number, t2
 
@@ -286,7 +286,7 @@ class SubA4(SuperA):
             )
         )
 
-        t2_new, number_new = read_int(t1)
+        number_new, t2_new = read_int(t1)
 
         return number_new, t2_new
 

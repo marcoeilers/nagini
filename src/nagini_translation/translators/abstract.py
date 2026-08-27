@@ -315,6 +315,10 @@ class AbstractTranslator(metaclass=ABCMeta):
         return translator.create_method_fork(ctx, targets, thread, position, info,
                                              target_node)
 
+    def get_must_terminate(self, ctx: Context) -> Expr:
+        translator = self.config.obligation_translator
+        return translator.get_must_terminate(ctx)
+
     def enter_loop_translation(
             self, node: Union[ast.While, ast.For], ctx: Context,
             err_var: PythonVar = None) -> None:
@@ -350,6 +354,9 @@ class AbstractTranslator(metaclass=ABCMeta):
                    inhale_exhale: bool=True) -> Expr:
         return self.config.type_translator.type_check(
             lhs, type, position, ctx, inhale_exhale=inhale_exhale)
+
+    def subtype_check(self, obj: Expr, type_expr: Expr, position: 'silver.ast.Position', ctx: Context) -> Expr:
+        return self.config.type_translator.subtype_check(obj, type_expr, position, ctx)
 
     def bind_type_vars(self, method: PythonMethod, ctx: Context) -> None:
         return self.config.method_translator.bind_type_vars(method, ctx)

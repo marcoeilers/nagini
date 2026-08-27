@@ -3,6 +3,7 @@
 
 from nagini_contracts.contracts import (
     Ensures,
+    GBool,
     Requires,
     Result,
     Implies,
@@ -84,7 +85,9 @@ def write_four_ints_2(t1: Place) -> Place:
     # See comment below.
     marco = (t1, True)
     wow(marco)
-    wow2(marco)
+    # wow2 takes a regular tuple, so it cannot be given the one holding a place.
+    marco2 = (3, True)  # type: Tuple[object, bool]
+    wow2(marco2)
 
     Open(write_two_ints_io(t1))
 
@@ -161,7 +164,7 @@ def write_four_ints_4(t1: Place) -> Place:
 # Here I'm adding some calls that should trigger any dangerous cases I can think of related to those changes, hoping
 # that if there is actually a problem, it will be triggered again in the future.
 
-def wow(t: Tuple[Place, int]) -> None:
+def wow(t: Tuple[Place, GBool]) -> None:
     Requires(MustTerminate(1))
     Requires(bool(t[1]))
     Ensures(Implies(isinstance(t[1], bool), t[1] is True))

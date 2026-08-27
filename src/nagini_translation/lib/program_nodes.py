@@ -1,5 +1,5 @@
 """
-Copyright (c) 2019 ETH Zurich
+Copyright (c) 2025 ETH Zurich
 This Source Code Form is subject to the terms of the Mozilla Public
 License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -24,6 +24,7 @@ from nagini_translation.lib.constants import (
     PRIMITIVE_PREFIX,
     PRIMITIVE_SEQ_TYPE,
     PRIMITIVE_SET_TYPE,
+    PRIMITIVE_TYPE_TYPE,
     PRIMITIVES,
     PSEQ_TYPE,
     PBYTESEQ_TYPE,
@@ -166,6 +167,7 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
         self.file = file
         self.defined_var = None
         self.names_var = None
+        self.ghost_names = types.ghost_names[type_prefix] if type_prefix in types.ghost_names else set()
         if global_module and type_prefix != '__main__':
             self.add_builtin_vars()
 
@@ -175,25 +177,26 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
             return self.types.module_name
         return self.type_prefix
 
+    @property
+    def full_name(self) -> List[str]:
+        if self.type_prefix is None:
+            # Only the global module has no prefix; its members are named by
+            # themselves, without any module part.
+            return []
+        return self.type_prefix.split(".")
+
     def get_relative_import_name(self, name: str, level: int) -> str:
         module_name = name
         if level > 0:
-            parts = self.full_module_name.split(".")
-            # A package's __init__ resolves relative imports against the
-            # package itself (mypy names pkg/__init__.py just 'pkg'), so it
-            # drops one component fewer than a plain module: `.helpers` inside
-            # pkg/__init__.py is pkg.helpers, inside pkg/mod.py it is also
-            # pkg.helpers (drop 'mod').
-            effective_level = level - 1 if self._is_package else level
-            module_name_to_add = parts[:len(parts) - effective_level]
+            current_module_name = self.full_module_name
+            actual_level = level if not (self.module.file.endswith('__init__.py') or self.module.file.endswith('__init__.pyi')) else level - 1
+            module_name_to_add = current_module_name.split(".")
+            if actual_level != 0:
+                module_name_to_add = module_name_to_add[:-actual_level]
             if module_name is not None:
                 module_name_to_add.append(module_name)
             module_name = ".".join(module_name_to_add)
         return module_name
-
-    @property
-    def _is_package(self) -> bool:
-        return str(self.file or '').endswith('__init__.py')
 
     def add_builtin_vars(self) -> None:
         """
@@ -233,6 +236,14 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
     def scope_prefix(self) -> List[str]:
         return []
 
+    @property
+    def all_classes(self) -> OrderedDict[str, 'PythonClass']:
+        res = OrderedDict()
+        for cls_name, cls in self.classes.items():
+            if cls_name == cls.name:
+                res.update(cls.all_classes)
+        return res
+
     def get_func_or_method(self, name: str) -> 'PythonMethod':
         for module in [self] + self.from_imports + [self.global_module]:
             if not isinstance(module, PythonModule):
@@ -256,6 +267,11 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
         """
         if self in previous:
             return None, None
+
+        local_type, local_alts = self.types.get_type(prefixes, name)
+        if local_type is not None:
+            return local_type, local_alts
+
         actual_prefix = self.type_prefix.split('.') if self.type_prefix else []
         actual_prefix.extend(prefixes)
         local_type, local_alts = self.types.get_type(actual_prefix, name)
@@ -419,6 +435,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self.predicates = OrderedDict()
         self.fields = OrderedDict()
         self.static_fields = OrderedDict()
+        self.classes = OrderedDict()
         self.type = None  # infer, domain type
         self.interface = interface
         self.dataclass = False
@@ -433,11 +450,20 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self.is_adt = name == 'ADT' # This flag is set when the class is
         # defining an algebraic data type or one of its constructors.
         # This flag is set transitively across subclasses.
+        self.is_ghost = False # infer
 
     def get_bound_type_vars(self) -> Dict['TypeVar', 'PythonType']:
         if self.superclass:
             return self.superclass.get_bound_type_vars()
         return {}
+
+    @property
+    def all_classes(self) -> OrderedDict[str, 'PythonClass']:
+        res = OrderedDict()
+        res[".".join(self.full_name)] = self
+        for cls_name, cls in self.classes.items():
+            res.update(cls.all_classes)
+        return res
 
     @property
     def is_defining_adt(self) -> bool:
@@ -687,6 +713,9 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         of them.
         """
         self.sil_name = sil_name
+        for name, cls in self.classes.items():
+            cls_name = self.name + '_' + name
+            cls.process(self.get_fresh_name(cls_name), translator)
         for name, function in self.functions.items():
             func_name = self.name + '_' + name
             function.process(self.get_fresh_name(func_name), translator)
@@ -746,7 +775,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         used by get_target). If 'only_top' is true, returns only top level
         elements that can be accessed without a receiver.
         """
-        dicts = [self.static_methods, self.static_fields, self.type_vars]
+        dicts = [self.static_methods, self.static_fields, self.type_vars, self.classes]
         if not only_top:
             dicts.extend([self.functions, self.fields, self.methods,
                           self.predicates])
@@ -763,12 +792,14 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
             boxed_name = self.name[len(PRIMITIVE_PREFIX):]
             if boxed_name == 'Set':
                 boxed_name = PSET_TYPE
-            if boxed_name == 'Multiset':
+            elif boxed_name == 'Multiset':
                 boxed_name = PMSET_TYPE
-            if boxed_name == 'Seq':
+            elif boxed_name == 'Seq':
                 boxed_name = PSEQ_TYPE
-            if boxed_name == 'PByteSeq':
+            elif boxed_name == 'PByteSeq':
                 boxed_name = PBYTESEQ_TYPE
+            elif self.name == PRIMITIVE_TYPE_TYPE:
+                boxed_name = 'type'
             return self.module.classes[boxed_name]
         return self
 
@@ -785,6 +816,13 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
     @property
     def python_class(self) -> 'PythonClass':
         return self
+
+    @property
+    def full_name(self) -> List[str]:
+        result = []
+        result.extend(self.superscope.full_name)
+        result.append(self.name)
+        return result
 
 
 class GenericType(PythonType):
@@ -1120,6 +1158,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.definition_deps = set()
         self.call_deps = set()
         self.decreases_clauses = []
+        self.is_ghost = False # infer
 
     def add_all_call_deps(self, res: Set[Tuple[ast.AST, PythonNode, PythonModule]],
                           prefix: Tuple[PythonNode, ...]=()) -> None:
@@ -1624,6 +1663,7 @@ class PythonVarBase(PythonNode):
         self.default_expr = None
         self.default_factory = None
         self.show_in_ce = True
+        self.is_ghost = False # infer
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -1725,6 +1765,7 @@ class PythonIOExistentialVar(PythonVarBase):
         super().__init__(name, node, type)
         self._ref = None
         self._old_ref = None
+        self.is_ghost = True
 
     def is_defined(self) -> bool:
         """
@@ -1856,6 +1897,7 @@ class PythonField(PythonNode):
         self._sil_field = None
         self.reads = []  # direct
         self.writes = []  # direct
+        self.is_ghost = False # infer
 
     @property
     def sil_field(self) -> 'silver.ast.Field':

@@ -95,7 +95,7 @@ def write_non_negative(t1: Place) -> Place:
         )
     )
 
-    t2, number = read_int(t1)
+    number, t2 = read_int(t1)
 
     if number >= 0:
         t3 = write_int(t2, number)
@@ -125,7 +125,7 @@ def write_only_positive(t1: Place) -> Place:
         )
     )
 
-    t2, number = read_int(t1)
+    number, t2 = read_int(t1)
 
     if number > 0:
         t3 = write_int(t2, number)

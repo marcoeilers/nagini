@@ -44,6 +44,7 @@ class TypeVisitor(TraverserVisitor):
         self.prefix = []
         self.all_types = {}
         self.alt_types = {}
+        self.ghost_names = {}
         self.type_map = type_map
         self.path = path
         self.ignored_lines = ignored_lines
@@ -138,7 +139,12 @@ class TypeVisitor(TraverserVisitor):
                 break
         if (node.name not in LITERALS and not is_alias):
             name_type = self.type_of(node)
-            if not isinstance(name_type, mypy.types.CallableType):
+            # References to functions are not recorded, but a class object is
+            # also typed as a callable (its constructor), and those are
+            # ordinary values that do need a recorded type.
+            is_function_ref = (isinstance(name_type, mypy.types.CallableType) and
+                               not name_type.is_type_obj())
+            if not is_function_ref:
                 self.set_type(self.prefix + [node.name], name_type,
                               node.line, col(node))
 
@@ -218,6 +224,22 @@ class TypeVisitor(TraverserVisitor):
             return
         if isinstance(node.callee, mypy.nodes.NameExpr) and node.callee.name == 'ResultT':
             return
+        if isinstance(node.callee, mypy.nodes.NameExpr) and node.callee.name == 'MarkGhost':
+            # Verify MarkGhost call and collect ghost names
+            if len(node.args) != 1:
+                msg = self.path + ':' + str(node.line) + ': error: MarkGhost may only define one ghost name at a time.'
+                raise TypeException([msg])
+            ghost_type = node.args[0]
+            if not isinstance(ghost_type.node, mypy.nodes.TypeAlias):
+                msg = self.path + ':' + str(node.line) + ': error: MarkGhost takes only Type aliases.'
+                raise TypeException([msg])
+            if not self.path in self.ghost_names:
+                self.ghost_names[self.path] = set()
+            curr_set = self.ghost_names[self.path]
+            if ghost_type.name in curr_set:
+                msg = self.path + ':' + str(node.line) + ': error: MarkGhost may only define ghost names once.'
+                raise TypeException([msg])
+            curr_set.add(ghost_type.name)
         for a in node.args:
             self.visit(a)
         self.visit(node.callee)
@@ -234,6 +256,11 @@ class TypeVisitor(TraverserVisitor):
             key = (node.name,)
             if key in self.all_types:
                 return self.all_types[key]
+            # Note: do not fall back to a previously recorded type for the
+            # qualified name here. mypy's own type for this node reflects
+            # narrowing by isinstance, whereas the recorded one is whatever the
+            # name had at its first occurrence, so preferring it would stop alt
+            # types from ever being collected.
         elif isinstance(node, mypy.nodes.CallExpr):
             if isinstance(node.callee, mypy.nodes.NameExpr) and node.callee.name == 'Result':
                 key = tuple(self.prefix)
@@ -281,6 +308,7 @@ class TypeInfo:
         self.files = {}
         self.type_aliases = {}
         self.type_vars = {}
+        self.ghost_names = {}
         self.module_name = None
 
     def _create_options(self, strict_optional: bool):
@@ -315,10 +343,9 @@ class TypeInfo:
         the build. Nagini needs their typed ASTs, which a cache hit does not
         materialize; everything else keeps its cache hit.
 
-        Replaces the earlier find_cache_meta monkeypatch, which (a) has no
-        effect on mypyc-compiled mypy — compiled call sites bind the original
-        function — and (b) stacked one more wrapper on every check() call in a
-        long-lived process.
+        Works on the on-disk cache because patching mypy.build.find_cache_meta
+        has no effect on the mypyc-compiled mypy wheel: compiled call sites
+        bind the original function.
         """
         cache_root = os.path.join(options.cache_dir,
                                   '%d.%d' % sys.version_info[:2])
@@ -338,8 +365,24 @@ class TypeInfo:
             for node in ast.walk(tree):
                 if isinstance(node, ast.Import):
                     seeds.update(a.name for a in node.names)
-                elif isinstance(node, ast.ImportFrom) and node.module:
-                    seeds.add(node.module)
+                elif isinstance(node, ast.ImportFrom):
+                    if node.level == 0:
+                        if node.module:
+                            seeds.add(node.module)
+                    elif module_name:
+                        # Resolve relative imports the way Python does: one
+                        # leading dot is the package containing the main file
+                        # (the file itself if it is a package __init__), each
+                        # further dot strips one more level.
+                        parts = module_name.split('.')
+                        if not filename.endswith(('__init__.py', '__init__.pyi')):
+                            parts = parts[:-1]
+                        if node.level > 1:
+                            parts = parts[:-(node.level - 1)]
+                        if node.module:
+                            parts += node.module.split('.')
+                        if parts:
+                            seeds.add('.'.join(parts))
         except (OSError, SyntaxError):
             pass
 
@@ -453,6 +496,7 @@ class TypeInfo:
                 self.alt_types.update(visitor.alt_types)
                 self.type_aliases.update(visitor.type_aliases)
                 self.type_vars.update(visitor.type_vars)
+                self.ghost_names.update(visitor.ghost_names)
             return True
         except mypy.errors.CompileError as e:
             report_errors(e.messages)
@@ -527,6 +571,9 @@ class TypeInfo:
 
     def is_type_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.TypeType)
+
+    def is_overloaded_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.Overloaded)
 
     def is_type_alias_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.TypeAliasType)

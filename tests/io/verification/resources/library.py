@@ -19,7 +19,7 @@ def read_int_io(
     Terminates(False)
 
 
-def read_int(t1: Place) -> Tuple[Place, int]:
+def read_int(t1: Place) -> Tuple[int, Place]:
     IOExists2(Place, int)(
         lambda t2, value: (
         Requires(
@@ -28,8 +28,8 @@ def read_int(t1: Place) -> Tuple[Place, int]:
         ),
         Ensures(
             token(t2) and
-            t2 == Result()[0] and
-            value == Result()[1]
+            t2 == Result()[1] and
+            value == Result()[0]
         ),
         )
     )

@@ -11,12 +11,12 @@ def read_str_io(t1: Place, val: str = Result(),
                 t2: Place = Result()) -> bool:
     Terminates(False)
 @ContractOnly
-def read_str(t1: Place) -> Tuple[Place, str]:
+def read_str(t1: Place) -> Tuple[str, Place]:
     IOExists2(Place, str)(
         lambda t2, val: (
             Requires(token(t1, 1) and read_str_io(t1, val, t2)),
-            Ensures(token(t2) and Result()[0] == t2 and
-                    Result()[1] is val)))
+            Ensures(token(t2) and Result()[1] == t2 and
+                    Result()[0] is val)))
 @IOOperation
 def write_str_io(t1: Place, val: str, t2: Place = Result()) -> bool:
     Terminates(True)
@@ -40,6 +40,6 @@ def echo(t1: Place) -> Place:
             Requires(token(t1, 2) and echo_io(t1, t3)),
             Ensures(token(t3) and Result() == t3)))
     Open(echo_io(t1))
-    t2, value = read_str(t1)
+    value, t2 = read_str(t1)
     t3 = write_str(t2, value)
     return t3

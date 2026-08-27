@@ -10,7 +10,6 @@ import ast
 from nagini_translation.lib.constants import (
     END_LABEL,
     ERROR_NAME,
-    FILE_VAR,
     GLOBAL_VAR_FIELD,
     MAIN_METHOD_NAME,
     MODULE_VARS,
@@ -18,12 +17,12 @@ from nagini_translation.lib.constants import (
     OBJECT_TYPE,
     PRIMITIVES,
     STRING_TYPE,
+    TYPE_TYPE,
 )
 from nagini_translation.lib.program_nodes import (
     GenericType,
     MethodType,
     PythonExceptionHandler,
-    PythonField,
     PythonMethod,
     PythonModule,
     PythonTryBlock,
@@ -243,8 +242,12 @@ class MethodTranslator(CommonTranslator):
                         continue
                     if func.method_type == MethodType.class_method:
                         cls_arg = arg.ref()
+                        type_type = ctx.module.global_module.classes[TYPE_TYPE]
+                        type_check = self.type_factory.type_check(
+                            cls_arg, type_type, self.no_position(ctx), ctx)
+                        pres.append(type_check)
                         type_check = self.type_factory.subtype_check(
-                            cls_arg, func.cls, self.no_position(ctx), ctx)
+                            self.to_pytype(cls_arg, ctx), func.cls, self.no_position(ctx), ctx)
                         pres.append(type_check)
                         continue
                 type_check = self.get_parameter_typeof(arg, ctx)
@@ -646,17 +649,21 @@ class MethodTranslator(CommonTranslator):
         error_cond = self.viper.GtCmp(code_var.ref(), one, self.no_position(ctx), info)
         error_case = []
         no_error_case = []
-        # FIXME: Cannot currently assign None to type variable, because types
-        # aren't objects.
         for var in [value_var, traceback_var]:
             assign = self.viper.LocalVarAssign(var.ref(), null, pos, info)
             no_error_case.append(assign)
+        # Types are objects, so the type variable can be assigned as well; it
+        # gets the type of the (absent) exception, i.e. NoneType. Leaving it
+        # unassigned would leave a value that need not be a type object at all.
+        no_error_type = self.to_ref(self.type_factory.typeof(null, ctx), ctx)
+        no_error_case.append(self.viper.LocalVarAssign(type_var.ref(),
+                                                       no_error_type, pos, info))
 
         value_assign = self.viper.LocalVarAssign(value_var.ref(),
                                                  block.error_var.ref(), pos,
                                                  info)
         error_case.append(value_assign)
-        error_type = self.type_factory.typeof(block.error_var.ref(), ctx)
+        error_type = self.to_ref(self.type_factory.typeof(block.error_var.ref(), ctx), ctx)
         type_assign = self.viper.LocalVarAssign(type_var.ref(), error_type,
                                                 pos, info)
         error_case.append(type_assign)
