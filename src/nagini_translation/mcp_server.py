@@ -140,7 +140,7 @@ def _filter_assumptions(dbg: dict) -> None:
     if len(relevant) < len(assumptions):
         _mark(dbg, 'assumptions',
               f'{len(assumptions) - len(relevant)} not sharing a symbol with '
-              'failedAssertion (full list in the recorded result.json)')
+              'failedAssertion (full list in result.json under recordedAt)')
     dbg['assumptions'] = relevant
 
 
@@ -236,6 +236,12 @@ async def verify_file(path: str, methods: Optional[List[str]] = None,
     of lines, so only request it when needed. `translate_only` stops after
     translation (mypy + Nagini-to-Viper): fast validity check that the file is
     a well-formed Nagini program; no proof obligations are checked.
+
+    Oversized `debug` payloads are slimmed to fit the response; whatever was
+    cut is listed per-diagnostic under `debug.omitted`. When the server records
+    attempts, `recordedAt` names this run's archive directory — its
+    `result.json` holds the untruncated payloads (full assumptions, state,
+    prover session); read that file when an omitted field matters.
     """
     selected = _as_selected(methods)
     result = await _run(lambda: _service.verify(

@@ -116,6 +116,9 @@ class VerifyResult:
     viper_program: Optional[str] = None
     # Seconds per pipeline phase (typecheck, translate, chop, verify).
     timings: Optional[dict] = None
+    # Attempt directory this run was archived under (record dir enabled only);
+    # its result.json holds the untruncated debug payloads.
+    recorded_at: Optional[str] = None
 
     def to_dict(self) -> dict:
         result = {
@@ -125,8 +128,12 @@ class VerifyResult:
             'crashed': self.crashed,
             'duration': self.duration,
             'timings': self.timings or {},
-            'diagnostics': [d.to_dict() for d in self.diagnostics],
         }
+        if self.recorded_at is not None:
+            # Early in the dict: any client-side tail truncation of an
+            # oversized result must not eat the pointer to the full archive.
+            result['recordedAt'] = self.recorded_at
+        result['diagnostics'] = [d.to_dict() for d in self.diagnostics]
         if self.viper_program is not None:
             result['viperProgram'] = self.viper_program
         return result
@@ -494,8 +501,9 @@ class VerificationService:
                 'log).'.format(type(e).__name__, e), 'internal.error')],
                 time.time() - start)
         result.timings = phases.phases()
-        self._record(path, selected, base_dir, viper_args, source, start,
-                     result, translate_only, smtstate_dir=smtstate_dir)
+        result.recorded_at = self._record(
+            path, selected, base_dir, viper_args, source, start,
+            result, translate_only, smtstate_dir=smtstate_dir)
         if smtstate_dir and os.path.isdir(smtstate_dir):
             shutil.rmtree(smtstate_dir, ignore_errors=True)
         return result
@@ -525,11 +533,11 @@ class VerificationService:
         return seq
 
     def _record(self, path, selected, base_dir, viper_args, source, start,
-                result, translate_only=False, smtstate_dir=None) -> None:
-        """Archive one verification attempt under the service's record dir.
-
-        Server-side only — nothing about the recording is visible through the
-        MCP tools. Every attempt gets meta.json (effective backend args,
+                result, translate_only=False, smtstate_dir=None) -> Optional[str]:
+        """Archive one verification attempt under the service's record dir;
+        returns the attempt directory (surfaced to clients as ``recordedAt``
+        so slimmed debug payloads stay recoverable), or None when recording
+        is off or failed. Every attempt gets meta.json (effective backend args,
         content hashes of the project's .py files for attempt-series
         attribution) and result.json (full structured result incl. debug
         payloads). Full file contents (the verified file plus its sibling
@@ -542,7 +550,7 @@ class VerificationService:
         Recording failures must never affect verification.
         """
         if not self._record_dir:
-            return
+            return None
         try:
             with self._record_lock:
                 self._record_seq += 1
@@ -600,9 +608,11 @@ class VerificationService:
                 json.dump(meta, f, indent=1)
             with open(os.path.join(attempt, 'result.json'), 'w') as f:
                 json.dump(result.to_dict(), f, indent=1)
+            return attempt
         except Exception:
             logging.exception('Failed to record verification attempt for %s.',
                               path)
+            return None
 
     def _apply_bitops_size(self, size: int) -> None:
         """Switch the bitvector width for subsequent translations; sticky, like
