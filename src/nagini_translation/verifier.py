@@ -26,14 +26,37 @@ class ViperVerifier(Enum):
     carbon = 'carbon'
 
 
+def merge_viper_args(defaults: List[str], overrides: List[str]) -> List[str]:
+    """Append ``overrides`` to ``defaults``, dropping every default option that
+    an override names too. An option is its ``--name`` token plus any attached
+    value tokens (``--flag=value`` or ``--flag value``); the backend rejects a
+    duplicated or contradictory pair, so defaults must give way rather than
+    coexist.
+    """
+    def grouped(args):
+        groups = []
+        for arg in args:
+            if arg.startswith('--') or not groups:
+                groups.append([arg])
+            else:
+                groups[-1].append(arg)
+        return groups
+
+    given = {g[0].split('=', 1)[0] for g in grouped(overrides)}
+    kept = [token for g in grouped(defaults)
+            if g[0].split('=', 1)[0] not in given for token in g]
+    return kept + list(overrides)
+
+
 def build_silicon_backend_args(viper_args: List[str], counterexample: bool,
                                disable_branch_conditions: bool) -> List[str]:
     """The Silicon command line used by Nagini.
 
     Shared by the direct Silicon backend and the ViperServer-based one so the
-    two always use identical arguments.
+    two always use identical arguments. ``viper_args`` override same-named
+    defaults.
     """
-    return [
+    defaults = [
         '--assumeInjectivityOnInhale',
         '--z3Exe', config.z3_path,
         '--disableCatchingExceptions',
@@ -58,18 +81,18 @@ def build_silicon_backend_args(viper_args: List[str], counterexample: bool,
         # dumps go to a temp dir so they don't litter the server's working
         # directory.
         *(['--smtStateDir', os.path.join(tempfile.gettempdir(), 'nagini-smtstate')]
-          if '--smtStateOnError' in viper_args
-          and not any(a.startswith('--smtStateDir') for a in viper_args) else []),
-        *viper_args,
+          if '--smtStateOnError' in viper_args else []),
     ]
+    return merge_viper_args(defaults, viper_args)
 
 
 def build_carbon_backend_args(viper_args: List[str]) -> List[str]:
     """The Carbon command line used by Nagini.
 
     Shared by the direct Carbon backend and the ViperServer-based one.
+    ``viper_args`` override same-named defaults.
     """
-    return [
+    defaults = [
         '--assumeInjectivityOnInhale',
         '--boogieExe', config.boogie_path,
         '--z3Exe', config.z3_path,
@@ -77,8 +100,8 @@ def build_carbon_backend_args(viper_args: List[str]) -> List[str]:
         '--plugin=viper.silver.plugin.standard.refute.RefutePlugin:'
         'viper.silver.plugin.standard.termination.TerminationPlugin:'
         'viper.silver.plugin.standard.predicateinstance.PredicateInstancePlugin',
-        *viper_args,
     ]
+    return merge_viper_args(defaults, viper_args)
 
 
 class VerificationResult(metaclass=ABCMeta):

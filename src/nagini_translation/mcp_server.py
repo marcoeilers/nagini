@@ -229,7 +229,9 @@ async def verify_file(path: str, methods: Optional[List[str]] = None,
 
     `viper_args` are extra command-line arguments passed to the Viper backend,
     e.g. `["--timeout=60"]` for a per-run verification timeout in seconds (the
-    CLI's `--viper-arg`, as a list). `include_viper` returns the translated
+    CLI's `--viper-arg`, as a list); they override same-named backend defaults,
+    and a rejected command line is reported as an `invalid.viper.args`
+    diagnostic. `include_viper` returns the translated
     Viper program in `viperProgram`; even a small file translates to hundreds
     of lines, so only request it when needed. `translate_only` stops after
     translation (mypy + Nagini-to-Viper): fast validity check that the file is

@@ -49,7 +49,8 @@ from nagini_translation.main import (
     TYPE_ERROR_MATCHER,
     verify as verify_program,
 )
-from nagini_translation.verifier import Failure, Success, ViperVerifier
+from nagini_translation.verifier import (Failure, merge_viper_args, Success,
+                                         ViperVerifier)
 
 
 @dataclass
@@ -446,14 +447,11 @@ class VerificationService:
         path = os.path.abspath(path)
         start = time.time()
         phases.reset()
-        viper_args = list(viper_args) if viper_args else []
         # Server-default backend args (the CLI's --viper-arg, given at service
         # launch), applied to every request. The request's own viper_args win:
         # a default is dropped when the request passes the same flag itself.
-        if self._default_viper_args:
-            given = {a.split('=', 1)[0] for a in viper_args}
-            viper_args = [a for a in self._default_viper_args
-                          if a.split('=', 1)[0] not in given] + viper_args
+        viper_args = merge_viper_args(self._default_viper_args,
+                                      list(viper_args) if viper_args else [])
         # Per-request dir for the backend's SMT state bundles, adopted into
         # the attempt record when a diagnostic is canceled (see _record).
         # Staged inside the record dir so adoption is a same-filesystem rename
@@ -872,8 +870,22 @@ class VerificationService:
 
         duration = time.time() - start
         phases.record('verify', time.time() - verify_start)
-        result, crash_texts = self._split_messages(messages)
+        result, crash_texts, invalid_args_texts = self._split_messages(messages)
         if result is None:
+            # A rejected command line (unknown, duplicated, or contradictory
+            # viper_args) is either reported properly (InvalidArgumentsReport)
+            # or thrown raw by the argument parser. The job never verified
+            # anything; without this classification the only symptom is a
+            # misleading backend crash.
+            arg_error_texts = invalid_args_texts + [
+                t for t in crash_texts
+                if 'org.rogach.scallop.exceptions' in t]
+            if arg_error_texts:
+                return VerifyResult(False, [self._point_diagnostic(
+                    path, 'Invalid Viper backend arguments: %s'
+                    % '; '.join(arg_error_texts),
+                    'invalid.viper.args')], duration,
+                    viper_program=viper_text)
             if crash_texts:
                 # The backend died with an exception instead of producing a
                 # result (e.g. a prover crash). Surface it as a distinct
@@ -941,18 +953,20 @@ class VerificationService:
         while scala_iterator.hasNext():
             yield scala_iterator.next()
 
-    def _split_messages(self, messages) -> Tuple[object, List[str]]:
+    def _split_messages(self, messages) -> Tuple[object, List[str], List[str]]:
         """Partition a finished job's reported messages into the overall
-        verification result and the texts of any reported backend exceptions.
+        verification result, the texts of any reported backend exceptions, and
+        the texts of any invalid-backend-arguments errors.
 
-        Returns ``(result, crash_texts)`` where ``result`` is the
-        ``viper.silver.verifier.VerificationResult`` from the job's overall
-        success/failure message, or ``None`` if the job never produced one
-        (crashed or cancelled).
+        Returns ``(result, crash_texts, invalid_args_texts)`` where ``result``
+        is the ``viper.silver.verifier.VerificationResult`` from the job's
+        overall success/failure message, or ``None`` if the job never produced
+        one (invalid arguments, crashed, or cancelled).
         """
         reporter = self.jvm.viper.silver.reporter
         result = None
         crash_texts = []
+        invalid_args_texts = []
         for msg in self._iterate(messages.iterator()):
             if isinstance(msg, reporter.OverallFailureMessage):
                 result = msg.result()
@@ -960,7 +974,11 @@ class VerificationService:
                 result = self.jvm.viper.silver.verifier.Success
             elif isinstance(msg, reporter.ExceptionReport):
                 crash_texts.append(str(msg.e()))
-        return result, crash_texts
+            elif isinstance(msg, reporter.InvalidArgumentsReport):
+                invalid_args_texts.extend(
+                    str(e.readableMessage())
+                    for e in self._iterate(msg.errors().iterator()))
+        return result, crash_texts, invalid_args_texts
 
     def _verify_serial(self, path, selected, base_dir, arp,
                        counterexample, ignore_global, viper_args,
