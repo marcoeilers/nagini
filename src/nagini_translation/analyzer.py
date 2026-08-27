@@ -56,7 +56,10 @@ from nagini_translation.lib.program_nodes import (
     TypeVar,
     UnionType,
 )
-from nagini_translation.lib.resolver import get_target as do_get_target
+from nagini_translation.lib.resolver import (
+    _get_subscript_type,
+    get_target as do_get_target,
+)
 from nagini_translation.lib.typedefs import Expr
 from nagini_translation.lib.typeinfo import TypeInfo
 from nagini_translation.lib.util import (
@@ -1803,6 +1806,9 @@ class Analyzer(ast.NodeVisitor):
             if isinstance(cls, PythonType):
                 return cls
             raise UnsupportedException(node)
+        elif isinstance(node, ast.Subscript):
+            return _get_subscript_type(self.typeof(node.value), self.module,
+                                       node)
         else:
             raise UnsupportedException(node)
 
