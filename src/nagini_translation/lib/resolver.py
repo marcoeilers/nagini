@@ -667,6 +667,10 @@ def get_subscript_type(node: ast.Subscript, module: PythonModule,
                         containers: List[ContainerInterface],
                         container: PythonNode) -> PythonType:
     value_type = get_type(node.value, containers, container)
+    if value_type is None:
+        # The subscripted expression refers to something unknown in the given
+        # context (see _do_get_type).
+        return None
     if value_type.python_class.name == TUPLE_TYPE and isinstance(node.slice, ast.Slice):
         if (hasattr(node, '_parent') and node._parent and isinstance(node._parent, (ast.Assign, ast.AnnAssign)) and
                 node is node._parent.value):
