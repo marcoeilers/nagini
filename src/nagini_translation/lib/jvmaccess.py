@@ -7,6 +7,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import jpype
 import logging
+import os
+import shlex
 
 
 class JVMStartupError(Exception):
@@ -56,8 +58,11 @@ class JVM:
                     'and/or point the JAVA_HOME environment variable to '
                     'it.'.format(e)) from e
             try:
+                # NAGINI_JVM_ARGS: extra JVM options, e.g. a heap cap (-Xmx6g)
+                # sized to the container the server runs in.
                 jpype.startJVM(jvm_path,
                                '-Djava.class.path=' + classpath, '-Xss128m',
+                               *shlex.split(os.environ.get('NAGINI_JVM_ARGS', '')),
                                convertStrings=True)
             except OSError as e:
                 raise JVMStartupError(
