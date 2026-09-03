@@ -35,7 +35,9 @@ from typing import List, Optional, Set, Tuple
 
 from nagini_translation.lib import config, phases
 from nagini_translation.lib.errors import error_manager
+from nagini_translation.lib.errors import messages
 from nagini_translation.lib.errors.messages import invalid_program_message
+
 from nagini_translation.lib.jvmaccess import JVM
 from nagini_translation.lib.typeinfo import TypeException
 from nagini_translation.lib.util import (
@@ -342,7 +344,8 @@ class VerificationService:
                  disable_branch_conditions: bool = False,
                  force_obligations: bool = False,
                  default_viper_args: List[str] = None,
-                 record_dir: str = None):
+                 record_dir: str = None,
+                 plain_diagnostics: bool = False):
         if viper_jar_path:
             config.classpath = viper_jar_path
         if z3_path:
@@ -368,6 +371,11 @@ class VerificationService:
         self._bv_size = int_bitops_size
         self._disable_branch_conditions = disable_branch_conditions
         self._record_dir = record_dir
+        # Plain diagnostics: messages carry no explanatory prose or phase
+        # timings, and the MCP frontend drops the SMT debug payloads (the
+        # recorded attempts keep everything).
+        self.plain_diagnostics = plain_diagnostics
+        messages.PROSE = not plain_diagnostics
         # Continue the attempt numbering of any earlier server that recorded
         # into the same directory (e.g. a session resume, or a harness-side
         # sweep sharing the agent's log) instead of clobbering attempt-0001.
@@ -758,18 +766,7 @@ class VerificationService:
                                                      build_silicon_backend_args,
                                                      get_viper_server_manager)
         manager = get_viper_server_manager(self.jvm)
-        if (self._record_dir and not manager.started
-                and manager.log_file is None):
-            # Persist ViperServer's journal next to the recorded attempts
-            # instead of a throwaway file in /tmp, so backend exception details
-            # survive the environment (e.g. a container exiting).
-            try:
-                os.makedirs(self._record_dir, exist_ok=True)
-                manager.log_file = os.path.join(
-                    os.path.abspath(self._record_dir), 'viperserver_journal.log')
-            except OSError:
-                logging.exception('Could not prepare the ViperServer journal '
-                                  'location; using the default temp file.')
+        self._set_journal_location(manager)
         start = time.time()
         # 1. Translate and snapshot this job's error-mapping state (serialized).
         with self._state_lock:
@@ -841,7 +838,7 @@ class VerificationService:
                 phases.record('verify', time.time() - verify_start)
                 return VerifyResult(False, [self._point_diagnostic(
                     path, 'Timeout occurred: verification exceeded %s second(s) '
-                    '(hard wall). Phases: %s.' % (wall_cap, phases.summary()),
+                    '(hard wall).%s' % (wall_cap, self._phase_note(phases)),
                     'TimeoutOccurred')], time.time() - start,
                     viper_program=viper_text)
             # Most commonly this is a cancelled job (its actor was stopped) —
@@ -860,9 +857,12 @@ class VerificationService:
                 return VerifyResult(False, [self._point_diagnostic(
                     path,
                     'Timeout occurred: the whole-run --timeout=%ds expired '
-                    'before verification finished. No individual obligation '
-                    'failed or exceeded its per-check budget. Phases: %s.'
-                    % (backend_timeout, phases.summary()),
+                    'before verification finished.%s%s'
+                    % (backend_timeout,
+                       '' if self.plain_diagnostics else
+                       ' No individual obligation failed or exceeded its '
+                       'per-check budget.',
+                       self._phase_note(phases)),
                     'TimeoutOccurred')], elapsed, cancelled=True,
                     viper_program=viper_text)
             logging.debug('Verification job failed or was cancelled.', exc_info=True)
@@ -932,8 +932,8 @@ class VerificationService:
                         # program point; report it under the same code the
                         # other timeout paths use.
                         diagnostics.append(self._point_diagnostic(
-                            path, '%s Phases: %s.' % (err.readableMessage(),
-                                                      phases.summary()),
+                            path, '%s%s' % (err.readableMessage(),
+                                            self._phase_note(phases)),
                             'TimeoutOccurred'))
                     else:
                         errors.append(err)
@@ -1050,6 +1050,12 @@ class VerificationService:
         "was collected. Re-verify with viper_args=['--disableCaching'] to "
         'run this member live and collect the state; the cache is kept.]')
 
+    def _phase_note(self, phases) -> str:
+        """Per-phase timing suffix for a timeout message ('' when plain)."""
+        if self.plain_diagnostics:
+            return ''
+        return ' Phases: %s.' % phases.summary()
+
     def _failure_diagnostics(self, failure: Failure, path: str,
                              smt_state_requested: bool = False) -> List[Diagnostic]:
         diagnostics = []
@@ -1057,7 +1063,8 @@ class VerificationService:
         for error in failure.errors:
             try:
                 diag = self._error_diagnostic(error, path)
-                if smt_state_requested and diag.debug is None:
+                if (smt_state_requested and diag.debug is None
+                        and not self.plain_diagnostics):
                     jvm_error = getattr(error, '_error', None)
                     try:
                         cached = bool(jvm_error is not None
@@ -1229,6 +1236,11 @@ def add_service_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentP
                              'snapshot, effective backend args, full result '
                              'incl. debug payloads) into this directory; '
                              'server-side only, invisible to MCP clients')
+    parser.add_argument('--plain-diagnostics', action='store_true',
+                        help='report plain diagnostics: no explanatory prose '
+                             'on invalid-program errors, no phase timings, and '
+                             'no SMT debug payloads in responses (recorded '
+                             'attempts keep everything)')
     return parser
 
 
@@ -1247,7 +1259,9 @@ def service_kwargs_from_args(args: argparse.Namespace) -> dict:
         disable_branch_conditions=args.disable_branch_conditions,
         force_obligations=args.force_obligations,
         default_viper_args=args.viper_arg.split(',') if args.viper_arg else None,
-        record_dir=args.record_dir)
+        record_dir=args.record_dir,
+        plain_diagnostics=args.plain_diagnostics)
+
 
 
 def make_service(args: argparse.Namespace) -> VerificationService:

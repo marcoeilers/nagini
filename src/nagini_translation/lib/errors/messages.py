@@ -91,7 +91,7 @@ ERRORS = {
         lambda n: 'Possibilistic non-interference might not be satisfied.',
     'termination.failed':
         lambda n: ('Function {} might not terminate.'.format(get_target_name(n))
-                   if isinstance(n, (ast.Call, ast.FunctionDef)) else
+                   if PROSE and isinstance(n, (ast.Call, ast.FunctionDef)) else
                    'Function might not terminate.'),
     'refute.failed':
         lambda n: 'Refute holds in all cases or could not be reached.',
@@ -204,12 +204,12 @@ REASONS = {
     'tuple.false':
         lambda n: ('Termination measure of {} might not decrease or might not be '
                    'bounded.'.format(get_target_name(n))
-                   if isinstance(n, (ast.Call, ast.FunctionDef)) else
+                   if PROSE and isinstance(n, (ast.Call, ast.FunctionDef)) else
                    'Termination measure might not decrease or might not be bounded.'),
     'termination.condition.false':
         lambda n: ('Termination condition of {} might not hold.'
                    .format(get_target_name(n))
-                   if isinstance(n, (ast.Call, ast.FunctionDef)) else
+                   if PROSE and isinstance(n, (ast.Call, ast.FunctionDef)) else
                    'Termination condition might not hold.'),
     'refutation.true':
         lambda n: 'Assertion definitely holds.'
@@ -236,6 +236,11 @@ VAGUE_REASONS = {
                                                      'at the point where obligation is '
                                                      'used.'),
 }
+
+# Explanatory prose in messages: raise-site explanations, named termination
+# errors, and the code prose below. Off (VerificationService plain_diagnostics),
+# messages carry bare codes and generic text.
+PROSE = True
 
 # Prose for InvalidProgramException codes that are otherwise shown verbatim.
 # Only codes raised without an explicit message need an entry; raise sites
@@ -300,6 +305,11 @@ INVALID_PROGRAM_MESSAGES = {
 def invalid_program_message(code: str, message: str = None) -> str:
     """
     User-facing text for an InvalidProgramException: an explicit message from
-    the raise site, prose for known codes, the bare code otherwise.
+    the raise site, prose for known codes, the bare code otherwise — or the bare
+    code alone without PROSE.
     """
+    if not PROSE:
+        return code
     return message or INVALID_PROGRAM_MESSAGES.get(code, code)
+
+
