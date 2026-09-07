@@ -90,6 +90,7 @@ method list_append(self: Ref, item: Ref) returns ()
     requires issubtype(typeof(item), list_arg(typeof(self), 0))
     ensures acc(self.list_acc)
     ensures self.list_acc == old(self.list_acc) ++ Seq(item)
+    ensures item in self.list_acc
 {
     assume false
 }
