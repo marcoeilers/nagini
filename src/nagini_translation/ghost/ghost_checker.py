@@ -1235,7 +1235,7 @@ class GhostChecker(ast.NodeVisitor):
         elif isinstance(expr, ast.Lambda):
             old_ctx = self.in_ghost_ctx
             self.in_ghost_ctx = True
-            self.check_for_call(expr.value)
+            self.check_for_call(expr.body)
             self.in_ghost_ctx = old_ctx
 
             items = []

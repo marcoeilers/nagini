@@ -30,7 +30,8 @@ CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant', 'Decrea
 GHOST_BUILTINS = ['PSeq', 'PByteSeq', 'PSet', 'PMultiset', 'GInt', 'GFloat', 'GComplex',
                   'GBool', 'GStr']
 
-CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'ResultT', 'Implies', 'Forall', 'IOForall', 'Forall2', 'Forall3', 'Forall6',
+CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'ResultT', 'Implies', 'Forall',
+                  'IOForall', 'Forall2', 'Forall3', 'Forall4', 'Forall5', 'Forall6',
                   'Exists', 'Low', 'LowVal', 'LowEvent', 'Declassify', 'TerminatesSif',
                   'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding', 'Previous',
                   'RaisedException', 'ToSeq', 'ToByteSeq', 'ToMS', 'MaySet', 'MayCreate',
