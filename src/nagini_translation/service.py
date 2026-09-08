@@ -202,7 +202,9 @@ def _debug_payload(error) -> Optional[dict]:
     ``--smtStateOnError`` option, passed through ``viper_args``); returns
     ``None`` otherwise. Everything is stringified eagerly here — the live
     ``state`` object itself cannot leave the JVM, so the store/heap
-    projections stand in for it.
+    projections stand in for it. Each field is projected on its own: an
+    accessor the loaded jar lacks (or that fails) leaves that field ``None``
+    and the rest of the payload intact.
     """
     try:
         jvm_error = getattr(error, '_error', None)
@@ -214,48 +216,57 @@ def _debug_payload(error) -> Optional[dict]:
         ctx = contexts.head()
         if not hasattr(ctx, 'proverEmits'):
             return None  # plain SiliconFailureContext, no SMT state
-        payload = {
-            'failedAssertion': str(ctx.failedAssertion()),
-            'failedAssertionPretty': _pretty_term(str(ctx.failedAssertion())),
-            'assumptions': _scala_strings(ctx.assumptions()),
-            'preambleAssumptions': _scala_strings(ctx.preambleAssumptions()),
-            'macroDecls': _scala_strings(ctx.macroDecls()),
-            'functionDecls': _scala_strings(ctx.functionDecls()),
-            'proverEmits': _scala_strings(ctx.proverEmits()),
-            'branchConditions': _scala_strings(ctx.branchConditions()),
-        }
-        if ctx.reasonUnknown().isDefined():
-            payload['reasonUnknown'] = str(ctx.reasonUnknown().get())
-        if ctx.rlimitDelta().isDefined():
-            # Z3 rlimit units spent on the failing check itself; the unit
-            # assertTimeout budgets are enforced in (ms * z3ResourcesPerMillisecond).
-            payload['rlimitDelta'] = int(str(ctx.rlimitDelta().get()))
-        if ctx.failingCheck().isDefined():
-            # The prover query that produced this failure (absent when the
-            # error was raised without one, e.g. a missing permission).
-            check = ctx.failingCheck().get()
-            payload['failingCheck'] = {
-                'ordinal': int(str(check.ordinal())),
-                'kind': str(check.kind()),
-                'answer': str(check.answer()),
-                'ms': int(str(check.ms())),
-                'budgetMs': int(str(check.budgetMs())),
-            }
-        if hasattr(ctx, 'sessionLog') and ctx.sessionLog().isDefined():
-            # Path of the prover session log this failure's .smt2 bundle is
-            # copied from (see the smtstate dir for the replayable bundle).
-            payload['sessionLog'] = str(ctx.sessionLog().get())
-        if ctx.state().isDefined():
-            state = ctx.state().get()
-            payload['state'] = {
-                'store': str(state.g().termValues()),
-                'heap': _heap_chunks(state.h()),
-                'oldHeaps': _old_heaps(state.oldHeaps()),
-            }
-        return payload
     except Exception:
-        logging.exception('Failed to project the SMT state failure context.')
+        logging.exception('Failed to reach the SMT state failure context.')
         return None
+
+    def field(name, project):
+        try:
+            return project()
+        except Exception:
+            logging.exception('Failed to project SMT state field %s.', name)
+            return None
+
+    def optional(name, project):
+        # A Scala Option accessor: None when absent, undefined, or unavailable.
+        def get():
+            opt = getattr(ctx, name)()
+            return project(opt.get()) if opt.isDefined() else None
+        return field(name, get)
+
+    def failing_check(check):
+        # The prover query that produced this failure (absent when the
+        # error was raised without one, e.g. a missing permission).
+        return {'ordinal': int(str(check.ordinal())), 'kind': str(check.kind()),
+                'answer': str(check.answer()), 'ms': int(str(check.ms())),
+                'budgetMs': int(str(check.budgetMs()))}
+
+    def state(st):
+        return {'store': str(st.g().termValues()), 'heap': _heap_chunks(st.h()),
+                'oldHeaps': _old_heaps(st.oldHeaps())}
+
+    failed = field('failedAssertion', lambda: str(ctx.failedAssertion()))
+    return {
+        'failedAssertion': failed,
+        'failedAssertionPretty': _pretty_term(failed) if failed is not None else None,
+        'assumptions': field('assumptions', lambda: _scala_strings(ctx.assumptions())),
+        'preambleAssumptions': field('preambleAssumptions',
+                                     lambda: _scala_strings(ctx.preambleAssumptions())),
+        'macroDecls': field('macroDecls', lambda: _scala_strings(ctx.macroDecls())),
+        'functionDecls': field('functionDecls', lambda: _scala_strings(ctx.functionDecls())),
+        'proverEmits': field('proverEmits', lambda: _scala_strings(ctx.proverEmits())),
+        'branchConditions': field('branchConditions',
+                                  lambda: _scala_strings(ctx.branchConditions())),
+        'reasonUnknown': optional('reasonUnknown', str),
+        # Z3 rlimit units spent on the failing check itself; the unit
+        # assertTimeout budgets are enforced in (ms * z3ResourcesPerMillisecond).
+        'rlimitDelta': optional('rlimitDelta', lambda v: int(str(v))),
+        'failingCheck': optional('failingCheck', failing_check),
+        # Path of the prover session log this failure's .smt2 bundle is
+        # copied from (see the smtstate dir for the replayable bundle).
+        'sessionLog': optional('sessionLog', str),
+        'state': optional('state', state),
+    }
 
 
 # Grace period on top of the backend's own --timeout before the service declares a
