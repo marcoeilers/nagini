@@ -197,6 +197,10 @@
         "__sil_seq__": {
             "args": ["set"],
             "type": "__prim__Seq"
+        },
+        "__sil_set__": {
+            "args": ["set"],
+            "type": "__prim__Set"
         }
     },
     "type_vars": 1,
@@ -266,6 +270,10 @@
         "__sil_seq__": {
             "args": ["dict"],
             "type": "__prim__Seq"
+        },
+        "__sil_set__": {
+            "args": ["dict"],
+            "type": "__prim__Set"
         }
     },
     "type_vars": 2,

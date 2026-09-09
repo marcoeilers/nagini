@@ -671,6 +671,11 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 return GenericType(seq_class, [content_type])
             elif node.func.id == 'ToByteSeq':
                 return module.global_module.classes[PBYTESEQ_TYPE]
+            elif node.func.id == 'ToSet':
+                arg_type = get_type(node.args[0], containers, container)
+                set_class = module.global_module.classes[PSET_TYPE]
+                content_type = _get_iteration_type(arg_type, module, node)
+                return GenericType(set_class, [content_type])
             elif node.func.id == 'ToMS':
                 arg_type = get_type(node.args[0], containers, container)
                 ms_class = module.global_module.classes[PMSET_TYPE]

@@ -25,6 +25,8 @@ from nagini_translation.lib.constants import (
     PBYTESEQ_TYPE,
     PSET_TYPE,
     RANGE_TYPE,
+    SET_TYPE,
+    DICT_TYPE,
     BYTEARRAY_TYPE,
     BYTES_TYPE,
     THREAD_DOMAIN,
@@ -749,6 +751,27 @@ class ContractTranslator(CommonTranslator):
                                         node, ctx)
         return stmt, result
     
+    def translate_to_set(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        coll_type = self.get_type(node.args[0], ctx)
+        if isinstance(coll_type, OptionalType):
+            coll_type = coll_type.optional_type
+        stmt, arg = self.translate_expr(node.args[0], ctx)
+        if coll_type.name == PSET_TYPE:
+            return stmt, arg
+        if coll_type.name not in (SET_TYPE, DICT_TYPE):
+            raise UnsupportedException(
+                node, 'ToSet takes a set, a dict (its keys) or a PSet')
+        set_call = self.get_function_call(coll_type, '__sil_set__', [arg], [None],
+                                          node, ctx)
+        set_class = ctx.module.global_module.classes[PSET_TYPE]
+        position = self.to_position(node, ctx)
+        type_lit = self.type_factory.translate_type_literal(coll_type.type_args[0],
+                                                            position, ctx)
+        result = self.get_function_call(set_class, '__create__',
+                                        [set_call, type_lit], [None, None],
+                                        node, ctx)
+        return stmt, result
+
     def translate_to_int_sequence(self, node: ast.Call,
                               ctx: Context) -> StmtsAndExpr:
         coll_type = self.get_type(node.args[0], ctx)
@@ -1232,6 +1255,8 @@ class ContractTranslator(CommonTranslator):
             return self.translate_to_sequence(node, ctx)
         elif func_name == 'ToByteSeq':
             return self.translate_to_int_sequence(node, ctx)
+        elif func_name == 'ToSet':
+            return self.translate_to_set(node, ctx)
         elif func_name == 'ToMS':
             return self.translate_to_multiset(node, ctx)
         elif func_name == 'Joinable':
