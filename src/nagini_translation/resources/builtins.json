@@ -62,7 +62,7 @@
         },
         "reverse": {
             "args": ["list"],
-            "type": "list",
+            "type": null,
             "MustTerminate": true
         },
         "copy": {

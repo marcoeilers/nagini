@@ -127,14 +127,12 @@ method list___mul__(self: Ref, factor: Int) returns (res: Ref)
     ensures factor > 0 ==> (forall i: Int :: {res.list_acc[i]}
                             i >= 0 && i < |res.list_acc| ==> res.list_acc[i] == self.list_acc[i % |self.list_acc|])
 
-method list_reverse(self: Ref) returns (res: Ref)
+method list_reverse(self: Ref) returns ()
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
-    requires acc(self.list_acc, 1/100)
-    ensures issubtype(typeof(res), list(list_arg(typeof(self), 0)))
-    ensures acc(self.list_acc, 1/100)
-    ensures acc(res.list_acc)
-    ensures |res.list_acc| == |self.list_acc|
-    ensures forall i: Int :: {res.list_acc[i]} ((i >= 0 && i < |res.list_acc|) ==> (res.list_acc[i] == self.list_acc[|self.list_acc| - 1 - i]))
+    requires acc(self.list_acc)
+    ensures acc(self.list_acc)
+    ensures |self.list_acc| == |old(self.list_acc)|
+    ensures forall i: Int :: {self.list_acc[i]} ((i >= 0 && i < |self.list_acc|) ==> (self.list_acc[i] == old(self.list_acc)[|self.list_acc| - 1 - i]))
 
 method list_copy(self: Ref) returns (res: Ref)
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
