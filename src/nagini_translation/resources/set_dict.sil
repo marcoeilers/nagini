@@ -90,7 +90,7 @@ function set___sil_seq__(self: Ref): Seq[Ref]
     requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
     requires acc(self.set_acc, wildcard)
     ensures |result| == |self.set_acc|
-    ensures forall c: Ref :: {c in result} c in self.set_acc <==> c in result
+    ensures forall c: Ref :: {c in result} {c in self.set_acc} c in self.set_acc <==> c in result
     ensures (forall i: Int :: {result[i]} (i >= 0 && i < |result|) ==> !((result[i] in result[..i])))
     ensures forall r: Ref:: {r in result} r in result ==> issubtype(typeof(r), set_arg(typeof(self), 0))
 
@@ -206,4 +206,4 @@ function dict___sil_seq__(self: Ref): Seq[Ref]
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
     requires acc(self.dict_acc, wildcard)
     ensures |result| == |self.dict_acc|
-    ensures forall c: Ref :: {c in result} c in self.dict_acc <==> c in result
+    ensures forall c: Ref :: {c in result} {c in self.dict_acc} c in self.dict_acc <==> c in result
