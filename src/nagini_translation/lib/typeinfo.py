@@ -336,12 +336,15 @@ class TypeInfo:
         return result
 
     def _evict_project_cache(self, options, filename: str,
-                             module_name: str) -> None:
-        """Forces mypy to re-check every module transitively imported from the
-        main file (ignoring IGNORED_IMPORTS and everything imported solely by
-        those) by deleting those modules' entries from the on-disk cache before
-        the build. Nagini needs their typed ASTs, which a cache hit does not
-        materialize; everything else keeps its cache hit.
+                             module_name: str, base_dir: str = None) -> None:
+        """Forces mypy to re-check every module Nagini needs the typed AST of,
+        which a cache hit does not materialize, by deleting its entry from the
+        on-disk cache before the build: every module whose source lives under
+        base_dir (the project), and every module transitively imported from
+        the main file (ignoring IGNORED_IMPORTS and everything imported solely
+        by those). Everything else keeps its cache hit. The project sweep does
+        not depend on cache metadata: mypy writes none for a module with
+        errors, so a walk from such a module would miss what it imports.
 
         Works on the on-disk cache because patching mypy.build.find_cache_meta
         has no effect on the mypyc-compiled mypy wheel: compiled call sites
@@ -351,6 +354,25 @@ class TypeInfo:
                                   '%d.%d' % sys.version_info[:2])
         if not os.path.isdir(cache_root):
             return
+
+        project = os.path.abspath(base_dir or os.path.dirname(filename))
+        for dirpath, _, names in os.walk(cache_root):
+            for name in names:
+                if not name.endswith('.meta.json'):
+                    continue
+                meta_path = os.path.join(dirpath, name)
+                try:
+                    with open(meta_path) as f:
+                        source = json.load(f).get('path', '')
+                except (OSError, ValueError):
+                    continue
+                if os.path.abspath(source).startswith(project + os.sep):
+                    for path in (meta_path,
+                                 meta_path[:-len('.meta.json')] + '.data.json'):
+                        try:
+                            os.remove(path)
+                        except OSError:
+                            pass
 
         # Seeds: the main module under both ids mypy may know it by, plus every
         # import in the current source text — a newly added import needs its
@@ -442,7 +464,8 @@ class TypeInfo:
             # even when their cache entries are fresh — a cache hit does not
             # materialize the mypy ASTs Nagini reads. Evict exactly those
             # entries; library stubs keep their hits.
-            self._evict_project_cache(options_strict, filename, module_name)
+            self._evict_project_cache(options_strict, filename, module_name,
+                                      base_dir)
 
             sources = [BuildSource(filename, module_name, None, base_dir=base_dir)]
 
@@ -462,7 +485,7 @@ class TypeInfo:
                 # s.t. we don't get overapproximated none-related errors.
                 options_non_strict = self._create_options(False)
                 self._evict_project_cache(options_non_strict, filename,
-                                          module_name)
+                                          module_name, base_dir)
                 res_non_strict = mypy.build.build(
                     [BuildSource(filename, module_name, None, base_dir=base_dir)],
                     options_non_strict
