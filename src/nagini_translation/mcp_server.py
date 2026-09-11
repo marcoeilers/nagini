@@ -28,13 +28,13 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from nagini_translation.service import (add_service_arguments, make_service,
                                         options_to_kwargs)
 
 
-mcp = FastMCP('nagini')
+mcp = MCPServer('nagini')
 _service = None
 # Multiple verifications can run at once; the service serializes only the fast
 # translation step internally.
