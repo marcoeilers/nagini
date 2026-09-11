@@ -198,25 +198,6 @@ def _old_heaps(old_heaps) -> object:
         return str(old_heaps)
 
 
-_SYM_SUFFIX = re.compile(r'@\d+@\d+')
-_CHECK_DEFINED = re.compile(r'_checkDefined\(_,\s*([^,()]+),\s*\d+\)')
-
-
-def _pretty_term(term: str) -> str:
-    """Best-effort readable rendering of a Silicon term string: strip the
-    ``@line@col`` freshness suffixes (``b@13@07`` -> ``b``, matching the
-    Python-level name the store maps it from) and unwrap ``_checkDefined``
-    shims. The raw term is always preserved alongside — this is a reading
-    aid, not a replacement."""
-    term = _SYM_SUFFIX.sub('', term)
-    for _ in range(8):
-        unwrapped = _CHECK_DEFINED.sub(r'\1', term)
-        if unwrapped == term:
-            break
-        term = unwrapped
-    return term
-
-
 def _debug_payload(error) -> Optional[dict]:
     """Project Silicon's SMT state failure context into a JSON-friendly dict.
 
@@ -274,7 +255,6 @@ def _debug_payload(error) -> Optional[dict]:
     failed = field('failedAssertion', lambda: str(ctx.failedAssertion()))
     return {
         'failedAssertion': failed,
-        'failedAssertionPretty': _pretty_term(failed) if failed is not None else None,
         'assumptions': field('assumptions', lambda: _scala_strings(ctx.assumptions())),
         'preambleAssumptions': field('preambleAssumptions',
                                      lambda: _scala_strings(ctx.preambleAssumptions())),
@@ -529,6 +509,11 @@ class VerificationService:
             except Exception:
                 logging.exception('ViperServer could not be started; verification '
                                   'will use the direct Silicon backend.')
+
+    @property
+    def record_dir(self) -> Optional[str]:
+        """The attempt archive root; None when recording is off."""
+        return self._record_dir
 
     def _set_journal_location(self, manager) -> None:
         """Persist ViperServer's journal next to the recorded attempts instead

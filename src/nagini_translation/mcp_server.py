@@ -53,6 +53,12 @@ _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix='nagini-verify'
 # agents actually act on), `failingCheck`, the truncation markers and the
 # diagnostic message itself always survive.
 _BULK_DEBUG_FIELDS = ('proverEmits', 'preambleAssumptions',
+                      # the path assumptions: byte-dominant and never consulted;
+                      # whether a fact is available is tested by probing
+                      'assumptions',
+                      # the term-level branch conditions; the diagnostic's own
+                      # branchConditions are the same decisions mapped to Python
+                      'branchConditions',
                       # 2026-08-13: across nine full benchmark runs no agent ever
                       # consulted either of these; they remain in the recorded
                       # result.json (--record-dir) for offline replay.
@@ -63,15 +69,16 @@ _BULK_DEBUG_FIELDS = ('proverEmits', 'preambleAssumptions',
 # sends (2-4% larger than the compact form). Claude Code redirects a result
 # to a file at about 50k chars of that text; 40k keeps a margin below it.
 _RESULT_BUDGET = 40_000
-_ENTRY_CHARS = 1_000           # an assumption or branch-condition term (step 1)
-_ASSUMPTION_CAPS = (20, 10)    # the assumption cap after steps 2 and 3
 _STATE_STUB_CHARS = 1_500      # per state projection (store/heap/oldHeaps)
 _QUANTIFIER_BODY_CHARS = 400   # a quantifier body; its triggers stay whole
-_BRANCH_CAP = 20               # branch conditions kept
 _EXCERPT_STUB_CHARS = 6_000    # the failing member's Viper text
 _ASSERTION_STUB_CHARS = 2_000
 _DEBUG_KEEP = 3                # diagnostics that keep a payload when the rest must go
 _DIAGS_KEEP = 10               # diagnostics kept when even that is not enough
+_INSPECT_LAST = 50             # list entries an inspect call returns by default
+_INSPECT_HINT = ('inspect(recorded_at=<recordedAt>, diagnostic=<index>) lists the '
+                 'archived fields of a diagnostic; fields=[...] returns them, '
+                 'including everything marked omitted')
 
 
 def _mark(dbg: dict, field: str, note) -> None:
@@ -84,28 +91,9 @@ def _truncate(text, limit: int):
     return text
 
 
-def _cap(dbg: dict, field: str, cap: int) -> None:
-    """Keep the newest `cap` entries of a list field, extending its note."""
-    entries = dbg.get(field)
-    if not isinstance(entries, list) or len(entries) <= cap:
-        return
-    note = '%d older ones beyond the cap of %d' % (len(entries) - cap, cap)
-    prev = (dbg.get('omitted') or {}).get(field)
-    _mark(dbg, field, '%s; %s' % (prev, note) if isinstance(prev, str) else note)
-    dbg[field] = entries[-cap:]
-
-
 def _drop(dbg: dict, field: str) -> None:
     if dbg.pop(field, None) is not None:
         _mark(dbg, field, 'dropped')
-
-
-def _step_entries(dbg: dict) -> None:
-    # A single assumption term can run to 100k+ chars; the list is what the
-    # diagnosis reads, so cut the terms before touching the list.
-    for field in ('assumptions', 'branchConditions'):
-        if isinstance(dbg.get(field), list):
-            dbg[field] = [_truncate(e, _ENTRY_CHARS) for e in dbg[field]]
 
 
 def _step_state_stubs(dbg: dict) -> None:
@@ -115,9 +103,7 @@ def _step_state_stubs(dbg: dict) -> None:
             state[k] = _truncate(v, _STATE_STUB_CHARS)
 
 
-def _step_assumptions_count(dbg: dict) -> None:
-    if 'assumptions' in dbg:
-        _mark(dbg, 'assumptions', len(dbg.pop('assumptions') or []))
+def _step_quantifier_bodies(dbg: dict) -> None:
     for q in dbg.get('quantifiers') or []:
         q['body'] = _truncate(q.get('body'), _QUANTIFIER_BODY_CHARS)
 
@@ -129,8 +115,7 @@ def _step_drop_state(dbg: dict) -> None:
         _mark(dbg, 'viperExcerpt.quantified', len(excerpt.pop('quantified')))
 
 
-def _step_drop_paths(dbg: dict) -> None:
-    _drop(dbg, 'branchConditions')
+def _step_drop_quantifiers(dbg: dict) -> None:
     _drop(dbg, 'quantifiers')
 
 
@@ -143,14 +128,10 @@ def _step_stubs(dbg: dict) -> None:
 
 # One payload's shrinking steps, applied in order, each once.
 _STEPS = (
-    _step_entries,
-    lambda dbg: _cap(dbg, 'assumptions', _ASSUMPTION_CAPS[0]),
-    lambda dbg: _cap(dbg, 'assumptions', _ASSUMPTION_CAPS[1]),
     _step_state_stubs,
-    _step_assumptions_count,
-    lambda dbg: _cap(dbg, 'branchConditions', _BRANCH_CAP),
+    _step_quantifier_bodies,
     _step_drop_state,
-    _step_drop_paths,
+    _step_drop_quantifiers,
     _step_stubs,
 )
 
@@ -172,7 +153,6 @@ def _as_selected(methods) -> Optional[set]:
 
 
 _SYMBOL = re.compile(r'[A-Za-z_$][\w$]*@\d+@\d+')
-_ASSUMPTION_CAP = 40
 _QUANTIFIER_CAP = 20
 
 
@@ -198,10 +178,6 @@ def _keep_relevant(dbg: dict, field: str, text, cap: int) -> None:
             notes.append('%d older ones beyond the cap of %d' % (len(relevant) - len(kept), cap))
         _mark(dbg, field, ', '.join(notes))
     dbg[field] = kept
-
-
-def _filter_assumptions(dbg: dict) -> None:
-    _keep_relevant(dbg, 'assumptions', str, _ASSUMPTION_CAP)
 
 
 def _filter_quantifiers(dbg: dict) -> None:
@@ -238,12 +214,13 @@ def _slim_debug(result: dict) -> dict:
         if not dbg:
             continue
         dbg = {k: v for k, v in dbg.items() if k not in _BULK_DEBUG_FIELDS}
-        _filter_assumptions(dbg)
         _filter_quantifiers(dbg)
         d['debug'] = dbg
         debugs.append(dbg)
     if not debugs:
         return result
+    if result.get('recordedAt'):
+        result['inspect'] = _INSPECT_HINT
     _share_excerpts(diagnostics)
     # Shrink as little as possible: while the whole result is over budget,
     # advance only the LARGEST remaining payload one step — small
@@ -388,6 +365,115 @@ async def verify_snippet(code: str, counterexample: bool = False,
         return _slim_debug(result.to_dict())
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+@mcp.tool()
+def inspect(recorded_at: str, diagnostic: int = 0,
+            fields: Optional[List[str]] = None,
+            contains: Optional[str] = None,
+            last: int = _INSPECT_LAST) -> dict:
+    """Read a diagnostic's archived debug payload.
+
+    `recorded_at` is a verify result's `recordedAt` directory and `diagnostic`
+    the index into its `diagnostics`. Without `fields` the result lists the
+    archived fields with their sizes (entries for lists, chars for text);
+    with `fields` it returns those fields, e.g. `["assumptions",
+    "state.heap"]`. Everything is there untruncated: the fields a verify
+    result omits or cuts (`assumptions`, `proverEmits`,
+    `preambleAssumptions`, `functionDecls`, `macroDecls`, the term-level
+    `branchConditions`, full `state` and `viperExcerpt`). A list field returns
+    its `last` entries (newest along the path), after keeping only the entries
+    containing `contains` when given; a too-large answer is cut with an
+    `omitted` note, so narrow with `contains` or a smaller `last`. No
+    verification runs.
+    """
+    if _service.plain_diagnostics:
+        return {'error': 'archived payloads are not available under --plain-diagnostics'}
+    root = _service.record_dir
+    path = os.path.realpath(recorded_at)
+    if not root or not path.startswith(os.path.realpath(root) + os.sep):
+        return {'error': 'recorded_at must be a recordedAt directory of this server'}
+    try:
+        with open(os.path.join(path, 'result.json')) as f:
+            result = json.load(f)
+    except (OSError, ValueError) as e:
+        return {'error': 'cannot read %s/result.json: %s' % (recorded_at, e)}
+    diagnostics = result.get('diagnostics') or []
+    if not 0 <= diagnostic < len(diagnostics):
+        return {'error': 'diagnostic %d out of range: %d archived' % (diagnostic, len(diagnostics))}
+    d = diagnostics[diagnostic]
+    dbg = d.get('debug') or {}
+    out = {'recordedAt': recorded_at, 'diagnostic': diagnostic, 'code': d.get('code'),
+           'message': d.get('message'), 'diagnostics': len(diagnostics)}
+    if not fields:
+        out['fields'] = {k: _field_size(v) for k, v in _walk(dbg)}
+        return out
+    out['fields'] = {}
+    omitted = {}
+    totals = {}
+    for name in fields:
+        value = _lookup(dbg, name)
+        if value is None:
+            omitted[name] = 'not archived'
+            continue
+        if isinstance(value, list):
+            totals[name] = len(value)
+            if contains:
+                value = [e for e in value if contains in json.dumps(e, default=str)]
+            value = value[-last:]
+        out['fields'][name] = value
+
+    def note():
+        for name, total in totals.items():
+            shown = len(out['fields'][name])
+            if shown < total:
+                omitted[name] = '%d of %d entries shown (newest)' % (shown, total)
+        if omitted:
+            out['omitted'] = omitted
+
+    # Fit the answer: halve the largest list, then cut the largest text.
+    note()
+    while _size(out) > _RESULT_BUDGET:
+        name, value = max(out['fields'].items(), key=lambda kv: _size(kv[1]))
+        if isinstance(value, list) and len(value) > 1:
+            out['fields'][name] = value[len(value) // 2:]
+        elif isinstance(value, list) and value and isinstance(value[0], str) \
+                and len(value[0]) > _EXCERPT_STUB_CHARS:
+            out['fields'][name] = [_truncate(value[0], _EXCERPT_STUB_CHARS)]
+        elif isinstance(value, str) and len(value) > _EXCERPT_STUB_CHARS:
+            out['fields'][name] = _truncate(value, _EXCERPT_STUB_CHARS)
+        else:
+            break
+        note()
+    return out
+
+
+_NESTED = ('state', 'viperExcerpt')  # the dict fields listed by their parts
+
+
+def _walk(dbg: dict):
+    """The payload's fields, `state` and `viperExcerpt` by their parts."""
+    for k, v in dbg.items():
+        if k in _NESTED and isinstance(v, dict):
+            for k2, v2 in v.items():
+                yield '%s.%s' % (k, k2), v2
+        else:
+            yield k, v
+
+
+def _lookup(dbg: dict, name: str):
+    value = dbg
+    for part in name.split('.'):
+        if not isinstance(value, dict):
+            return None
+        value = value.get(part)
+    return value
+
+
+def _field_size(value) -> dict:
+    if isinstance(value, list):
+        return {'entries': len(value)}
+    return {'chars': len(value) if isinstance(value, str) else _size(value)}
 
 
 @mcp.tool()
