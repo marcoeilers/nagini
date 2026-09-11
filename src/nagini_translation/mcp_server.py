@@ -41,17 +41,17 @@ _service = None
 _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix='nagini-verify')
 
 
-# Inline debug payloads must fit Claude Code's per-result token limit (25k
-# tokens by default) or the whole result gets file-redirected — which agents
-# in practice never read (and the redirect swallows even the diagnostic
-# message, so an oversized payload is WORSE than none). Everything dropped
-# here is still recorded server-side (--record-dir) in full.
+# Inline debug payloads must fit Claude Code's per-result size limit or the
+# whole result gets file-redirected — which agents in practice rarely read
+# (and the redirect swallows even the diagnostic message, so an oversized
+# payload is WORSE than none). Everything dropped here is still recorded
+# server-side (--record-dir) in full.
 #
-# Strategy: measure the whole serialized result and degrade the debug
-# payloads stage by stage — least-consulted (expert-tier) fields first, as
-# observed in real agent runs — until the result fits. `reasonUnknown` (the
-# field agents actually act on), the truncation markers, and the diagnostic
-# message itself always survive.
+# Strategy: measure the whole serialized result and shrink the debug payloads
+# step by step — least information lost per byte recovered first, as measured
+# on archived payloads — until the result fits. `reasonUnknown` (the field
+# agents actually act on), `failingCheck`, the truncation markers and the
+# diagnostic message itself always survive.
 _BULK_DEBUG_FIELDS = ('proverEmits', 'preambleAssumptions',
                       # 2026-08-13: across nine full benchmark runs no agent ever
                       # consulted either of these; they remain in the recorded
@@ -63,64 +63,100 @@ _BULK_DEBUG_FIELDS = ('proverEmits', 'preambleAssumptions',
 # sends (2-4% larger than the compact form). Claude Code redirects a result
 # to a file at about 50k chars of that text; 40k keeps a margin below it.
 _RESULT_BUDGET = 40_000
-_STATE_STUB_CHARS = 1_500  # per state projection (store/heap/oldHeaps)
-_BRANCH_CAP = 20           # branch conditions kept in stage 4
+_ENTRY_CHARS = 1_000           # an assumption or branch-condition term (step 1)
+_ASSUMPTION_CAPS = (20, 10)    # the assumption cap after steps 2 and 3
+_STATE_STUB_CHARS = 1_500      # per state projection (store/heap/oldHeaps)
+_QUANTIFIER_BODY_CHARS = 400   # a quantifier body; its triggers stay whole
+_BRANCH_CAP = 20               # branch conditions kept
+_EXCERPT_STUB_CHARS = 6_000    # the failing member's Viper text
 _ASSERTION_STUB_CHARS = 2_000
-_EXCERPT_STUB_CHARS = 6_000    # the failing member's Viper text in stage 7
-_QUANTIFIER_BODY_CHARS = 400   # a quantifier body in stage 3; its triggers stay whole
+_DEBUG_KEEP = 3                # diagnostics that keep a payload when the rest must go
+_DIAGS_KEEP = 10               # diagnostics kept when even that is not enough
 
 
 def _mark(dbg: dict, field: str, note) -> None:
     dbg.setdefault('omitted', {})[field] = note
 
 
-def _degrade(dbg: dict, stage: int) -> None:
-    """Destructively degrade one debug dict to the given stage (cumulative).
+def _truncate(text, limit: int):
+    if isinstance(text, str) and len(text) > limit:
+        return text[:limit] + '…[truncated]'
+    return text
 
-    Ordered by information lost per byte recovered: state stubs first (the
-    heap/store strings are almost always the byte-dominant fields, and a stub
-    still shows the store variables and heap shape), then the fields agents
-    were never observed to consult, then the progressively harsher cuts.
-    """
-    if stage >= 1 and isinstance(dbg.get('state'), dict):
-        for k, v in dbg['state'].items():
-            if isinstance(v, str) and len(v) > _STATE_STUB_CHARS:
-                dbg['state'][k] = v[:_STATE_STUB_CHARS] + '…[truncated]'
-    if stage >= 2 and ('macroDecls' in dbg or 'functionDecls' in dbg):
-        for f in ('macroDecls', 'functionDecls'):
-            if dbg.pop(f, None) is not None:
-                _mark(dbg, f, 'dropped')
-    if stage >= 3 and 'assumptions' in dbg:
+
+def _cap(dbg: dict, field: str, cap: int) -> None:
+    """Keep the newest `cap` entries of a list field, extending its note."""
+    entries = dbg.get(field)
+    if not isinstance(entries, list) or len(entries) <= cap:
+        return
+    note = '%d older ones beyond the cap of %d' % (len(entries) - cap, cap)
+    prev = (dbg.get('omitted') or {}).get(field)
+    _mark(dbg, field, '%s; %s' % (prev, note) if isinstance(prev, str) else note)
+    dbg[field] = entries[-cap:]
+
+
+def _drop(dbg: dict, field: str) -> None:
+    if dbg.pop(field, None) is not None:
+        _mark(dbg, field, 'dropped')
+
+
+def _step_entries(dbg: dict) -> None:
+    # A single assumption term can run to 100k+ chars; the list is what the
+    # diagnosis reads, so cut the terms before touching the list.
+    for field in ('assumptions', 'branchConditions'):
+        if isinstance(dbg.get(field), list):
+            dbg[field] = [_truncate(e, _ENTRY_CHARS) for e in dbg[field]]
+
+
+def _step_state_stubs(dbg: dict) -> None:
+    state = dbg.get('state')
+    if isinstance(state, dict):
+        for k, v in state.items():
+            state[k] = _truncate(v, _STATE_STUB_CHARS)
+
+
+def _step_assumptions_count(dbg: dict) -> None:
+    if 'assumptions' in dbg:
         _mark(dbg, 'assumptions', len(dbg.pop('assumptions') or []))
-    if stage >= 3:
-        for q in dbg.get('quantifiers') or []:
-            if isinstance(q.get('body'), str) and len(q['body']) > _QUANTIFIER_BODY_CHARS:
-                q['body'] = q['body'][:_QUANTIFIER_BODY_CHARS] + '…[truncated]'
-    if stage >= 4 and isinstance(dbg.get('branchConditions'), list) \
-            and len(dbg['branchConditions']) > _BRANCH_CAP:
-        _mark(dbg, 'branchConditions',
-              len(dbg['branchConditions']) - _BRANCH_CAP)
-        dbg['branchConditions'] = dbg['branchConditions'][:_BRANCH_CAP]
-    if stage >= 5 and dbg.pop('state', None) is not None:
-        _mark(dbg, 'state', 'dropped')
-    if stage >= 5 and (dbg.get('viperExcerpt') or {}).get('quantified'):
-        _mark(dbg, 'viperExcerpt.quantified', len(dbg['viperExcerpt'].pop('quantified')))
-    if stage >= 6 and dbg.pop('branchConditions', None) is not None:
-        _mark(dbg, 'branchConditions', 'dropped')
-    if stage >= 6 and dbg.pop('quantifiers', None) is not None:
-        _mark(dbg, 'quantifiers', 'dropped')
-    if stage >= 7 and isinstance((dbg.get('viperExcerpt') or {}).get('viper'), str) \
-            and len(dbg['viperExcerpt']['viper']) > _EXCERPT_STUB_CHARS:
-        dbg['viperExcerpt']['viper'] = (dbg['viperExcerpt']['viper'][:_EXCERPT_STUB_CHARS]
-                                        + '…[truncated]')
-    if stage >= 7 and isinstance(dbg.get('failedAssertion'), str) \
-            and len(dbg['failedAssertion']) > _ASSERTION_STUB_CHARS:
-        dbg['failedAssertion'] = (dbg['failedAssertion'][:_ASSERTION_STUB_CHARS]
-                                  + '…[truncated]')
+    for q in dbg.get('quantifiers') or []:
+        q['body'] = _truncate(q.get('body'), _QUANTIFIER_BODY_CHARS)
 
 
-_MAX_STAGE = 7
+def _step_drop_state(dbg: dict) -> None:
+    _drop(dbg, 'state')
+    excerpt = dbg.get('viperExcerpt') or {}
+    if excerpt.get('quantified'):
+        _mark(dbg, 'viperExcerpt.quantified', len(excerpt.pop('quantified')))
 
+
+def _step_drop_paths(dbg: dict) -> None:
+    _drop(dbg, 'branchConditions')
+    _drop(dbg, 'quantifiers')
+
+
+def _step_stubs(dbg: dict) -> None:
+    excerpt = dbg.get('viperExcerpt') or {}
+    if 'viper' in excerpt:
+        excerpt['viper'] = _truncate(excerpt['viper'], _EXCERPT_STUB_CHARS)
+    dbg['failedAssertion'] = _truncate(dbg.get('failedAssertion'), _ASSERTION_STUB_CHARS)
+
+
+# One payload's shrinking steps, applied in order, each once.
+_STEPS = (
+    _step_entries,
+    lambda dbg: _cap(dbg, 'assumptions', _ASSUMPTION_CAPS[0]),
+    lambda dbg: _cap(dbg, 'assumptions', _ASSUMPTION_CAPS[1]),
+    _step_state_stubs,
+    _step_assumptions_count,
+    lambda dbg: _cap(dbg, 'branchConditions', _BRANCH_CAP),
+    _step_drop_state,
+    _step_drop_paths,
+    _step_stubs,
+)
+
+
+def _size(obj) -> int:
+    return len(json.dumps(obj, default=str, indent=2))
 
 def _as_selected(methods) -> Optional[set]:
     """Normalize a list of method names to a set, or None for 'whole file'.
@@ -160,7 +196,7 @@ def _keep_relevant(dbg: dict, field: str, text, cap: int) -> None:
                          % (len(entries) - len(relevant)))
         if len(kept) < len(relevant):
             notes.append('%d older ones beyond the cap of %d' % (len(relevant) - len(kept), cap))
-        _mark(dbg, field, ', '.join(notes) + ' (full list in result.json under recordedAt)')
+        _mark(dbg, field, ', '.join(notes))
     dbg[field] = kept
 
 
@@ -173,6 +209,19 @@ def _filter_quantifiers(dbg: dict) -> None:
         t for ts in q.get('triggers', []) for t in ts), _QUANTIFIER_CAP)
 
 
+def _share_excerpts(diagnostics: list) -> None:
+    """A member's Viper excerpt travels once: the first diagnostic in the
+    member carries it, the later ones point at that diagnostic's index."""
+    first = {}
+    for i, d in enumerate(diagnostics):
+        excerpt = (d.get('debug') or {}).get('viperExcerpt')
+        if not excerpt or excerpt.get('member') is None:
+            continue
+        holder = first.setdefault(excerpt['member'], i)
+        if holder != i:
+            d['debug']['viperExcerpt'] = {'member': excerpt['member'], 'sameAs': holder}
+
+
 def _slim_debug(result: dict) -> dict:
     if _service.plain_diagnostics:
         # Plain diagnostics (--plain-diagnostics): no debug payloads, no phase
@@ -182,8 +231,9 @@ def _slim_debug(result: dict) -> dict:
         for d in result.get('diagnostics', []):
             d.pop('debug', None)
         return result
+    diagnostics = result.get('diagnostics', [])
     debugs = []
-    for d in result.get('diagnostics', []):
+    for d in diagnostics:
         dbg = d.get('debug')
         if not dbg:
             continue
@@ -194,20 +244,33 @@ def _slim_debug(result: dict) -> dict:
         debugs.append(dbg)
     if not debugs:
         return result
-    # Degrade as little as possible: while the whole result is over budget,
-    # advance only the LARGEST remaining payload one stage — small
-    # diagnostics keep their full payloads.
-    stages = {id(dbg): 0 for dbg in debugs}
-    while len(json.dumps(result, default=str, indent=2)) > _RESULT_BUDGET:
-        candidates = [dbg for dbg in debugs if stages[id(dbg)] < _MAX_STAGE]
-        if not candidates:
-            break  # nothing left to degrade (oversize is outside the payloads)
-        worst = max(candidates, key=lambda dbg: len(json.dumps(dbg, default=str)))
-        stages[id(worst)] += 1
-        _degrade(worst, stages[id(worst)])
+    _share_excerpts(diagnostics)
+    # Shrink as little as possible: while the whole result is over budget,
+    # advance only the LARGEST remaining payload one step — small
+    # diagnostics keep their full payloads. When every payload is at the last
+    # step, strip the payloads of the last diagnostics down to _DEBUG_KEEP,
+    # then cut the diagnostic list itself down to _DIAGS_KEEP.
+    steps = {id(dbg): 0 for dbg in debugs}
+    while _size(result) > _RESULT_BUDGET:
+        candidates = [dbg for dbg in debugs if steps[id(dbg)] < len(_STEPS)]
+        if candidates:
+            worst = max(candidates, key=_size)
+            steps[id(worst)] += 1
+            _STEPS[steps[id(worst)] - 1](worst)
+            continue
+        live = {id(dbg) for dbg in debugs}
+        holders = [d for d in diagnostics if id(d.get('debug')) in live]
+        if len(holders) > _DEBUG_KEEP:
+            last = holders[-1]
+            debugs = [dbg for dbg in debugs if dbg is not last['debug']]
+            last['debug'] = {'omitted': {'debug': 'dropped'}}
+            continue
+        if len(diagnostics) > _DIAGS_KEEP:
+            diagnostics.pop()
+            result['diagnosticsDropped'] = result.get('diagnosticsDropped', 0) + 1
+            continue
+        break  # nothing left to shrink (oversize is outside the payloads)
     return result
-
-
 
 async def _run(fn):
     try:
