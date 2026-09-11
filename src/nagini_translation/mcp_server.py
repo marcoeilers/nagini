@@ -378,11 +378,15 @@ def inspect(recorded_at: str, diagnostic: int = 0,
     the index into its `diagnostics`. Without `fields` the result lists the
     archived fields with their sizes (entries for lists, chars for text);
     with `fields` it returns those fields, e.g. `["assumptions",
-    "state.heap"]`. Everything is there untruncated: the fields a verify
-    result omits or cuts (`assumptions`, `proverEmits`,
-    `preambleAssumptions`, `functionDecls`, `macroDecls`, the term-level
-    `branchConditions`, full `state` and `viperExcerpt`). A list field returns
-    its `last` entries (newest along the path), after keeping only the entries
+    "state.heap"]`, untruncated. Beyond the verify payload: `assumptions`
+    (every fact the solver held on the path — is fact F present, and in
+    which shape?), `preambleAssumptions` (the background axioms — what does
+    builtin or pure function G guarantee?), the term-level
+    `branchConditions` (which encoded case is the path in, when the
+    diagnostic's own list is empty), `functionDecls`/`macroDecls` (what is
+    symbol S?), `proverEmits` (the SMT session; its last entries are the
+    failing query as Z3 received it). A list field returns its `last`
+    entries (newest along the path), after keeping only the entries
     containing `contains` when given; a too-large answer is cut with an
     `omitted` note, so narrow with `contains` or a smaller `last`. No
     verification runs.
