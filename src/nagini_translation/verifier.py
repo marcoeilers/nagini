@@ -6,6 +6,9 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 
+import os
+import tempfile
+
 from abc import ABCMeta
 from enum import Enum
 from typing import List
@@ -23,36 +26,73 @@ class ViperVerifier(Enum):
     carbon = 'carbon'
 
 
+def merge_viper_args(defaults: List[str], overrides: List[str]) -> List[str]:
+    """Append ``overrides`` to ``defaults``, dropping every default option that
+    an override names too. An option is its ``--name`` token plus any attached
+    value tokens (``--flag=value`` or ``--flag value``); the backend rejects a
+    duplicated or contradictory pair, so defaults must give way rather than
+    coexist.
+    """
+    def grouped(args):
+        groups = []
+        for arg in args:
+            if arg.startswith('--') or not groups:
+                groups.append([arg])
+            else:
+                groups[-1].append(arg)
+        return groups
+
+    given = {g[0].split('=', 1)[0] for g in grouped(overrides)}
+    kept = [token for g in grouped(defaults)
+            if g[0].split('=', 1)[0] not in given for token in g]
+    return kept + list(overrides)
+
+
 def build_silicon_backend_args(viper_args: List[str], counterexample: bool,
                                disable_branch_conditions: bool) -> List[str]:
     """The Silicon command line used by Nagini.
 
     Shared by the direct Silicon backend and the ViperServer-based one so the
-    two always use identical arguments.
+    two always use identical arguments. ``viper_args`` override same-named
+    defaults.
     """
-    return [
+    defaults = [
         '--assumeInjectivityOnInhale',
         '--z3Exe', config.z3_path,
         '--disableCatchingExceptions',
         '--exhaleMode=2',
         '--alternativeFunctionVerificationOrder',
         '--z3ResourcesPerMillisecond=9000',
+        '--proverConfigArgs=memory_max_size=4096', # Remove before merging
         '--disableDefaultPlugins',
         *(['--enableBranchconditionReporting'] if not disable_branch_conditions else []),
         '--plugin=viper.silver.plugin.standard.refute.RefutePlugin:'
         'viper.silver.plugin.standard.termination.TerminationPlugin:'
         'viper.silver.plugin.standard.predicateinstance.PredicateInstancePlugin',
         *(['--counterexample=native', '--proverArgs=model.partial=true'] if counterexample else []),
-        *viper_args,
+        # ViperServer serves cached failures without failure contexts, so a
+        # cache hit on a failing member yields no SMT state even under
+        # --smtStateOnError. Caching stays enabled anyway: cached successes
+        # are the bulk of the win, and a first failure is normally a cache
+        # miss (the member just changed), so it still collects its state
+        # live. A cached failure that comes back stateless carries a
+        # diagnostic hint to re-verify with --disableCaching (per-request,
+        # cache preserved) — see service._failure_diagnostics. The file
+        # dumps go to a temp dir so they don't litter the server's working
+        # directory.
+        *(['--smtStateDir', os.path.join(tempfile.gettempdir(), 'nagini-smtstate')]
+          if '--smtStateOnError' in viper_args else []),
     ]
+    return merge_viper_args(defaults, viper_args)
 
 
 def build_carbon_backend_args(viper_args: List[str]) -> List[str]:
     """The Carbon command line used by Nagini.
 
     Shared by the direct Carbon backend and the ViperServer-based one.
+    ``viper_args`` override same-named defaults.
     """
-    return [
+    defaults = [
         '--assumeInjectivityOnInhale',
         '--boogieExe', config.boogie_path,
         '--z3Exe', config.z3_path,
@@ -60,8 +100,8 @@ def build_carbon_backend_args(viper_args: List[str]) -> List[str]:
         '--plugin=viper.silver.plugin.standard.refute.RefutePlugin:'
         'viper.silver.plugin.standard.termination.TerminationPlugin:'
         'viper.silver.plugin.standard.predicateinstance.PredicateInstancePlugin',
-        *viper_args,
     ]
+    return merge_viper_args(defaults, viper_args)
 
 
 class VerificationResult(metaclass=ABCMeta):

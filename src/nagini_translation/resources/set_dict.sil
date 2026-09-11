@@ -79,12 +79,18 @@ method set_clear(self: Ref) returns ()
     assume false
 }
 
+function set___sil_set__(self: Ref): Set[Ref]
+    decreases _
+    requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
+    requires acc(self.set_acc, wildcard)
+    ensures result == self.set_acc
+
 function set___sil_seq__(self: Ref): Seq[Ref]
     decreases _
     requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
     requires acc(self.set_acc, wildcard)
     ensures |result| == |self.set_acc|
-    ensures forall c: Ref :: {c in result} c in self.set_acc <==> c in result
+    ensures forall c: Ref :: {c in result} {c in self.set_acc} c in self.set_acc <==> c in result
     ensures (forall i: Int :: {result[i]} (i >= 0 && i < |result|) ==> !((result[i] in result[..i])))
     ensures forall r: Ref:: {r in result} r in result ==> issubtype(typeof(r), set_arg(typeof(self), 0))
 
@@ -153,6 +159,26 @@ method dict___setitem__(self: Ref, key: Ref, item: Ref) returns ()
     ensures self.dict_acc == old(self.dict_acc)[key := item]
 
 
+method dict___delitem__(self: Ref, key: Ref) returns ()
+    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    requires acc(self.dict_acc)
+    requires @error("Key might not be present in dictionary.")(key in self.dict_acc)
+    ensures acc(self.dict_acc)
+    ensures domain(self.dict_acc) == domain(old(self.dict_acc)) setminus Set(key)
+    ensures forall k: Ref :: {self.dict_acc[k]} k in self.dict_acc ==> self.dict_acc[k] == old(self.dict_acc)[k]
+    ensures |self.dict_acc| == |old(self.dict_acc)| - 1
+
+method dict_pop(self: Ref, key: Ref) returns (_res: Ref)
+    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    requires acc(self.dict_acc)
+    requires @error("Key might not be present in dictionary.")(key in self.dict_acc)
+    ensures acc(self.dict_acc)
+    ensures issubtype(typeof(_res), dict_arg(typeof(self), 1))
+    ensures _res == old(self.dict_acc)[key]
+    ensures domain(self.dict_acc) == domain(old(self.dict_acc)) setminus Set(key)
+    ensures forall k: Ref :: {self.dict_acc[k]} k in self.dict_acc ==> self.dict_acc[k] == old(self.dict_acc)[k]
+    ensures |self.dict_acc| == |old(self.dict_acc)| - 1
+
 method dict_values(self: Ref) returns (_res: Ref)
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
     requires acc(self.dict_acc, 1/100)
@@ -169,9 +195,15 @@ function dict___len__(self: Ref): Int
     requires acc(self.dict_acc, wildcard)
     ensures result == |self.dict_acc|
 
+function dict___sil_set__(self: Ref): Set[Ref]
+    decreases _
+    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    requires acc(self.dict_acc, wildcard)
+    ensures result == domain(self.dict_acc)
+
 function dict___sil_seq__(self: Ref): Seq[Ref]
     decreases _
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
     requires acc(self.dict_acc, wildcard)
     ensures |result| == |self.dict_acc|
-    ensures forall c: Ref :: {c in result} c in self.dict_acc <==> c in result
+    ensures forall c: Ref :: {c in result} {c in self.dict_acc} c in self.dict_acc <==> c in result

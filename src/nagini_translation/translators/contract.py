@@ -25,6 +25,8 @@ from nagini_translation.lib.constants import (
     PBYTESEQ_TYPE,
     PSET_TYPE,
     RANGE_TYPE,
+    SET_TYPE,
+    DICT_TYPE,
     BYTEARRAY_TYPE,
     BYTES_TYPE,
     THREAD_DOMAIN,
@@ -32,6 +34,7 @@ from nagini_translation.lib.constants import (
     THREAD_START_PRED,
 )
 from nagini_translation.lib.program_nodes import (
+    OptionalType,
     PythonField,
     PythonGlobalVar,
     PythonMethod,
@@ -405,6 +408,10 @@ class ContractTranslator(CommonTranslator):
             if key in ctx.old_expr_aliases:
                 return [], ctx.old_expr_aliases[key]
 
+        if ctx.actual_function and (ctx.actual_function.pure or
+                                    ctx.actual_function.predicate):
+            raise InvalidProgramException(node, 'old.in.pure')
+
         stmt, exp = self.translate_expr(node.args[0], ctx)
         res = self.viper.Old(exp, self.to_position(node, ctx),
                              self.no_info(ctx))
@@ -629,6 +636,8 @@ class ContractTranslator(CommonTranslator):
                 if not isinstance(el, ast.List):
                     raise InvalidProgramException(el, 'invalid.trigger')
                 for inner in el.elts:
+                    if isinstance(inner, ast.Name):
+                        raise InvalidProgramException(inner, 'invalid.trigger')
                     if (isinstance(inner, ast.Compare) and len(inner.ops) == 1 and
                             isinstance(inner.ops[0], ast.In)):
                         # Use the less complex and more efficient trigger translation we
@@ -721,6 +730,10 @@ class ContractTranslator(CommonTranslator):
     def translate_to_sequence(self, node: ast.Call,
                               ctx: Context) -> StmtsAndExpr:
         coll_type = self.get_type(node.args[0], ctx)
+        if isinstance(coll_type, OptionalType):
+            # An Optional's type_args are [None, typ]; element types must come
+            # from the underlying collection type.
+            coll_type = coll_type.optional_type
         stmt, arg = self.translate_expr(node.args[0], ctx)
         # Use the same sequence conversion as for iterating over the
         # iterable (which gives no information about order for unordered types).
@@ -738,9 +751,32 @@ class ContractTranslator(CommonTranslator):
                                         node, ctx)
         return stmt, result
     
+    def translate_to_set(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        coll_type = self.get_type(node.args[0], ctx)
+        if isinstance(coll_type, OptionalType):
+            coll_type = coll_type.optional_type
+        stmt, arg = self.translate_expr(node.args[0], ctx)
+        if coll_type.name == PSET_TYPE:
+            return stmt, arg
+        if coll_type.name not in (SET_TYPE, DICT_TYPE):
+            raise UnsupportedException(
+                node, 'ToSet takes a set, a dict (its keys) or a PSet')
+        set_call = self.get_function_call(coll_type, '__sil_set__', [arg], [None],
+                                          node, ctx)
+        set_class = ctx.module.global_module.classes[PSET_TYPE]
+        position = self.to_position(node, ctx)
+        type_lit = self.type_factory.translate_type_literal(coll_type.type_args[0],
+                                                            position, ctx)
+        result = self.get_function_call(set_class, '__create__',
+                                        [set_call, type_lit], [None, None],
+                                        node, ctx)
+        return stmt, result
+
     def translate_to_int_sequence(self, node: ast.Call,
                               ctx: Context) -> StmtsAndExpr:
         coll_type = self.get_type(node.args[0], ctx)
+        if isinstance(coll_type, OptionalType):
+            coll_type = coll_type.optional_type
         stmt, arg = self.translate_expr(node.args[0], ctx)
         
         seq_call = self.get_int_sequence(coll_type, arg, node, ctx)
@@ -1107,7 +1143,7 @@ class ContractTranslator(CommonTranslator):
             return self.translate_raised_exception(node, ctx)
         elif func_name in ('Acc', 'Rd', 'Wildcard'):
             if not impure:
-                raise InvalidProgramException(node, 'invalid.contract.position')
+                raise InvalidProgramException(node, 'permission.in.pure.context')
             if func_name == 'Rd':
                 perm = self.get_arp_for_context(node, ctx)
             elif func_name == 'Wildcard':
@@ -1219,6 +1255,8 @@ class ContractTranslator(CommonTranslator):
             return self.translate_to_sequence(node, ctx)
         elif func_name == 'ToByteSeq':
             return self.translate_to_int_sequence(node, ctx)
+        elif func_name == 'ToSet':
+            return self.translate_to_set(node, ctx)
         elif func_name == 'ToMS':
             return self.translate_to_multiset(node, ctx)
         elif func_name == 'Joinable':

@@ -18,16 +18,27 @@ servers build on; it can also be reused by the existing ZMQ server.
 
 import argparse
 import ast
+import glob
+import hashlib
+import json
 import logging
 import os
+import re
+import shutil
+import signal
+import tempfile
 import threading
 import time
 
 from dataclasses import dataclass, field
 from typing import List, Optional, Set, Tuple
 
-from nagini_translation.lib import config
+from nagini_translation import session_log
+from nagini_translation.lib import config, phases
 from nagini_translation.lib.errors import error_manager
+from nagini_translation.lib.errors import messages
+from nagini_translation.lib.errors.messages import invalid_program_message
+
 from nagini_translation.lib.jvmaccess import JVM
 from nagini_translation.lib.typeinfo import TypeException
 from nagini_translation.lib.util import (
@@ -41,7 +52,8 @@ from nagini_translation.main import (
     TYPE_ERROR_MATCHER,
     verify as verify_program,
 )
-from nagini_translation.verifier import Failure, Success, ViperVerifier
+from nagini_translation.verifier import (Failure, merge_viper_args, Success,
+                                         ViperVerifier)
 
 
 @dataclass
@@ -68,9 +80,10 @@ class Diagnostic:
     vias: List[Tuple[str, str]] = field(default_factory=list)
     counterexample: Optional[str] = None
     branch_conditions: List[str] = field(default_factory=list)
+    debug: Optional[dict] = None
 
     def to_dict(self) -> dict:
-        return {
+        result = {
             'file': self.file,
             'startLine': self.start_line,
             'startCol': self.start_col,
@@ -86,6 +99,9 @@ class Diagnostic:
             'counterexample': self.counterexample,
             'branchConditions': self.branch_conditions,
         }
+        if self.debug is not None:
+            result['debug'] = self.debug
+        return result
 
 
 @dataclass
@@ -95,19 +111,304 @@ class VerifyResult:
     duration: float
     translation_failed: bool = False
     cancelled: bool = False
+    # The verification backend died with an exception (e.g. a prover crash)
+    # instead of producing a result. Deterministic for a given input more often
+    # than not — clients should not blindly retry the way they might for a
+    # timeout.
+    crashed: bool = False
     viper_program: Optional[str] = None
+    # Seconds per pipeline phase (typecheck, translate, chop, verify).
+    timings: Optional[dict] = None
+    # Attempt directory this run was archived under (record dir enabled only);
+    # its result.json holds the untruncated debug payloads.
+    recorded_at: Optional[str] = None
 
     def to_dict(self) -> dict:
         result = {
             'success': self.success,
             'translationFailed': self.translation_failed,
             'cancelled': self.cancelled,
+            'crashed': self.crashed,
             'duration': self.duration,
-            'diagnostics': [d.to_dict() for d in self.diagnostics],
+            'timings': self.timings or {},
         }
+        if self.recorded_at is not None:
+            # Early in the dict: any client-side tail truncation of an
+            # oversized result must not eat the pointer to the full archive.
+            result['recordedAt'] = self.recorded_at
+        result['diagnostics'] = [d.to_dict() for d in self.diagnostics]
         if self.viper_program is not None:
             result['viperProgram'] = self.viper_program
         return result
+
+
+def _scala_items(collection):
+    """The elements of any Scala collection via its iterator."""
+    iterator = (collection.toIterator() if hasattr(collection, 'toIterator')
+                else collection.iterator())
+    while iterator.hasNext():
+        yield iterator.next()
+
+
+def _scala_strings(collection) -> List[str]:
+    return [str(item) for item in _scala_items(collection)]
+
+
+def _quantifiers(terms) -> list:
+    """The quantified terms among the path-condition `terms`, with the triggers
+    Silicon's printer omits: what the solver could instantiate at the failure,
+    and on which patterns. The background axioms (a pure function's definition
+    and postconditions) arrive pre-rendered and are covered by the Viper excerpt."""
+    out = []
+    for term in _scala_items(terms):
+        if term.getClass().getSimpleName() != 'Quantification':
+            continue
+        out.append({
+            'quantifier': str(term.q()),
+            'vars': [str(v) for v in _scala_items(term.vars())],
+            'triggers': [[str(p) for p in _scala_items(trigger.p())]
+                         for trigger in _scala_items(term.triggers())],
+            'body': str(term.body()),
+        })
+    return out
+
+
+def _heap_chunks(heap) -> object:
+    """Render a Silicon heap as its chunk list. ``str(heap)`` is just the Java
+    object identity (``ListBackedHeap@6798e882``) — every agent run confirmed it
+    carries zero information — while the chunks themselves print as
+    ``resource(receiver; snapshot, permission)``. Falls back to the raw string
+    on any API surprise."""
+    try:
+        return _scala_strings(heap.values())
+    except Exception:
+        return str(heap)
+
+
+def _old_heaps(old_heaps) -> object:
+    """Render Silicon's label -> heap map with the same chunk treatment."""
+    try:
+        out = {}
+        it = old_heaps.iterator()
+        while it.hasNext():
+            kv = it.next()
+            out[str(kv._1())] = _heap_chunks(kv._2())
+        return out
+    except Exception:
+        return str(old_heaps)
+
+
+def _debug_payload(error) -> Optional[dict]:
+    """Project Silicon's SMT state failure context into a JSON-friendly dict.
+
+    Attached only when Silicon recorded the symbolic state (its
+    ``--smtStateOnError`` option, passed through ``viper_args``); returns
+    ``None`` otherwise. Everything is stringified eagerly here — the live
+    ``state`` object itself cannot leave the JVM, so the store/heap
+    projections stand in for it. Each field is projected on its own: an
+    accessor the loaded jar lacks (or that fails) leaves that field ``None``
+    and the rest of the payload intact.
+    """
+    try:
+        jvm_error = getattr(error, '_error', None)
+        if jvm_error is None or not hasattr(jvm_error, 'failureContexts'):
+            return None
+        contexts = jvm_error.failureContexts()
+        if not contexts.nonEmpty():
+            return None
+        ctx = contexts.head()
+        if not hasattr(ctx, 'proverEmits'):
+            return None  # plain SiliconFailureContext, no SMT state
+    except Exception:
+        logging.exception('Failed to reach the SMT state failure context.')
+        return None
+
+    def field(name, project):
+        try:
+            return project()
+        except Exception:
+            logging.exception('Failed to project SMT state field %s.', name)
+            return None
+
+    def optional(name, project):
+        # A Scala Option accessor: None when absent, undefined, or unavailable.
+        def get():
+            opt = getattr(ctx, name)()
+            return project(opt.get()) if opt.isDefined() else None
+        return field(name, get)
+
+    def failing_check(check):
+        # The prover query that produced this failure (absent when the
+        # error was raised without one, e.g. a missing permission).
+        instantiations = check.instantiations()
+        return {'ordinal': int(str(check.ordinal())), 'kind': str(check.kind()),
+                'answer': str(check.answer()), 'ms': int(str(check.ms())),
+                'budgetMs': int(str(check.budgetMs())),
+                # Quantifier instantiations during the query (Z3 only).
+                'instantiations': (int(str(instantiations.get()))
+                                   if instantiations.isDefined() else None)}
+
+    def state(st):
+        return {'store': str(st.g().termValues()), 'heap': _heap_chunks(st.h()),
+                'oldHeaps': _old_heaps(st.oldHeaps())}
+
+    failed = field('failedAssertion', lambda: str(ctx.failedAssertion()))
+    return {
+        'failedAssertion': failed,
+        'assumptions': field('assumptions', lambda: _scala_strings(ctx.assumptions())),
+        'preambleAssumptions': field('preambleAssumptions',
+                                     lambda: _scala_strings(ctx.preambleAssumptions())),
+        'macroDecls': field('macroDecls', lambda: _scala_strings(ctx.macroDecls())),
+        'functionDecls': field('functionDecls', lambda: _scala_strings(ctx.functionDecls())),
+        'proverEmits': field('proverEmits', lambda: _scala_strings(ctx.proverEmits())),
+        'branchConditions': field('branchConditions',
+                                  lambda: _scala_strings(ctx.branchConditions())),
+        'quantifiers': field('quantifiers', lambda: _quantifiers(ctx.assumptions())),
+        'reasonUnknown': optional('reasonUnknown', str),
+        # Z3 rlimit units spent on the failing check itself; the unit
+        # assertTimeout budgets are enforced in (ms * z3ResourcesPerMillisecond).
+        'rlimitDelta': optional('rlimitDelta', lambda v: int(str(v))),
+        'failingCheck': optional('failingCheck', failing_check),
+        # Path of the prover session log this failure's .smt2 bundle is
+        # copied from (see the smtstate dir for the replayable bundle).
+        'sessionLog': optional('sessionLog', str),
+        'state': optional('state', state),
+    }
+
+
+def _python_name(member) -> str:
+    return ('%s.%s' % (member.cls.name, member.name)
+            if getattr(member, 'cls', None) is not None else member.name)
+
+
+def _members(module):
+    """Every def Nagini translated to a Viper member, module-level and in classes."""
+    yield from module.methods.values()
+    yield from module.functions.values()
+    yield from module.predicates.values()
+    for cls in module.classes.values():
+        for group in (cls.methods, cls.functions, cls.static_methods, cls.predicates):
+            yield from group.values()
+
+
+def _enclosing_member(error, modules):
+    """The innermost translated def whose source span covers the error's position."""
+    pos = error.position
+    line, file = pos.line, os.path.basename(pos.file_name)
+    best = None
+    for module in modules or ():
+        if os.path.basename(getattr(module, 'file', '') or '') != file:
+            continue
+        for member in _members(module):
+            node = getattr(member, 'node', None)
+            if node is None or not hasattr(node, 'lineno'):
+                continue
+            end = getattr(node, 'end_lineno', None) or node.lineno
+            if node.lineno <= line <= end and (best is None or end - node.lineno < best[1]):
+                best = (member, end - node.lineno)
+    return best[0] if best else None
+
+
+def _viper_excerpt(error, modules, prog) -> Optional[dict]:
+    """The Viper text of the member the error lies in, plus the quantified
+    functions and predicates it mentions: the encoding an interpretation of a
+    quantifier failure has to be read against (each `forall` shows its
+    triggers). None when the position maps to no translated def."""
+    try:
+        member = _enclosing_member(error, modules)
+        if member is None:
+            return None
+        groups = ((prog.methods(), 'method'), (prog.functions(), 'function'),
+                  (prog.predicates(), 'predicate'))
+        texts = {}
+        for group, kind in groups:
+            it = group.iterator()
+            while it.hasNext():
+                node = it.next()
+                texts[str(node.name())] = (kind, node)
+        hit = texts.get(member.sil_name)
+        if hit is None:
+            return None
+        kind, node = hit
+        text = str(node)
+        quantified = []
+        for name, (k, other) in texts.items():
+            if k == 'method' or name == member.sil_name or not re.search(r'\b%s\b' % re.escape(name), text):
+                continue
+            other_text = str(other)
+            if 'forall' in other_text:
+                quantified.append({'name': name, 'kind': k, 'viper': other_text})
+        return {'member': _python_name(member), 'kind': kind, 'viper': text,
+                'quantified': quantified}
+    except Exception:
+        logging.exception('Failed to build the Viper excerpt.')
+        return None
+
+
+# Grace period on top of the backend's own --timeout before the service declares a
+# verification wedged and force-kills its prover processes (see _hard_wall_seconds).
+HARD_DEADLINE_GRACE = 60
+
+
+def _backend_timeout_seconds(backend_args) -> Optional[int]:
+    """The backend's own --timeout in seconds, or None when unset/0."""
+    timeout = None
+    args = list(backend_args)
+    for i, arg in enumerate(args):
+        if arg.startswith('--timeout='):
+            timeout = arg.split('=', 1)[1]
+        elif arg == '--timeout' and i + 1 < len(args):
+            timeout = args[i + 1]
+    try:
+        seconds = int(timeout)
+    except (TypeError, ValueError):
+        return None
+    return seconds if seconds > 0 else None
+
+
+def _hard_wall_seconds(backend_args) -> Optional[int]:
+    """Wall cap for one verification job, derived from the effective backend args.
+
+    Silicon's --timeout produces a TimeoutOccurred *result* at T seconds, but the
+    result is only delivered after teardown joins the worker pool — and a prover
+    stuck deep in a single hard query ignores the JVM-side interrupt, so the job
+    (and, since jobs serialize per client, every queued call behind it) can grind
+    for many extra minutes. Cap the wait at T plus a grace period; None (no
+    --timeout, or --timeout=0) means wait indefinitely.
+    """
+    seconds = _backend_timeout_seconds(backend_args)
+    return seconds + HARD_DEADLINE_GRACE if seconds else None
+
+
+def _is_await_timeout(exc: Exception) -> bool:
+    """True for the TimeoutException scala.concurrent.Await.result raises."""
+    return ('TimeoutException' in type(exc).__name__
+            or 'Futures timed out' in str(exc))
+
+
+def _kill_child_provers() -> None:
+    """SIGKILL any prover process (z3/boogie) spawned by this process.
+
+    Used only after a hard-deadline cancel: StopVerification interrupts the job's
+    JVM threads, but a prover blocked in one long-running query never reads the
+    exit command and keeps burning CPU — and Silicon's teardown in turn blocks on
+    it. The JVM is in-process (JPype), so provers are direct children of this
+    process; killing them unblocks the readers with EOF and the job actor dies
+    quickly. Killing is process-wide, so the caller must ensure no concurrent
+    job is in flight (it would lose its provers and fail as cancelled).
+    """
+    me = str(os.getpid())
+    for stat_path in glob.glob('/proc/[0-9]*/stat'):
+        try:
+            with open(stat_path) as f:
+                fields = f.read().split()
+            comm, ppid = fields[1].strip('()'), fields[3]
+            if ppid == me and (comm.startswith('z3') or comm.startswith('boogie')):
+                os.kill(int(fields[0]), signal.SIGKILL)
+                logging.warning('Killed wedged prover process %s (%s).',
+                                fields[0], comm)
+        except (OSError, IndexError, ValueError):
+            continue
 
 
 class VerificationService:
@@ -127,7 +428,12 @@ class VerificationService:
                  int_bitops_size: int = 8, use_viper_server: bool = True,
                  verifier_backend: str = 'silicon', sif=False,
                  float_encoding: str = None,
-                 disable_branch_conditions: bool = False):
+                 disable_branch_conditions: bool = False,
+                 force_obligations: bool = False,
+                 default_viper_args: List[str] = None,
+                 record_dir: str = None,
+                 plain_diagnostics: bool = False,
+                 plain_messages: bool = False):
         if viper_jar_path:
             config.classpath = viper_jar_path
         if z3_path:
@@ -147,10 +453,25 @@ class VerificationService:
                              'environment variable).')
 
         self._backend = verifier_backend
+        self._default_viper_args = list(default_viper_args) if default_viper_args else []
         self._sif = sif
         self._float_encoding = float_encoding
         self._bv_size = int_bitops_size
         self._disable_branch_conditions = disable_branch_conditions
+        self._record_dir = record_dir
+        # Plain diagnostics: no phase timings or archive pointer, and the MCP
+        # frontend drops the SMT debug payloads (the recorded attempts keep
+        # everything). Plain messages: no explanatory prose.
+        self.plain_diagnostics = plain_diagnostics
+        messages.PROSE = not plain_messages
+        # Continue the attempt numbering of any earlier server that recorded
+        # into the same directory (e.g. a session resume, or a harness-side
+        # sweep sharing the agent's log) instead of clobbering attempt-0001.
+        self._record_seq = self._existing_record_seq(record_dir)
+        self._record_lock = threading.Lock()
+        if force_obligations:
+            # False instead of None: force the obligation encoding (see main.py).
+            config.obligation_config.disable_all = False
         # The obligation encoding is auto-detected per program by translate(),
         # which persistently sets obligation_config.disable_all once a program
         # without obligations is seen. In a long-lived service that would then
@@ -165,6 +486,11 @@ class VerificationService:
         # per-job cancellation.
         self._jobs = {}
         self._jobs_lock = threading.Lock()
+        # Number of verify() calls currently awaiting a ViperServer result; the
+        # hard-deadline path only force-kills prover processes when the wedged
+        # job is the sole one in flight (killing is process-wide, so a
+        # concurrent job would lose its provers too).
+        self._inflight = 0
 
         # JVM() routes JVM System.out to System.err and quiets logback, so the
         # JSON-RPC stream of a stdio-based LSP/MCP frontend on stdout stays clean.
@@ -177,17 +503,39 @@ class VerificationService:
         if config.use_viper_server:
             try:
                 from nagini_translation.viper_server import get_viper_server_manager
-                get_viper_server_manager(self.jvm).start()
+                manager = get_viper_server_manager(self.jvm)
+                self._set_journal_location(manager)
+                manager.start()
             except Exception:
                 logging.exception('ViperServer could not be started; verification '
                                   'will use the direct Silicon backend.')
+
+    @property
+    def record_dir(self) -> Optional[str]:
+        """The attempt archive root; None when recording is off."""
+        return self._record_dir
+
+    def _set_journal_location(self, manager) -> None:
+        """Persist ViperServer's journal next to the recorded attempts instead
+        of a throwaway file in /tmp, so backend exception details survive the
+        environment (e.g. a container exiting)."""
+        if not self._record_dir or manager.started or manager.log_file:
+            return
+        try:
+            os.makedirs(self._record_dir, exist_ok=True)
+            manager.log_file = os.path.join(
+                os.path.abspath(self._record_dir), 'viperserver_journal.log')
+        except OSError:
+            logging.exception('Could not prepare the ViperServer journal '
+                              'location; using the default temp file.')
 
     # -- public API ---------------------------------------------------------
 
     def verify(self, path: str, *, selected: Set[str] = None, base_dir: str = None,
                arp: bool = False, counterexample: bool = False,
                ignore_global: bool = False, viper_args: List[str] = None,
-               include_viper: bool = False,
+               include_viper: bool = False, translate_only: bool = False,
+               int_bitops_size: int = None,
                job_token: str = None) -> VerifyResult:
         """Translate and verify the file at ``path`` and return structured results.
 
@@ -197,17 +545,187 @@ class VerificationService:
         to skip verification of top-level (module-global) statements.
         ``viper_args`` are extra command-line arguments for the Viper backend
         (the CLI's ``--viper-arg``, as a list). ``include_viper`` returns the
-        translated Viper program in ``viper_program``.
+        translated Viper program in ``viper_program``. ``translate_only`` stops
+        after translation (mypy + Nagini-to-Viper): success means the file is a
+        valid Nagini program; no proof obligations are checked. ``int_bitops_size`` sets
+        the bitvector width used to encode int bitwise operations for this
+        request; like :meth:`reconfigure` it is sticky (subsequent requests
+        keep it) and reloads the Silver resources only when the width changes.
         """
         path = os.path.abspath(path)
-        viper_args = list(viper_args) if viper_args else []
-        if self._can_run_concurrently(arp):
-            return self._verify_concurrent(path, selected, base_dir, counterexample,
-                                           ignore_global, viper_args,
-                                           include_viper, job_token)
-        with self._state_lock:
-            return self._verify_serial(path, selected, base_dir, arp, counterexample,
-                                       ignore_global, viper_args, include_viper)
+        start = time.time()
+        phases.reset()
+        # Server-default backend args (the CLI's --viper-arg, given at service
+        # launch), applied to every request. The request's own viper_args win:
+        # a default is dropped when the request passes the same flag itself.
+        viper_args = merge_viper_args(self._default_viper_args,
+                                      list(viper_args) if viper_args else [])
+        # Per-request dir for the backend's SMT state bundles, adopted into
+        # the attempt record when a diagnostic is canceled (see _record).
+        # Staged inside the record dir so adoption is a same-filesystem rename
+        # and nothing lands in the system temp dir.
+        smtstate_dir = None
+        if ('--smtStateOnError' in viper_args
+                and not any(a.startswith('--smtStateDir')
+                            for a in viper_args)):
+            if self._record_dir:
+                os.makedirs(self._record_dir, exist_ok=True)
+            smtstate_dir = tempfile.mkdtemp(
+                prefix='.smtstate-', dir=self._record_dir or None)
+            viper_args.append('--smtStateDir=' + smtstate_dir)
+        # Snapshot the source before verification: the agent may edit the file
+        # while the run is in flight, and the record must show what was verified.
+        source = self._read_source(path)
+        try:
+            if self._can_run_concurrently(arp):
+                result = self._verify_concurrent(path, selected, base_dir,
+                                                 counterexample,
+                                                 ignore_global, viper_args,
+                                                 include_viper, job_token,
+                                                 translate_only=translate_only,
+                                                 int_bitops_size=int_bitops_size)
+            else:
+                with self._state_lock:
+                    result = self._verify_serial(path, selected, base_dir, arp,
+                                                 counterexample, ignore_global,
+                                                 viper_args, include_viper,
+                                                 translate_only=translate_only,
+                                                 int_bitops_size=int_bitops_size)
+        except Exception as e:
+            # Last-resort conversion of internal crashes (translator bugs,
+            # unexpected error shapes) into a structured result: callers get a
+            # diagnostic instead of a bare exception string, and the full
+            # traceback lands in the server log.
+            logging.exception('Internal error verifying %s.', path)
+            result = VerifyResult(False, [self._point_diagnostic(
+                path, 'Internal Nagini error: {}: {} (traceback in server '
+                'log).'.format(type(e).__name__, e), 'internal.error')],
+                time.time() - start)
+        result.timings = phases.phases()
+        result.recorded_at = self._record(
+            path, selected, base_dir, viper_args, source, start,
+            result, translate_only, smtstate_dir=smtstate_dir)
+        if smtstate_dir and os.path.isdir(smtstate_dir):
+            shutil.rmtree(smtstate_dir, ignore_errors=True)
+        return result
+
+    @staticmethod
+    def _read_source(path):
+        try:
+            with open(path, 'rb') as f:
+                return f.read()
+        except OSError:
+            return None
+
+    @staticmethod
+    def _existing_record_seq(record_dir) -> int:
+        """Highest attempt-NNNN number already present in record_dir (0 if none)."""
+        if not record_dir:
+            return 0
+        try:
+            names = os.listdir(record_dir)
+        except OSError:
+            return 0
+        seq = 0
+        for name in names:
+            m = re.fullmatch(r'attempt-(\d+)', name)
+            if m:
+                seq = max(seq, int(m.group(1)))
+        return seq
+
+    def _record(self, path, selected, base_dir, viper_args, source, start,
+                result, translate_only=False, smtstate_dir=None) -> Optional[str]:
+        """Archive one verification attempt under the service's record dir;
+        returns the attempt directory (surfaced to clients as ``recordedAt``
+        so slimmed debug payloads stay recoverable), or None when recording
+        is off or failed. Every attempt gets meta.json (effective backend args,
+        content hashes of the project's .py files for attempt-series
+        attribution) and result.json (full structured result incl. debug
+        payloads). Full file contents (the verified file plus its sibling
+        .py files) and the backend's SMT state bundles (``smtstate_dir``:
+        replayable .smt2 sessions cut at canceled failures and at slow checks,
+        plus every verifier's session log) are archived when the attempt is
+        worth replaying in later SMT experiments: a diagnostic is canceled, a
+        slow-check bundle was written, or the whole run timed out (the session
+        logs then end at the in-flight checks).
+        Recording failures must never affect verification.
+        """
+        if not self._record_dir:
+            return None
+        try:
+            with self._record_lock:
+                self._record_seq += 1
+                seq = self._record_seq
+            attempt = os.path.join(self._record_dir, 'attempt-%04d' % seq)
+            os.makedirs(attempt, exist_ok=True)
+            bundles = (os.listdir(smtstate_dir)
+                       if smtstate_dir and os.path.isdir(smtstate_dir) else [])
+            has_canceled = (
+                any((d.debug or {}).get('reasonUnknown') == 'canceled'
+                    or d.code == 'TimeoutOccurred'
+                    for d in result.diagnostics)
+                or any(b.startswith('smtslow-') or '-canceled-' in b
+                       for b in bundles))
+            src_dir = os.path.dirname(path)
+            project_files = {}
+            for name in sorted(os.listdir(src_dir) or []):
+                if not name.endswith('.py'):
+                    continue
+                data = self._read_source(os.path.join(src_dir, name))
+                if data is None:
+                    continue
+                project_files[name] = hashlib.sha256(data).hexdigest()
+                if has_canceled:
+                    files_dir = os.path.join(attempt, 'files')
+                    os.makedirs(files_dir, exist_ok=True)
+                    with open(os.path.join(files_dir, name), 'wb') as f:
+                        f.write(data)
+            if has_canceled and source is not None:
+                with open(os.path.join(attempt, 'source.py'), 'wb') as f:
+                    f.write(source)
+            if has_canceled and bundles:
+                shutil.move(smtstate_dir, os.path.join(attempt, 'smtstate'))
+            meta = {
+                'seq': seq,
+                'path': path,
+                'selected': sorted(selected) if selected else None,
+                'baseDir': base_dir,
+                'effectiveViperArgs': viper_args,
+                'backend': self._backend,
+                'intBitopsSize': self._bv_size,
+                'sourceSha256': (hashlib.sha256(source).hexdigest()
+                                 if source is not None else None),
+                'projectFiles': project_files,
+                'startTime': start,
+                'duration': result.duration,
+                'timings': result.timings,
+                'success': result.success,
+                'cancelled': result.cancelled,
+                'translationFailed': result.translation_failed,
+                'translateOnly': translate_only,
+                'diagnosticCount': len(result.diagnostics),
+            }
+            with open(os.path.join(attempt, 'meta.json'), 'w') as f:
+                json.dump(meta, f, indent=1)
+            with open(os.path.join(attempt, 'result.json'), 'w') as f:
+                json.dump(result.to_dict(), f, indent=1)
+            return attempt
+        except Exception:
+            logging.exception('Failed to record verification attempt for %s.',
+                              path)
+            return None
+
+    def _apply_bitops_size(self, size: int) -> None:
+        """Switch the bitvector width for subsequent translations; sticky, like
+        :meth:`reconfigure`. Must be called while holding the state lock.
+        No-op when ``size`` is ``None`` or already current.
+        """
+        if size is None or size == self._bv_size:
+            return
+        self._bv_size = size
+        import nagini_translation.main as main_module
+        main_module.sil_programs = load_sil_files(self.jvm, self._bv_size,
+                                                  self._sif, self._float_encoding)
 
     def _reset_obligations(self) -> None:
         """Restore the obligation auto-detection setting before a translation.
@@ -335,14 +853,17 @@ class VerificationService:
 
     def _verify_concurrent(self, path, selected, base_dir, counterexample,
                            ignore_global, viper_args, include_viper,
-                           job_token) -> VerifyResult:
+                           job_token, translate_only=False,
+                           int_bitops_size=None) -> VerifyResult:
         from nagini_translation.viper_server import (build_carbon_backend_args,
                                                      build_silicon_backend_args,
                                                      get_viper_server_manager)
         manager = get_viper_server_manager(self.jvm)
+        self._set_journal_location(manager)
         start = time.time()
         # 1. Translate and snapshot this job's error-mapping state (serialized).
         with self._state_lock:
+            self._apply_bitops_size(int_bitops_size)
             self._reset_obligations()
             try:
                 translated = translate(
@@ -364,6 +885,9 @@ class VerificationService:
                     time.time() - start, translation_failed=True)
             modules, prog = translated
             viper_text = str(prog) if include_viper else None
+            if translate_only:
+                return VerifyResult(True, [], time.time() - start,
+                                    viper_program=viper_text)
             snapshot = (dict(error_manager._items),
                         dict(error_manager._conversion_rules))
             error_manager.clear()
@@ -378,14 +902,66 @@ class VerificationService:
         if job_token is not None:
             with self._jobs_lock:
                 self._jobs[job_token] = job_id
+        wall_cap = _hard_wall_seconds(backend_args)
+        with self._jobs_lock:
+            self._inflight += 1
+        verify_start = time.time()
         try:
-            result = manager.await_result(job_id)
-        except Exception:
-            # Most commonly this is a cancelled job (its actor was stopped).
+            messages = manager.await_messages(
+                job_id, timeout_ms=wall_cap * 1000 if wall_cap else None)
+        except Exception as e:
+            if wall_cap is not None and _is_await_timeout(e):
+                # The backend blew through its own --timeout plus the grace
+                # period: cancel the job and, when no other job would be hit,
+                # hard-kill the prover processes so the server is immediately
+                # usable again; either way report a plain timeout.
+                with self._jobs_lock:
+                    alone = self._inflight == 1
+                logging.warning('Verification of %s exceeded the hard %ss wall '
+                                '(backend --timeout plus %ss grace); '
+                                'cancelling%s.', path, wall_cap,
+                                HARD_DEADLINE_GRACE,
+                                ' and killing provers' if alone else
+                                '; provers left running (concurrent job in flight)')
+                try:
+                    manager.cancel_job(job_id)
+                finally:
+                    if alone:
+                        _kill_child_provers()
+                phases.record('verify', time.time() - verify_start)
+                return VerifyResult(False, [self._timeout_diagnostic(
+                    path, 'Timeout occurred: verification exceeded %s second(s) '
+                    '(hard wall).' % wall_cap, phases, viper_args, modules)],
+                    time.time() - start, viper_program=viper_text)
+            # Most commonly this is a cancelled job (its actor was stopped) —
+            # either explicitly via the cancel tool, or because the backend's own
+            # --timeout ended the run. Tell those apart by the elapsed time, and
+            # report the timeout as a real diagnostic instead of an inexplicable
+            # empty result: this is the whole-run budget expiring while every
+            # individual SMT check stayed within its per-check budget (otherwise
+            # a located failure would have been reported).
+            elapsed = time.time() - start
+            phases.record('verify', time.time() - verify_start)
+            backend_timeout = _backend_timeout_seconds(backend_args)
+            if backend_timeout is not None and elapsed >= backend_timeout - 1:
+                logging.debug('Verification job ended by backend --timeout.',
+                              exc_info=True)
+                return VerifyResult(False, [self._timeout_diagnostic(
+                    path,
+                    'Timeout occurred: the whole-run --timeout=%ds expired '
+                    'before verification finished.%s'
+                    % (backend_timeout,
+                       '' if self.plain_diagnostics else
+                       ' No individual obligation failed or exceeded its '
+                       'per-check budget.'),
+                    phases, viper_args, modules)], elapsed, cancelled=True,
+                    viper_program=viper_text)
             logging.debug('Verification job failed or was cancelled.', exc_info=True)
-            return VerifyResult(False, [], time.time() - start, cancelled=True,
+            return VerifyResult(False, [], elapsed, cancelled=True,
                                 viper_program=viper_text)
         finally:
+            with self._jobs_lock:
+                self._inflight -= 1
             if job_token is not None:
                 with self._jobs_lock:
                     # Only remove our own mapping; a newer run may have already
@@ -394,10 +970,41 @@ class VerificationService:
                         del self._jobs[job_token]
 
         duration = time.time() - start
+        phases.record('verify', time.time() - verify_start)
+        result, crash_texts, invalid_args_texts = self._split_messages(messages)
         if result is None:
-            return VerifyResult(False, [self._point_diagnostic(
-                path, 'Internal verifier error (see server log).',
-                'verifier.error')], duration, viper_program=viper_text)
+            # A rejected command line (unknown, duplicated, or contradictory
+            # viper_args) is either reported properly (InvalidArgumentsReport)
+            # or thrown raw by the argument parser. The job never verified
+            # anything; without this classification the only symptom is a
+            # misleading backend crash.
+            arg_error_texts = invalid_args_texts + [
+                t for t in crash_texts
+                if 'org.rogach.scallop.exceptions' in t]
+            if arg_error_texts:
+                return VerifyResult(False, [self._point_diagnostic(
+                    path, 'Invalid Viper backend arguments: %s'
+                    % '; '.join(arg_error_texts),
+                    'invalid.viper.args')], duration,
+                    viper_program=viper_text)
+            if crash_texts:
+                # The backend died with an exception instead of producing a
+                # result (e.g. a prover crash). Surface it as a distinct
+                # status: unlike a timeout, retrying is usually pointless.
+                logging.warning('Verification backend crashed for %s: %s',
+                                path, crash_texts[0])
+                more = ('' if len(crash_texts) == 1 else
+                        ' (%d further exceptions; see the ViperServer journal)'
+                        % (len(crash_texts) - 1))
+                return VerifyResult(False, [self._point_diagnostic(
+                    path, 'The verification backend crashed: %s%s'
+                    % (crash_texts[0], more),
+                    'verifier.crashed')], duration, crashed=True,
+                    viper_program=viper_text)
+            # No overall result and no reported exception: the job's actor was
+            # stopped before finishing, i.e. the job was cancelled.
+            return VerifyResult(False, [], duration, cancelled=True,
+                                viper_program=viper_text)
 
         # 3. Convert the result with this job's snapshot installed (serialized).
         is_failure = isinstance(result, self.jvm.viper.silver.verifier.Failure)
@@ -408,19 +1015,78 @@ class VerificationService:
             try:
                 it = result.errors().toIterator()
                 errors = []
-                while it.hasNext():
-                    errors.append(it.next())
-                failure = Failure(errors, self.jvm, modules, self._sif)
-                diagnostics = self._failure_diagnostics(failure, path)
+                diagnostics = []
+                timeout_cls = self.jvm.viper.silver.verifier.TimeoutOccurred
+                for err in self._iterate(it):
+                    if isinstance(err, timeout_cls):
+                        # Silicon's whole-run --timeout: not attributable to a
+                        # program point; report it under the same code the
+                        # other timeout paths use.
+                        diagnostics.append(self._timeout_diagnostic(
+                            path, str(err.readableMessage()), phases, viper_args, modules))
+                    else:
+                        errors.append(err)
+                try:
+                    if errors:
+                        failure = Failure(errors, self.jvm, modules, self._sif)
+                        diagnostics.extend(self._failure_diagnostics(
+                            failure, path,
+                            smt_state_requested='--smtStateOnError' in viper_args,
+                            modules=modules, prog=prog))
+                except Exception:
+                    # Even a failed conversion must yield the raw Viper
+                    # messages rather than crash the request.
+                    logging.exception('Failed to convert errors for %s.', path)
+                    diagnostics.extend([self._point_diagnostic(
+                        path, self._raw_error_message(e), 'verifier.error')
+                        for e in errors])
+                if not diagnostics:
+                    diagnostics = [self._point_diagnostic(
+                        path, 'Internal verifier error (see server log).',
+                        'verifier.error')]
             finally:
                 error_manager.clear()
         return VerifyResult(False, diagnostics, duration, viper_program=viper_text)
 
+    @staticmethod
+    def _iterate(scala_iterator):
+        while scala_iterator.hasNext():
+            yield scala_iterator.next()
+
+    def _split_messages(self, messages) -> Tuple[object, List[str], List[str]]:
+        """Partition a finished job's reported messages into the overall
+        verification result, the texts of any reported backend exceptions, and
+        the texts of any invalid-backend-arguments errors.
+
+        Returns ``(result, crash_texts, invalid_args_texts)`` where ``result``
+        is the ``viper.silver.verifier.VerificationResult`` from the job's
+        overall success/failure message, or ``None`` if the job never produced
+        one (invalid arguments, crashed, or cancelled).
+        """
+        reporter = self.jvm.viper.silver.reporter
+        result = None
+        crash_texts = []
+        invalid_args_texts = []
+        for msg in self._iterate(messages.iterator()):
+            if isinstance(msg, reporter.OverallFailureMessage):
+                result = msg.result()
+            elif isinstance(msg, reporter.OverallSuccessMessage):
+                result = self.jvm.viper.silver.verifier.Success
+            elif isinstance(msg, reporter.ExceptionReport):
+                crash_texts.append(str(msg.e()))
+            elif isinstance(msg, reporter.InvalidArgumentsReport):
+                invalid_args_texts.extend(
+                    str(e.readableMessage())
+                    for e in self._iterate(msg.errors().iterator()))
+        return result, crash_texts, invalid_args_texts
+
     def _verify_serial(self, path, selected, base_dir, arp,
                        counterexample, ignore_global, viper_args,
-                       include_viper) -> VerifyResult:
+                       include_viper, translate_only=False,
+                       int_bitops_size=None) -> VerifyResult:
         start = time.time()
         try:
+            self._apply_bitops_size(int_bitops_size)
             self._reset_obligations()
             selected_set = set(selected) if selected else set()
             translated = translate(
@@ -434,12 +1100,16 @@ class VerificationService:
                     time.time() - start, translation_failed=True)
             modules, prog = translated
             viper_text = str(prog) if include_viper else None
+            if translate_only:
+                return VerifyResult(True, [], time.time() - start,
+                                    viper_program=viper_text)
             backend = (ViperVerifier.silicon if self._backend == 'silicon'
                        else ViperVerifier.carbon)
-            vresult = verify_program(
-                modules, prog, path, self.jvm, viper_args, backend=backend,
-                arp=arp, counterexample=counterexample, sif=self._sif,
-                disable_branch_conditions=self._disable_branch_conditions)
+            with phases.phase('verify'):
+                vresult = verify_program(
+                    modules, prog, path, self.jvm, viper_args, backend=backend,
+                    arp=arp, counterexample=counterexample, sif=self._sif,
+                    disable_branch_conditions=self._disable_branch_conditions)
             duration = time.time() - start
             if vresult is None:
                 # main.verify swallows JVM exceptions and returns None.
@@ -447,8 +1117,13 @@ class VerificationService:
                     path, 'Internal verifier error (see server log).',
                     'verifier.error')], duration, viper_program=viper_text)
             if isinstance(vresult, Failure):
-                return VerifyResult(False, self._failure_diagnostics(vresult, path),
-                                    duration, viper_program=viper_text)
+                return VerifyResult(
+                    False,
+                    self._failure_diagnostics(
+                        vresult, path,
+                        smt_state_requested='--smtStateOnError' in viper_args,
+                        modules=modules, prog=prog),
+                    duration, viper_program=viper_text)
             return VerifyResult(True, [], duration, viper_program=viper_text)
         except (TypeException, InvalidProgramException, UnsupportedException) as e:
             return VerifyResult(False, self._exception_diagnostics(e, path),
@@ -458,45 +1133,137 @@ class VerificationService:
                 path, e.message + ': Translated AST contains inconsistencies.',
                 'consistency.error')], time.time() - start, translation_failed=True)
 
-    def _failure_diagnostics(self, failure: Failure, path: str) -> List[Diagnostic]:
+    # Appended to a failure diagnostic served from ViperServer's verification
+    # cache while --smtStateOnError is in effect: cache hits replay the stored
+    # errors without failure contexts, so no SMT state exists to attach.
+    CACHED_STATE_HINT = (
+        ' [note: result served from the verification cache, so no SMT state '
+        "was collected. Re-verify with viper_args=['--disableCaching'] to "
+        'run this member live and collect the state; the cache is kept.]')
+
+    def _phase_note(self, phases) -> str:
+        """Per-phase timing suffix for a timeout message ('' when plain)."""
+        if self.plain_diagnostics:
+            return ''
+        return ' Phases: %s.' % phases.summary()
+
+    @staticmethod
+    def _smtstate_dir(viper_args) -> Optional[str]:
+        for arg in viper_args:
+            if arg.startswith('--smtStateDir='):
+                return arg.split('=', 1)[1]
+        return None
+
+    def _timeout_diagnostic(self, path, message, phases, viper_args, modules) -> Diagnostic:
+        """The whole-run timeout diagnostic. Unless plain, the message also
+        names what each verifier had in flight, and the debug payload carries
+        the in-flight checks, the slowest completed checks and the check count
+        and time per member, read from the session logs the backend left in
+        its SMT state dir."""
+        diag = self._point_diagnostic(path, message + self._phase_note(phases),
+                                      'TimeoutOccurred')
+        smtstate_dir = self._smtstate_dir(viper_args)
+        if self.plain_diagnostics or not smtstate_dir or not os.path.isdir(smtstate_dir):
+            return diag
+        try:
+            names = {m.sil_name: _python_name(m) for module in modules or ()
+                     for m in _members(module)}
+            report = session_log.timeout_report(
+                smtstate_dir, int(time.time() * 1000), lambda n: names.get(n, n))
+        except Exception:
+            logging.exception('Failed to read the session logs of a timed-out run.')
+            return diag
+        if report is None:
+            return diag
+        diag.debug = report
+        if report['inFlight']:
+            diag.message += ' In flight: ' + '; '.join(
+                '%s at %s (%s, %.1fs)' % (c['member'], c['at'], c['kind'], c['runningMs'] / 1000)
+                for c in report['inFlight']) + '.'
+        return diag
+
+    def _failure_diagnostics(self, failure: Failure, path: str,
+                             smt_state_requested: bool = False,
+                             modules=None, prog=None) -> List[Diagnostic]:
         diagnostics = []
         seen = set()
         for error in failure.errors:
-            pos = error.position
             try:
-                file_name = pos.file_name
+                diag = self._error_diagnostic(error, path, modules, prog)
+                if (smt_state_requested and diag.debug is None
+                        and not self.plain_diagnostics):
+                    jvm_error = getattr(error, '_error', None)
+                    try:
+                        cached = bool(jvm_error is not None
+                                      and jvm_error.cached())
+                    except Exception:
+                        cached = False
+                    if cached:
+                        diag.message += self.CACHED_STATE_HINT
             except Exception:
-                file_name = path
-            vias = [(str(reason), str(p))
-                    for reason, p in (error.reason.vias or error._vias or [])]
-            try:
-                reason_pos = (error.reason.position.line, error.reason.position.column)
-            except Exception:
-                reason_pos = None
-            diag = Diagnostic(
-                file=file_name,
-                start_line=pos.line, start_col=pos.column,
-                end_line=pos.line_end, end_col=pos.column_end,
-                message=error.message,
-                code=error.full_id,
-                reason=error.reason.string(False),
-                reason_position=reason_pos,
-                vias=vias,
-                counterexample=(str(error._inputs)
-                                if error._inputs is not None else None),
-                branch_conditions=list(error.bcs) if error.bcs else [],
-            )
+                # Rendering a diagnostic must never lose the error itself
+                # (internal verifier exceptions produce errors without a
+                # mapped reason or position).
+                logging.exception('Failed to render diagnostic for %s.', path)
+                diag = self._point_diagnostic(
+                    path, self._raw_error_message(error), 'verifier.error')
             key = (diag.file, diag.start_line, diag.start_col, diag.code, diag.message)
             if key not in seen:
                 seen.add(key)
                 diagnostics.append(diag)
         return diagnostics
 
+    def _error_diagnostic(self, error, path: str, modules=None, prog=None) -> Diagnostic:
+        pos = error.position
+        try:
+            file_name = pos.file_name
+        except Exception:
+            file_name = path
+        reason = error.reason  # None for internal verifier exceptions
+        vias = [(str(r), str(p))
+                for r, p in ((reason.vias if reason is not None else None)
+                             or error._vias or [])]
+        try:
+            reason_pos = (reason.position.line, reason.position.column)
+        except Exception:
+            reason_pos = None
+        debug = _debug_payload(error)
+        if debug is not None and prog is not None:
+            debug['viperExcerpt'] = _viper_excerpt(error, modules, prog)
+        return Diagnostic(
+            file=file_name,
+            start_line=pos.line, start_col=pos.column,
+            end_line=pos.line_end, end_col=pos.column_end,
+            message=(error.message if reason is not None
+                     else self._raw_error_message(error)),
+            code=error.full_id,
+            reason=reason.string(False) if reason is not None else None,
+            reason_position=reason_pos,
+            vias=vias,
+            counterexample=(str(error._inputs)
+                            if error._inputs is not None else None),
+            branch_conditions=list(error.bcs) if error.bcs else [],
+            debug=debug,
+        )
+
+    @staticmethod
+    def _raw_error_message(error) -> str:
+        """Best-effort message for an error whose normal rendering is
+        unavailable (no reason mapping, exotic error class)."""
+        for attr in ('readable_message', 'readableMessage', 'text'):
+            try:
+                value = getattr(error, attr)
+                return str(value() if callable(value) else value)
+            except Exception:
+                continue
+        return 'Internal verifier error (see server log).'
+
     def _exception_diagnostics(self, e, path: str) -> List[Diagnostic]:
         if isinstance(e, (InvalidProgramException, UnsupportedException)):
             if isinstance(e, InvalidProgramException):
                 code = 'invalid.program'
-                message = 'Invalid program: ' + (e.message or e.code)
+                message = ('Invalid program: ' +
+                           invalid_program_message(e.code, e.message))
             else:
                 code = 'unsupported'
                 detail = e.args[0] if e.args and e.args[0] else ast.unparse(e.node)
@@ -586,6 +1353,27 @@ def add_service_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentP
                              'errors (Silicon backend)')
     parser.add_argument('--no-viper-server', action='store_true',
                         help='disable the in-process ViperServer backend')
+    parser.add_argument('--force-obligations', action='store_true', default=False,
+                        help='force use of the obligations encoding used to '
+                             'verify liveness properties')
+    parser.add_argument('--viper-arg', default=None,
+                        help='arguments forwarded to the Viper backend on every '
+                             'verification request, separated by commas (same '
+                             "syntax as the CLI's --viper-arg; a request's own "
+                             'viper_args override same-name flags)')
+    parser.add_argument('--record-dir', default=None,
+                        help='archive every verification attempt (source '
+                             'snapshot, effective backend args, full result '
+                             'incl. debug payloads) into this directory; '
+                             'server-side only, invisible to MCP clients')
+    parser.add_argument('--plain-diagnostics', action='store_true',
+                        help='report plain diagnostics: no phase timings and '
+                             'no SMT debug payloads in responses (recorded '
+                             'attempts keep everything)')
+    parser.add_argument('--plain-messages', action='store_true',
+                        help='report plain messages: no explanatory prose on '
+                             'invalid-program errors and no member names in '
+                             'termination messages')
     return parser
 
 
@@ -601,7 +1389,13 @@ def service_kwargs_from_args(args: argparse.Namespace) -> dict:
         mypy_path=args.mypy_path, int_bitops_size=args.int_bitops_size,
         use_viper_server=not args.no_viper_server, verifier_backend=args.verifier,
         sif=args.sif, float_encoding=args.float_encoding,
-        disable_branch_conditions=args.disable_branch_conditions)
+        disable_branch_conditions=args.disable_branch_conditions,
+        force_obligations=args.force_obligations,
+        default_viper_args=args.viper_arg.split(',') if args.viper_arg else None,
+        record_dir=args.record_dir,
+        plain_diagnostics=args.plain_diagnostics,
+        plain_messages=args.plain_messages)
+
 
 
 def make_service(args: argparse.Namespace) -> VerificationService:

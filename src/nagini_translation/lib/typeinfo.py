@@ -5,9 +5,12 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
+import ast
+import json
 import logging
 import mypy.build
 import os
+import sys
 
 from mypy.build import BuildSource
 from nagini_translation.lib.constants import IGNORED_IMPORTS, LITERALS
@@ -16,7 +19,7 @@ from nagini_translation.mypy_patches.visitor import TraverserVisitor
 from nagini_translation.lib.util import (
     construct_lambda_prefix,
 )
-from typing import List, Optional, Union
+from typing import List, Optional
 
 
 logger = logging.getLogger('nagini_translation.lib.typeinfo')
@@ -34,30 +37,6 @@ def col(node) -> Optional[int]:
 class TypeException(Exception):
     def __init__(self, messages):
         self.messages = messages
-
-
-def absolute_import_id(importer: 'mypy.nodes.MypyFile', imp) -> str:
-    """
-    Returns the absolute module id an ImportFrom or ImportAll node refers to.
-
-    ``imp.id`` is the name as written, so for a relative import it is missing
-    the package part ('A' for ``from .A import A``, and '' for
-    ``from . import x``). Resolve it against the importing module the way
-    Python does: one leading dot means the package containing the importer,
-    which for a package's own __init__ is that package itself, and each further
-    dot strips one more level.
-    """
-    relative = getattr(imp, 'relative', 0)
-    if not relative:
-        return imp.id
-    parts = importer.fullname.split('.')
-    if not importer.is_package_init_file():
-        parts = parts[:-1]
-    if relative > 1:
-        parts = parts[:-(relative - 1)]
-    if imp.id:
-        parts = parts + imp.id.split('.')
-    return '.'.join(parts)
 
 
 class TypeVisitor(TraverserVisitor):
@@ -356,6 +335,103 @@ class TypeInfo:
         result.cache_dir = '.mypy_cache_strict' if strict_optional else '.mypy_cache_nonstrict'
         return result
 
+    def _evict_project_cache(self, options, filename: str,
+                             module_name: str, base_dir: str = None) -> None:
+        """Forces mypy to re-check every module Nagini needs the typed AST of,
+        which a cache hit does not materialize, by deleting its entry from the
+        on-disk cache before the build: every module whose source lives under
+        base_dir (the project), and every module transitively imported from
+        the main file (ignoring IGNORED_IMPORTS and everything imported solely
+        by those). Everything else keeps its cache hit. The project sweep does
+        not depend on cache metadata: mypy writes none for a module with
+        errors, so a walk from such a module would miss what it imports.
+
+        Works on the on-disk cache because patching mypy.build.find_cache_meta
+        has no effect on the mypyc-compiled mypy wheel: compiled call sites
+        bind the original function.
+        """
+        cache_root = os.path.join(options.cache_dir,
+                                  '%d.%d' % sys.version_info[:2])
+        if not os.path.isdir(cache_root):
+            return
+
+        project = os.path.abspath(base_dir or os.path.dirname(filename))
+        for dirpath, _, names in os.walk(cache_root):
+            for name in names:
+                if not name.endswith('.meta.json'):
+                    continue
+                meta_path = os.path.join(dirpath, name)
+                try:
+                    with open(meta_path) as f:
+                        source = json.load(f).get('path', '')
+                except (OSError, ValueError):
+                    continue
+                if os.path.abspath(source).startswith(project + os.sep):
+                    for path in (meta_path,
+                                 meta_path[:-len('.meta.json')] + '.data.json'):
+                        try:
+                            os.remove(path)
+                        except OSError:
+                            pass
+
+        # Seeds: the main module under both ids mypy may know it by, plus every
+        # import in the current source text — a newly added import needs its
+        # (library-cached) entry evicted even though no prior project cache
+        # entry chains to it yet.
+        seeds = {'__main__'}
+        if module_name:
+            seeds.add(module_name)
+        try:
+            with open(filename, encoding='utf-8') as f:
+                tree = ast.parse(f.read())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    seeds.update(a.name for a in node.names)
+                elif isinstance(node, ast.ImportFrom):
+                    if node.level == 0:
+                        if node.module:
+                            seeds.add(node.module)
+                    elif module_name:
+                        # Resolve relative imports the way Python does: one
+                        # leading dot is the package containing the main file
+                        # (the file itself if it is a package __init__), each
+                        # further dot strips one more level.
+                        parts = module_name.split('.')
+                        if not filename.endswith(('__init__.py', '__init__.pyi')):
+                            parts = parts[:-1]
+                        if node.level > 1:
+                            parts = parts[:-(node.level - 1)]
+                        if node.module:
+                            parts += node.module.split('.')
+                        if parts:
+                            seeds.add('.'.join(parts))
+        except (OSError, SyntaxError):
+            pass
+
+        todo = list(seeds)
+        seen = set()
+        while todo:
+            mod_id = todo.pop()
+            if mod_id in seen or mod_id in IGNORED_IMPORTS:
+                continue
+            seen.add(mod_id)
+            base = os.path.join(cache_root, *mod_id.split('.'))
+            for meta_path in (base + '.meta.json',
+                              os.path.join(base, '__init__.meta.json')):
+                if not os.path.exists(meta_path):
+                    continue
+                try:
+                    with open(meta_path) as f:
+                        todo.extend(json.load(f).get('dependencies', []))
+                except (OSError, ValueError):
+                    pass
+                for path in (meta_path,
+                             meta_path[:-len('.meta.json')] + '.data.json'):
+                    try:
+                        os.remove(path)
+                    except OSError:
+                        pass
+
     def check(self, filename: str, base_dir: str = None) -> bool:
         """
         Typechecks the given file and collects all type information needed for
@@ -365,7 +441,10 @@ class TypeInfo:
         def report_errors(errors: List[str]) -> None:
             for error in errors:
                 logger.info(error)
-            raise TypeException(errors)
+            # mypy 1.8 appends "(it only ever returns None)" to
+            # func-returns-value messages; strip it for stable error texts.
+            raise TypeException([e.replace(' (it only ever returns None)', '')
+                                 for e in errors])
 
         module_name = None
         if base_dir is not None:
@@ -378,56 +457,35 @@ class TypeInfo:
                     relpath = relpath[:-4]
                 module_name = relpath
         self.module_name = module_name
-        old_find_cache_meta = mypy.build.find_cache_meta
         try:
             options_strict = self._create_options(True)
 
-            # Terrible dirty hack:
-            # We want mypy to use its cache as much as possible, however, all files that Nagini needs to analyze
-            # must be re-checked by mypy, otherwise there are no mypy ASTs for these files for us to use.
-            # So: We monkey-patch the function that tries to find cached type information for the given file s.t.
-            # it returns None (= no cached info to use) for all files transitively imported from __main__, ignoring
-            # modules in IGNORED_IMPORTS and everything imported solely by those.
-            directly_imported = set()
-            imports_not_handled = set()
-            def my_find_cache_meta(id, path, mgr):
-                fl = mgr.ast_cache
-                to_handle = set(imports_not_handled)
-                for i in to_handle:
-                    if i in fl:
-                        imports_not_handled.remove(i)
-                        importer = fl[i][0]
-                        for ii in importer.imports:
-                            ids = []
-                            if isinstance(ii, mypy.build.Import):
-                                ids.extend([imported_id for imported_id, _ in ii.ids])
-                            else:
-                                # ImportFrom and ImportAll may be relative, in
-                                # which case ii.id is not the name mypy asks
-                                # about later ('A' rather than 'pkg.A'), so the
-                                # module would keep its cached, stripped tree.
-                                ids.append(absolute_import_id(importer, ii))
-                            for imported_id in ids:
-                                if imported_id not in IGNORED_IMPORTS:
-                                    imports_not_handled.add(imported_id)
-                                    directly_imported.add(imported_id)
-                if id == '__main__' or id == module_name:
-                    imports_not_handled.add(id)
-                    directly_imported.add(id)
-
-                if id not in directly_imported:
-                    return old_find_cache_meta(id, path, mgr)
-                return None
-            mypy.build.find_cache_meta = my_find_cache_meta
+            # All files that Nagini needs to analyze must be re-checked by mypy
+            # even when their cache entries are fresh — a cache hit does not
+            # materialize the mypy ASTs Nagini reads. Evict exactly those
+            # entries; library stubs keep their hits.
+            self._evict_project_cache(options_strict, filename, module_name,
+                                      base_dir)
 
             sources = [BuildSource(filename, module_name, None, base_dir=base_dir)]
 
             res_strict = mypy.build.build(sources, options_strict)
 
-            if res_strict.errors:
+            # An implicit-None return incompatibility exists only under
+            # strict-optional overapproximation: with strict_optional=False,
+            # None is compatible with every return type, so this error class
+            # ALWAYS vanishes in the confirmation build below. A batch
+            # consisting solely of such errors needs no confirmation build —
+            # this skips a full second mypy pass on the common
+            # agent-in-development file shape.
+            confirmable = [e for e in res_strict.errors
+                           if 'implicitly returns "None"' not in e]
+            if confirmable:
                 # Run mypy a second time with strict optional checking disabled,
                 # s.t. we don't get overapproximated none-related errors.
                 options_non_strict = self._create_options(False)
+                self._evict_project_cache(options_non_strict, filename,
+                                          module_name, base_dir)
                 res_non_strict = mypy.build.build(
                     [BuildSource(filename, module_name, None, base_dir=base_dir)],
                     options_non_strict
@@ -465,11 +523,6 @@ class TypeInfo:
             return True
         except mypy.errors.CompileError as e:
             report_errors(e.messages)
-        finally:
-            # Undo the patch: otherwise every call would wrap the function
-            # installed by the previous one, and looking up a single cache entry
-            # would recurse through all of them.
-            mypy.build.find_cache_meta = old_find_cache_meta
 
     def get_type_prefix(self, name: str) -> str:
         name = os.path.abspath(name)

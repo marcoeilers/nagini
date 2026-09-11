@@ -12,6 +12,10 @@
         "__cast__": {
             "args": ["PyType", "object"],
             "type": "object"
+        },
+        "__id__": {
+            "args": ["object"],
+            "type": "__prim__int"
         }
     },
     "methods": {
@@ -58,7 +62,7 @@
         },
         "reverse": {
             "args": ["list"],
-            "type": "list",
+            "type": null,
             "MustTerminate": true
         },
         "copy": {
@@ -69,6 +73,23 @@
         "remove": {
             "args": ["list", "object"],
             "type": null,
+            "MustTerminate": true
+        },
+        "pop": {
+            "args": ["list"],
+            "type": "object",
+            "generic_type": 0,
+            "MustTerminate": true
+        },
+        "__delitem__": {
+            "args": ["list", "__prim__int"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__delitem_slice__": {
+            "args": ["list", "slice"],
+            "type": null,
+            "display_name": "__delitem__",
             "MustTerminate": true
         },
         "__setitem__": {
@@ -176,6 +197,10 @@
         "__sil_seq__": {
             "args": ["set"],
             "type": "__prim__Seq"
+        },
+        "__sil_set__": {
+            "args": ["set"],
+            "type": "__prim__Set"
         }
     },
     "type_vars": 1,
@@ -196,6 +221,17 @@
         "__setitem__": {
             "args": ["dict", "object", "object"],
             "type": null,
+            "MustTerminate": true
+        },
+        "__delitem__": {
+            "args": ["dict", "object"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "pop": {
+            "args": ["dict", "object"],
+            "type": "object",
+            "generic_type": 1,
             "MustTerminate": true
         },
         "__iter__": {
@@ -234,6 +270,10 @@
         "__sil_seq__": {
             "args": ["dict"],
             "type": "__prim__Seq"
+        },
+        "__sil_set__": {
+            "args": ["dict"],
+            "type": "__prim__Set"
         }
     },
     "type_vars": 2,
@@ -895,11 +935,13 @@
         },
         "update": {
             "args": ["PSeq", "__prim__int", "object"],
-            "type": "PSeq"
+            "type": "PSeq",
+            "generic_type": -2
         },
         "__add__": {
             "args": ["PSeq", "PSeq"],
-            "type": "PSeq"
+            "type": "PSeq",
+            "generic_type": -2
         },
         "__eq__": {
             "args": ["PSeq", "PSeq"],
@@ -994,11 +1036,13 @@
         },
         "__add__": {
             "args": ["PSet", "PSet"],
-            "type": "PSet"
+            "type": "PSet",
+            "generic_type": -2
         },
         "__sub__": {
             "args": ["PSet", "PSet"],
-            "type": "PSet"
+            "type": "PSet",
+            "generic_type": -2
         },
         "__eq__": {
             "args": ["PSet", "PSet"],
@@ -1032,11 +1076,13 @@
         },
         "__add__": {
             "args": ["PMultiset", "PMultiset"],
-            "type": "PMultiset"
+            "type": "PMultiset",
+            "generic_type": -2
         },
         "__sub__": {
             "args": ["PMultiset", "PMultiset"],
-            "type": "PMultiset"
+            "type": "PMultiset",
+            "generic_type": -2
         },
         "__eq__": {
             "args": ["PMultiset", "PMultiset"],

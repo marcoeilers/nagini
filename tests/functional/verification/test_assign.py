@@ -59,10 +59,10 @@ def m3_fail_3() -> None:
     l3 = ['asd']  # type: List[object]
     l4 = [A()]  # type: List[object]
     t = [l1, l2, l3]
-    #:: ExpectedOutput(application.precondition:assertion.false)
+    # The starred receiver absorbs no elements: z gets t[2].
     d, (g, h), *e, z = t
     assert d[0] == 1
-    #:: ExpectedOutput(carbon)(assert.failed:assertion.false)
+    #:: ExpectedOutput(assert.failed:assertion.false)
     assert len(e) == 1
     assert e[0][0] is 'asd'
     assert g == 4
@@ -136,3 +136,39 @@ def m7() -> None:
     assert d is f[2]
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert c is f[0]
+
+def swap_locals() -> None:
+    a = 1
+    b = 2
+    a, b = b, a
+    assert a == 2
+    assert b == 1
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert b == 2
+
+
+def swap_subscripts(xs: List[int]) -> None:
+    Requires(list_pred(xs))
+    Requires(len(xs) >= 2)
+    Ensures(list_pred(xs))
+    Ensures(len(xs) == Old(len(xs)))
+    Ensures(xs[0] == Old(xs[1]) and xs[1] == Old(xs[0]))
+    xs[0], xs[1] = xs[1], xs[0]
+
+
+def rotate_subscripts(xs: List[int]) -> None:
+    Requires(list_pred(xs))
+    Requires(len(xs) > 2)
+    Ensures(list_pred(xs))
+    Ensures(len(xs) == Old(len(xs)))
+    Ensures(xs[0] == Old(xs[2]) and xs[1] == Old(xs[0]) and xs[2] == Old(xs[1]))
+    xs[0], xs[1], xs[2] = xs[2], xs[0], xs[1]
+
+
+def starred_tail() -> None:
+    a, *b, c = (1, 2, 3, 4)
+    assert a == 1
+    assert c == 4
+    assert len(b) == 2
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert c == 3

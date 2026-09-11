@@ -17,7 +17,8 @@ function PSeq___sil_seq__(box: Ref): Seq[Ref]
 function PSeq___contains__(self: Ref, item: Ref): Bool
     decreases _
     requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
-    ensures result == (item in PSeq___sil_seq__(self))
+    ensures result == exists i: Ref :: object___eq__(item, i) && i in PSeq___sil_seq__(self)
+    ensures item in PSeq___sil_seq__(self) ==> result
     ensures result ==> issubtype(typeof(item), PSeq_arg(typeof(self), 0))
 
 function PSeq___getitem__(self: Ref, index: Ref): Ref

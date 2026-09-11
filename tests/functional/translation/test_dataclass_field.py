@@ -6,5 +6,5 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True)
 class MissingType:
-    #:: ExpectedOutput(unsupported:field() requires a type annotation)
+    #:: ExpectedOutput(type.error:Need type annotation for "arr" (hint: "arr: List[<type>] = ...")  [var-annotated])
     arr = field(default_factory=list)

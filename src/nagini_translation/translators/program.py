@@ -6,11 +6,14 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import ast
+import builtins
 from collections import OrderedDict
 from typing import List, Set, Tuple
 
+from nagini_translation.lib import phases
 from nagini_translation.lib.constants import (
     ARBITRARY_BOOL_FUNC,
+    OBJECT_TYPE,
     ASSERTING_FUNC,
     ASSUMING_FUNC,
     CHECK_DEFINED_FUNC,
@@ -1290,6 +1293,28 @@ class ProgramTranslator(CommonTranslator):
                                 None, pos, info)
 
 
+    @staticmethod
+    def _inherits_object_eq(cls: PythonClass, module: PythonModule) -> bool:
+        """
+        Whether instances whose dynamic type is exactly ``cls`` compare with
+        object's ``__eq__`` (identity): a user-defined, non-generic class that
+        does not override ``__eq__``. Built-ins compare by value and have
+        their own encodings, as do enums and ADTs; interfaces have no
+        instances of their own.
+        """
+        if module is module.global_module:
+            # Modeled builtins compare by value — except the runtime-defined
+            # builtin exception classes the analyzer registers globally, which
+            # keep object's identity __eq__.
+            builtin_val = getattr(builtins, cls.name, None)
+            if not (cls.node is None and isinstance(builtin_val, type) and
+                    cls.name != 'Exception' and issubclass(builtin_val, Exception)):
+                return False
+        if cls.interface or cls.enum or cls.is_adt or cls.type_vars:
+            return False
+        eq = cls.get_function('__eq__')
+        return eq is not None and eq.cls is not None and eq.cls.name == OBJECT_TYPE
+
     def translate_program(self, modules: List[PythonModule], sil_progs: Program,
                           ctx: Context, selected: Set[str] = None,
                           ignore_global: bool = False) -> Program:
@@ -1420,6 +1445,9 @@ class ProgramTranslator(CommonTranslator):
                 type_funcs.extend(funcs)
                 if axioms:
                     type_axioms.extend(axioms)
+                if self._inherits_object_eq(cls, module):
+                    type_axioms.append(
+                        self.type_factory.create_inherits_object_eq_fact(cls, ctx))
                 for func_name in cls.functions:
                     func = cls.functions[func_name]
                     if func.interface:
@@ -1574,7 +1602,8 @@ class ProgramTranslator(CommonTranslator):
                                   methods, self.no_position(ctx),
                                   self.no_info(ctx))
 
-        chopped_prog = self.viper.chopper.chop(prog, self.viper.to_set(all_used_names))
+        with phases.phase('chop'):
+            chopped_prog = self.viper.chopper.chop(prog, self.viper.to_set(all_used_names))
 
         if chopped_prog.isEmpty():
             print('Nothing was selected to be verified.')

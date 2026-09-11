@@ -15,6 +15,13 @@ from nagini_translation.lib.util import (
 )
 
 
+def _member_name(n: 'ast.Node') -> str:
+    """Name of the member containing ``n``; nodes can sit outside any member
+    (e.g. positions that map into contract expressions), so never assume one."""
+    member = get_containing_member(n)
+    return member.name if member is not None else '(unknown)'
+
+
 ERRORS = {
     'assignment.failed':
         lambda n: 'Assignment might fail.',
@@ -56,10 +63,10 @@ ERRORS = {
         lambda n: 'Loop invariant might not hold on entry.',
     'function.not.wellformed':
         lambda n: ('Function {} might not be '
-                   'well-formed.').format(get_containing_member(n).name),
+                   'well-formed.').format(_member_name(n)),
     'predicate.not.wellformed':
         lambda n: ('Predicate {} might not be '
-                   'well-formed.').format(get_containing_member(n).name),
+                   'well-formed.').format(_member_name(n)),
     'termination_check.failed':
         lambda n: 'Operation might not terminate.',
     'leak_check.failed':
@@ -83,7 +90,9 @@ ERRORS = {
     'possibilistic.sif.violated':
         lambda n: 'Possibilistic non-interference might not be satisfied.',
     'termination.failed':
-        lambda n: 'Function might not terminate.',
+        lambda n: ('Function {} might not terminate.'.format(get_target_name(n))
+                   if PROSE and isinstance(n, (ast.Call, ast.FunctionDef)) else
+                   'Function might not terminate.'),
     'refute.failed':
         lambda n: 'Refute holds in all cases or could not be reached.',
     'predicateinstance.no.access':
@@ -193,9 +202,15 @@ REASONS = {
     'family.member.not.framed':
         lambda n: 'Predicate family addition might not be self-framing.',
     'tuple.false':
-        lambda n: 'Termination measure might not decrease or might not be bounded.',
+        lambda n: ('Termination measure of {} might not decrease or might not be '
+                   'bounded.'.format(get_target_name(n))
+                   if PROSE and isinstance(n, (ast.Call, ast.FunctionDef)) else
+                   'Termination measure might not decrease or might not be bounded.'),
     'termination.condition.false':
-        lambda n: 'Termination condition might not hold.',
+        lambda n: ('Termination condition of {} might not hold.'
+                   .format(get_target_name(n))
+                   if PROSE and isinstance(n, (ast.Call, ast.FunctionDef)) else
+                   'Termination condition might not hold.'),
     'refutation.true':
         lambda n: 'Assertion definitely holds.'
 }
@@ -221,3 +236,80 @@ VAGUE_REASONS = {
                                                      'at the point where obligation is '
                                                      'used.'),
 }
+
+# Explanatory prose in messages: raise-site explanations, named termination
+# errors, and the code prose below. Off (VerificationService plain_messages),
+# messages carry bare codes and generic text.
+PROSE = True
+
+# Prose for InvalidProgramException codes that are otherwise shown verbatim.
+# Only codes raised without an explicit message need an entry; raise sites
+# that pass ``message=`` take precedence.
+INVALID_PROGRAM_MESSAGES = {
+    'purity.violated':
+        'an impure construct (e.g. a call to a non-@Pure function or method) '
+        'appears where only pure expressions are allowed, such as contracts '
+        'or loop guards. Evaluate it into a local variable first.',
+    'invalid.perm.amount':
+        'this expression cannot be used as a permission amount. Permission '
+        'amounts must be built from integer literals and int-typed '
+        'expressions (e.g. 1/1000, n/2) — a name bound to a float or other '
+        'non-int value (e.g. FRAC = 1 / 1000) is not supported; write the '
+        'fraction literally at the use site.',
+    'permission.in.pure.context':
+        'a permission expression (Acc/Rd/Wildcard or a predicate instance) '
+        'appears in a position that only accepts pure boolean expressions: '
+        'the postcondition of a @Pure function, an Assume, the body of an '
+        'Unfolding, a branch or loop condition, or under a negation. '
+        'Permissions are allowed in the contracts and loop invariants of '
+        'impure methods, in @Pure preconditions, in Assert, and in '
+        'predicate bodies.',
+    'invalid.contract.position':
+        'a contract expression (Requires/Ensures/Invariant/...) appears '
+        'outside its designated position: pre- and postconditions at the '
+        'start of a body, invariants at the start of a loop body.',
+    'invalid.trigger':
+        'invalid trigger: a trigger list must be a list of lists of terms, '
+        'and each term must be a function or predicate application, a field '
+        'access, or a membership test (`x in xs`); a bare variable is not a '
+        'valid trigger term.',
+    'invalid.contract.call':
+        'a contract-only construct (e.g. Result, Old, Acc) is used outside '
+        'a contract expression.',
+    'old.in.pure':
+        'Old() is used inside a @Pure function or @Predicate. These have no '
+        'pre-state to refer to; Old() is only meaningful in method contracts, '
+        'loop invariants and method bodies.',
+    'invalid.override':
+        'this override is incompatible with the member it overrides: '
+        'parameter names, defaults and count must match, and an override '
+        'of a pure method (e.g. __eq__) must itself be @Pure.',
+    'illegal.magic.method':
+        'this magic method is not among the ones Nagini supports (the '
+        'comparison, arithmetic, reflected and in-place operator methods, '
+        '__init__, __post_init__, __enter__/__exit__, __str__/__repr__/'
+        '__format__, __len__, __bool__, __hash__, __getitem__, __setitem__ '
+        'and __contains__).',
+    'generic.constructor.without.type':
+        'the type arguments of this collection literal or constructor call '
+        'cannot be inferred from its context. Assign it to a target with an '
+        'explicit type annotation (e.g. xs: Set[int] = set()) or pass it to a '
+        'parameter whose type provides them.',
+    'function.return.missing':
+        'a @Pure function must end in a return statement on every path.',
+    'function.throws.exception':
+        'a @Pure function may not declare or raise exceptions.',
+}
+
+
+def invalid_program_message(code: str, message: str = None) -> str:
+    """
+    User-facing text for an InvalidProgramException: an explicit message from
+    the raise site, prose for known codes, the bare code otherwise — or the bare
+    code alone without PROSE.
+    """
+    if not PROSE:
+        return code
+    return message or INVALID_PROGRAM_MESSAGES.get(code, code)
+
+
