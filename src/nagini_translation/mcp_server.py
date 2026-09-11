@@ -59,9 +59,10 @@ _BULK_DEBUG_FIELDS = ('proverEmits', 'preambleAssumptions',
                       'macroDecls', 'functionDecls',
                       # a server-side path to a prover session file
                       'sessionLog')
-# Whole-result char budget. Silicon terms are symbol-dense (~2.5 chars/token),
-# so 50k chars keeps a comfortable margin under the 25k-token cap.
-_RESULT_BUDGET = 50_000
+# Whole-result char budget, measured on the indented JSON the MCP layer
+# sends (2-4% larger than the compact form). Claude Code redirects a result
+# to a file at about 50k chars of that text; 40k keeps a margin below it.
+_RESULT_BUDGET = 40_000
 _STATE_STUB_CHARS = 1_500  # per state projection (store/heap/oldHeaps)
 _BRANCH_CAP = 20           # branch conditions kept in stage 4
 _ASSERTION_STUB_CHARS = 2_000
@@ -197,7 +198,7 @@ def _slim_debug(result: dict) -> dict:
     # advance only the LARGEST remaining payload one stage — small
     # diagnostics keep their full payloads.
     stages = {id(dbg): 0 for dbg in debugs}
-    while len(json.dumps(result, default=str)) > _RESULT_BUDGET:
+    while len(json.dumps(result, default=str, indent=2)) > _RESULT_BUDGET:
         candidates = [dbg for dbg in debugs if stages[id(dbg)] < _MAX_STAGE]
         if not candidates:
             break  # nothing left to degrade (oversize is outside the payloads)

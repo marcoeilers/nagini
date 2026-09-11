@@ -452,7 +452,8 @@ class VerificationService:
                  force_obligations: bool = False,
                  default_viper_args: List[str] = None,
                  record_dir: str = None,
-                 plain_diagnostics: bool = False):
+                 plain_diagnostics: bool = False,
+                 plain_messages: bool = False):
         if viper_jar_path:
             config.classpath = viper_jar_path
         if z3_path:
@@ -478,11 +479,11 @@ class VerificationService:
         self._bv_size = int_bitops_size
         self._disable_branch_conditions = disable_branch_conditions
         self._record_dir = record_dir
-        # Plain diagnostics: messages carry no explanatory prose or phase
-        # timings, and the MCP frontend drops the SMT debug payloads (the
-        # recorded attempts keep everything).
+        # Plain diagnostics: no phase timings or archive pointer, and the MCP
+        # frontend drops the SMT debug payloads (the recorded attempts keep
+        # everything). Plain messages: no explanatory prose.
         self.plain_diagnostics = plain_diagnostics
-        messages.PROSE = not plain_diagnostics
+        messages.PROSE = not plain_messages
         # Continue the attempt numbering of any earlier server that recorded
         # into the same directory (e.g. a session resume, or a harness-side
         # sweep sharing the agent's log) instead of clobbering attempt-0001.
@@ -1381,10 +1382,13 @@ def add_service_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentP
                              'incl. debug payloads) into this directory; '
                              'server-side only, invisible to MCP clients')
     parser.add_argument('--plain-diagnostics', action='store_true',
-                        help='report plain diagnostics: no explanatory prose '
-                             'on invalid-program errors, no phase timings, and '
+                        help='report plain diagnostics: no phase timings and '
                              'no SMT debug payloads in responses (recorded '
                              'attempts keep everything)')
+    parser.add_argument('--plain-messages', action='store_true',
+                        help='report plain messages: no explanatory prose on '
+                             'invalid-program errors and no member names in '
+                             'termination messages')
     return parser
 
 
@@ -1404,7 +1408,8 @@ def service_kwargs_from_args(args: argparse.Namespace) -> dict:
         force_obligations=args.force_obligations,
         default_viper_args=args.viper_arg.split(',') if args.viper_arg else None,
         record_dir=args.record_dir,
-        plain_diagnostics=args.plain_diagnostics)
+        plain_diagnostics=args.plain_diagnostics,
+        plain_messages=args.plain_messages)
 
 
 
