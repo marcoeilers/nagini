@@ -56,13 +56,17 @@ _BULK_DEBUG_FIELDS = ('proverEmits', 'preambleAssumptions',
                       # 2026-08-13: across nine full benchmark runs no agent ever
                       # consulted either of these; they remain in the recorded
                       # result.json (--record-dir) for offline replay.
-                      'macroDecls', 'functionDecls')
+                      'macroDecls', 'functionDecls',
+                      # a server-side path to a prover session file
+                      'sessionLog')
 # Whole-result char budget. Silicon terms are symbol-dense (~2.5 chars/token),
 # so 50k chars keeps a comfortable margin under the 25k-token cap.
 _RESULT_BUDGET = 50_000
 _STATE_STUB_CHARS = 1_500  # per state projection (store/heap/oldHeaps)
 _BRANCH_CAP = 20           # branch conditions kept in stage 4
 _ASSERTION_STUB_CHARS = 2_000
+_EXCERPT_STUB_CHARS = 6_000    # the failing member's Viper text in stage 7
+_QUANTIFIER_BODY_CHARS = 400   # a quantifier body in stage 3; its triggers stay whole
 
 
 def _mark(dbg: dict, field: str, note) -> None:
@@ -87,6 +91,10 @@ def _degrade(dbg: dict, stage: int) -> None:
                 _mark(dbg, f, 'dropped')
     if stage >= 3 and 'assumptions' in dbg:
         _mark(dbg, 'assumptions', len(dbg.pop('assumptions') or []))
+    if stage >= 3:
+        for q in dbg.get('quantifiers') or []:
+            if isinstance(q.get('body'), str) and len(q['body']) > _QUANTIFIER_BODY_CHARS:
+                q['body'] = q['body'][:_QUANTIFIER_BODY_CHARS] + '…[truncated]'
     if stage >= 4 and isinstance(dbg.get('branchConditions'), list) \
             and len(dbg['branchConditions']) > _BRANCH_CAP:
         _mark(dbg, 'branchConditions',
@@ -94,8 +102,16 @@ def _degrade(dbg: dict, stage: int) -> None:
         dbg['branchConditions'] = dbg['branchConditions'][:_BRANCH_CAP]
     if stage >= 5 and dbg.pop('state', None) is not None:
         _mark(dbg, 'state', 'dropped')
+    if stage >= 5 and (dbg.get('viperExcerpt') or {}).get('quantified'):
+        _mark(dbg, 'viperExcerpt.quantified', len(dbg['viperExcerpt'].pop('quantified')))
     if stage >= 6 and dbg.pop('branchConditions', None) is not None:
         _mark(dbg, 'branchConditions', 'dropped')
+    if stage >= 6 and dbg.pop('quantifiers', None) is not None:
+        _mark(dbg, 'quantifiers', 'dropped')
+    if stage >= 7 and isinstance((dbg.get('viperExcerpt') or {}).get('viper'), str) \
+            and len(dbg['viperExcerpt']['viper']) > _EXCERPT_STUB_CHARS:
+        dbg['viperExcerpt']['viper'] = (dbg['viperExcerpt']['viper'][:_EXCERPT_STUB_CHARS]
+                                        + '…[truncated]')
     if stage >= 7 and isinstance(dbg.get('failedAssertion'), str) \
             and len(dbg['failedAssertion']) > _ASSERTION_STUB_CHARS:
         dbg['failedAssertion'] = (dbg['failedAssertion'][:_ASSERTION_STUB_CHARS]
@@ -120,28 +136,40 @@ def _as_selected(methods) -> Optional[set]:
 
 _SYMBOL = re.compile(r'[A-Za-z_$][\w$]*@\d+@\d+')
 _ASSUMPTION_CAP = 40
+_QUANTIFIER_CAP = 20
+
+
+def _keep_relevant(dbg: dict, field: str, text, cap: int) -> None:
+    """Keep only the entries of the list `dbg[field]` that share a symbol with
+    the failed assertion (they are the ones that can explain it), and of those
+    the newest along the path up to `cap`; `text` renders an entry for the
+    symbol test. The full list stays in the recorded result.json. Runs before
+    the budget loop, so relevant entries survive slimming that would
+    previously have dropped the whole list."""
+    entries = dbg.get(field)
+    if not isinstance(entries, list) or not entries:
+        return
+    syms = set(_SYMBOL.findall(str(dbg.get('failedAssertion', ''))))
+    relevant = [e for e in entries if not syms or any(s in text(e) for s in syms)]
+    kept = relevant[-cap:]
+    if len(kept) < len(entries):
+        notes = []
+        if len(relevant) < len(entries):
+            notes.append('%d not sharing a symbol with failedAssertion'
+                         % (len(entries) - len(relevant)))
+        if len(kept) < len(relevant):
+            notes.append('%d older ones beyond the cap of %d' % (len(relevant) - len(kept), cap))
+        _mark(dbg, field, ', '.join(notes) + ' (full list in result.json under recordedAt)')
+    dbg[field] = kept
 
 
 def _filter_assumptions(dbg: dict) -> None:
-    """Keep only the assumptions that share a symbol with the failed assertion
-    (they are the ones that can explain it), capped. The full list stays in the
-    recorded result.json. Runs before the budget loop, so relevant assumptions
-    survive slimming that would previously have dropped the whole list."""
-    assumptions = dbg.get('assumptions')
-    if not isinstance(assumptions, list) or not assumptions:
-        return
-    syms = set(_SYMBOL.findall(str(dbg.get('failedAssertion', ''))))
-    if syms:
-        relevant = [a for a in assumptions if any(s in a for s in syms)]
-    else:
-        relevant = list(assumptions)
-    if len(relevant) > _ASSUMPTION_CAP:
-        relevant = relevant[:_ASSUMPTION_CAP]
-    if len(relevant) < len(assumptions):
-        _mark(dbg, 'assumptions',
-              f'{len(assumptions) - len(relevant)} not sharing a symbol with '
-              'failedAssertion (full list in result.json under recordedAt)')
-    dbg['assumptions'] = relevant
+    _keep_relevant(dbg, 'assumptions', str, _ASSUMPTION_CAP)
+
+
+def _filter_quantifiers(dbg: dict) -> None:
+    _keep_relevant(dbg, 'quantifiers', lambda q: q.get('body', '') + ' '.join(
+        t for ts in q.get('triggers', []) for t in ts), _QUANTIFIER_CAP)
 
 
 def _slim_debug(result: dict) -> dict:
@@ -160,6 +188,7 @@ def _slim_debug(result: dict) -> dict:
             continue
         dbg = {k: v for k, v in dbg.items() if k not in _BULK_DEBUG_FIELDS}
         _filter_assumptions(dbg)
+        _filter_quantifiers(dbg)
         d['debug'] = dbg
         debugs.append(dbg)
     if not debugs:
@@ -230,17 +259,11 @@ async def verify_file(path: str, methods: Optional[List[str]] = None,
     e.g. `["--timeout=60"]` for a per-run verification timeout in seconds (the
     CLI's `--viper-arg`, as a list); they override same-named backend defaults,
     and a rejected command line is reported as an `invalid.viper.args`
-    diagnostic. `include_viper` returns the translated
-    Viper program in `viperProgram`; even a small file translates to hundreds
-    of lines, so only request it when needed. `translate_only` stops after
+    diagnostic. `include_viper` returns the whole translated program in
+    `viperProgram` (thousands of lines for a large module). `translate_only`
+    stops after
     translation (mypy + Nagini-to-Viper): fast validity check that the file is
     a well-formed Nagini program; no proof obligations are checked.
-
-    Oversized `debug` payloads are slimmed to fit the response; whatever was
-    cut is listed per-diagnostic under `debug.omitted`. When the server records
-    attempts, `recordedAt` names this run's archive directory — its
-    `result.json` holds the untruncated payloads (full assumptions, state,
-    prover session); read that file when an omitted field matters.
     """
     selected = _as_selected(methods)
     result = await _run(lambda: _service.verify(

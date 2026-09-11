@@ -160,18 +160,20 @@ class ErrorManager:
             inputs = None
 
         py_bcs = None
-        if (error_item is not None and has_contexts and original_error.failureContexts().nonEmpty() and
-                original_error.failureContexts().head().branchConditions().nonEmpty()):
-            bcs = original_error.failureContexts().head().branchConditions()
+        if error_item is not None and has_contexts and original_error.failureContexts().nonEmpty():
+            context = original_error.failureContexts().head()
+            # An SMT-state context carries the branch conditions as terms and
+            # as source expressions; only the expressions map back to Python.
+            bcs = (context.branchConditionExps() if hasattr(context, 'branchConditionExps')
+                   else context.branchConditions())
+        else:
+            bcs = None
+        if bcs is not None and bcs.nonEmpty():
             py_bcs = []
             iterator = bcs.toIterator()
             while iterator.hasNext():
                 bc = iterator.next()
                 if not hasattr(bc, 'pos'):
-                    # SMT-state contexts (--smtStateOnError) carry silicon
-                    # Terms, which have no source positions and cannot map to
-                    # a Python-level condition here; clients get the raw terms
-                    # via the diagnostic's debug payload instead.
                     continue
                 bc_pos = bc.pos()
                 negated = False

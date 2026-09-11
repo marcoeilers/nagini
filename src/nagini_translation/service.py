@@ -33,6 +33,7 @@ import time
 from dataclasses import dataclass, field
 from typing import List, Optional, Set, Tuple
 
+from nagini_translation import session_log
 from nagini_translation.lib import config, phases
 from nagini_translation.lib.errors import error_manager
 from nagini_translation.lib.errors import messages
@@ -141,13 +142,34 @@ class VerifyResult:
         return result
 
 
-def _scala_strings(collection) -> List[str]:
-    """Stringify the elements of any Scala collection via its iterator."""
-    out = []
+def _scala_items(collection):
+    """The elements of any Scala collection via its iterator."""
     iterator = (collection.toIterator() if hasattr(collection, 'toIterator')
                 else collection.iterator())
     while iterator.hasNext():
-        out.append(str(iterator.next()))
+        yield iterator.next()
+
+
+def _scala_strings(collection) -> List[str]:
+    return [str(item) for item in _scala_items(collection)]
+
+
+def _quantifiers(terms) -> list:
+    """The quantified terms among the path-condition `terms`, with the triggers
+    Silicon's printer omits: what the solver could instantiate at the failure,
+    and on which patterns. The background axioms (a pure function's definition
+    and postconditions) arrive pre-rendered and are covered by the Viper excerpt."""
+    out = []
+    for term in _scala_items(terms):
+        if term.getClass().getSimpleName() != 'Quantification':
+            continue
+        out.append({
+            'quantifier': str(term.q()),
+            'vars': [str(v) for v in _scala_items(term.vars())],
+            'triggers': [[str(p) for p in _scala_items(trigger.p())]
+                         for trigger in _scala_items(term.triggers())],
+            'body': str(term.body()),
+        })
     return out
 
 
@@ -237,9 +259,13 @@ def _debug_payload(error) -> Optional[dict]:
     def failing_check(check):
         # The prover query that produced this failure (absent when the
         # error was raised without one, e.g. a missing permission).
+        instantiations = check.instantiations()
         return {'ordinal': int(str(check.ordinal())), 'kind': str(check.kind()),
                 'answer': str(check.answer()), 'ms': int(str(check.ms())),
-                'budgetMs': int(str(check.budgetMs()))}
+                'budgetMs': int(str(check.budgetMs())),
+                # Quantifier instantiations during the query (Z3 only).
+                'instantiations': (int(str(instantiations.get()))
+                                   if instantiations.isDefined() else None)}
 
     def state(st):
         return {'store': str(st.g().termValues()), 'heap': _heap_chunks(st.h()),
@@ -257,6 +283,7 @@ def _debug_payload(error) -> Optional[dict]:
         'proverEmits': field('proverEmits', lambda: _scala_strings(ctx.proverEmits())),
         'branchConditions': field('branchConditions',
                                   lambda: _scala_strings(ctx.branchConditions())),
+        'quantifiers': field('quantifiers', lambda: _quantifiers(ctx.assumptions())),
         'reasonUnknown': optional('reasonUnknown', str),
         # Z3 rlimit units spent on the failing check itself; the unit
         # assertTimeout budgets are enforced in (ms * z3ResourcesPerMillisecond).
@@ -267,6 +294,75 @@ def _debug_payload(error) -> Optional[dict]:
         'sessionLog': optional('sessionLog', str),
         'state': optional('state', state),
     }
+
+
+def _python_name(member) -> str:
+    return ('%s.%s' % (member.cls.name, member.name)
+            if getattr(member, 'cls', None) is not None else member.name)
+
+
+def _members(module):
+    """Every def Nagini translated to a Viper member, module-level and in classes."""
+    yield from module.methods.values()
+    yield from module.functions.values()
+    yield from module.predicates.values()
+    for cls in module.classes.values():
+        for group in (cls.methods, cls.functions, cls.static_methods, cls.predicates):
+            yield from group.values()
+
+
+def _enclosing_member(error, modules):
+    """The innermost translated def whose source span covers the error's position."""
+    pos = error.position
+    line, file = pos.line, os.path.basename(pos.file_name)
+    best = None
+    for module in modules or ():
+        if os.path.basename(getattr(module, 'file', '') or '') != file:
+            continue
+        for member in _members(module):
+            node = getattr(member, 'node', None)
+            if node is None or not hasattr(node, 'lineno'):
+                continue
+            end = getattr(node, 'end_lineno', None) or node.lineno
+            if node.lineno <= line <= end and (best is None or end - node.lineno < best[1]):
+                best = (member, end - node.lineno)
+    return best[0] if best else None
+
+
+def _viper_excerpt(error, modules, prog) -> Optional[dict]:
+    """The Viper text of the member the error lies in, plus the quantified
+    functions and predicates it mentions: the encoding an interpretation of a
+    quantifier failure has to be read against (each `forall` shows its
+    triggers). None when the position maps to no translated def."""
+    try:
+        member = _enclosing_member(error, modules)
+        if member is None:
+            return None
+        groups = ((prog.methods(), 'method'), (prog.functions(), 'function'),
+                  (prog.predicates(), 'predicate'))
+        texts = {}
+        for group, kind in groups:
+            it = group.iterator()
+            while it.hasNext():
+                node = it.next()
+                texts[str(node.name())] = (kind, node)
+        hit = texts.get(member.sil_name)
+        if hit is None:
+            return None
+        kind, node = hit
+        text = str(node)
+        quantified = []
+        for name, (k, other) in texts.items():
+            if k == 'method' or name == member.sil_name or not re.search(r'\b%s\b' % re.escape(name), text):
+                continue
+            other_text = str(other)
+            if 'forall' in other_text:
+                quantified.append({'name': name, 'kind': k, 'viper': other_text})
+        return {'member': _python_name(member), 'kind': kind, 'viper': text,
+                'quantified': quantified}
+    except Exception:
+        logging.exception('Failed to build the Viper excerpt.')
+        return None
 
 
 # Grace period on top of the backend's own --timeout before the service declares a
@@ -847,11 +943,10 @@ class VerificationService:
                     if alone:
                         _kill_child_provers()
                 phases.record('verify', time.time() - verify_start)
-                return VerifyResult(False, [self._point_diagnostic(
+                return VerifyResult(False, [self._timeout_diagnostic(
                     path, 'Timeout occurred: verification exceeded %s second(s) '
-                    '(hard wall).%s' % (wall_cap, self._phase_note(phases)),
-                    'TimeoutOccurred')], time.time() - start,
-                    viper_program=viper_text)
+                    '(hard wall).' % wall_cap, phases, viper_args, modules)],
+                    time.time() - start, viper_program=viper_text)
             # Most commonly this is a cancelled job (its actor was stopped) —
             # either explicitly via the cancel tool, or because the backend's own
             # --timeout ended the run. Tell those apart by the elapsed time, and
@@ -865,16 +960,15 @@ class VerificationService:
             if backend_timeout is not None and elapsed >= backend_timeout - 1:
                 logging.debug('Verification job ended by backend --timeout.',
                               exc_info=True)
-                return VerifyResult(False, [self._point_diagnostic(
+                return VerifyResult(False, [self._timeout_diagnostic(
                     path,
                     'Timeout occurred: the whole-run --timeout=%ds expired '
-                    'before verification finished.%s%s'
+                    'before verification finished.%s'
                     % (backend_timeout,
                        '' if self.plain_diagnostics else
                        ' No individual obligation failed or exceeded its '
-                       'per-check budget.',
-                       self._phase_note(phases)),
-                    'TimeoutOccurred')], elapsed, cancelled=True,
+                       'per-check budget.'),
+                    phases, viper_args, modules)], elapsed, cancelled=True,
                     viper_program=viper_text)
             logging.debug('Verification job failed or was cancelled.', exc_info=True)
             return VerifyResult(False, [], elapsed, cancelled=True,
@@ -942,10 +1036,8 @@ class VerificationService:
                         # Silicon's whole-run --timeout: not attributable to a
                         # program point; report it under the same code the
                         # other timeout paths use.
-                        diagnostics.append(self._point_diagnostic(
-                            path, '%s%s' % (err.readableMessage(),
-                                            self._phase_note(phases)),
-                            'TimeoutOccurred'))
+                        diagnostics.append(self._timeout_diagnostic(
+                            path, str(err.readableMessage()), phases, viper_args, modules))
                     else:
                         errors.append(err)
                 try:
@@ -953,7 +1045,8 @@ class VerificationService:
                         failure = Failure(errors, self.jvm, modules, self._sif)
                         diagnostics.extend(self._failure_diagnostics(
                             failure, path,
-                            smt_state_requested='--smtStateOnError' in viper_args))
+                            smt_state_requested='--smtStateOnError' in viper_args,
+                            modules=modules, prog=prog))
                 except Exception:
                     # Even a failed conversion must yield the raw Viper
                     # messages rather than crash the request.
@@ -1042,7 +1135,8 @@ class VerificationService:
                     False,
                     self._failure_diagnostics(
                         vresult, path,
-                        smt_state_requested='--smtStateOnError' in viper_args),
+                        smt_state_requested='--smtStateOnError' in viper_args,
+                        modules=modules, prog=prog),
                     duration, viper_program=viper_text)
             return VerifyResult(True, [], duration, viper_program=viper_text)
         except (TypeException, InvalidProgramException, UnsupportedException) as e:
@@ -1067,13 +1161,49 @@ class VerificationService:
             return ''
         return ' Phases: %s.' % phases.summary()
 
+    @staticmethod
+    def _smtstate_dir(viper_args) -> Optional[str]:
+        for arg in viper_args:
+            if arg.startswith('--smtStateDir='):
+                return arg.split('=', 1)[1]
+        return None
+
+    def _timeout_diagnostic(self, path, message, phases, viper_args, modules) -> Diagnostic:
+        """The whole-run timeout diagnostic. Unless plain, the message also
+        names what each verifier had in flight, and the debug payload carries
+        the in-flight checks, the slowest completed checks and the check count
+        and time per member, read from the session logs the backend left in
+        its SMT state dir."""
+        diag = self._point_diagnostic(path, message + self._phase_note(phases),
+                                      'TimeoutOccurred')
+        smtstate_dir = self._smtstate_dir(viper_args)
+        if self.plain_diagnostics or not smtstate_dir or not os.path.isdir(smtstate_dir):
+            return diag
+        try:
+            names = {m.sil_name: _python_name(m) for module in modules or ()
+                     for m in _members(module)}
+            report = session_log.timeout_report(
+                smtstate_dir, int(time.time() * 1000), lambda n: names.get(n, n))
+        except Exception:
+            logging.exception('Failed to read the session logs of a timed-out run.')
+            return diag
+        if report is None:
+            return diag
+        diag.debug = report
+        if report['inFlight']:
+            diag.message += ' In flight: ' + '; '.join(
+                '%s at %s (%s, %.1fs)' % (c['member'], c['at'], c['kind'], c['runningMs'] / 1000)
+                for c in report['inFlight']) + '.'
+        return diag
+
     def _failure_diagnostics(self, failure: Failure, path: str,
-                             smt_state_requested: bool = False) -> List[Diagnostic]:
+                             smt_state_requested: bool = False,
+                             modules=None, prog=None) -> List[Diagnostic]:
         diagnostics = []
         seen = set()
         for error in failure.errors:
             try:
-                diag = self._error_diagnostic(error, path)
+                diag = self._error_diagnostic(error, path, modules, prog)
                 if (smt_state_requested and diag.debug is None
                         and not self.plain_diagnostics):
                     jvm_error = getattr(error, '_error', None)
@@ -1097,7 +1227,7 @@ class VerificationService:
                 diagnostics.append(diag)
         return diagnostics
 
-    def _error_diagnostic(self, error, path: str) -> Diagnostic:
+    def _error_diagnostic(self, error, path: str, modules=None, prog=None) -> Diagnostic:
         pos = error.position
         try:
             file_name = pos.file_name
@@ -1111,6 +1241,9 @@ class VerificationService:
             reason_pos = (reason.position.line, reason.position.column)
         except Exception:
             reason_pos = None
+        debug = _debug_payload(error)
+        if debug is not None and prog is not None:
+            debug['viperExcerpt'] = _viper_excerpt(error, modules, prog)
         return Diagnostic(
             file=file_name,
             start_line=pos.line, start_col=pos.column,
@@ -1124,7 +1257,7 @@ class VerificationService:
             counterexample=(str(error._inputs)
                             if error._inputs is not None else None),
             branch_conditions=list(error.bcs) if error.bcs else [],
-            debug=_debug_payload(error),
+            debug=debug,
         )
 
     @staticmethod
