@@ -107,7 +107,7 @@ function tuple___create7__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, arg4: Re
     ensures issubtype(typeof(result), tuple(Seq(t0, t1, t2, t3, t4, t5, t6)))
     ensures tuple_args(typeof(result)) == Seq(typeof(arg0), typeof(arg1), typeof(arg2), typeof(arg3), typeof(arg4), typeof(arg5), typeof(arg6))
     ensures tuple___val__(result) == Seq(arg0, arg1, arg2, arg3, arg4, arg5, arg6)
-    ensures tuple___len__(result) == 6 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2 && tuple___getitem__(result, 3) == arg3 && tuple___getitem__(result, 4) == arg4 && tuple___getitem__(result, 5) == arg5 && tuple___getitem__(result, 6) == arg6
+    ensures tuple___len__(result) == 7 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2 && tuple___getitem__(result, 3) == arg3 && tuple___getitem__(result, 4) == arg4 && tuple___getitem__(result, 5) == arg5 && tuple___getitem__(result, 6) == arg6
 
 function tuple___create8__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, arg4: Ref, arg5: Ref, arg6: Ref, arg7: Ref, t0: PyType, t1: PyType, t2: PyType, t3: PyType, t4: PyType, t5: PyType, t6: PyType, t7: PyType, ctr: Int): Ref
     decreases _
@@ -124,7 +124,7 @@ function tuple___create8__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, arg4: Re
     ensures issubtype(typeof(result), tuple(Seq(t0, t1, t2, t3, t4, t5, t6, t7)))
     ensures tuple_args(typeof(result)) == Seq(typeof(arg0), typeof(arg1), typeof(arg2), typeof(arg3), typeof(arg4), typeof(arg5), typeof(arg6), typeof(arg7))
     ensures tuple___val__(result) == Seq(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
-    ensures tuple___len__(result) == 6 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2 && tuple___getitem__(result, 3) == arg3 && tuple___getitem__(result, 4) == arg4 && tuple___getitem__(result, 5) == arg5 && tuple___getitem__(result, 6) == arg6 && tuple___getitem__(result, 7) == arg7
+    ensures tuple___len__(result) == 8 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2 && tuple___getitem__(result, 3) == arg3 && tuple___getitem__(result, 4) == arg4 && tuple___getitem__(result, 5) == arg5 && tuple___getitem__(result, 6) == arg6 && tuple___getitem__(result, 7) == arg7
 
 function tuple___create9__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, arg4: Ref, arg5: Ref, arg6: Ref, arg7: Ref, arg8: Ref, t0: PyType, t1: PyType, t2: PyType, t3: PyType, t4: PyType, t5: PyType, t6: PyType, t7: PyType, t8: PyType, ctr: Int): Ref
     decreases _
@@ -142,7 +142,7 @@ function tuple___create9__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, arg4: Re
     ensures issubtype(typeof(result), tuple(Seq(t0, t1, t2, t3, t4, t5, t6, t7, t8)))
     ensures tuple_args(typeof(result)) == Seq(typeof(arg0), typeof(arg1), typeof(arg2), typeof(arg3), typeof(arg4), typeof(arg5), typeof(arg6), typeof(arg7), typeof(arg8))
     ensures tuple___val__(result) == Seq(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
-    ensures tuple___len__(result) == 6 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2 && tuple___getitem__(result, 3) == arg3 && tuple___getitem__(result, 4) == arg4 && tuple___getitem__(result, 5) == arg5 && tuple___getitem__(result, 6) == arg6 && tuple___getitem__(result, 7) == arg7 && tuple___getitem__(result, 8) == arg8
+    ensures tuple___len__(result) == 9 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2 && tuple___getitem__(result, 3) == arg3 && tuple___getitem__(result, 4) == arg4 && tuple___getitem__(result, 5) == arg5 && tuple___getitem__(result, 6) == arg6 && tuple___getitem__(result, 7) == arg7 && tuple___getitem__(result, 8) == arg8
 
 function tuple___sil_seq__(self: Ref): Seq[Ref]
     decreases _
