@@ -1532,6 +1532,7 @@ class ProgramTranslator(CommonTranslator):
                 # - if its precondition contains predicates or perms
                 functions.append(
                     self.create_global_var_function(var, ctx))
+        functions.extend(ctx.tuple_constructors.values())
 
         # IO operations are translated last because we need to know which functions are
         # used with Eval.

@@ -338,6 +338,12 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
             return module.global_module.classes[FLOAT_TYPE]
     elif isinstance(node, ast.Tuple):
         args = [get_type(arg, containers, container) for arg in node.elts]
+        if len(args) > 9 and len({a.name for a in args}) == 1:
+            # Beyond the fixed arities a homogeneous literal is translated as a
+            # variadic tuple (ExpressionTranslator.create_tuple).
+            res = GenericType(module.global_module.classes[TUPLE_TYPE], [args[0]])
+            res.exact_length = False
+            return res
         return GenericType(module.global_module.classes[TUPLE_TYPE],
                            args)
     elif isinstance(node, ast.Subscript):

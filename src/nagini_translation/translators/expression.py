@@ -732,11 +732,21 @@ class ExpressionTranslator(CommonTranslator):
         """
         tuple_class = ctx.module.global_module.classes[TUPLE_TYPE]
         tuple_len = len(vals)
-        if tuple_len > 9:
-            raise UnsupportedException(node, "Tuples longer than 9 elements are currently unsupported. Please file an issue to resolve this.")
-        func_name = '__create' + str(tuple_len) + '__'
         types = [self.get_tuple_type_arg(v, t, node, ctx)
                  for (t, v) in zip(val_types, vals)]
+        if tuple_len > 9:
+            if len({t.name for t in val_types}) != 1:
+                raise UnsupportedException(node, "Tuples longer than 9 elements are only supported with a single element type.")
+            refs = [self.to_ref(v, ctx) for v in vals]
+            position = self.to_position(node, ctx)
+            info = self.no_info(ctx)
+            if self._is_constant_literal(node):
+                return self.viper.FuncApp(self._constant_tuple(refs, types[0], ctx), [],
+                                          position, info, self.viper.Ref)
+            return self.viper.FuncApp(self._long_tuple_constructor(tuple_len, ctx),
+                                      refs + [types[0], self.get_fresh_int_lit(ctx)],
+                                      position, info, self.viper.Ref)
+        func_name = '__create' + str(tuple_len) + '__'
         args = vals + types
         # Also add a running integer s.t. other tuples with same contents are
         # not reference-identical (except for empty tuples).
@@ -746,6 +756,114 @@ class ExpressionTranslator(CommonTranslator):
         call = self.get_function_call(tuple_class, func_name, args, arg_types,
                                       node, ctx)
         return call
+
+    def _long_tuple_constructor(self, n: int, ctx: Context) -> str:
+        """
+        The name of the generated constructor for homogeneous tuples of arity
+        n (beyond the fixed-arity ones in tuple.sil), created on first use. It
+        states the variadic type, the length and one fact per element rather
+        than the value and type sequences, which Silicon encodes as chains of
+        the tuple's length.
+        """
+        name = 'tuple___create' + str(n) + '__'
+        if name in ctx.tuple_constructors:
+            return name
+        pos = self.no_position(ctx)
+        info = self.no_info(ctx)
+        tf = self.type_factory
+        ref = self.viper.Ref
+        args = [self.viper.LocalVarDecl('arg' + str(i), ref, pos, info) for i in range(n)]
+        elem_type = self.viper.LocalVarDecl('t', tf.type_type(), pos, info)
+        ctr = self.viper.LocalVarDecl('ctr', self.viper.Int, pos, info)
+        result = self.viper.Result(ref, pos, info)
+        length = self.viper.IntLit(n, pos, info)
+
+        def app(func, fargs, typ):
+            return self.viper.FuncApp(func, fargs, pos, info, typ)
+
+        pres = [self.viper.DomainFuncApp('issubtype', [tf.typeof(a.localVar(), ctx), elem_type.localVar()],
+                                         self.viper.Bool, pos, info, tf.type_domain)
+                for a in args]
+        posts = [self.viper.NeCmp(result, self.viper.NullLit(pos, info), pos, info),
+                 self.viper.EqCmp(tf.typeof(result, ctx),
+                                  self.viper.DomainFuncApp('tuple_var', [elem_type.localVar()],
+                                                           tf.type_type(), pos, info, tf.type_domain),
+                                  pos, info),
+                 self.viper.EqCmp(app('tuple___len__', [result], self.viper.Int), length, pos, info),
+                 self.viper.EqCmp(self.viper.SeqLength(app('tuple___val__', [result],
+                                                           self.viper.SeqType(ref)), pos, info),
+                                  length, pos, info)]
+        posts += [self.viper.EqCmp(app('tuple___getitem__', [result, self.viper.IntLit(i, pos, info)], ref),
+                                   a.localVar(), pos, info)
+                  for i, a in enumerate(args)]
+        posts.append(self.viper.DecreasesWildcard(None, pos, info))
+        ctx.tuple_constructors[name] = self.viper.Function(name, args + [elem_type, ctr], ref,
+                                                           pres, posts, None, pos, info)
+        return name
+
+    @staticmethod
+    def _is_constant_literal(node: ast.AST) -> bool:
+        """A tuple literal of constants, nested tuples of constants included."""
+        return isinstance(node, ast.Tuple) and all(
+            isinstance(e, ast.Constant) or ExpressionTranslator._is_constant_literal(e)
+            for e in node.elts)
+
+    def _constant_tuple(self, elems: List[Expr], elem_type: Expr, ctx: Context) -> str:
+        """
+        The name of a generated nullary function for a constant tuple literal
+        beyond the fixed arities (homogeneous, all elements constants). It
+        states the variadic type, the length, and the elements through an
+        element function whose body is the literal as a conditional chain, so
+        a lookup instantiates only the index it uses.
+        """
+        n = len(elems)
+        stem = 'tuple___lit' + str(ctx.get_fresh_int())
+        name, elem_name = stem + '__', stem + '_elem__'
+        pos = self.no_position(ctx)
+        info = self.no_info(ctx)
+        tf = self.type_factory
+        ref = self.viper.Ref
+
+        def lit(k):
+            return self.viper.IntLit(k, pos, info)
+
+        def app(func, fargs, typ):
+            return self.viper.FuncApp(func, fargs, pos, info, typ)
+
+        i = self.viper.LocalVarDecl('i', self.viper.Int, pos, info)
+        in_range = self.viper.And(self.viper.LeCmp(lit(0), i.localVar(), pos, info),
+                                  self.viper.LtCmp(i.localVar(), lit(n), pos, info), pos, info)
+        body = elems[-1]
+        for k in range(n - 2, -1, -1):
+            body = self.viper.CondExp(self.viper.EqCmp(i.localVar(), lit(k), pos, info),
+                                      elems[k], body, pos, info)
+        ctx.tuple_constructors[elem_name] = self.viper.Function(
+            elem_name, [i], ref, [in_range], [self.viper.DecreasesWildcard(None, pos, info)],
+            body, pos, info)
+        result = self.viper.Result(ref, pos, info)
+        getitem_i = app('tuple___getitem__', [result, i.localVar()], ref)
+        val_i = self.viper.SeqIndex(app('tuple___val__', [result], self.viper.SeqType(ref)),
+                                    i.localVar(), pos, info)
+        # Also triggered by the value sequence, which is what list(t), == and
+        # iteration read.
+        elements = self.viper.Forall(
+            [i], [self.viper.Trigger([getitem_i], pos, info), self.viper.Trigger([val_i], pos, info)],
+            self.viper.Implies(in_range, self.viper.EqCmp(getitem_i, app(elem_name, [i.localVar()], ref),
+                                                          pos, info), pos, info),
+            pos, info)
+        posts = [self.viper.NeCmp(result, self.viper.NullLit(pos, info), pos, info),
+                 self.viper.EqCmp(tf.typeof(result, ctx),
+                                  self.viper.DomainFuncApp('tuple_var', [elem_type], tf.type_type(),
+                                                           pos, info, tf.type_domain),
+                                  pos, info),
+                 self.viper.EqCmp(app('tuple___len__', [result], self.viper.Int), lit(n), pos, info),
+                 self.viper.EqCmp(self.viper.SeqLength(app('tuple___val__', [result],
+                                                           self.viper.SeqType(ref)), pos, info),
+                                  lit(n), pos, info),
+                 elements,
+                 self.viper.DecreasesWildcard(None, pos, info)]
+        ctx.tuple_constructors[name] = self.viper.Function(name, [], ref, [], posts, None, pos, info)
+        return name
 
     def translate_Subscript(self, node: ast.Subscript,
                             ctx: Context) -> StmtsAndExpr:
