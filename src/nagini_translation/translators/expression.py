@@ -1646,8 +1646,8 @@ class ExpressionTranslator(CommonTranslator):
         app_stmt, app = self.get_func_or_method_call(
             right_type, '__contains__', args, arg_types, node, ctx)
         if isinstance(node.ops[0], ast.NotIn):
-            app = self.viper.Not(
-                app, self.to_position(node, ctx), self.no_info(ctx))
+            app = self.viper.Not(self.to_bool(app, ctx, node),
+                                 self.to_position(node, ctx), self.no_info(ctx))
         return app_stmt, app
 
     def translate_Constant(self, node: 'ast.Constant', ctx: Context) -> StmtsAndExpr:
