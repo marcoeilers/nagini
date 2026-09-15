@@ -596,7 +596,7 @@
     },
     "methods": {
         "split": {
-            "args": ["str"],
+            "args": ["str", "str"],
             "type": "list",
             "MustTerminate": true
         },
