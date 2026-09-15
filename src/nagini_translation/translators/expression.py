@@ -192,6 +192,17 @@ class ExpressionTranslator(CommonTranslator):
                 result_var, list_type, element_var, body, filter_cond, node, ctx)
         return stmt, result_var.ref()
 
+    def _comp_iter_type(self, node: ast.AST, ctx: Context) -> GenericType:
+        """The comprehension's iterable type. Only generic collection instances
+        carry the element type the inhale needs."""
+        iter_type = self.get_type(node.generators[0].iter, ctx)
+        if isinstance(iter_type, GenericType):
+            return iter_type
+        hint = ('; iterate a list, or build the result with a while loop'
+                if iter_type.name == 'range' else '')
+        raise UnsupportedException(
+            node, 'comprehension over {}{}'.format(iter_type.name, hint))
+
     def _create_list_comp_inhale(self, result_var: PythonVar, list_type: PythonType,
                                  element_var: PythonVar, body: Expr, node: ast.ListComp,
                                  ctx: Context) -> List[Stmt]:
@@ -215,7 +226,7 @@ class ExpressionTranslator(CommonTranslator):
         result_len = self.get_function_call(list_class, '__len__', [result_var.ref()],
                                             [None], node, ctx)
         iter_stmt, iter = self.translate_expr(node.generators[0].iter, ctx)
-        iter_type = self.get_type(node.generators[0].iter, ctx)
+        iter_type = self._comp_iter_type(node, ctx)
         sil_seq, _ = self.get_sequence(iter_type.python_class, iter, None, node, ctx,
                                     position)
         seq_len = self.viper.SeqLength(sil_seq, position, info)
@@ -272,7 +283,7 @@ class ExpressionTranslator(CommonTranslator):
                                                    position, info)
         type_and_perm = self.viper.And(type_check, acc_pred, position, info)
         iter_stmt, iter = self.translate_expr(node.generators[0].iter, ctx)
-        iter_type = self.get_type(node.generators[0].iter, ctx)
+        iter_type = self._comp_iter_type(node, ctx)
         sil_seq, _ = self.get_sequence(iter_type.python_class, iter, None, node, ctx,
                                        position)
         seq_len = self.viper.SeqLength(sil_seq, position, info)
@@ -388,7 +399,7 @@ class ExpressionTranslator(CommonTranslator):
         type_check = self.type_check(result_var.ref(), result_type, position, ctx)
         # Iterate over the source.
         iter_stmt, iter = self.translate_expr(node.generators[0].iter, ctx)
-        iter_type = self.get_type(node.generators[0].iter, ctx)
+        iter_type = self._comp_iter_type(node, ctx)
         sil_seq, _ = self.get_sequence(iter_type.python_class, iter, None, node, ctx,
                                        position)
         seq_len = self.viper.SeqLength(sil_seq, position, info)

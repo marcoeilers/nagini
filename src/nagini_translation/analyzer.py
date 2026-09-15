@@ -1200,6 +1200,8 @@ class Analyzer(ast.NodeVisitor):
             self.current_function.kw_arg = kw_arg
 
     def visit_ListComp(self, node: ast.Lambda) -> None:
+        if self.current_function is None:
+            raise UnsupportedException(node, 'comprehension at module level')
         name = construct_lambda_prefix(node.lineno, node.col_offset)
         target = node.generators[0].target
         local_name = name + '$' + target.id
