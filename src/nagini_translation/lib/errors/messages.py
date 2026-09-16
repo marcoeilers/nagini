@@ -260,7 +260,8 @@ INVALID_PROGRAM_MESSAGES = {
         'a permission expression (Acc/Rd/Wildcard or a predicate instance) '
         'appears in a position that only accepts pure boolean expressions: '
         'the postcondition of a @Pure function, an Assume, the body of an '
-        'Unfolding, a branch or loop condition, or under a negation. '
+        'Unfolding, a branch or loop condition, a comparison operand, the '
+        'antecedent of an Implies, or under a negation. '
         'Permissions are allowed in the contracts and loop invariants of '
         'impure methods, in @Pure preconditions, in Assert, and in '
         'predicate bodies.',

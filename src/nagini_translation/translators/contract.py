@@ -1143,7 +1143,9 @@ class ContractTranslator(CommonTranslator):
             return self.translate_raised_exception(node, ctx)
         elif func_name in ('Acc', 'Rd', 'Wildcard'):
             if not impure:
-                raise InvalidProgramException(node, 'permission.in.pure.context')
+                raise InvalidProgramException(
+                    node, 'invalid.contract.position' if statement
+                    else 'permission.in.pure.context')
             if func_name == 'Rd':
                 perm = self.get_arp_for_context(node, ctx)
             elif func_name == 'Wildcard':
