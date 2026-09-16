@@ -61,7 +61,7 @@ def test_id_unaffected_by_heap_changes(x: A) -> None:
     a = id(x)
     y = A()
     assert a == id(x)
-    assert Old(id(x)) == id(x)
+    Assert(Old(id(x)) == id(x))
 
 
 def test_id_in_invariant(x: A) -> None:
