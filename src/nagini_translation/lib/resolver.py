@@ -35,7 +35,6 @@ from nagini_translation.lib.constants import (
 from nagini_translation.lib.program_nodes import (
     ContainerInterface,
     GenericType,
-    MethodType,
     OptionalType,
     PythonClass,
     PythonField,
@@ -280,13 +279,11 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                     target.type_vars):
                 # This is a call to a constructor of a generic class; it's not
                 # enough to just return the class, we need the entire type with
-                # type arguments. We take them from the context the call
-                # appears in (an annotated assignment target or the callee
-                # parameter it is passed to).
-                context_type = _type_from_context(node, target, containers,
-                                                  container)
-                if context_type is not None:
-                    return context_type
+                # type arguments, which mypy inferred from the arguments and
+                # the context.
+                recorded = _recorded_type(node, module)
+                if recorded is not None:
+                    return recorded
                 if (target.name in (PSEQ_TYPE, PSET_TYPE, PMSET_TYPE) and
                           isinstance(node, ast.Call) and node.args):
                     arg_types = [get_type(arg, containers, container)
@@ -337,13 +334,17 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         if isinstance(node.value, float):
             return module.global_module.classes[FLOAT_TYPE]
     elif isinstance(node, ast.Tuple):
-        args = [get_type(arg, containers, container) for arg in node.elts]
+        typ = _recorded_type(node, module)
+        args = (typ.type_args if typ is not None else
+                [get_type(arg, containers, container) for arg in node.elts])
         if len(args) > 9 and len({a.name for a in args}) == 1:
             # Beyond the fixed arities a homogeneous literal is translated as a
             # variadic tuple (ExpressionTranslator.create_tuple).
             res = GenericType(module.global_module.classes[TUPLE_TYPE], [args[0]])
             res.exact_length = False
             return res
+        if typ is not None:
+            return typ
         return GenericType(module.global_module.classes[TUPLE_TYPE],
                            args)
     elif isinstance(node, ast.Subscript):
@@ -459,6 +460,17 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         raise UnsupportedException(node)
 
 
+def _recorded_type(node: ast.AST, module: PythonModule) -> Optional[PythonType]:
+    """
+    The type mypy inferred for the collection literal or constructor call
+    ``node``, as recorded by the analyzer; None for a node it did not see
+    (one without a position, or typed with Any).
+    """
+    if not hasattr(node, 'lineno'):
+        return None
+    return module.literal_types.get((node.lineno, node.col_offset))
+
+
 def _get_collection_literal_type(node: ast.AST, arg_fields: List[str],
                                  coll_type: str, module: PythonModule,
                                  containers: List[ContainerInterface],
@@ -467,101 +479,23 @@ def _get_collection_literal_type(node: ast.AST, arg_fields: List[str],
     Assuming ``node`` is a collection literal, ``coll_type`` is the type of the
     collection (e.g. 'list'), and ``arg_fields`` contains the fields of the
     literal which contain the contents of the literal (e.g. 'keys' and 'values'
-    for a dict), returns the type of the collection.
+    for a dict), returns the type of the collection: the one mypy inferred if
+    the analyzer recorded it, else the elements' common supertype.
     """
-    coll_class = module.global_module.classes[coll_type]
-    empty = not all(getattr(node, arg_field) for arg_field in arg_fields)
-    # A non-empty literal's elements determine its type; the callee parameter
-    # is consulted only when there are no elements (an annotated assignment
-    # target always wins, as before).
-    context_type = _type_from_context(node, coll_class, containers, container,
-                                      from_call=empty)
-    if context_type is not None:
-        return context_type
-    if not empty:
+    recorded = _recorded_type(node, module)
+    if recorded is not None:
+        return recorded
+    if all(getattr(node, arg_field) for arg_field in arg_fields):
         args = []
         for arg_field in arg_fields:
             arg_types = [get_type(arg, containers, container) for arg in
                          getattr(node, arg_field)]
             args.append(common_supertype(arg_types))
     else:
-        # No elements and no typed context (e.g. `len([])`, or a parameter
-        # typed object): the element type is object.
         object_class = module.global_module.classes[OBJECT_TYPE]
         args = [object_class for arg_field in arg_fields]
     return GenericType(module.global_module.classes[coll_type],
                        args)
-
-
-def _type_from_context(node: ast.AST, cls: PythonClass,
-                       containers: List[ContainerInterface],
-                       container: PythonNode,
-                       from_call: bool = True) -> Optional[GenericType]:
-    """
-    Infers the full generic type of a constructor call or collection literal
-    ``node`` of class ``cls`` from where it appears: the annotation of the
-    target it is assigned to, or (if ``from_call``) the parameter of the call
-    it is passed to (positional or keyword, ``Optional`` unwrapped). Returns
-    None if the context provides no type for ``cls``; a parameter type that
-    still mentions the callee's own type variables does not count.
-    """
-    parent = getattr(node, '_parent', None)
-    if isinstance(parent, (ast.Assign, ast.AnnAssign)):
-        target = (parent.targets[0] if isinstance(parent, ast.Assign)
-                  else parent.target)
-        context_type = get_type(target, containers, container)
-    else:
-        if not from_call:
-            return None
-        if isinstance(parent, ast.keyword):
-            parent = getattr(parent, '_parent', None)
-        if not isinstance(parent, ast.Call):
-            return None
-        context_type = _call_param_type(parent, node, containers, container)
-        if isinstance(context_type, OptionalType):
-            context_type = context_type.optional_type
-        if _mentions_type_var(context_type):
-            # The callee's own type variables are not bound at the call site.
-            return None
-    if isinstance(context_type, OptionalType):
-        context_type = context_type.optional_type
-    if (isinstance(context_type, GenericType)
-            and context_type.python_class == cls):
-        return context_type
-    return None
-
-
-def _mentions_type_var(typ: PythonType) -> bool:
-    if isinstance(typ, TypeVar):
-        return True
-    return any(_mentions_type_var(arg)
-               for arg in getattr(typ, 'type_args', None) or [] if arg)
-
-
-def _call_param_type(call: ast.Call, arg: ast.AST,
-                     containers: List[ContainerInterface],
-                     container: PythonNode) -> Optional[PythonType]:
-    """
-    Returns the declared type of the parameter that ``arg`` (a positional or
-    keyword argument of ``call``) is passed to, or None if the callee or the
-    parameter cannot be determined (builtins, contract functions, *args).
-    """
-    target = get_target(call.func, containers, container)
-    if isinstance(target, PythonClass):
-        target = target.get_method('__init__')
-    if not isinstance(target, PythonMethod):
-        return None
-    params = list(target.args.values())
-    if target.cls is not None and target.method_type != MethodType.static_method:
-        # self / cls is not passed explicitly.
-        params = params[1:]
-    for index, positional in enumerate(call.args):
-        if positional is arg:
-            return params[index].type if index < len(params) else None
-    for keyword in call.keywords:
-        if keyword.value is arg and keyword.arg in target.args:
-            return target.args[keyword.arg].type
-    return None
 
 
 def _get_call_type(node: ast.Call, module: PythonModule,
@@ -596,13 +530,11 @@ def _get_call_type(node: ast.Call, module: PythonModule,
             call_target.type_vars):
         # This is a call to a constructor of a generic class; it's not
         # enough to just return the class, we need the entire type with
-        # type arguments. We take them from the context the call
-        # appears in (an annotated assignment target or the callee
-        # parameter it is passed to).
-        context_type = _type_from_context(node, call_target, containers,
-                                          container)
-        if context_type is not None:
-            return context_type
+        # type arguments, which mypy inferred from the arguments and the
+        # context.
+        recorded = _recorded_type(node, module)
+        if recorded is not None:
+            return recorded
         if (call_target.name in (PSEQ_TYPE, PSET_TYPE, PMSET_TYPE) and
                 node.args):
             arg_types = [get_type(arg, containers, container)

@@ -168,6 +168,9 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
         self.defined_var = None
         self.names_var = None
         self.ghost_names = types.ghost_names[type_prefix] if type_prefix in types.ghost_names else set()
+        # (line, column) -> the type mypy inferred for the collection literal or
+        # constructor call there, recorded by the analyzer.
+        self.literal_types = {}
         if global_module and type_prefix != '__main__':
             self.add_builtin_vars()
 

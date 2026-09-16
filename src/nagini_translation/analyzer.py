@@ -496,13 +496,29 @@ class Analyzer(ast.NodeVisitor):
                         self.visit(item, node)
 
     def visit(self, child_node: ast.AST, parent: ast.AST) -> None:
-        child_node._parent = parent
+        self.attach(child_node, parent)
         method = 'visit_' + child_node.__class__.__name__
         visitor = getattr(self, method, self.visit_default)
         visitor(child_node)
 
-    def visit_but_ignore(self, node: ast.AST, parent: ast.AST) -> None:
+    def attach(self, node: ast.AST, parent: ast.AST) -> None:
+        """
+        Links the node to its parent and, for a collection literal or a
+        constructor call, records the type mypy inferred for it in the module's
+        literal_types; the resolver takes it from there.
+        """
         node._parent = parent
+        if (isinstance(node, (ast.List, ast.Set, ast.Dict, ast.Tuple, ast.Call))
+                and hasattr(node, 'lineno')):
+            # Nodes the analyzer synthesizes (dataclass methods) have no
+            # position, and mypy never saw them.
+            position = (node.lineno, node.col_offset)
+            mypy_type = self.types.get_expr_type(self.module.type_prefix, *position)
+            if mypy_type is not None:
+                self.module.literal_types[position] = self.convert_type(mypy_type, node)
+
+    def visit_but_ignore(self, node: ast.AST, parent: ast.AST) -> None:
+        self.attach(node, parent)
         for field in node._fields:
             fieldval = getattr(node, field)
             if isinstance(fieldval, ast.AST):
@@ -1799,6 +1815,9 @@ class Analyzer(ast.NodeVisitor):
             raise InvalidProgramException(node, 'partial.type', message=msg)
         elif self.types.is_literal_type(mypy_type):
             return self.convert_type(mypy_type.fallback, node, bound_type_vars)
+        elif self.types.is_uninhabited_type(mypy_type):
+            # Never: the element type of an empty literal in an untyped position.
+            result = self.module.global_module.classes[OBJECT_TYPE]
         else:
             name = ""
             if hasattr(node, 'id'):

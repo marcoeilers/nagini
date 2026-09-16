@@ -25,6 +25,13 @@ from typing import List, Optional
 logger = logging.getLogger('nagini_translation.lib.typeinfo')
 
 
+def contains_any(type: mypy.types.Type) -> bool:
+    if isinstance(type, mypy.types.AnyType):
+        return True
+    parts = list(getattr(type, 'args', ())) + list(getattr(type, 'items', ()))
+    return any(contains_any(part) for part in parts)
+
+
 def col(node) -> Optional[int]:
     """
     Returns the column in a mypy mypy AST node, if any.
@@ -46,6 +53,7 @@ class TypeVisitor(TraverserVisitor):
         self.alt_types = {}
         self.ghost_names = {}
         self.type_map = type_map
+        self.expr_types = {}
         self.path = path
         self.ignored_lines = ignored_lines
         self.type_aliases = {}
@@ -240,9 +248,38 @@ class TypeVisitor(TraverserVisitor):
                 msg = self.path + ':' + str(node.line) + ': error: MarkGhost may only define ghost names once.'
                 raise TypeException([msg])
             curr_set.add(ghost_type.name)
+        if (isinstance(node.callee, mypy.nodes.RefExpr) and
+                isinstance(node.callee.node, mypy.nodes.TypeInfo)):
+            self.record_expr_type(node)
         for a in node.args:
             self.visit(a)
         self.visit(node.callee)
+
+    def visit_list_expr(self, node: mypy.nodes.ListExpr):
+        self.record_expr_type(node)
+        super().visit_list_expr(node)
+
+    def visit_set_expr(self, node: mypy.nodes.SetExpr):
+        self.record_expr_type(node)
+        super().visit_set_expr(node)
+
+    def visit_dict_expr(self, node: mypy.nodes.DictExpr):
+        self.record_expr_type(node)
+        super().visit_dict_expr(node)
+
+    def visit_tuple_expr(self, node: mypy.nodes.TupleExpr):
+        self.record_expr_type(node)
+        super().visit_tuple_expr(node)
+
+    def record_expr_type(self, node: mypy.nodes.Expression):
+        """
+        Records mypy's type for a collection literal or a constructor call,
+        whose type arguments mypy infers from the context (an annotation, the
+        callee's parameter, an enclosing literal) as well as the elements.
+        """
+        expr_type = self.type_map.get(node)
+        if expr_type is not None and not contains_any(expr_type):
+            self.expr_types[(node.line, col(node))] = expr_type
 
     def type_of(self, node):
         if hasattr(node, 'node') and isinstance(node.node, mypy.nodes.MypyFile):
@@ -305,6 +342,7 @@ class TypeInfo:
     def __init__(self):
         self.all_types = {}
         self.alt_types = {}
+        self.expr_types = {}
         self.files = {}
         self.type_aliases = {}
         self.type_vars = {}
@@ -517,6 +555,8 @@ class TypeInfo:
                 visitor.visit(file)
                 self.all_types.update(visitor.all_types)
                 self.alt_types.update(visitor.alt_types)
+                for (line, column), expr_type in visitor.expr_types.items():
+                    self.expr_types[(name, line, column)] = expr_type
                 self.type_aliases.update(visitor.type_aliases)
                 self.type_vars.update(visitor.type_vars)
                 self.ghost_names.update(visitor.ghost_names)
@@ -555,6 +595,13 @@ class TypeInfo:
                 return self.get_type(prefix[:len(prefix) - 1], name)
         else:
             return result, alts
+
+    def get_expr_type(self, module: str, line: int, column: int):
+        """
+        Looks up the recorded type of the collection literal or constructor
+        call at the given position of the given module, if any.
+        """
+        return self.expr_types.get((module, line, column))
 
     def get_func_type(self, prefix: List[str]):
         """
