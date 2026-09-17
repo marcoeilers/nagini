@@ -277,7 +277,10 @@ class GhostChecker(ast.NodeVisitor):
 
         if current_function is None:
             raise InvalidProgramException(node, 'invalid.ghost.functionDef', f"Couldn't correctly resolve function {node.name}")
-        
+        if current_function.node is None:
+            # Resolved to a builtin function that this definition fails to override.
+            raise InvalidProgramException(node, 'invalid.override')
+
         self.ctx.current_function = current_function
         old_ghost_ctx = self.in_ghost_ctx
         self.in_ghost_ctx = current_function.is_ghost
