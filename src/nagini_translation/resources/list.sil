@@ -20,7 +20,7 @@ function list___contains__(self: Ref, item: Ref): Bool
     decreases _
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     requires acc(self.list_acc, wildcard)
-    ensures result == exists i: Ref :: object___eq__(item, i) && i in self.list_acc
+    ensures result == __seq_ref_contains(self.list_acc, item)
     ensures item in self.list_acc ==> result
 
 function list___bool__(self: Ref) : Bool
