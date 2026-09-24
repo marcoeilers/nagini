@@ -787,9 +787,9 @@ class GhostChecker(ast.NodeVisitor):
         modules.extend(self.current_module.get_included_modules(()))
         modules.append(self.global_module)
         for module in modules:
-            cls = getattr(module, 'classes', {}).get(name)
-            if cls is not None:
-                return cls
+            classes = getattr(module, 'classes', {})
+            if name in classes:
+                return classes[name]
         return None
 
     def get_mixed_return_parts(self, ann: Optional[annotation_t]
