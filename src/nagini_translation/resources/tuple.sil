@@ -179,6 +179,7 @@ function tuple___contains__(self: Ref, item: Ref): Bool
 
 function tuple___eq__(self: Ref, other: Ref): Bool
     decreases _
+    ensures result == object___eq__(self, other)
     ensures result <==>
             (tuple___len__(self) == tuple___len__(other) &&
              (forall i: Int :: { tuple___getitem__(self, i) }
