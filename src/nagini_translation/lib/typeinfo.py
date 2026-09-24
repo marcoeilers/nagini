@@ -13,6 +13,7 @@ import os
 import sys
 
 from mypy.build import BuildSource
+from mypy.checkexpr import has_any_type
 from nagini_translation.lib.constants import IGNORED_IMPORTS, LITERALS
 from nagini_translation.mypy_patches.visitor import TraverserVisitor
 
@@ -23,13 +24,6 @@ from typing import List, Optional
 
 
 logger = logging.getLogger('nagini_translation.lib.typeinfo')
-
-
-def contains_any(type: mypy.types.Type) -> bool:
-    if isinstance(type, mypy.types.AnyType):
-        return True
-    parts = list(getattr(type, 'args', ())) + list(getattr(type, 'items', ()))
-    return any(contains_any(part) for part in parts)
 
 
 def col(node) -> Optional[int]:
@@ -278,7 +272,7 @@ class TypeVisitor(TraverserVisitor):
         callee's parameter, an enclosing literal) as well as the elements.
         """
         expr_type = self.type_map.get(node)
-        if expr_type is not None and not contains_any(expr_type):
+        if expr_type is not None and not has_any_type(expr_type):
             self.expr_types[(node.line, col(node))] = expr_type
 
     def type_of(self, node):
