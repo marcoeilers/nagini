@@ -535,7 +535,6 @@ class VerificationService:
                arp: bool = False, counterexample: bool = False,
                ignore_global: bool = False, viper_args: List[str] = None,
                include_viper: bool = False, translate_only: bool = False,
-               int_bitops_size: int = None,
                job_token: str = None) -> VerifyResult:
         """Translate and verify the file at ``path`` and return structured results.
 
@@ -547,10 +546,7 @@ class VerificationService:
         (the CLI's ``--viper-arg``, as a list). ``include_viper`` returns the
         translated Viper program in ``viper_program``. ``translate_only`` stops
         after translation (mypy + Nagini-to-Viper): success means the file is a
-        valid Nagini program; no proof obligations are checked. ``int_bitops_size`` sets
-        the bitvector width used to encode int bitwise operations for this
-        request; like :meth:`reconfigure` it is sticky (subsequent requests
-        keep it) and reloads the Silver resources only when the width changes.
+        valid Nagini program; no proof obligations are checked.
         """
         path = os.path.abspath(path)
         start = time.time()
@@ -582,15 +578,13 @@ class VerificationService:
                                                  counterexample,
                                                  ignore_global, viper_args,
                                                  include_viper, job_token,
-                                                 translate_only=translate_only,
-                                                 int_bitops_size=int_bitops_size)
+                                                 translate_only=translate_only)
             else:
                 with self._state_lock:
                     result = self._verify_serial(path, selected, base_dir, arp,
                                                  counterexample, ignore_global,
                                                  viper_args, include_viper,
-                                                 translate_only=translate_only,
-                                                 int_bitops_size=int_bitops_size)
+                                                 translate_only=translate_only)
         except Exception as e:
             # Last-resort conversion of internal crashes (translator bugs,
             # unexpected error shapes) into a structured result: callers get a
@@ -714,18 +708,6 @@ class VerificationService:
             logging.exception('Failed to record verification attempt for %s.',
                               path)
             return None
-
-    def _apply_bitops_size(self, size: int) -> None:
-        """Switch the bitvector width for subsequent translations; sticky, like
-        :meth:`reconfigure`. Must be called while holding the state lock.
-        No-op when ``size`` is ``None`` or already current.
-        """
-        if size is None or size == self._bv_size:
-            return
-        self._bv_size = size
-        import nagini_translation.main as main_module
-        main_module.sil_programs = load_sil_files(self.jvm, self._bv_size,
-                                                  self._sif, self._float_encoding)
 
     def _reset_obligations(self) -> None:
         """Restore the obligation auto-detection setting before a translation.
@@ -853,8 +835,7 @@ class VerificationService:
 
     def _verify_concurrent(self, path, selected, base_dir, counterexample,
                            ignore_global, viper_args, include_viper,
-                           job_token, translate_only=False,
-                           int_bitops_size=None) -> VerifyResult:
+                           job_token, translate_only=False) -> VerifyResult:
         from nagini_translation.viper_server import (build_carbon_backend_args,
                                                      build_silicon_backend_args,
                                                      get_viper_server_manager)
@@ -863,7 +844,6 @@ class VerificationService:
         start = time.time()
         # 1. Translate and snapshot this job's error-mapping state (serialized).
         with self._state_lock:
-            self._apply_bitops_size(int_bitops_size)
             self._reset_obligations()
             try:
                 translated = translate(
@@ -1082,11 +1062,9 @@ class VerificationService:
 
     def _verify_serial(self, path, selected, base_dir, arp,
                        counterexample, ignore_global, viper_args,
-                       include_viper, translate_only=False,
-                       int_bitops_size=None) -> VerifyResult:
+                       include_viper, translate_only=False) -> VerifyResult:
         start = time.time()
         try:
-            self._apply_bitops_size(int_bitops_size)
             self._reset_obligations()
             selected_set = set(selected) if selected else set()
             translated = translate(

@@ -267,7 +267,6 @@ async def verify_file(path: str, methods: Optional[List[str]] = None,
                       viper_args: Optional[List[str]] = None,
                       include_viper: bool = False,
                       translate_only: bool = False,
-                      int_bitops_size: Optional[int] = None,
                       job_token: Optional[str] = None) -> dict:
     """Verify a Nagini Python file.
 
@@ -311,7 +310,7 @@ async def verify_file(path: str, methods: Optional[List[str]] = None,
         path, selected=selected, counterexample=counterexample, base_dir=base_dir,
         ignore_global=ignore_global, viper_args=viper_args,
         include_viper=include_viper, translate_only=translate_only,
-        int_bitops_size=int_bitops_size, job_token=job_token))
+        job_token=job_token))
     return _slim_debug(result.to_dict())
 
 
@@ -321,7 +320,6 @@ async def verify_method(path: str, methods: List[str],
                         viper_args: Optional[List[str]] = None,
                         include_viper: bool = False,
                         translate_only: bool = False,
-                        int_bitops_size: Optional[int] = None,
                         job_token: Optional[str] = None) -> dict:
     """Verify selected methods of a file (fast, via Nagini's --select).
 
@@ -335,7 +333,7 @@ async def verify_method(path: str, methods: List[str],
         path, selected=_as_selected(methods), counterexample=counterexample,
         viper_args=viper_args, include_viper=include_viper,
         translate_only=translate_only,
-        int_bitops_size=int_bitops_size, job_token=job_token))
+        job_token=job_token))
     return _slim_debug(result.to_dict())
 
 
@@ -345,7 +343,6 @@ async def verify_snippet(code: str, counterexample: bool = False,
                          viper_args: Optional[List[str]] = None,
                          include_viper: bool = False,
                          translate_only: bool = False,
-                         int_bitops_size: Optional[int] = None,
                          job_token: Optional[str] = None) -> dict:
     """Verify an inline snippet of Nagini Python code (written to a temp file).
 
@@ -361,7 +358,7 @@ async def verify_snippet(code: str, counterexample: bool = False,
             tmp_path, counterexample=counterexample, base_dir=tmp_dir,
             ignore_global=ignore_global, viper_args=viper_args,
             include_viper=include_viper, translate_only=translate_only,
-            int_bitops_size=int_bitops_size, job_token=job_token))
+            job_token=job_token))
         return _slim_debug(result.to_dict())
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
