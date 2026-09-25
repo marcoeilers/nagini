@@ -147,7 +147,9 @@ class PermTranslator(CommonTranslator):
         stmt, res = self.translate_expr(node, ctx)
         if stmt:
             raise InvalidProgramException(node, 'purity.violated')
-        return  res
+        if res.typ() not in (self.viper.Int, self.viper.Perm):
+            raise InvalidProgramException(node, 'invalid.perm.amount')
+        return res
 
     def translate_perm_Attribute(self, node: ast.Attribute, ctx: Context) -> Expr:
         stmt, expr = self.translate_expr(node, ctx, self.viper.Int)

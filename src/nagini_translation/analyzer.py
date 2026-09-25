@@ -6,6 +6,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import ast
+import builtins
 import logging
 import os
 import nagini_contracts.io_builtins
@@ -24,6 +25,7 @@ from nagini_contracts.obligations import OBLIGATION_CONTRACT_FUNCS
 from nagini_translation.analyzer_io import IOOperationAnalyzer
 from nagini_translation.external.ast_util import mark_text_ranges
 from nagini_translation.lib.constants import (
+    BUILTIN_PREDICATES,
     CALLABLE_TYPE,
     EXTENDABLE_BUILTINS,
     IGNORED_IMPORTS,
@@ -55,7 +57,10 @@ from nagini_translation.lib.program_nodes import (
     TypeVar,
     UnionType,
 )
-from nagini_translation.lib.resolver import get_target as do_get_target
+from nagini_translation.lib.resolver import (
+    _get_subscript_type,
+    get_target as do_get_target,
+)
 from nagini_translation.lib.typedefs import Expr
 from nagini_translation.lib.typeinfo import TypeInfo
 from nagini_translation.lib.util import (
@@ -214,8 +219,28 @@ class Analyzer(ast.NodeVisitor):
                 if len(stmt.names) == 1 and stmt.names[0].name == '*':
                     names = None
                 else:
-                    names = [(name.name, name.asname if name.asname else None)
-                             for name in stmt.names] # TODO rename?
+                    names = []
+                    for name in stmt.names:
+                        # A member that mypy knows as a module is a submodule
+                        # import (`from pkg import helpers`): bind it into the
+                        # importing module's namespaces — the same shape as
+                        # `import pkg.helpers as helpers` — instead of treating
+                        # it as a name defined inside the package.
+                        member_module = module_name + '.' + name.name
+                        if member_module in self.types.files:
+                            member_path = os.path.abspath(
+                                self.types.files[member_module])
+                            self.add_module(member_path, abs_path,
+                                            name.asname if name.asname
+                                            else name.name, parse_result)
+                        else:
+                            names.append((name.name,
+                                          name.asname if name.asname else None))
+                    if not names:
+                        # Every member was a submodule: keep the package itself
+                        # in from_imports (so its own statements still execute
+                        # at the import site) but let the view expose nothing.
+                        names = [('$nothing', None)]
                 self.add_module(path, abs_path, None, parse_result, names)
         self.module_index = self.module_paths.index(abs_path) + 1
 
@@ -471,13 +496,29 @@ class Analyzer(ast.NodeVisitor):
                         self.visit(item, node)
 
     def visit(self, child_node: ast.AST, parent: ast.AST) -> None:
-        child_node._parent = parent
+        self.attach(child_node, parent)
         method = 'visit_' + child_node.__class__.__name__
         visitor = getattr(self, method, self.visit_default)
         visitor(child_node)
 
-    def visit_but_ignore(self, node: ast.AST, parent: ast.AST) -> None:
+    def attach(self, node: ast.AST, parent: ast.AST) -> None:
+        """
+        Links the node to its parent and, for a collection literal or a
+        constructor call, records the type mypy inferred for it in the module's
+        literal_types; the resolver takes it from there.
+        """
         node._parent = parent
+        if (isinstance(node, (ast.List, ast.Set, ast.Dict, ast.Tuple, ast.Call))
+                and hasattr(node, 'lineno')):
+            # Nodes the analyzer synthesizes (dataclass methods) have no
+            # position, and mypy never saw them.
+            position = (node.lineno, node.col_offset)
+            mypy_type = self.types.get_expr_type(self.module.type_prefix, *position)
+            if mypy_type is not None:
+                self.module.literal_types[position] = self.convert_type(mypy_type, node)
+
+    def visit_but_ignore(self, node: ast.AST, parent: ast.AST) -> None:
+        self.attach(node, parent)
         for field in node._fields:
             fieldval = getattr(node, field)
             if isinstance(fieldval, ast.AST):
@@ -568,6 +609,22 @@ class Analyzer(ast.NodeVisitor):
         else:
             # Class doesn't exist yet, create it.
             superclass = self.global_module.classes[OBJECT_TYPE] if name != OBJECT_TYPE else None
+            builtin_val = getattr(builtins, name, None)
+            if (not nested_declaration and isinstance(builtin_val, type) and
+                    name != 'Exception' and
+                    issubclass(builtin_val, Exception) and
+                    'Exception' in self.global_module.classes):
+                # An unmodeled builtin exception class (e.g. ValueError): give it
+                # the modeled Exception as superclass so that it and its user
+                # subclasses sit inside the modeled exception hierarchy (and are
+                # caught by `except Exception`). BaseException-only descendants
+                # like KeyboardInterrupt deliberately stay below object.
+                # Register it in the global module: the name is process-global,
+                # so every referencing module must resolve to the same class —
+                # per-module copies are distinct nominal types, making a
+                # cross-module Exsures/except pair unprovable.
+                superclass = self.global_module.classes['Exception']
+                creation_scope = self.global_module
             cls = self.node_factory.create_python_class(name, creation_scope,
                                                         self.node_factory,
                                                         superclass=superclass)
@@ -862,6 +919,15 @@ class Analyzer(ast.NodeVisitor):
                     self.module.ghost_names.add(new_ghost_name)
 
         self.analyze_import(module_name)
+        for name in node.names:
+            if name.name == '*':
+                continue
+            # Members that are submodules (`from pkg import helpers`) are
+            # bound as namespace imports during collect_imports; their
+            # contents must be analyzed like any imported module.
+            member_module = module_name + '.' + name.name
+            if member_module in self.types.files:
+                self.analyze_import(member_module)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         if self.current_function:
@@ -869,6 +935,13 @@ class Analyzer(ast.NodeVisitor):
         name = node.name
         if self._is_illegal_magic_method_name(name):
             raise InvalidProgramException(node, 'illegal.magic.method')
+        # Calls to these dispatch on the bare name, so a user definition would be
+        # silently shadowed by the built-in.
+        if name in BUILTIN_PREDICATES:
+            raise InvalidProgramException(
+                node, 'builtin.predicate.shadowed',
+                f'"{name}" is a built-in Nagini predicate name and cannot be '
+                'redefined; choose a different name.')
         assert isinstance(name, str)
         if self.is_io_operation(node):
             self.io_operation_analyzer.analyze_io_operation(node)
@@ -1143,6 +1216,8 @@ class Analyzer(ast.NodeVisitor):
             self.current_function.kw_arg = kw_arg
 
     def visit_ListComp(self, node: ast.Lambda) -> None:
+        if self.current_function is None:
+            raise UnsupportedException(node, 'comprehension at module level')
         name = construct_lambda_prefix(node.lineno, node.col_offset)
         target = node.generators[0].target
         local_name = name + '$' + target.id
@@ -1286,6 +1361,21 @@ class Analyzer(ast.NodeVisitor):
                     (node.args, self._aliases.copy()))
             elif node.func.id == 'Exsures':
                 exception = self.get_target(node.args[0], self.module)
+                if exception is None and isinstance(node.args[0], ast.Name):
+                    builtin_val = getattr(builtins, node.args[0].id, None)
+                    if (isinstance(builtin_val, type)
+                            and issubclass(builtin_val, Exception)):
+                        # Builtin exception: create it under the modeled
+                        # Exception, like except-handler analysis does.
+                        exception = self.find_or_create_class(node.args[0].id)
+                if exception is None:
+                    # Unresolvable (a BaseException-only builtin, or a typo).
+                    raise InvalidProgramException(
+                        node, 'invalid.program',
+                        message='Exsures names an exception type Nagini '
+                                'cannot resolve: {}. Use a module-defined '
+                                'Exception subclass.'.format(
+                                    ast.unparse(node.args[0])))
                 if exception not in self.current_function.declared_exceptions:
                     self.current_function.declared_exceptions[exception] = []
                 self.current_function.declared_exceptions[exception].append(
@@ -1670,7 +1760,8 @@ class Analyzer(ast.NodeVisitor):
         elif self.types.is_instance_type(mypy_type):
             result = self.convert_type(mypy_type.type, node)
             if mypy_type.args:
-                args = [self.convert_type(arg, node) for arg in mypy_type.args]
+                args = [self.convert_type(arg, node, bound_type_vars)
+                        for arg in mypy_type.args]
                 if mypy_type.type.name == 'enumerate':
                     # We cheat and represent type enumerate as a list of pairs.
                     assert len(args) == 1
@@ -1697,7 +1788,7 @@ class Analyzer(ast.NodeVisitor):
                     # without falling back (it is definitely not an ADT).
                     pass
             # Regular tuple handling without falling back
-            args = [self.convert_type(arg_type, node)
+            args = [self.convert_type(arg_type, node, bound_type_vars)
                     for arg_type in mypy_type.items]
             result = GenericType(self.module.global_module.classes[TUPLE_TYPE],
                                  args)
@@ -1724,6 +1815,9 @@ class Analyzer(ast.NodeVisitor):
             raise InvalidProgramException(node, 'partial.type', message=msg)
         elif self.types.is_literal_type(mypy_type):
             return self.convert_type(mypy_type.fallback, node, bound_type_vars)
+        elif self.types.is_uninhabited_type(mypy_type):
+            # Never: the element type of an empty literal in an untyped position.
+            result = self.module.global_module.classes[OBJECT_TYPE]
         else:
             name = ""
             if hasattr(node, 'id'):
@@ -1964,6 +2058,9 @@ class Analyzer(ast.NodeVisitor):
             if isinstance(cls, PythonType):
                 return cls
             raise UnsupportedException(node)
+        elif isinstance(node, ast.Subscript):
+            return _get_subscript_type(self.typeof(node.value), self.module,
+                                       node)
         else:
             raise UnsupportedException(node)
 
@@ -1999,6 +2096,17 @@ class Analyzer(ast.NodeVisitor):
         try_block.finally_name = finally_name
         self.stmt_container.labels.append(finally_name)
         self.stmt_container.try_blocks.append(try_block)
+
+    def visit_Raise(self, node: ast.Raise) -> None:
+        # Raising a builtin exception must create its class in the modeled
+        # hierarchy, like except-handler analysis does.
+        target = node.exc.func if isinstance(node.exc, ast.Call) else node.exc
+        if isinstance(target, ast.Name):
+            builtin_val = getattr(builtins, target.id, None)
+            if (isinstance(builtin_val, type)
+                    and issubclass(builtin_val, Exception)):
+                self.find_or_create_class(target.id)
+        self.visit_default(node)
 
     def visit_Try(self, node: ast.Try) -> None:
         """

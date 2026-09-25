@@ -40,6 +40,11 @@ class ViperServerManager:
         self.server = None
         self.executor = None
         self._started = False
+        # Optional path for ViperServer's journal (its --logFile). When unset,
+        # ViperServer writes to a throwaway temp file, which is lost with the
+        # environment (e.g. a container's /tmp) — set this before the first
+        # verification to keep backend exception details diagnosable.
+        self.log_file = None
 
     def start(self) -> None:
         if self._started:
@@ -50,9 +55,10 @@ class ViperServerManager:
         self._configure_logging()
         # Server-level configuration (ScallopConf parsed from CLI-style args).
         # A high job limit lets several verifications run concurrently.
-        server_args = list_to_seq(
-            ['--logLevel', 'ERROR', '--maximumActiveJobs', '1024'],
-            jvm, jvm.java.lang.String)
+        args = ['--logLevel', 'ERROR', '--maximumActiveJobs', '1024']
+        if self.log_file:
+            args += ['--logFile', self.log_file]
+        server_args = list_to_seq(args, jvm, jvm.java.lang.String)
         cfg = jvm.viper.server.ViperConfig(server_args)
         # Execution context with the library's default actor-system/thread-pool
         # settings (None => automatic thread count).
@@ -117,9 +123,31 @@ class ViperServerManager:
         return self.jvm.viper.server.core.ViperCoreServerUtils.getResultsFuture(
             self.server, job_id, self.executor)
 
-    def await_result(self, job_id):
-        """Block (concurrently across jobs) until ``job_id``'s result is ready."""
-        return self._await(self.result_future(job_id))
+    def await_result(self, job_id, timeout_ms=None):
+        """Block (concurrently across jobs) until ``job_id``'s result is ready.
+
+        With a finite ``timeout_ms`` the wait raises
+        ``java.util.concurrent.TimeoutException`` once it elapses; the caller is
+        then responsible for cancelling the job (the job itself keeps running).
+        """
+        return self._await(self.result_future(job_id), timeout_ms=timeout_ms)
+
+    def messages_future(self, job_id):
+        return self.jvm.viper.server.core.ViperCoreServerUtils.getMessagesFuture(
+            self.server, job_id, self.executor)
+
+    def await_messages(self, job_id, timeout_ms=None):
+        """Block until ``job_id``'s message stream completes; returns the
+        Scala ``List[Message]`` of everything the job reported.
+
+        Unlike ``await_result`` (whose future *asserts* that the stream holds
+        exactly one overall success/failure message and hence fails uselessly
+        for jobs that died or were cancelled), this completes with the partial
+        stream in every case, letting the caller classify the outcome — an
+        overall result message, an ``ExceptionReport`` (backend crash), or
+        neither (cancellation). Timeout semantics are as in ``await_result``.
+        """
+        return self._await(self.messages_future(job_id), timeout_ms=timeout_ms)
 
     def cancel_job(self, job_id) -> None:
         """Precisely stop a single running job by sending its actor StopVerification."""

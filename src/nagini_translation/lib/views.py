@@ -26,24 +26,38 @@ class CombinedDict:
             self.names[new_name] = name
 
     def __getitem__(self, item):
+        return self._getitem(item, frozenset())
+
+    def _getitem(self, item, visited: frozenset):
         key = item
         if self.names:
             if not key in self.names:
                 raise KeyError(item)
             key = self.names[key]
         for d in self.dicts:
-            if key in d:
-                return d[key]
+            if id(d) in visited:
+                continue
+            if _view_contains(d, key, visited):
+                return _view_getitem(d, key, visited)
         raise KeyError(item)
 
     def __contains__(self, item):
-        return self.contains(item, None)
+        return self._contains(item, frozenset())
 
     def contains(self, item, caller_module):
         """
-        Checks if the given item is contained anywhere in this view, excluding anything
-        represented by ``caller_module`` (to prevent infinite recursion in case of cyclic
-        imports).
+        Checks if the given item is contained anywhere in this view, excluding
+        ``caller_module`` (compatibility wrapper around ``_contains``).
+        """
+        visited = frozenset() if caller_module is None else frozenset({id(caller_module)})
+        return self._contains(item, visited)
+
+    def _contains(self, item, visited: frozenset):
+        """
+        Checks if the given item is contained anywhere in this view. ``visited``
+        carries the ids of every view already on the lookup path, so cyclic
+        imports (including cycles of length > 1, e.g. re-exports through a
+        package ``__init__``) terminate instead of recursing forever.
         """
         key = item
         if self.names:
@@ -51,11 +65,23 @@ class CombinedDict:
                 return False
             key = self.names[key]
         for d in self.dicts:
-            if d is caller_module:
+            if id(d) in visited:
                 continue
-            if key in d:
+            if _view_contains(d, key, visited):
                 return True
         return False
+
+
+def _view_contains(d, key, visited: frozenset) -> bool:
+    """Membership through a member dict, threading the visited set into nested
+    views (plain dicts just use ``in``)."""
+    inner = getattr(d, '_contains', None)
+    return inner(key, visited) if inner is not None else key in d
+
+
+def _view_getitem(d, key, visited: frozenset):
+    inner = getattr(d, '_getitem', None)
+    return inner(key, visited) if inner is not None else d[key]
 
 
 class IOOperationContentDict:
@@ -98,14 +124,24 @@ class ModuleDictView:
         self._dict = CombinedDict(self.names, dicts)
 
     def __contains__(self, item):
+        return self._contains(item, frozenset())
+
+    def _contains(self, item, visited: frozenset):
+        if id(self) in visited:
+            return False
         if self._dict is None:
             self.initialize()
-        return self._dict.contains(item, self)
+        return self._dict._contains(item, visited | {id(self)})
 
     def __getitem__(self, item):
+        return self._getitem(item, frozenset())
+
+    def _getitem(self, item, visited: frozenset):
+        if id(self) in visited:
+            raise KeyError(item)
         if self._dict is None:
             self.initialize()
-        return self._dict[item]
+        return self._dict._getitem(item, visited | {id(self)})
 
 
 class PythonModuleView:

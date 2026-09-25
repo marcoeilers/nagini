@@ -277,7 +277,10 @@ class GhostChecker(ast.NodeVisitor):
 
         if current_function is None:
             raise InvalidProgramException(node, 'invalid.ghost.functionDef', f"Couldn't correctly resolve function {node.name}")
-        
+        if current_function.node is None:
+            # Resolved to a builtin function that this definition fails to override.
+            raise InvalidProgramException(node, 'invalid.override')
+
         self.ctx.current_function = current_function
         old_ghost_ctx = self.in_ghost_ctx
         self.in_ghost_ctx = current_function.is_ghost
@@ -784,9 +787,9 @@ class GhostChecker(ast.NodeVisitor):
         modules.extend(self.current_module.get_included_modules(()))
         modules.append(self.global_module)
         for module in modules:
-            cls = getattr(module, 'classes', {}).get(name)
-            if cls is not None:
-                return cls
+            classes = getattr(module, 'classes', {})
+            if name in classes:
+                return classes[name]
         return None
 
     def get_mixed_return_parts(self, ann: Optional[annotation_t]
@@ -1235,7 +1238,7 @@ class GhostChecker(ast.NodeVisitor):
         elif isinstance(expr, ast.Lambda):
             old_ctx = self.in_ghost_ctx
             self.in_ghost_ctx = True
-            self.check_for_call(expr.value)
+            self.check_for_call(expr.body)
             self.in_ghost_ctx = old_ctx
 
             items = []
