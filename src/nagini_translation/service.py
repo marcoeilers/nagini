@@ -411,6 +411,18 @@ def _kill_child_provers() -> None:
             continue
 
 
+def _process_memory() -> dict:
+    """This process's resident memory (bytes), now and at its peak; empty where
+    /proc is unavailable. The JVM is in-process, so both include it."""
+    try:
+        with open('/proc/self/status') as f:
+            fields = dict(line.split(':', 1) for line in f if ':' in line)
+        return {'rss': int(fields['VmRSS'].split()[0]) * 1024,
+                'rssPeak': int(fields['VmHWM'].split()[0]) * 1024}
+    except (OSError, KeyError, ValueError):
+        return {}
+
+
 class VerificationService:
     """
     Long-lived, in-process Nagini verification service.
@@ -698,6 +710,8 @@ class VerificationService:
                 'translationFailed': result.translation_failed,
                 'translateOnly': translate_only,
                 'diagnosticCount': len(result.diagnostics),
+                'pid': os.getpid(),
+                **_process_memory(),
             }
             with open(os.path.join(attempt, 'meta.json'), 'w') as f:
                 json.dump(meta, f, indent=1)
