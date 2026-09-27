@@ -7,6 +7,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 
 import asyncio
+import inspect
 import json
 import os
 import sys
@@ -239,3 +240,12 @@ def test_configure_disable_branch_conditions_via_tool(service):
     finally:
         service.reconfigure(
             disable_branch_conditions=original["disableBranchConditions"])
+
+
+def test_plain_tools_lack_the_viper_level_parameters():
+    for tool in (mcp_server.verify_file, mcp_server.verify_method, mcp_server.verify_snippet):
+        plain = mcp_server._without_debug_params(tool)
+        assert set(inspect.signature(plain).parameters) == \
+            set(inspect.signature(tool).parameters) - set(mcp_server.DEBUG_PARAMS)
+        assert not any(name in plain.__doc__ for name in mcp_server.DEBUG_PARAMS)
+        assert "counterexample" not in plain.__doc__

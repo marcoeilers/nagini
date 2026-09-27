@@ -27,6 +27,7 @@ import sys
 import tempfile
 
 from concurrent.futures import ThreadPoolExecutor
+from inspect import getdoc, signature
 from typing import List, Optional
 
 from mcp.server.mcpserver import MCPServer
@@ -202,11 +203,14 @@ def _share_excerpts(diagnostics: list) -> None:
 def _slim_debug(result: dict) -> dict:
     if _service.plain_diagnostics:
         # Plain diagnostics (--plain-diagnostics): no debug payloads, no phase
-        # timings, no pointer to the recorded archive.
+        # timings, no pointer to the recorded archive, nothing of the Viper
+        # level (see _without_debug_params).
         result.pop('timings', None)
         result.pop('recordedAt', None)
+        result.pop('viperProgram', None)
         for d in result.get('diagnostics', []):
             d.pop('debug', None)
+            d.pop('counterexample', None)
         return result
     diagnostics = result.get('diagnostics', [])
     debugs = []
@@ -250,6 +254,30 @@ def _slim_debug(result: dict) -> dict:
         break  # nothing left to shrink (oversize is outside the payloads)
     return result
 
+# The Viper-level parameters of the verify tools: under --plain-diagnostics the
+# tools are registered without them and without the description paragraphs that
+# name them.
+DEBUG_PARAMS = ('counterexample', 'include_viper')
+
+
+def _without_debug_params(tool):
+    """`tool` re-signed without DEBUG_PARAMS, for plain diagnostics."""
+    sig = signature(tool)
+    kept = [p for name, p in sig.parameters.items() if name not in DEBUG_PARAMS]
+
+    async def plain(**kwargs):
+        return await tool(**kwargs)
+
+    plain.__name__ = tool.__name__
+    plain.__signature__ = sig.replace(parameters=kept)
+    plain.__annotations__ = {k: v for k, v in tool.__annotations__.items()
+                             if k not in DEBUG_PARAMS}
+    plain.__doc__ = '\n\n'.join(
+        para for para in getdoc(tool).split('\n\n')
+        if not any('`{}`'.format(name) in para for name in DEBUG_PARAMS))
+    return plain
+
+
 async def _run(fn):
     try:
         return await asyncio.get_event_loop().run_in_executor(_executor, fn)
@@ -276,8 +304,8 @@ async def verify_file(path: str, methods: Optional[List[str]] = None,
     is usually not what you want.
 
     Returns structured diagnostics: a list of {file, startLine, startCol,
-    endLine, endCol, severity, code, message, reason, counterexample,
-    branchConditions, vias}, plus `success` and `duration` — and two abnormal-
+    endLine, endCol, severity, code, message, reason, branchConditions, vias},
+    plus `success` and `duration` — and two abnormal-
     end flags: `cancelled` (the job was stopped, e.g. via the `cancel` tool)
     and `crashed` (the verification backend died with an exception, reported
     in a `verifier.crashed` diagnostic; unlike a timeout, retrying an
@@ -300,11 +328,13 @@ async def verify_file(path: str, methods: Optional[List[str]] = None,
     e.g. `["--timeout=60"]` for a per-run verification timeout in seconds (the
     CLI's `--viper-arg`, as a list); they override same-named backend defaults,
     and a rejected command line is reported as an `invalid.viper.args`
-    diagnostic. `include_viper` returns the whole translated program in
-    `viperProgram` (thousands of lines for a large module). `translate_only`
-    stops after
-    translation (mypy + Nagini-to-Viper): fast validity check that the file is
-    a well-formed Nagini program; no proof obligations are checked.
+    diagnostic. `translate_only` stops after translation (mypy +
+    Nagini-to-Viper): fast validity check that the file is a well-formed Nagini
+    program; no proof obligations are checked.
+
+    `counterexample` adds to each diagnostic a `counterexample`, the model of a
+    failing state; `include_viper` returns the whole translated program in
+    `viperProgram` (thousands of lines for a large module).
     """
     selected = _as_selected(methods)
     result = await _run(lambda: _service.verify(
@@ -515,6 +545,13 @@ def main():
     logging.basicConfig(level=getattr(logging, args.log.upper(), logging.WARNING))
     global _service
     _service = make_service(args)
+    if args.plain_diagnostics:
+        # Nothing of the Viper level: the verify tools without DEBUG_PARAMS, and
+        # no inspect (no archive pointer to read).
+        for tool in (verify_file, verify_method, verify_snippet):
+            mcp.remove_tool(tool.__name__)
+            mcp.add_tool(_without_debug_params(tool))
+        mcp.remove_tool(inspect.__name__)
     # SIGTERM unwinds like SIGINT, so the service shuts down (see finally).
     signal.signal(signal.SIGTERM, signal.default_int_handler)
 
