@@ -22,6 +22,7 @@ import logging
 import os
 import re
 import shutil
+import signal
 import sys
 import tempfile
 
@@ -514,6 +515,8 @@ def main():
     logging.basicConfig(level=getattr(logging, args.log.upper(), logging.WARNING))
     global _service
     _service = make_service(args)
+    # SIGTERM unwinds like SIGINT, so the service shuts down (see finally).
+    signal.signal(signal.SIGTERM, signal.default_int_handler)
 
     try:
         mcp.run()

@@ -30,6 +30,7 @@ import tempfile
 import threading
 import time
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import List, Optional, Set, Tuple
 
@@ -348,6 +349,8 @@ def _viper_excerpt(error, modules, prog) -> Optional[dict]:
 # Grace period on top of the backend's own --timeout before the service declares a
 # verification wedged and force-kills its prover processes (see _hard_wall_seconds).
 HARD_DEADLINE_GRACE = 60
+# How long shutdown() waits for the cancelled verifications to record.
+SHUTDOWN_WAIT = 30
 
 
 def _backend_timeout_seconds(backend_args) -> Optional[int]:
@@ -481,6 +484,12 @@ class VerificationService:
         # sweep sharing the agent's log) instead of clobbering attempt-0001.
         self._record_seq = self._existing_record_seq(record_dir)
         self._record_lock = threading.Lock()
+        # Archived SMT state is compressed off the request path (_record).
+        self._compressor = ThreadPoolExecutor(max_workers=1,
+                                              thread_name_prefix='nagini-compress')
+        # verify() calls in flight, which shutdown() cancels and waits for.
+        self._active = 0
+        self._activity = threading.Condition()
         if force_obligations:
             # False instead of None: force the obligation encoding (see main.py).
             config.obligation_config.disable_all = False
@@ -560,6 +569,19 @@ class VerificationService:
         after translation (mypy + Nagini-to-Viper): success means the file is a
         valid Nagini program; no proof obligations are checked.
         """
+        with self._activity:
+            self._active += 1
+        try:
+            return self._verify(path, selected, base_dir, arp, counterexample,
+                                ignore_global, viper_args, include_viper,
+                                translate_only, job_token)
+        finally:
+            with self._activity:
+                self._active -= 1
+                self._activity.notify_all()
+
+    def _verify(self, path, selected, base_dir, arp, counterexample, ignore_global,
+                viper_args, include_viper, translate_only, job_token) -> VerifyResult:
         path = os.path.abspath(path)
         start = time.time()
         phases.reset()
@@ -691,6 +713,8 @@ class VerificationService:
                     f.write(source)
             if has_canceled and bundles:
                 shutil.move(smtstate_dir, os.path.join(attempt, 'smtstate'))
+                self._compressor.submit(self._compress,
+                                        os.path.join(attempt, 'smtstate'))
             meta = {
                 'seq': seq,
                 'path': path,
@@ -722,6 +746,15 @@ class VerificationService:
             logging.exception('Failed to record verification attempt for %s.',
                               path)
             return None
+
+    @staticmethod
+    def _compress(smtstate_dir: str) -> None:
+        """Compress an archived attempt's SMT state; a failure leaves it raw."""
+        try:
+            from nagini_translation import smt_archive
+            smt_archive.compress_dir(smtstate_dir)
+        except Exception:
+            logging.exception('Failed to compress %s.', smtstate_dir)
 
     def _reset_obligations(self) -> None:
         """Restore the obligation auto-detection setting before a translation.
@@ -777,7 +810,14 @@ class VerificationService:
             except Exception:
                 logging.exception('Error flushing ViperServer cache.')
 
-    def shutdown(self) -> None:
+    def shutdown(self, wait: float = SHUTDOWN_WAIT) -> None:
+        """Cancel the running verifications, wait up to ``wait`` seconds for
+        their records, finish compressing the archived SMT state, then stop the
+        backend."""
+        self.cancel()
+        with self._activity:
+            self._activity.wait_for(lambda: self._active == 0, timeout=wait)
+        self._compressor.shutdown(wait=True)
         if config.use_viper_server:
             try:
                 from nagini_translation.viper_server import get_viper_server_manager
