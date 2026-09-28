@@ -415,15 +415,32 @@ def _kill_child_provers() -> None:
 
 
 def _process_memory() -> dict:
-    """This process's resident memory (bytes), now and at its peak; empty where
-    /proc is unavailable. The JVM is in-process, so both include it."""
+    """This process's memory (bytes): its resident size now and at its peak (the
+    JVM is in-process, so both include it), and the JVM heap reserved, in use,
+    and live after the last collection. A value that cannot be read is left out."""
+    out = {}
     try:
         with open('/proc/self/status') as f:
             fields = dict(line.split(':', 1) for line in f if ':' in line)
-        return {'rss': int(fields['VmRSS'].split()[0]) * 1024,
-                'rssPeak': int(fields['VmHWM'].split()[0]) * 1024}
+        out['rss'] = int(fields['VmRSS'].split()[0]) * 1024
+        out['rssPeak'] = int(fields['VmHWM'].split()[0]) * 1024
     except (OSError, KeyError, ValueError):
-        return {}
+        pass
+    try:
+        import jpype
+        if jpype.isJVMStarted():
+            mgmt = jpype.JClass('java.lang.management.ManagementFactory')
+            heap = mgmt.getMemoryMXBean().getHeapMemoryUsage()
+            out['heapCommitted'] = int(heap.getCommitted())
+            out['heapUsed'] = int(heap.getUsed())
+            heap_type = jpype.JClass('java.lang.management.MemoryType').HEAP
+            out['heapAfterGc'] = sum(
+                int(pool.getCollectionUsage().getUsed())
+                for pool in mgmt.getMemoryPoolMXBeans()
+                if pool.getType() == heap_type and pool.getCollectionUsage() is not None)
+    except Exception:
+        pass
+    return out
 
 
 class VerificationService:
