@@ -139,6 +139,24 @@ def test_viper_args_invalid_option_fails_cleanly(service, tmp_path):
     assert not result.success
 
 
+def test_prover_out_of_memory_reported_as_timeout(service, tmp_path):
+    path = _write(tmp_path, "oom.py", _NO_OBLIGATIONS_SRC)
+    capped = ["--proverConfigArgs=memory_max_size=1", "--disableCaching"]
+    result = service.verify(path, viper_args=capped)
+    assert not (result.success or result.crashed)
+    [diag] = result.diagnostics
+    assert diag.code == "TimeoutOccurred"
+    assert "memory limit of 1 MB" in diag.message
+    # Plain diagnostics keep the backend's crash.
+    service.plain_diagnostics = True
+    try:
+        plain = service.verify(path, viper_args=capped)
+    finally:
+        service.plain_diagnostics = False
+    assert plain.crashed
+    assert plain.diagnostics[0].code == "verifier.crashed"
+
+
 # -- include_viper ------------------------------------------------------------
 
 def test_include_viper_returns_translated_program(service, tmp_path):
