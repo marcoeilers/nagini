@@ -344,7 +344,8 @@ async def verify_file(path: str, methods: Optional[List[str]] = None,
     well-formed Nagini program; no proof obligations are checked.
 
     For example, `viper_args=["--timeout=60"]` sets a per-run verification
-    timeout in seconds.
+    timeout in seconds. A prover that runs past its memory limit is reported
+    like such a timeout: a `TimeoutOccurred` diagnostic saying so.
 
     `counterexample` adds to each diagnostic a `counterexample`, the model of a
     failing state; `include_viper` returns the whole translated program in

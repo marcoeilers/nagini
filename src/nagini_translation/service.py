@@ -369,6 +369,16 @@ def _backend_timeout_seconds(backend_args) -> Optional[int]:
     return seconds if seconds > 0 else None
 
 
+# z3's reply once it is past its memory_max_size.
+PROVER_OUT_OF_MEMORY = '(error "out of memory")'
+
+
+def _prover_memory_mb(backend_args) -> Optional[int]:
+    """The prover's memory_max_size (MB) set through --proverConfigArgs, or None."""
+    match = re.search(r'\bmemory_max_size=(\d+)', ' '.join(backend_args))
+    return int(match.group(1)) if match else None
+
+
 def _hard_wall_seconds(backend_args) -> Optional[int]:
     """Wall cap for one verification job, derived from the effective backend args.
 
@@ -1043,6 +1053,18 @@ class VerificationService:
                     path, 'Invalid Viper backend arguments: %s'
                     % '; '.join(arg_error_texts),
                     'invalid.viper.args')], duration,
+                    viper_program=viper_text)
+            if crash_texts and not self.plain_diagnostics and any(
+                    PROVER_OUT_OF_MEMORY in t for t in crash_texts):
+                # The prover ran past its memory cap: a budget, reported like
+                # the whole-run timeout.
+                cap = _prover_memory_mb(backend_args)
+                return VerifyResult(False, [self._timeout_diagnostic(
+                    path, 'Out of memory: the prover exceeded its memory limit%s. '
+                    'Like a timeout, the proof search is too expensive, typically '
+                    'a matching loop or too much context; the same program runs '
+                    'out again.' % (' of %d MB' % cap if cap else ''),
+                    phases, viper_args, modules)], duration,
                     viper_program=viper_text)
             if crash_texts:
                 # The backend died with an exception instead of producing a
