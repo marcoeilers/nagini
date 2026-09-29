@@ -573,7 +573,7 @@ class VerificationService:
                arp: bool = False, counterexample: bool = False,
                ignore_global: bool = False, viper_args: List[str] = None,
                include_viper: bool = False, translate_only: bool = False,
-               job_token: str = None) -> VerifyResult:
+               job_token: str = None, request_meta: dict = None) -> VerifyResult:
         """Translate and verify the file at ``path`` and return structured results.
 
         Multiple calls may run concurrently: translation is serialized but the
@@ -585,20 +585,22 @@ class VerificationService:
         translated Viper program in ``viper_program``. ``translate_only`` stops
         after translation (mypy + Nagini-to-Viper): success means the file is a
         valid Nagini program; no proof obligations are checked.
+        ``request_meta`` is recorded with the attempt.
         """
         with self._activity:
             self._active += 1
         try:
             return self._verify(path, selected, base_dir, arp, counterexample,
                                 ignore_global, viper_args, include_viper,
-                                translate_only, job_token)
+                                translate_only, job_token, request_meta)
         finally:
             with self._activity:
                 self._active -= 1
                 self._activity.notify_all()
 
     def _verify(self, path, selected, base_dir, arp, counterexample, ignore_global,
-                viper_args, include_viper, translate_only, job_token) -> VerifyResult:
+                viper_args, include_viper, translate_only, job_token,
+                request_meta) -> VerifyResult:
         path = os.path.abspath(path)
         start = time.time()
         phases.reset()
@@ -649,7 +651,8 @@ class VerificationService:
         result.timings = phases.phases()
         result.recorded_at = self._record(
             path, selected, base_dir, viper_args, source, start,
-            result, translate_only, smtstate_dir=smtstate_dir)
+            result, translate_only, smtstate_dir=smtstate_dir,
+            request_meta=request_meta)
         if smtstate_dir and os.path.isdir(smtstate_dir):
             shutil.rmtree(smtstate_dir, ignore_errors=True)
         return result
@@ -679,13 +682,15 @@ class VerificationService:
         return seq
 
     def _record(self, path, selected, base_dir, viper_args, source, start,
-                result, translate_only=False, smtstate_dir=None) -> Optional[str]:
+                result, translate_only=False, smtstate_dir=None,
+                request_meta=None) -> Optional[str]:
         """Archive one verification attempt under the service's record dir;
         returns the attempt directory (surfaced to clients as ``recordedAt``
         so slimmed debug payloads stay recoverable), or None when recording
         is off or failed. Every attempt gets meta.json (effective backend args,
         content hashes of the project's .py files for attempt-series
-        attribution) and result.json (full structured result incl. debug
+        attribution, the request's MCP ``_meta`` to tie the attempt to the
+        client's tool call) and result.json (full structured result incl. debug
         payloads). Full file contents (the verified file plus its sibling
         .py files) and the backend's SMT state bundles (``smtstate_dir``:
         replayable .smt2 sessions cut at canceled failures and at slow checks,
@@ -753,6 +758,7 @@ class VerificationService:
                 'diagnosticCount': len(result.diagnostics),
                 'pid': os.getpid(),
                 **_process_memory(),
+                'requestMeta': request_meta,
             }
             with open(os.path.join(attempt, 'meta.json'), 'w') as f:
                 json.dump(meta, f, indent=1)

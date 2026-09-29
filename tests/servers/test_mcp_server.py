@@ -35,7 +35,7 @@ def _tool_result_payload(result):
     raise AssertionError("no textual content in tool result")
 
 
-def _run_stdio_smoke(pass_file):
+def _run_stdio_smoke(pass_file, record_dir):
     """Drive the server as a real MCP client would: spawn it as a subprocess and
     talk to it over stdio. Returns (tool names, verify result, server stderr)."""
     from mcp import ClientSession, StdioServerParameters
@@ -43,7 +43,8 @@ def _run_stdio_smoke(pass_file):
 
     params = StdioServerParameters(
         command=sys.executable,
-        args=["-m", "nagini_translation.mcp_server", "--log", "WARNING"],
+        args=["-m", "nagini_translation.mcp_server", "--log", "WARNING",
+              "--record-dir", record_dir],
         # Inherit the parent environment so JAVA_HOME / jar paths reach the JVM,
         # just as an MCP client is expected to pass them through.
         env=dict(os.environ),
@@ -56,7 +57,8 @@ def _run_stdio_smoke(pass_file):
                 tools = await session.list_tools()
                 names = {tool.name for tool in tools.tools}
                 result = await asyncio.wait_for(
-                    session.call_tool("verify_file", {"path": pass_file}),
+                    session.call_tool("verify_file", {"path": pass_file},
+                                      meta={"client/callId": "call-1"}),
                     timeout=300)
                 return names, result
 
@@ -67,13 +69,13 @@ def _run_stdio_smoke(pass_file):
     return names, result, server_stderr
 
 
-def test_stdio_transport_end_to_end_and_clean_shutdown(pass_file):
+def test_stdio_transport_end_to_end_and_clean_shutdown(pass_file, tmp_path):
     # Integration smoke test over the actual stdio transport and process
     # lifecycle (the in-process tool-call tests below never exercise those).
     # Starts its own JVM/ViperServer, so it is skipped if that is unavailable.
     pytest.importorskip("mcp.client.stdio")
     try:
-        names, result, server_stderr = _run_stdio_smoke(pass_file)
+        names, result, server_stderr = _run_stdio_smoke(pass_file, str(tmp_path))
     except Exception as e:  # pragma: no cover - environment dependent
         pytest.skip("MCP stdio server could not be started: {}".format(e))
 
@@ -85,6 +87,10 @@ def test_stdio_transport_end_to_end_and_clean_shutdown(pass_file):
     payload = _tool_result_payload(result)
     assert payload["success"] is True
     assert payload["diagnostics"] == []
+
+    # The request's _meta is recorded with the attempt.
+    with open(tmp_path / "attempt-0001" / "meta.json") as f:
+        assert json.load(f)["requestMeta"] == {"client/callId": "call-1"}
 
     # Closing the client pipe shuts the server down cleanly; in particular it
     # must not trip the "I/O operation on closed file" flush error on exit.
@@ -249,3 +255,5 @@ def test_plain_tools_lack_the_viper_level_parameters():
             set(inspect.signature(tool).parameters) - set(mcp_server.DEBUG_PARAMS)
         assert not any(name in plain.__doc__ for name in mcp_server.DEBUG_PARAMS)
         assert "counterexample" not in plain.__doc__
+        assert "--timeout" not in plain.__doc__
+    assert "--timeout" in mcp_server.verify_file.__doc__

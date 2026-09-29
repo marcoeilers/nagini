@@ -30,7 +30,7 @@ from concurrent.futures import ThreadPoolExecutor
 from inspect import getdoc, signature
 from typing import List, Optional
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Context, MCPServer
 
 from nagini_translation.service import (add_service_arguments, make_service,
                                         options_to_kwargs)
@@ -256,12 +256,14 @@ def _slim_debug(result: dict) -> dict:
 
 # The Viper-level parameters of the verify tools: under --plain-diagnostics the
 # tools are registered without them and without the description paragraphs that
-# name them.
+# name them or a verifier budget (PLAIN_HIDDEN): the budgets are not advertised.
 DEBUG_PARAMS = ('counterexample', 'include_viper')
+PLAIN_HIDDEN = tuple('`{}`'.format(name) for name in DEBUG_PARAMS) + ('--timeout',)
 
 
 def _without_debug_params(tool):
-    """`tool` re-signed without DEBUG_PARAMS, for plain diagnostics."""
+    """`tool` re-signed without DEBUG_PARAMS and the paragraphs naming
+    PLAIN_HIDDEN, for plain diagnostics."""
     sig = signature(tool)
     kept = [p for name, p in sig.parameters.items() if name not in DEBUG_PARAMS]
 
@@ -274,8 +276,17 @@ def _without_debug_params(tool):
                              if k not in DEBUG_PARAMS}
     plain.__doc__ = '\n\n'.join(
         para for para in getdoc(tool).split('\n\n')
-        if not any('`{}`'.format(name) in para for name in DEBUG_PARAMS))
+        if not any(term in para for term in PLAIN_HIDDEN))
     return plain
+
+
+def _request_meta(ctx: Optional[Context]) -> Optional[dict]:
+    """The request's `_meta` (a client's id for the tool call, e.g.), kept in
+    the attempt record."""
+    try:
+        return dict(ctx.request_context.meta or {}) if ctx else None
+    except ValueError:
+        return None
 
 
 async def _run(fn):
@@ -296,7 +307,8 @@ async def verify_file(path: str, methods: Optional[List[str]] = None,
                       viper_args: Optional[List[str]] = None,
                       include_viper: bool = False,
                       translate_only: bool = False,
-                      job_token: Optional[str] = None) -> dict:
+                      job_token: Optional[str] = None,
+                      ctx: Optional[Context] = None) -> dict:
     """Verify a Nagini Python file.
 
     `path` should be absolute; relative paths are resolved against the server
@@ -324,13 +336,15 @@ async def verify_file(path: str, methods: Optional[List[str]] = None,
     allow precisely cancelling this run via the `cancel` tool. Multiple
     verifications may run concurrently.
 
-    `viper_args` are extra command-line arguments passed to the Viper backend,
-    e.g. `["--timeout=60"]` for a per-run verification timeout in seconds (the
-    CLI's `--viper-arg`, as a list); they override same-named backend defaults,
-    and a rejected command line is reported as an `invalid.viper.args`
-    diagnostic. `translate_only` stops after translation (mypy +
-    Nagini-to-Viper): fast validity check that the file is a well-formed Nagini
-    program; no proof obligations are checked.
+    `viper_args` are extra command-line arguments passed to the Viper backend
+    (the CLI's `--viper-arg`, as a list); they override same-named backend
+    defaults, and a rejected command line is reported as an
+    `invalid.viper.args` diagnostic. `translate_only` stops after translation
+    (mypy + Nagini-to-Viper): fast validity check that the file is a
+    well-formed Nagini program; no proof obligations are checked.
+
+    For example, `viper_args=["--timeout=60"]` sets a per-run verification
+    timeout in seconds.
 
     `counterexample` adds to each diagnostic a `counterexample`, the model of a
     failing state; `include_viper` returns the whole translated program in
@@ -341,7 +355,7 @@ async def verify_file(path: str, methods: Optional[List[str]] = None,
         path, selected=selected, counterexample=counterexample, base_dir=base_dir,
         ignore_global=ignore_global, viper_args=viper_args,
         include_viper=include_viper, translate_only=translate_only,
-        job_token=job_token))
+        job_token=job_token, request_meta=_request_meta(ctx)))
     return _slim_debug(result.to_dict())
 
 
@@ -351,7 +365,8 @@ async def verify_method(path: str, methods: List[str],
                         viper_args: Optional[List[str]] = None,
                         include_viper: bool = False,
                         translate_only: bool = False,
-                        job_token: Optional[str] = None) -> dict:
+                        job_token: Optional[str] = None,
+                        ctx: Optional[Context] = None) -> dict:
     """Verify selected methods of a file (fast, via Nagini's --select).
 
     `path` should be absolute (see `verify_file`). `methods` is a list of
@@ -364,7 +379,7 @@ async def verify_method(path: str, methods: List[str],
         path, selected=_as_selected(methods), counterexample=counterexample,
         viper_args=viper_args, include_viper=include_viper,
         translate_only=translate_only,
-        job_token=job_token))
+        job_token=job_token, request_meta=_request_meta(ctx)))
     return _slim_debug(result.to_dict())
 
 
@@ -374,7 +389,8 @@ async def verify_snippet(code: str, counterexample: bool = False,
                          viper_args: Optional[List[str]] = None,
                          include_viper: bool = False,
                          translate_only: bool = False,
-                         job_token: Optional[str] = None) -> dict:
+                         job_token: Optional[str] = None,
+                         ctx: Optional[Context] = None) -> dict:
     """Verify an inline snippet of Nagini Python code (written to a temp file).
 
     Set `ignore_global` to skip verification of top-level statements. The other
@@ -389,7 +405,7 @@ async def verify_snippet(code: str, counterexample: bool = False,
             tmp_path, counterexample=counterexample, base_dir=tmp_dir,
             ignore_global=ignore_global, viper_args=viper_args,
             include_viper=include_viper, translate_only=translate_only,
-            job_token=job_token))
+            job_token=job_token, request_meta=_request_meta(ctx)))
         return _slim_debug(result.to_dict())
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
