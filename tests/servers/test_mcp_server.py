@@ -256,4 +256,5 @@ def test_plain_tools_lack_the_viper_level_parameters():
         assert not any(name in plain.__doc__ for name in mcp_server.DEBUG_PARAMS)
         assert "counterexample" not in plain.__doc__
         assert "--timeout" not in plain.__doc__
+        assert "viper_args" not in plain.__doc__
     assert "--timeout" in mcp_server.verify_file.__doc__

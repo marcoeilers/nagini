@@ -256,9 +256,11 @@ def _slim_debug(result: dict) -> dict:
 
 # The Viper-level parameters of the verify tools: under --plain-diagnostics the
 # tools are registered without them and without the description paragraphs that
-# name them or a verifier budget (PLAIN_HIDDEN): the budgets are not advertised.
+# name them, the backend arguments or a verifier budget (PLAIN_HIDDEN): neither
+# the budgets nor the way to set them are advertised.
 DEBUG_PARAMS = ('counterexample', 'include_viper')
-PLAIN_HIDDEN = tuple('`{}`'.format(name) for name in DEBUG_PARAMS) + ('--timeout',)
+PLAIN_HIDDEN = tuple('`{}`'.format(name) for name in DEBUG_PARAMS + ('viper_args',)) \
+    + ('--timeout',)
 
 
 def _without_debug_params(tool):
