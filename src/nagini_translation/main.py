@@ -24,8 +24,10 @@ from nagini_translation.ghost.extraction import ProgramExtractor
 from nagini_translation.lib.context import Context
 from nagini_translation.sif_translator import SIFTranslator
 from nagini_translation.lib import config
+from nagini_translation.lib import phases
 from nagini_translation.lib.constants import DEFAULT_SERVER_SOCKET
 from nagini_translation.lib.errors import error_manager, format_translation_error
+from nagini_translation.lib.errors.messages import invalid_program_message
 from nagini_translation.lib.jvmaccess import (
     getclass,
     getobject,
@@ -133,10 +135,12 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
     if sif and not viper_ast.is_extension_available():
         raise Exception('Viper AST SIF extension not found on classpath.')
     types = TypeInfo()
-    type_correct = types.check(path, base_dir)
+    with phases.phase('typecheck'):
+        type_correct = types.check(path, base_dir)
     if not type_correct:
         return None
 
+    translate_start = time.time()
     analyzer = Analyzer(types, path, selected)
     main_module = analyzer.module
     with open(os.path.join(builtins_index_path, 'builtins.json'), 'r') as file:
@@ -176,6 +180,9 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
 
     prog = translator.translate_program(modules, sil_programs, selected,
                                         arp=arp, ignore_global=ignore_global, sif=sif, float_encoding=float_encoding)
+    # The chopper inside translate_program times itself; report the rest.
+    phases.record('translate', time.time() - translate_start
+                  - phases.phases().get('chop', 0.0))
     if skip_verification:
         return modules, None
     if sif:
@@ -543,6 +550,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
         start = time.time()
         if selected is None:
             selected = set(args.select.split(',')) if args.select else set()
+        phases.reset()
         modules, prog = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif, base_dir=base_dir,
                                   ignore_global=args.ignore_global, arp=arp, verbose=args.verbose, skip_verification=args.skip_verification,
                                   extraction=args.extraction, counterexample=args.counterexample, float_encoding=args.float_encoding)
@@ -579,10 +587,11 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                 submitter = jvm.viper.silver.utility.ManualProgramSubmitter(True, "", "Nagini", backend.name.capitalize(), viper_args)
                 submitter.setProgram(prog)
 
-            vresult = verify(modules, prog, python_file, jvm, viper_args,
-                             backend=backend, arp=arp, counterexample=args.counterexample,
-                             sif=args.sif, disable_branch_conditions=args.disable_branch_conditions)
-            
+            with phases.phase('verify'):
+                vresult = verify(modules, prog, python_file, jvm, viper_args,
+                                 backend=backend, arp=arp, counterexample=args.counterexample,
+                                 sif=args.sif, disable_branch_conditions=args.disable_branch_conditions)
+
             if submitter is not None:
                 submitter.setSuccess(vresult.__bool__())
                 submitter.submit()
@@ -590,17 +599,15 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
             print("Verification completed.")
         print(vresult.to_string(args.ide_mode, args.show_viper_errors))
         duration = '{:.2f}'.format(time.time() - start)
-        print('Verification took ' + duration + ' seconds.')
+        print('Verification took ' + duration + ' seconds ('
+              + phases.summary() + ').')
         return isinstance(vresult, verifier.Success)
     except (TypeException, InvalidProgramException, UnsupportedException) as e:
         print("Translation failed")
         if isinstance(e, (InvalidProgramException, UnsupportedException)):
             if isinstance(e, InvalidProgramException):
-                issue = 'Invalid program: '
-                if e.message:
-                    issue += e.message
-                else:
-                    issue += e.code
+                issue = ('Invalid program: ' +
+                         invalid_program_message(e.code, e.message))
             else:
                 issue = 'Not supported: '
                 if e.args[0]:

@@ -60,6 +60,7 @@ class TypeDomainFactory:
             self.create_subtype_exclusion_axiom(ctx),
             self.create_subtype_exclusion_axiom_2(ctx),
             self.create_subtype_exclusion_propagation_axiom(ctx),
+            self.create_object_eq_is_identity_axiom(ctx),
         ]
         result.extend(self.create_union_basic_axioms(ctx))
         result.extend(self.create_union_subtype_axioms(ctx))
@@ -76,6 +77,7 @@ class TypeDomainFactory:
             self.union_basic_func(ctx),
             self.typeof_func(ctx),
             self.basic_func(ctx),
+            self.inherits_object_eq_func(ctx),
         ]
         result.extend(self.union_funcs(ctx))
         return result
@@ -761,6 +763,67 @@ class TypeDomainFactory:
                                  info)
         return self.viper.DomainAxiom('issubtype_object', body, position, info,
                                       self.type_domain)
+
+    INHERITS_OBJECT_EQ = 'inherits_object_eq'
+
+    def inherits_object_eq_func(self, ctx: Context) -> 'silver.ast.DomainFunc':
+        """
+        Creates the domain function inherits_object_eq(PyType): Bool, true for
+        types whose __eq__ is object's (see create_inherits_object_eq_fact).
+        """
+        position, info = self.no_position(ctx), self.no_info(ctx)
+        arg = self.viper.LocalVarDecl('typ', self.type_type(), position, info)
+        return self.viper.DomainFunc(self.INHERITS_OBJECT_EQ, [arg],
+                                     self.viper.Bool, False, position, info,
+                                     self.type_domain)
+
+    def create_object_eq_is_identity_axiom(
+            self, ctx: Context) -> 'silver.ast.DomainAxiom':
+        """
+        object.__eq__ is identity. Python falls back to it (and, for the
+        reflected operand, again to it) exactly when neither operand's class
+        overrides __eq__, so for two such objects == coincides with is:
+        forall o1, o2: Ref :: { object___eq__(o1, o2) }
+          inherits_object_eq(typeof(o1)) && inherits_object_eq(typeof(o2))
+          ==> object___eq__(o1, o2) == (o1 == o2)
+        """
+        position, info = self.no_position(ctx), self.no_info(ctx)
+        o1_decl = self.viper.LocalVarDecl('o1', self.viper.Ref, position, info)
+        o2_decl = self.viper.LocalVarDecl('o2', self.viper.Ref, position, info)
+        o1 = self.viper.LocalVar('o1', self.viper.Ref, position, info)
+        o2 = self.viper.LocalVar('o2', self.viper.Ref, position, info)
+        obj_eq = self.viper.DomainFuncApp('object___eq__', [o1, o2],
+                                          self.viper.Bool, position, info,
+                                          '__ObjectEquality')
+        plain = [self.viper.DomainFuncApp(self.INHERITS_OBJECT_EQ,
+                                          [self.typeof(o, ctx)],
+                                          self.viper.Bool, position, info,
+                                          self.type_domain)
+                 for o in (o1, o2)]
+        premise = self.viper.And(plain[0], plain[1], position, info)
+        identity = self.viper.EqCmp(o1, o2, position, info)
+        body = self.viper.Implies(
+            premise, self.viper.EqCmp(obj_eq, identity, position, info),
+            position, info)
+        trigger = self.viper.Trigger([obj_eq], position, info)
+        forall = self.viper.Forall([o1_decl, o2_decl], [trigger], body,
+                                   position, info)
+        return self.viper.DomainAxiom('object_eq_is_identity', forall,
+                                      position, info, self.type_domain)
+
+    def create_inherits_object_eq_fact(
+            self, cls: 'PythonClass', ctx: Context) -> 'silver.ast.DomainAxiom':
+        """
+        Creates the axiom inherits_object_eq(C()) for a non-generic class C
+        that does not override __eq__.
+        """
+        position, info = self.no_position(ctx), self.no_info(ctx)
+        type_literal = self.translate_type_literal(cls, position, ctx)
+        fact = self.viper.DomainFuncApp(self.INHERITS_OBJECT_EQ, [type_literal],
+                                        self.viper.Bool, position, info,
+                                        self.type_domain)
+        return self.viper.DomainAxiom('inherits_object_eq_' + cls.sil_name,
+                                      fact, position, info, self.type_domain)
 
     def typeof_func(self, ctx: Context) -> 'silver.ast.DomainFunc':
         """

@@ -14,6 +14,6 @@ class C:
 
     def test(self) -> None:
         Requires(
-            #:: ExpectedOutput(invalid.program:invalid.contract.position)
+            #:: ExpectedOutput(invalid.program:permission.in.pure.context)
             Acc(self.f) == 1
         )

@@ -14,5 +14,5 @@ def P(x: Node) -> bool:
 
 
 def m(n: Node) -> None:
-    #:: ExpectedOutput(invalid.program:invalid.contract.position)
+    #:: ExpectedOutput(invalid.program:permission.in.pure.context)
     Requires(Unfolding(P(n), Acc(n.val)))

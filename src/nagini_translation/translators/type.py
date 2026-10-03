@@ -9,7 +9,9 @@ import ast
 
 from nagini_translation.lib.constants import (
     CALLABLE_TYPE,
+    INT_TYPE,
     PRIMITIVES,
+    PSEQ_TYPE,
 )
 from nagini_translation.lib.program_nodes import (
     PythonClass,
@@ -96,8 +98,7 @@ class TypeTranslator(CommonTranslator):
             none_type = ctx.module.global_module.classes['NoneType']
             return self.type_factory.type_check(lhs, none_type, position, ctx)
         else:
-            result = self.type_factory.type_check(lhs, type, position, ctx)
-            return result
+            return self.type_factory.type_check(lhs, type, position, ctx)
 
     def subtype_check(self, obj: Expr, type_expr: Expr, position: 'silver.ast.Position', ctx: Context) -> Expr:
         obj_type = self.type_factory.typeof(self.to_ref(obj, ctx), ctx)
