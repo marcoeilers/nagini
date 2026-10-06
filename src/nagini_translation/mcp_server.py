@@ -341,7 +341,9 @@ async def verify_file(path: str, methods: Optional[List[str]] = None,
     `viper_args` are extra command-line arguments passed to the Viper backend
     (the CLI's `--viper-arg`, as a list); they override same-named backend
     defaults, and a rejected command line is reported as an
-    `invalid.viper.args` diagnostic. `translate_only` stops after translation
+    `invalid.viper.args` diagnostic. A verification whose `viper_args` differ
+    from those of the verifications already running waits until they finish.
+    `translate_only` stops after translation
     (mypy + Nagini-to-Viper): fast validity check that the file is a
     well-formed Nagini program; no proof obligations are checked.
 

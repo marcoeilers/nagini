@@ -26,25 +26,31 @@ class ViperVerifier(Enum):
     carbon = 'carbon'
 
 
+def option_groups(args: List[str]) -> List[List[str]]:
+    """``args`` as options: each ``--name`` token with its attached value tokens
+    (``--flag=value`` or ``--flag value``)."""
+    groups = []
+    for arg in args:
+        if arg.startswith('--') or not groups:
+            groups.append([arg])
+        else:
+            groups[-1].append(arg)
+    return groups
+
+
+def option_name(group: List[str]) -> str:
+    """The ``--name`` of an option group (option_groups)."""
+    return group[0].split('=', 1)[0]
+
+
 def merge_viper_args(defaults: List[str], overrides: List[str]) -> List[str]:
     """Append ``overrides`` to ``defaults``, dropping every default option that
-    an override names too. An option is its ``--name`` token plus any attached
-    value tokens (``--flag=value`` or ``--flag value``); the backend rejects a
-    duplicated or contradictory pair, so defaults must give way rather than
-    coexist.
+    an override names too (option_groups); the backend rejects a duplicated or
+    contradictory pair, so defaults must give way rather than coexist.
     """
-    def grouped(args):
-        groups = []
-        for arg in args:
-            if arg.startswith('--') or not groups:
-                groups.append([arg])
-            else:
-                groups[-1].append(arg)
-        return groups
-
-    given = {g[0].split('=', 1)[0] for g in grouped(overrides)}
-    kept = [token for g in grouped(defaults)
-            if g[0].split('=', 1)[0] not in given for token in g]
+    given = {option_name(g) for g in option_groups(overrides)}
+    kept = [token for g in option_groups(defaults)
+            if option_name(g) not in given for token in g]
     return kept + list(overrides)
 
 

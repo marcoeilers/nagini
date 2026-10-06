@@ -18,6 +18,8 @@ servers build on; it can also be reused by the existing ZMQ server.
 
 import argparse
 import ast
+import collections
+import contextlib
 import glob
 import hashlib
 import json
@@ -53,8 +55,8 @@ from nagini_translation.main import (
     TYPE_ERROR_MATCHER,
     verify as verify_program,
 )
-from nagini_translation.verifier import (Failure, merge_viper_args, Success,
-                                         ViperVerifier)
+from nagini_translation.verifier import (Failure, merge_viper_args, option_groups,
+                                         option_name, Success, ViperVerifier)
 
 
 @dataclass
@@ -371,6 +373,8 @@ def _backend_timeout_seconds(backend_args) -> Optional[int]:
 
 # z3's reply once it is past its memory_max_size.
 PROVER_OUT_OF_MEMORY = '(error "out of memory")'
+# How Silicon reports a prover killed by SIGSEGV.
+PROVER_SEGFAULT = 'exited with code 139'
 
 
 def _prover_memory_mb(backend_args) -> Optional[int]:
@@ -391,6 +395,46 @@ def _hard_wall_seconds(backend_args) -> Optional[int]:
     """
     seconds = _backend_timeout_seconds(backend_args)
     return seconds + HARD_DEADLINE_GRACE if seconds else None
+
+
+class _BackendGate:
+    """Admits backend jobs: jobs with the same options overlap, a job with other
+    options waits until the running ones finish. Silicon keeps its configuration
+    in a process-wide global that every new job overwrites, so a job started
+    next to one with other options would change that job's options (its
+    budgets, among others) mid-run. Admission is first come, first served: a
+    waiting job holds back the jobs after it, so neither side starves.
+    ``--smtStateDir`` differs per request and is not compared; concurrent jobs
+    may still dump their SMT state into each other's directory."""
+
+    def __init__(self):
+        self._cond = threading.Condition()
+        self._queue = collections.deque()  # waiting tickets, in arrival order
+        self._options = None               # the running jobs' options
+        self._running = 0
+
+    @staticmethod
+    def _key(backend_args) -> frozenset:
+        return frozenset(tuple(g) for g in option_groups(backend_args)
+                         if option_name(g) != '--smtStateDir')
+
+    @contextlib.contextmanager
+    def admit(self, backend_args):
+        key, ticket = self._key(backend_args), object()
+        with self._cond:
+            self._queue.append(ticket)
+            while not (self._queue[0] is ticket
+                       and (self._running == 0 or self._options == key)):
+                self._cond.wait()
+            self._queue.popleft()
+            self._options, self._running = key, self._running + 1
+            self._cond.notify_all()  # the next in line may share these options
+        try:
+            yield
+        finally:
+            with self._cond:
+                self._running -= 1
+                self._cond.notify_all()
 
 
 def _is_await_timeout(exc: Exception) -> bool:
@@ -539,6 +583,7 @@ class VerificationService:
         # job is the sole one in flight (killing is process-wide, so a
         # concurrent job would lose its provers too).
         self._inflight = 0
+        self._backend_gate = _BackendGate()
 
         # JVM() routes JVM System.out to System.err and quiets logback, so the
         # JSON-RPC stream of a stdio-based LSP/MCP frontend on stdout stays clean.
@@ -586,8 +631,9 @@ class VerificationService:
                job_token: str = None, request_meta: dict = None) -> VerifyResult:
         """Translate and verify the file at ``path`` and return structured results.
 
-        Multiple calls may run concurrently: translation is serialized but the
-        Viper verification overlaps. Pass a ``job_token`` to allow precise
+        Multiple calls may run concurrently: translation is serialized and the
+        Viper verification overlaps for calls with the same backend arguments
+        (_BackendGate). Pass a ``job_token`` to allow precise
         cancellation of this request via :meth:`cancel`. Set ``ignore_global``
         to skip verification of top-level (module-global) statements.
         ``viper_args`` are extra command-line arguments for the Viper backend
@@ -965,76 +1011,81 @@ class VerificationService:
         else:
             backend_args = build_silicon_backend_args(
                 viper_args, counterexample, self._disable_branch_conditions)
-        job_id = manager.submit(prog, path, backend_args, backend=self._backend)
-        if job_token is not None:
-            with self._jobs_lock:
-                self._jobs[job_token] = job_id
-        wall_cap = _hard_wall_seconds(backend_args)
-        with self._jobs_lock:
-            self._inflight += 1
-        verify_start = time.time()
-        try:
-            messages = manager.await_messages(
-                job_id, timeout_ms=wall_cap * 1000 if wall_cap else None)
-        except Exception as e:
-            if wall_cap is not None and _is_await_timeout(e):
-                # The backend blew through its own --timeout plus the grace
-                # period: cancel the job and, when no other job would be hit,
-                # hard-kill the prover processes so the server is immediately
-                # usable again; either way report a plain timeout.
-                with self._jobs_lock:
-                    alone = self._inflight == 1
-                logging.warning('Verification of %s exceeded the hard %ss wall '
-                                '(backend --timeout plus %ss grace); '
-                                'cancelling%s.', path, wall_cap,
-                                HARD_DEADLINE_GRACE,
-                                ' and killing provers' if alone else
-                                '; provers left running (concurrent job in flight)')
-                try:
-                    manager.cancel_job(job_id)
-                finally:
-                    if alone:
-                        _kill_child_provers()
-                phases.record('verify', time.time() - verify_start)
-                return VerifyResult(False, [self._timeout_diagnostic(
-                    path, 'Timeout occurred: verification exceeded %s second(s) '
-                    '(hard wall).' % wall_cap, phases, viper_args, modules)],
-                    time.time() - start, viper_program=viper_text)
-            # Most commonly this is a cancelled job (its actor was stopped) —
-            # either explicitly via the cancel tool, or because the backend's own
-            # --timeout ended the run. Tell those apart by the elapsed time, and
-            # report the timeout as a real diagnostic instead of an inexplicable
-            # empty result: this is the whole-run budget expiring while every
-            # individual SMT check stayed within its per-check budget (otherwise
-            # a located failure would have been reported).
-            elapsed = time.time() - start
-            phases.record('verify', time.time() - verify_start)
-            backend_timeout = _backend_timeout_seconds(backend_args)
-            if backend_timeout is not None and elapsed >= backend_timeout - 1:
-                logging.debug('Verification job ended by backend --timeout.',
-                              exc_info=True)
-                return VerifyResult(False, [self._timeout_diagnostic(
-                    path,
-                    'Timeout occurred: the whole-run --timeout=%ds expired '
-                    'before verification finished.%s'
-                    % (backend_timeout,
-                       '' if self.plain_diagnostics else
-                       ' No individual obligation failed or exceeded its '
-                       'per-check budget.'),
-                    phases, viper_args, modules)], elapsed, cancelled=True,
-                    viper_program=viper_text)
-            logging.debug('Verification job failed or was cancelled.', exc_info=True)
-            return VerifyResult(False, [], elapsed, cancelled=True,
-                                viper_program=viper_text)
-        finally:
-            with self._jobs_lock:
-                self._inflight -= 1
+        queued = time.time()
+        with self._backend_gate.admit(backend_args):
+            if time.time() - queued > 0.01:
+                phases.record('queued', time.time() - queued)
+            job_id = manager.submit(prog, path, backend_args, backend=self._backend)
             if job_token is not None:
                 with self._jobs_lock:
-                    # Only remove our own mapping; a newer run may have already
-                    # reused this token (e.g. an editor re-saving the same file).
-                    if self._jobs.get(job_token) is job_id:
-                        del self._jobs[job_token]
+                    self._jobs[job_token] = job_id
+            wall_cap = _hard_wall_seconds(backend_args)
+            with self._jobs_lock:
+                self._inflight += 1
+            verify_start = time.time()
+            try:
+                messages = manager.await_messages(
+                    job_id, timeout_ms=wall_cap * 1000 if wall_cap else None)
+            except Exception as e:
+                if wall_cap is not None and _is_await_timeout(e):
+                    # The backend blew through its own --timeout plus the grace
+                    # period: cancel the job and, when no other job would be hit,
+                    # hard-kill the prover processes so the server is immediately
+                    # usable again; either way report a plain timeout.
+                    with self._jobs_lock:
+                        alone = self._inflight == 1
+                    logging.warning('Verification of %s exceeded the hard %ss wall '
+                                    '(backend --timeout plus %ss grace); '
+                                    'cancelling%s.', path, wall_cap,
+                                    HARD_DEADLINE_GRACE,
+                                    ' and killing provers' if alone else
+                                    '; provers left running (concurrent job in flight)')
+                    try:
+                        manager.cancel_job(job_id)
+                    finally:
+                        if alone:
+                            _kill_child_provers()
+                    phases.record('verify', time.time() - verify_start)
+                    return VerifyResult(False, [self._timeout_diagnostic(
+                        path, 'Timeout occurred: verification exceeded %s second(s) '
+                        '(hard wall).' % wall_cap, phases, viper_args, modules)],
+                        time.time() - start, viper_program=viper_text)
+                # Most commonly this is a cancelled job (its actor was stopped) —
+                # either explicitly via the cancel tool, or because the backend's own
+                # --timeout ended the run. Tell those apart by the elapsed time, and
+                # report the timeout as a real diagnostic instead of an inexplicable
+                # empty result: this is the whole-run budget expiring while every
+                # individual SMT check stayed within its per-check budget (otherwise
+                # a located failure would have been reported).
+                elapsed = time.time() - start
+                phases.record('verify', time.time() - verify_start)
+                backend_timeout = _backend_timeout_seconds(backend_args)
+                if (backend_timeout is not None
+                        and time.time() - verify_start >= backend_timeout - 1):
+                    logging.debug('Verification job ended by backend --timeout.',
+                                  exc_info=True)
+                    return VerifyResult(False, [self._timeout_diagnostic(
+                        path,
+                        'Timeout occurred: the whole-run --timeout=%ds expired '
+                        'before verification finished.%s'
+                        % (backend_timeout,
+                           '' if self.plain_diagnostics else
+                           ' No individual obligation failed or exceeded its '
+                           'per-check budget.'),
+                        phases, viper_args, modules)], elapsed, cancelled=True,
+                        viper_program=viper_text)
+                logging.debug('Verification job failed or was cancelled.', exc_info=True)
+                return VerifyResult(False, [], elapsed, cancelled=True,
+                                    viper_program=viper_text)
+            finally:
+                with self._jobs_lock:
+                    self._inflight -= 1
+                if job_token is not None:
+                    with self._jobs_lock:
+                        # Only remove our own mapping; a newer run may have already
+                        # reused this token (e.g. an editor re-saving the same file).
+                        if self._jobs.get(job_token) is job_id:
+                            del self._jobs[job_token]
 
         duration = time.time() - start
         phases.record('verify', time.time() - verify_start)
@@ -1060,12 +1111,18 @@ class VerificationService:
                 # the whole-run timeout.
                 cap = _prover_memory_mb(backend_args)
                 return VerifyResult(False, [self._timeout_diagnostic(
-                    path, 'Out of memory: the prover exceeded its memory limit%s. '
-                    'Like a timeout, the proof search is too expensive, typically '
-                    'a matching loop or too much context; the same program runs '
-                    'out again.' % (' of %d MB' % cap if cap else ''),
+                    path, 'Out of memory: the prover exceeded its memory limit%s.'
+                    % (' of %d MB' % cap if cap else ''),
                     phases, viper_args, modules)], duration,
                     viper_program=viper_text)
+            if crash_texts and not self.plain_diagnostics and any(
+                    PROVER_SEGFAULT in t for t in crash_texts):
+                logging.warning('Prover segfault for %s: %s', path, crash_texts[0])
+                diag = self._point_diagnostic(
+                    path, 'Z3 crashed with a segmentation fault.', 'verifier.crashed')
+                self._add_in_flight(diag, viper_args, modules)
+                return VerifyResult(False, [diag], duration, crashed=True,
+                                    viper_program=viper_text)
             if crash_texts:
                 # The backend died with an exception instead of producing a
                 # result (e.g. a prover crash). Surface it as a distinct
@@ -1239,25 +1296,31 @@ class VerificationService:
         its SMT state dir."""
         diag = self._point_diagnostic(path, message + self._phase_note(phases),
                                       'TimeoutOccurred')
+        self._add_in_flight(diag, viper_args, modules)
+        return diag
+
+    def _add_in_flight(self, diag, viper_args, modules) -> None:
+        """Unless plain, name in `diag`'s message what each verifier has in
+        flight, and attach the session-log report (session_log.timeout_report)
+        as its debug payload."""
         smtstate_dir = self._smtstate_dir(viper_args)
         if self.plain_diagnostics or not smtstate_dir or not os.path.isdir(smtstate_dir):
-            return diag
+            return
         try:
             names = {m.sil_name: _python_name(m) for module in modules or ()
                      for m in _members(module)}
             report = session_log.timeout_report(
                 smtstate_dir, int(time.time() * 1000), lambda n: names.get(n, n))
         except Exception:
-            logging.exception('Failed to read the session logs of a timed-out run.')
-            return diag
+            logging.exception('Failed to read the session logs of %s.', smtstate_dir)
+            return
         if report is None:
-            return diag
+            return
         diag.debug = report
         if report['inFlight']:
             diag.message += ' In flight: ' + '; '.join(
                 '%s at %s (%s, %.1fs)' % (c['member'], c['at'], c['kind'], c['runningMs'] / 1000)
                 for c in report['inFlight']) + '.'
-        return diag
 
     def _failure_diagnostics(self, failure: Failure, path: str,
                              smt_state_requested: bool = False,
