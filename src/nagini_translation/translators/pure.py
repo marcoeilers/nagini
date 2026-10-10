@@ -362,6 +362,8 @@ class PureTranslator(CommonTranslator):
                                              wrapper.names, ctx)
             if wrapper.name in ctx.var_aliases:
                 old_val = ctx.var_aliases[wrapper.name].ref()
+            elif wrapper.name in function.args:
+                old_val = function.args[wrapper.name].ref()
             else:
                 # Variable newly defined in conditional branch, so
                 # there is no old value; the variable is not defined
@@ -446,17 +448,16 @@ class PureTranslator(CommonTranslator):
         if ass_stmt:
             raise InvalidProgramException(wrapper.node, 'purity.violated')
 
-        asserting = self.viper.Asserting(ass, previous, position, info)
-
         if wrapper.cond:
+            # Fold the branch condition into the asserted expression instead
+            # of branching around it: CondExp(cond, Asserting(ass, previous),
+            # previous) duplicates the whole continuation, which nests
+            # exponentially when many guarded Asserts share a branch.
             cond = self._translate_condition(wrapper.cond,
                                              wrapper.names, ctx)
+            ass = self.viper.Implies(cond, ass, position, info)
 
-            new_val = self.viper.CondExp(cond, asserting, previous, position,
-                                         info)
-            return new_val
-        else:
-            return asserting
+        return self.viper.Asserting(ass, previous, position, info)
 
     def _translate_wrapper_expr(self, wrapper: Wrapper,
                                 ctx: Context) -> Expr:

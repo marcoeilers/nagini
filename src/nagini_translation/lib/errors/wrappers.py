@@ -47,34 +47,44 @@ class Position:
         else:
             self.node_id = None
 
+    # Errors surfaced for internal verifier exceptions carry ``NoPosition``,
+    # which has none of the accessors below — every property must degrade
+    # instead of raising while an error is being rendered.
+
     @property
     def file_name(self) -> str:
         """Return ``file``."""
+        if not hasattr(self._position, 'file'):
+            return '<no position>'
         return self._position.file().toString()
 
     @property
     def line(self) -> int:
         """Return ``start.line``."""
+        if not hasattr(self._position, 'line'):
+            return 0
         return self._position.line()
 
     @property
     def column(self) -> int:
         """Return ``start.column``."""
+        if not hasattr(self._position, 'column'):
+            return 0
         return self._position.column()
 
     @property
     def line_end(self) -> int:
         """Return ``end.line``."""
-        if self._position.end().isDefined():
+        if hasattr(self._position, 'end') and self._position.end().isDefined():
             return self._position.end().get().line()
-        return self._position.line()
+        return self.line
 
     @property
     def column_end(self) -> int:
         """Return ``end.column``."""
-        if self._position.end().isDefined():
+        if hasattr(self._position, 'end') and self._position.end().isDefined():
             return self._position.end().get().column()
-        return self._position.column()
+        return self.column
 
     def __str__(self) -> str:
         return str(self._position)
@@ -114,7 +124,15 @@ class Reason:
                 return VAGUE_REASONS[self.identifier]
             else:
                 return self._reason.readableMessage()
-        return REASONS[self.identifier](reason)
+        handler = REASONS.get(self.identifier)
+        if handler is not None:
+            try:
+                return handler(reason)
+            except Exception:
+                pass  # a formatter must never turn an error into a crash
+        if hasattr(self._reason, 'readableMessage'):
+            return self._reason.readableMessage()
+        return str(self._reason)
 
 
 class Error:
@@ -150,7 +168,7 @@ class Error:
             self.reason = Reason(reason_id, viper_reason)
         else:
             self.reason = None
-        self.position = Position(error.pos())
+        self.position = Position(error.pos() if hasattr(error, 'pos') else None)
         self.bcs = bcs
 
     def pos(self) -> 'ast.AbstractSourcePosition':
@@ -166,6 +184,8 @@ class Error:
     @property
     def full_id(self) -> str:
         """Full error identifier."""
+        if self.reason is None:
+            return self.identifier
         return '{}:{}'.format(self.identifier, self.reason.identifier)
 
     @property
@@ -197,10 +217,19 @@ class Error:
     def message(self) -> str:
         """Human readable error message."""
         if self._node:
-            return ERRORS[self.identifier](self._node)
-        # If we don't have a node, fall back to the original Silver message,
-        # it's better than nothing.
-        return self._error.text()
+            handler = ERRORS.get(self.identifier)
+            if handler is not None:
+                try:
+                    return handler(self._node)
+                except Exception:
+                    pass  # a formatter must never turn an error into a crash
+        # If we don't have a node (or no message template for this error id),
+        # fall back to the original Silver message, it's better than nothing.
+        if hasattr(self._error, 'text'):
+            return self._error.text()
+        if hasattr(self._error, 'readableMessage'):
+            return self._error.readableMessage()
+        return str(self._error)
 
     def __str__(self) -> str:
         return self.string(False, False)

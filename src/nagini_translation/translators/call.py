@@ -6,6 +6,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import ast
+import builtins
 import copy
 from collections import OrderedDict
 from typing import Dict, List, Tuple, Union
@@ -159,6 +160,14 @@ class CallTranslator(CommonTranslator):
         len_stmt, len_val = self.get_func_or_method_call(arg_type, '__len__', [target],
                                                          [None], node, ctx)
         return stmt + len_stmt, len_val
+
+    def _translate_id(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        assert len(node.args) == 1
+        stmt, target = self.translate_expr(node.args[0], ctx)
+        object_class = ctx.module.global_module.classes['object']
+        id_val = self.get_function_call(object_class, '__id__', [target],
+                                        [None], node, ctx)
+        return stmt, id_val
 
     def _translate_str(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
@@ -650,7 +659,11 @@ class CallTranslator(CommonTranslator):
             
         if method_name:
             target_method = bytearray_class.get_method(method_name)
-            arg_stmts, arg_vals, arg_types = self.translate_args(target_method, node.args, node.keywords, node, ctx)
+            # The __initFrom*__ factories take no receiver, although the call
+            # node syntactically is a constructor call.
+            arg_stmts, arg_vals, arg_types = self.translate_args(
+                target_method, node.args, node.keywords, node, ctx,
+                implicit_receiver=False)
             constr_call = self.get_method_call(bytearray_class, method_name, arg_vals, arg_types, targets, node, ctx)
             return arg_stmts + constr_call, res_var.ref(node, ctx)
 
@@ -667,6 +680,8 @@ class CallTranslator(CommonTranslator):
             return self._translate_isinstance(node, ctx)
         elif func_name == 'super':
             return self._translate_super(node, ctx)
+        elif func_name == 'id':
+            return self._translate_id(node, ctx)
         elif func_name == 'len':
             return self._translate_len(node, ctx)
         elif func_name == 'str':
@@ -953,10 +968,16 @@ class CallTranslator(CommonTranslator):
             if keywords:
                 raise UnsupportedException(node, desc='Keyword arguments in call to '
                                                       'builtin function: ' + target.name)
-            diff = target.nargs - len(unpacked_args)
+            # The receiver of a method call is not among arg_nodes but fills the
+            # first declared parameter; count it, or extra arguments beyond the
+            # modeled arity are silently dropped downstream.
+            diff = target.nargs - len(unpacked_args) - (1 if implicit_receiver else 0)
             if diff < 0:
-                raise UnsupportedException(node, 'Unsupported version of builtin '
-                                                 'function: ' + target.name)
+                modeled = target.nargs - (1 if implicit_receiver else 0)
+                raise UnsupportedException(
+                    node, 'call to builtin function {} with {} argument(s); '
+                          'Nagini models only {}.'.format(
+                              target.name, len(unpacked_args), modeled))
             if diff > 0:
                 null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
                 unpacked_args += [null] * diff
@@ -1285,7 +1306,24 @@ class CallTranslator(CommonTranslator):
 
             # Must be a function that exists (otherwise mypy would complain)
             # we don't know, so probably some builtin we don't support yet.
-            msg = 'Unsupported builtin function'
+            func_name = get_func_name(node)
+            if isinstance(node.func, ast.Name):
+                builtin_target = getattr(builtins, node.func.id, None)
+                if (isinstance(builtin_target, type) and
+                        issubclass(builtin_target, BaseException)):
+                    raise UnsupportedException(
+                        node, 'builtin exceptions ({}) can only be '
+                              'constructed in a raise statement, Exsures, or '
+                              'except clause. Raise it directly, or define a '
+                              'module-level subclass of Exception '
+                              'instead.'.format(node.func.id))
+            if func_name == 'pow' and len(node.args) == 3:
+                raise UnsupportedException(
+                    node, 'the 3-argument form of pow() is not modeled; '
+                          'implement modular exponentiation as a helper '
+                          '(e.g. square-and-multiply).')
+            msg = ("Unsupported builtin function '{}'".format(func_name)
+                   if func_name else 'Unsupported builtin function')
             if ctx.actual_function.method_type == MethodType.class_method:
                 msg += ' or indirect call of classmethod argument'
             raise UnsupportedException(node, msg + '.')
@@ -1388,7 +1426,7 @@ class CallTranslator(CommonTranslator):
                 target_name = family_root.get_predicate(name).sil_name
             perm = self.viper.FullPerm(position, self.no_info(ctx))
             if not impure:
-                raise InvalidProgramException(node, 'invalid.contract.position')
+                raise InvalidProgramException(node, 'permission.in.pure.context')
             return arg_stmts, self.create_predicate_access(target_name, args,
                                                            perm, node, ctx)
         elif target.pure:
@@ -1446,6 +1484,9 @@ class CallTranslator(CommonTranslator):
             elif func_name in OBLIGATION_CONTRACT_FUNCS:
                 return self.translate_obligation_contractfunc_call(node, ctx, impure)
             elif func_name in BUILTINS:
+                if func_name == 'id' and self.get_target(node.func, ctx) is not None:
+                    # A user-defined function named 'id' shadows the builtin.
+                    return self.translate_normal_call_node(node, ctx, impure)
                 return self._translate_builtin_func(node, ctx)
             elif func_name == "Thread":
                 return self._translate_thread_creation(node, ctx)
