@@ -362,6 +362,8 @@ class PureTranslator(CommonTranslator):
                                              wrapper.names, ctx)
             if wrapper.name in ctx.var_aliases:
                 old_val = ctx.var_aliases[wrapper.name].ref()
+            elif wrapper.name in function.args:
+                old_val = function.args[wrapper.name].ref()
             else:
                 # Variable newly defined in conditional branch, so
                 # there is no old value; the variable is not defined
