@@ -254,6 +254,8 @@ The following papers and theses have used Nagini to verify Python programs:
 
 - `Self-Spec Verifiable Code Generation <https://arxiv.org/pdf/2609.39568>`_ — Qian et al., Peking University (2026). Introduces VeriCodeBench, a benchmark of 400 problems across C, Java, Rust, and Python in which LLMs must generate both their own specifications and verified code; the Python track uses Nagini.
 
+- `Verifier-Grounded Agentic RL for Provably Correct Code <https://arxiv.org/pdf/2610.19298>`_ — Ma et al., UC Berkeley / AWS AI Labs (2026). Uses a program verifier as a reinforcement-learning reward for LLM agents, giving partial credit for each proof obligation discharged, and trains on the Nagini instances of SWE-Proof (alongside Dafny programs from DafnyBench), with a HumanEval-based Nagini suite used for held-out evaluation.
+
 - `SWE-Proof: Can Language Models Resolve Real-World Issues with Machine-Checked Proofs? <https://arxiv.org/pdf/2609.21190>`_ — Ma et al., UC Berkeley / Georgia Tech / UIUC / AWS AI Labs (2026). Turns the 500 real-world issues of SWE-bench Verified into formally verified coding tasks for LLM agents, using Nagini as one of three verification backends (alongside Velvet and Lean).
 
 - `Formally Verified ASN.1 Python Encoders and Decoders <https://ethz.ch/content/dam/ethz/special-interest/infk/chair-program-method/pm/documents/Education/Theses/Luca_Schafroth_MS_Report.pdf>`_ — Luca Schafroth, ETH Zurich Master's Thesis (2026). Formal verification of ASN.1/ACN-generated Python codecs using Nagini, proving round-trip correctness for several data types and fully verifying the BitStream runtime component.
