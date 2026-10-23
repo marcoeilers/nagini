@@ -30,10 +30,11 @@ CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant', 'Decrea
 GHOST_BUILTINS = ['PSeq', 'PByteSeq', 'PSet', 'PMultiset', 'GInt', 'GFloat', 'GComplex',
                   'GBool', 'GStr']
 
-CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'ResultT', 'Implies', 'Forall', 'IOForall', 'Forall2', 'Forall3', 'Forall6',
+CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'ResultT', 'Implies', 'Forall',
+                  'IOForall', 'Forall2', 'Forall3', 'Forall4', 'Forall5', 'Forall6',
                   'Exists', 'Low', 'LowVal', 'LowEvent', 'Declassify', 'TerminatesSif',
                   'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding', 'Previous',
-                  'RaisedException', 'ToSeq', 'ToByteSeq', 'ToMS', 'MaySet', 'MayCreate',
+                  'RaisedException', 'ToSeq', 'ToByteSeq', 'ToSet', 'ToMS', 'MaySet', 'MayCreate',
                   'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',
                   'LowExit', 'Refute', 'isNaN', 'Reveal', 'MarkGhost'] + GHOST_BUILTINS
 
@@ -446,6 +447,13 @@ def ToByteSeq(l: Iterable[int]) -> PByteSeq:
     """
 
 
+def ToSet(l: Iterable[T]) -> PSet[T]:
+    """
+    Converts a built-in set, or the keys of a built-in dict, to a pure PSet.
+    A PSet argument is returned as is.
+    """
+
+
 def ToMS(s: PSeq[T]) -> PMultiset[T]:
     """
     Multiset view of the given sequence.
@@ -455,7 +463,7 @@ def ToMS(s: PSeq[T]) -> PMultiset[T]:
 # The following annotations have no runtime semantics. They are only used for
 # the Python to Viper translation.
 
-def Acc(field, ratio=1) -> bool:
+def Acc(field, ratio: float=1) -> bool:
     """
     Access permission to field.
     0 < ratio < 1 means read-only access.
@@ -680,6 +688,7 @@ __all__ = [
         'PMultiset',
         'ToSeq',
         'ToByteSeq',
+        'ToSet',
         'ToMS',
         'MaySet',
         'MayCreate',

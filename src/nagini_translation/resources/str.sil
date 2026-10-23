@@ -57,8 +57,9 @@ method str___format__(self: Ref, other: Ref) returns (_res: Ref)
     requires issubtype(typeof(other), str())
     ensures issubtype(typeof(_res), str())
     
-method str_split(self: Ref) returns (res: Ref)
+method str_split(self: Ref, sep: Ref) returns (res: Ref)
     decreases _
     requires issubtype(typeof(self), str())
+    requires sep == null || (issubtype(typeof(sep), str()) && str___len__(sep) > 0)
     ensures issubtype(typeof(res), list(str()))
     ensures acc(res.list_acc)

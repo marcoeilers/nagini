@@ -15,6 +15,6 @@ class A:
 
 
 def m(a: A) -> int:
-    #:: ExpectedOutput(invalid.program:invalid.contract.position)
+    #:: ExpectedOutput(invalid.program:permission.in.pure.context)
     Requires(Implies(Acc(a.v), Acc(a.p())))
     return 7

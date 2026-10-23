@@ -10,6 +10,9 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 --disable-branch-conditions, obligation auto-detection, per-request Viper
 backend arguments, and include_viper."""
 
+import threading
+import time
+
 
 _TOPLEVEL_ASSERT_SRC = (
     "from nagini_contracts.contracts import *\n\n"
@@ -45,6 +48,21 @@ _MUST_TERMINATE_BAD_SRC = (
     "def rec(n: int) -> int:\n"
     "    Requires(MustTerminate(1))\n"
     "    return rec(n)\n"
+)
+
+
+_SLOW_THEN_FAILING_SRC = (
+    "from nagini_contracts.contracts import *\n\n"
+    "def slow(a: int, b: int, c: int, d: int) -> None:\n"
+    "    Requires(a > 1 and b > 1 and c > 1 and d > 1)\n"
+    + "".join("    Assert(a * b * c * d + {0} > a * b + {0})\n".format(i) for i in range(150))
+    + "    Assert(a > 1000)\n"
+)
+
+_QUICK_FAILING_SRC = (
+    "from nagini_contracts.contracts import *\n\n"
+    "def quick(x: int) -> None:\n"
+    "    Assert(x > 0)\n"
 )
 
 
@@ -137,6 +155,45 @@ def test_viper_args_invalid_option_fails_cleanly(service, tmp_path):
         _write(tmp_path, "va_bad.py", _NO_OBLIGATIONS_SRC),
         viper_args=["--no-such-silicon-option"])
     assert not result.success
+
+
+def test_prover_out_of_memory_reported_as_timeout(service, tmp_path):
+    path = _write(tmp_path, "oom.py", _NO_OBLIGATIONS_SRC)
+    capped = ["--proverConfigArgs=memory_max_size=1", "--disableCaching"]
+    result = service.verify(path, viper_args=capped)
+    assert not (result.success or result.crashed)
+    [diag] = result.diagnostics
+    assert diag.code == "TimeoutOccurred"
+    assert "memory limit of 1 MB" in diag.message
+    # Plain diagnostics keep the backend's crash.
+    service.plain_diagnostics = True
+    try:
+        plain = service.verify(path, viper_args=capped)
+    finally:
+        service.plain_diagnostics = False
+    assert plain.crashed
+    assert plain.diagnostics[0].code == "verifier.crashed"
+
+
+def test_concurrent_requests_keep_their_own_backend_options(service, tmp_path):
+    # Silicon's configuration is process-global: a job started next to one with
+    # other options would change that job's per-check budget mid-run.
+    slow = _write(tmp_path, "gate_slow.py", _SLOW_THEN_FAILING_SRC)
+    quick = _write(tmp_path, "gate_quick.py", _QUICK_FAILING_SRC)
+    results = {}
+
+    def run(path, budget):
+        results[path] = service.verify(path, viper_args=[
+            "--assertTimeout=%d" % budget, "--smtStateOnError", "--disableCaching"])
+
+    first = threading.Thread(target=run, args=(slow, 5000))
+    first.start()
+    time.sleep(3)  # the slow job is verifying when the quick one arrives
+    run(quick, 500)
+    first.join()
+    budgets = lambda r: [d.debug["failingCheck"]["budgetMs"] for d in r.diagnostics]
+    assert budgets(results[slow]) == [5000]
+    assert budgets(results[quick]) == [500]
 
 
 # -- include_viper ------------------------------------------------------------

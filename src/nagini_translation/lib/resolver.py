@@ -74,7 +74,17 @@ def get_target(node: ast.AST,
     if isinstance(node, ast.Name):
         return find_entry(node.id, True, containers)
     elif type and isStr(node):
-        return find_entry(node.value, True, containers)
+        result = find_entry(node.value, True, containers)
+        if result is None:
+            # The string may be a type expression like 'Box[V, K]' rather
+            # than a plain name; parse it and resolve the expression.
+            try:
+                parsed = ast.parse(node.value, mode='eval').body
+            except SyntaxError:
+                return None
+            if not isStr(parsed):
+                return get_target(parsed, containers, container, True)
+        return result
     elif isinstance(node, ast.Call):
         # For calls, we return the type of the result of the call
         if isinstance(node.func, ast.Call):
@@ -173,6 +183,8 @@ def get_target(node: ast.AST,
                 return res
             if node.value.id == 'Optional':
                 option = get_target(node.slice, containers, container, True)
+                if option is None:
+                    return None
                 return OptionalType(option)
             if node.value.id == 'Union':
                 if isinstance(node.slice, ast.Tuple):
@@ -267,22 +279,17 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                     target.type_vars):
                 # This is a call to a constructor of a generic class; it's not
                 # enough to just return the class, we need the entire type with
-                # type arguments. We only support that if we can get it directly
-                # from mypy, i.e., when the result is assigned to a variable
-                # and we can get the variable type.
-                if hasattr(node, '_parent') and node._parent and isinstance(node._parent, (ast.Assign, ast.AnnAssign)):
-                    trgt = node._parent.targets[0] if isinstance(node._parent, ast.Assign) else node._parent.target
-                    ann_type = get_type(trgt, containers, container)
-                    if isinstance(ann_type, GenericType) and ann_type.python_class == target:
-                        return ann_type
+                # type arguments, which mypy inferred from the arguments and
+                # the context.
+                recorded = _recorded_type(node, module)
+                if recorded is not None:
+                    return recorded
                 if (target.name in (PSEQ_TYPE, PSET_TYPE, PMSET_TYPE) and
                           isinstance(node, ast.Call) and node.args):
                     arg_types = [get_type(arg, containers, container)
                                  for arg in node.args]
                     return GenericType(target, [common_supertype(arg_types)])
-                else:
-                    error = 'generic.constructor.without.type'
-                    raise InvalidProgramException(node, error)
+                raise InvalidProgramException(node, 'generic.constructor.without.type')
             if isinstance(node, ast.Call) or isinstance(target, PythonModule):
                 # Only a reference to a class is a class object. A call yields
                 # whatever the call returns, and a module is not a type at all,
@@ -327,7 +334,17 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         if isinstance(node.value, float):
             return module.global_module.classes[FLOAT_TYPE]
     elif isinstance(node, ast.Tuple):
-        args = [get_type(arg, containers, container) for arg in node.elts]
+        typ = _recorded_type(node, module)
+        args = (typ.type_args if typ is not None else
+                [get_type(arg, containers, container) for arg in node.elts])
+        if len(args) > 9 and len({a.name for a in args}) == 1:
+            # Beyond the fixed arities a homogeneous literal is translated as a
+            # variadic tuple (ExpressionTranslator.create_tuple).
+            res = GenericType(module.global_module.classes[TUPLE_TYPE], [args[0]])
+            res.exact_length = False
+            return res
+        if typ is not None:
+            return typ
         return GenericType(module.global_module.classes[TUPLE_TYPE],
                            args)
     elif isinstance(node, ast.Subscript):
@@ -340,12 +357,17 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         return module.global_module.classes[BOOL_TYPE]
     elif isinstance(node, ast.BoolOp):
         # And and Or always return one of their operands, so we use the common
-        # supertype of all arguments.
+        # supertype of all arguments. Operands with no value type (bare
+        # predicate accesses like list_pred(xs) in assertion positions) do
+        # not contribute to the value type.
         # TODO: We could also use a union type, but since support for e.g.
         # calling methods on those isn't amazing yet, we don't do that yet.
         operand_types = [get_type(operand, containers, container)
                          for operand in node.values]
-        return common_supertype(operand_types)
+        valued = [t for t in operand_types if t is not None]
+        if not valued:
+            return None
+        return common_supertype(valued)
     elif isinstance(node, ast.List):
         return _get_collection_literal_type(node, ['elts'], LIST_TYPE, module,
                                             containers, container)
@@ -364,6 +386,7 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         right_type = get_type(node.right, containers, container)
 
         func = None
+        receiver = left_type
         if left_type == right_type or isinstance(right_type, TypeVar):
             func = left_type.get_func_or_method(LEFT_OPERATOR_FUNCTIONS[type(node.op)])
 
@@ -375,15 +398,26 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                 base_right_func = left_type.get_compatible_func_or_method(right_func_name, [right_type, left_type])
                 if right_func.overrides or base_right_func == None:
                     func = right_func
+                    receiver = right_type
 
             if func is None:
                 left_func = left_type.get_compatible_func_or_method(LEFT_OPERATOR_FUNCTIONS[type(node.op)], [left_type, right_type])
                 if left_func:
                     func = left_func
+                    receiver = left_type
                 if right_func:
                     func = right_func
+                    receiver = right_type
         if func is None:
             raise UnsupportedException(node, 'Unsupported operator')
+        # Parameterize the result from the receiver, like the PythonMethod call case
+        # above: generic_type -2 means the receiver's type, >= 0 one of its type args.
+        if func.generic_type == -2:
+            return receiver
+        if func.generic_type >= 0:
+            return receiver.type_args[func.generic_type]
+        if func.type is not None and func.type.contains_type_var():
+            return func.type.substitute(receiver.get_bound_type_vars())
         return func.type
 
     elif isinstance(node, ast.UnaryOp):
@@ -426,6 +460,17 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         raise UnsupportedException(node)
 
 
+def _recorded_type(node: ast.AST, module: PythonModule) -> Optional[PythonType]:
+    """
+    The type mypy inferred for the collection literal or constructor call
+    ``node``, as recorded by the analyzer; None for a node it did not see
+    (one without a position, or typed with Any).
+    """
+    if not hasattr(node, 'lineno'):
+        return None
+    return module.literal_types.get((node.lineno, node.col_offset))
+
+
 def _get_collection_literal_type(node: ast.AST, arg_fields: List[str],
                                  coll_type: str, module: PythonModule,
                                  containers: List[ContainerInterface],
@@ -434,17 +479,12 @@ def _get_collection_literal_type(node: ast.AST, arg_fields: List[str],
     Assuming ``node`` is a collection literal, ``coll_type`` is the type of the
     collection (e.g. 'list'), and ``arg_fields`` contains the fields of the
     literal which contain the contents of the literal (e.g. 'keys' and 'values'
-    for a dict), returns the type of the collection.
+    for a dict), returns the type of the collection: the one mypy inferred if
+    the analyzer recorded it, else the elements' common supertype.
     """
-    if hasattr(node, '_parent') and isinstance(node._parent, (ast.Assign, ast.AnnAssign)):
-        # Constructor is assigned to variable;
-        # we get the type of the dict from the type of the
-        # variable it's assigned to.
-        target = node._parent.targets[0] if isinstance(node._parent, ast.Assign) else node._parent.target
-        ann_type = get_type(target, containers, container)
-        if isinstance(ann_type, GenericType) and ann_type.python_class.name == coll_type:
-            return GenericType(module.global_module.classes[coll_type],
-                               ann_type.type_args)
+    recorded = _recorded_type(node, module)
+    if recorded is not None:
+        return recorded
     if all(getattr(node, arg_field) for arg_field in arg_fields):
         args = []
         for arg_field in arg_fields:
@@ -490,22 +530,17 @@ def _get_call_type(node: ast.Call, module: PythonModule,
             call_target.type_vars):
         # This is a call to a constructor of a generic class; it's not
         # enough to just return the class, we need the entire type with
-        # type arguments. We only support that if we can get it directly
-        # from mypy, i.e., when the result is assigned to a variable
-        # and we can get the variable type.
-        if hasattr(node, '_parent') and node._parent and isinstance(node._parent, (ast.Assign, ast.AnnAssign)):
-            trgt = node._parent.targets[0] if isinstance(node._parent, ast.Assign) else node._parent.target
-            ann_type = get_type(trgt, containers, container)
-            if isinstance(ann_type, GenericType) and ann_type.python_class == call_target:
-                return ann_type
+        # type arguments, which mypy inferred from the arguments and the
+        # context.
+        recorded = _recorded_type(node, module)
+        if recorded is not None:
+            return recorded
         if (call_target.name in (PSEQ_TYPE, PSET_TYPE, PMSET_TYPE) and
-                isinstance(node, ast.Call) and node.args):
+                node.args):
             arg_types = [get_type(arg, containers, container)
                          for arg in node.args]
             return GenericType(call_target, [common_supertype(arg_types)])
-        else:
-            error = 'generic.constructor.without.type'
-            raise InvalidProgramException(node, error)
+        raise InvalidProgramException(node, 'generic.constructor.without.type')
     if isinstance(call_target, PythonType):
         # constructor call
         return call_target
@@ -519,6 +554,10 @@ def _get_call_type(node: ast.Call, module: PythonModule,
             raise InvalidProgramException(node, 'invalid.super.call')
     if func_name == 'len':
         return module.global_module.classes[INT_TYPE]
+    if func_name == 'id':
+        # A user-defined function named 'id' shadows the builtin.
+        if get_target(node.func, containers, container) is None:
+            return module.global_module.classes[INT_TYPE]
     if func_name in ('token', 'ctoken', 'MustTerminate', 'MustRelease'):
         return module.global_module.classes[BOOL_TYPE]
     if func_name == PSEQ_TYPE:
@@ -570,6 +609,11 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 return GenericType(seq_class, [content_type])
             elif node.func.id == 'ToByteSeq':
                 return module.global_module.classes[PBYTESEQ_TYPE]
+            elif node.func.id == 'ToSet':
+                arg_type = get_type(node.args[0], containers, container)
+                set_class = module.global_module.classes[PSET_TYPE]
+                content_type = _get_iteration_type(arg_type, module, node)
+                return GenericType(set_class, [content_type])
             elif node.func.id == 'ToMS':
                 arg_type = get_type(node.args[0], containers, container)
                 ms_class = module.global_module.classes[PMSET_TYPE]
@@ -630,6 +674,10 @@ def get_subscript_type(node: ast.Subscript, module: PythonModule,
                         containers: List[ContainerInterface],
                         container: PythonNode) -> PythonType:
     value_type = get_type(node.value, containers, container)
+    if value_type is None:
+        # The subscripted expression refers to something unknown in the given
+        # context (see _do_get_type).
+        return None
     if value_type.python_class.name == TUPLE_TYPE and isinstance(node.slice, ast.Slice):
         if (hasattr(node, '_parent') and node._parent and isinstance(node._parent, (ast.Assign, ast.AnnAssign)) and
                 node is node._parent.value):

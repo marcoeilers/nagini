@@ -8,6 +8,6 @@ class C:
         self.f = 1
 
 def bla(x: C) -> None:
-    #:: ExpectedOutput(invalid.program:invalid.contract.position)
+    #:: ExpectedOutput(invalid.program:permission.in.pure.context)
     if Acc(x.f):
         pass

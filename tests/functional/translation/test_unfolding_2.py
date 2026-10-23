@@ -17,5 +17,5 @@ def P(c: Cell) -> bool:
 
 def client(c: Cell) -> None:
     Requires(Unfolding(P(c), c.val is not None))
-    #:: ExpectedOutput(invalid.program:invalid.contract.position)
+    #:: ExpectedOutput(invalid.program:permission.in.pure.context)
     Requires(Unfolding(P(c), Acc(c.val.val)))
