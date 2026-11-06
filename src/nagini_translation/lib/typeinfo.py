@@ -372,11 +372,13 @@ class TypeInfo:
         """Forces mypy to re-check every module Nagini needs the typed AST of,
         which a cache hit does not materialize, by deleting its entry from the
         on-disk cache before the build: every module whose source lives under
-        base_dir (the project), and every module transitively imported from
-        the main file (ignoring IGNORED_IMPORTS and everything imported solely
-        by those). Everything else keeps its cache hit. The project sweep does
-        not depend on cache metadata: mypy writes none for a module with
-        errors, so a walk from such a module would miss what it imports.
+        base_dir (the project) or whose name a project file has (mypy reuses
+        an entry cached from an identical file elsewhere), and every module
+        transitively imported from the main file (ignoring IGNORED_IMPORTS and
+        everything imported solely by those). Everything else keeps its cache
+        hit. The project sweep does not depend on cache metadata: mypy writes
+        none for a module with errors, so a walk from such a module would miss
+        what it imports.
 
         Works on the on-disk cache because patching mypy.build.find_cache_meta
         has no effect on the mypyc-compiled mypy wheel: compiled call sites
@@ -392,15 +394,18 @@ class TypeInfo:
             for name in names:
                 if not name.endswith('.meta.json'):
                     continue
-                meta_path = os.path.join(dirpath, name)
+                stem = os.path.join(dirpath, name[:-len('.meta.json')])
+                rel = os.path.relpath(stem, cache_root)
+                named = any(os.path.exists(os.path.join(project, rel + ext))
+                            for ext in ('.py', '.pyi'))
                 try:
-                    with open(meta_path) as f:
+                    with open(stem + '.meta.json') as f:
                         source = json.load(f).get('path', '')
                 except (OSError, ValueError):
-                    continue
-                if os.path.abspath(source).startswith(project + os.sep):
-                    for path in (meta_path,
-                                 meta_path[:-len('.meta.json')] + '.data.json'):
+                    source = ''
+                inside = os.path.abspath(source).startswith(project + os.sep)
+                if named or source and inside:
+                    for path in (stem + '.meta.json', stem + '.data.json'):
                         try:
                             os.remove(path)
                         except OSError:
