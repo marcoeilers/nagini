@@ -123,6 +123,8 @@ class VerifyResult:
     viper_program: Optional[str] = None
     # Seconds per pipeline phase (lib.phases.ORDER).
     timings: Optional[dict] = None
+    # Of those, the seconds the request's thread ran (lib.phases.cpu); recorded only.
+    cpu_timings: Optional[dict] = None
     # Attempt directory this run was archived under (record dir enabled only);
     # its result.json holds the untruncated debug payloads.
     recorded_at: Optional[str] = None
@@ -721,7 +723,7 @@ class VerificationService:
                                                  translate_only=translate_only,
                                                  erased=erased)
             else:
-                with self._state_lock:
+                with self._request_lock():
                     result = self._verify_serial(path, selected, base_dir, arp,
                                                  counterexample, ignore_global,
                                                  viper_args, include_viper,
@@ -738,6 +740,7 @@ class VerificationService:
                 'log).'.format(type(e).__name__, e), 'internal.error')],
                 time.time() - start)
         result.timings = phases.phases()
+        result.cpu_timings = phases.cpu()
         self._record_erased(erased)
         result.recorded_at = self._record(
             path, selected, base_dir, viper_args, source, start,
@@ -746,6 +749,14 @@ class VerificationService:
         if smtstate_dir and os.path.isdir(smtstate_dir):
             shutil.rmtree(smtstate_dir, ignore_errors=True)
         return result
+
+    @contextlib.contextmanager
+    def _request_lock(self):
+        """The state lock, the wait for it recorded as the request's ``lock`` phase."""
+        start = time.time()
+        with self._state_lock:
+            phases.record('lock', time.time() - start)
+            yield
 
     def _record_erased(self, erased) -> None:
         """Keep the ghost-erased source of each file of an analysis (``erased``,
@@ -864,6 +875,7 @@ class VerificationService:
                 'startTime': start,
                 'duration': result.duration,
                 'timings': result.timings,
+                'cpuTimings': result.cpu_timings,
                 'success': result.success,
                 'cancelled': result.cancelled,
                 'translationFailed': result.translation_failed,
@@ -1034,7 +1046,7 @@ class VerificationService:
         self._set_journal_location(manager)
         start = time.time()
         # 1. Translate and snapshot this job's error-mapping state (serialized).
-        with self._state_lock:
+        with self._request_lock():
             self._reset_obligations()
             try:
                 translated = translate(
@@ -1205,7 +1217,7 @@ class VerificationService:
         is_failure = isinstance(result, self.jvm.viper.silver.verifier.Failure)
         if not is_failure:
             return VerifyResult(True, [], duration, viper_program=viper_text)
-        with self._state_lock:
+        with self._request_lock():
             error_manager._items, error_manager._conversion_rules = snapshot
             try:
                 it = result.errors().toIterator()

@@ -14,6 +14,7 @@ import sys
 
 from mypy.build import BuildSource
 from mypy.checkexpr import has_any_type
+from nagini_translation.lib import phases
 from nagini_translation.lib.constants import IGNORED_IMPORTS, LITERALS
 from nagini_translation.mypy_patches.visitor import TraverserVisitor
 
@@ -501,12 +502,14 @@ class TypeInfo:
             # even when their cache entries are fresh — a cache hit does not
             # materialize the mypy ASTs Nagini reads. Evict exactly those
             # entries; library stubs keep their hits.
-            self._evict_project_cache(options_strict, filename, module_name,
-                                      base_dir)
+            with phases.phase('typecheck.evict'):
+                self._evict_project_cache(options_strict, filename, module_name,
+                                          base_dir)
 
             sources = [BuildSource(filename, module_name, None, base_dir=base_dir)]
 
-            res_strict = mypy.build.build(sources, options_strict)
+            with phases.phase('typecheck.strict'):
+                res_strict = mypy.build.build(sources, options_strict)
 
             # An implicit-None return incompatibility exists only under
             # strict-optional overapproximation: with strict_optional=False,
@@ -521,47 +524,55 @@ class TypeInfo:
                 # Run mypy a second time with strict optional checking disabled,
                 # s.t. we don't get overapproximated none-related errors.
                 options_non_strict = self._create_options(False)
-                self._evict_project_cache(options_non_strict, filename,
-                                          module_name, base_dir)
-                res_non_strict = mypy.build.build(
-                    [BuildSource(filename, module_name, None, base_dir=base_dir)],
-                    options_non_strict
-                )
+                with phases.phase('typecheck.evict'):
+                    self._evict_project_cache(options_non_strict, filename,
+                                              module_name, base_dir)
+                with phases.phase('typecheck.nonstrict'):
+                    res_non_strict = mypy.build.build(
+                        [BuildSource(filename, module_name, None, base_dir=base_dir)],
+                        options_non_strict
+                    )
                 if res_non_strict.errors:
                     report_errors(res_non_strict.errors)
-            relevant_files = [next(iter(res_strict.graph))]
-            i = 0
-            while i < len(relevant_files):
-                name = relevant_files[i]
-                for dep_name in res_strict.graph[name].dep_line_map:
-                    if dep_name in IGNORED_IMPORTS:
-                        continue
-                    if dep_name not in relevant_files:
-                        relevant_files.append(dep_name)
-                i += 1
-            relevant_files = [(name, res_strict.graph[name]) for name in relevant_files]
-
-            for name, file_graph in relevant_files:
-                file = file_graph.tree
-                real_name = None
-                if name == module_name:
-                    real_name = name.split('.')
-                    name = '__main__'
-                self.files[name] = file.path
-                visitor = TypeVisitor(res_strict.types, name,
-                                      file.ignored_lines, real_name)
-                visitor.prefix = name.split('.')
-                visitor.visit(file)
-                self.all_types.update(visitor.all_types)
-                self.alt_types.update(visitor.alt_types)
-                for (line, column), expr_type in visitor.expr_types.items():
-                    self.expr_types[(name, line, column)] = expr_type
-                self.type_aliases.update(visitor.type_aliases)
-                self.type_vars.update(visitor.type_vars)
-                self.ghost_names.update(visitor.ghost_names)
+            with phases.phase('typecheck.visit'):
+                self._collect(res_strict, module_name)
             return True
         except mypy.errors.CompileError as e:
             report_errors(e.messages)
+
+    def _collect(self, result, module_name: str) -> None:
+        """Collects the type information of the main file of the given mypy
+        build and of everything it transitively imports."""
+        relevant_files = [next(iter(result.graph))]
+        i = 0
+        while i < len(relevant_files):
+            name = relevant_files[i]
+            for dep_name in result.graph[name].dep_line_map:
+                if dep_name in IGNORED_IMPORTS:
+                    continue
+                if dep_name not in relevant_files:
+                    relevant_files.append(dep_name)
+            i += 1
+        relevant_files = [(name, result.graph[name]) for name in relevant_files]
+
+        for name, file_graph in relevant_files:
+            file = file_graph.tree
+            real_name = None
+            if name == module_name:
+                real_name = name.split('.')
+                name = '__main__'
+            self.files[name] = file.path
+            visitor = TypeVisitor(result.types, name,
+                                  file.ignored_lines, real_name)
+            visitor.prefix = name.split('.')
+            visitor.visit(file)
+            self.all_types.update(visitor.all_types)
+            self.alt_types.update(visitor.alt_types)
+            for (line, column), expr_type in visitor.expr_types.items():
+                self.expr_types[(name, line, column)] = expr_type
+            self.type_aliases.update(visitor.type_aliases)
+            self.type_vars.update(visitor.type_vars)
+            self.ghost_names.update(visitor.ghost_names)
 
     def get_type_prefix(self, name: str) -> str:
         name = os.path.abspath(name)

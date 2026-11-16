@@ -144,7 +144,7 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
     if not type_correct:
         return None
 
-    translate_start = time.time()
+    translate_start, translate_cpu_start = time.time(), time.thread_time()
     analyzer = Analyzer(types, path, selected)
     main_module = analyzer.module
     with open(os.path.join(builtins_index_path, 'builtins.json'), 'r') as file:
@@ -199,7 +199,9 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
     # report the rest.
     phases.record('translate',
                   time.time() - translate_start
-                  - sum(phases.phases().get(p, 0.0) for p in ('erase', 'chop')))
+                  - sum(phases.phases().get(p, 0.0) for p in ('erase', 'chop')),
+                  time.thread_time() - translate_cpu_start
+                  - sum(phases.cpu().get(p, 0.0) for p in ('erase', 'chop')))
     if skip_verification:
         return modules, None
     if sif:
