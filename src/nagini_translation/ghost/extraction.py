@@ -47,6 +47,8 @@ class ProgramExtractor:
         Comments are lost when the extracted program is unparsed, so the type
         information would otherwise be missing from it.
         """
+        if not any(isinstance(n, ast.Assign) and n.type_comment for n in ast.walk(node)):
+            return node
         # The extracted program shares nodes with the original one, which is
         # still needed for the translation, so we must not modify them.
         result = copy.deepcopy(node)
