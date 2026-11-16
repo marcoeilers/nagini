@@ -1,4 +1,4 @@
-"""Per-request phase timings (typecheck, translate, chop, verify).
+"""Per-request phase timings (ORDER).
 
 Kept in a thread-local so concurrent service requests do not mix: each
 request runs its whole translate-and-verify pipeline on one thread.
@@ -10,7 +10,9 @@ from typing import Dict, Optional
 
 _local = threading.local()
 
-ORDER = ('typecheck', 'translate', 'chop', 'verify')
+ORDER = ('typecheck', 'translate', 'erase', 'chop', 'verify')
+# in a recorded attempt's meta, not in a result
+RECORDED_ONLY = ('erase',)
 
 
 def reset() -> None:
@@ -38,7 +40,12 @@ def phases() -> Dict[str, float]:
     return {k: round(phases[k], 2) for k in ORDER if k in phases}
 
 
+def reported(timings: Dict[str, float]) -> Dict[str, float]:
+    """``timings`` as a result shows them."""
+    return {k: v for k, v in timings.items() if k not in RECORDED_ONLY}
+
+
 def summary(timings: Optional[Dict[str, float]] = None) -> str:
     """``typecheck 4s, translate 18s, chop 190s, verify 360s``."""
-    timings = phases() if timings is None else timings
+    timings = reported(phases() if timings is None else timings)
     return ', '.join('%s %.0fs' % (k, timings[k]) for k in ORDER if k in timings)

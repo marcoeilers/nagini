@@ -120,7 +120,7 @@ class VerifyResult:
     # timeout.
     crashed: bool = False
     viper_program: Optional[str] = None
-    # Seconds per pipeline phase (typecheck, translate, chop, verify).
+    # Seconds per pipeline phase (lib.phases.ORDER).
     timings: Optional[dict] = None
     # Attempt directory this run was archived under (record dir enabled only);
     # its result.json holds the untruncated debug payloads.
@@ -133,7 +133,7 @@ class VerifyResult:
             'cancelled': self.cancelled,
             'crashed': self.crashed,
             'duration': self.duration,
-            'timings': self.timings or {},
+            'timings': phases.reported(self.timings or {}),
         }
         if self.recorded_at is not None:
             # Early in the dict: any client-side tail truncation of an

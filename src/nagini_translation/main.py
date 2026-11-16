@@ -177,14 +177,15 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
         sil_programs = load_sil_files(jvm, bv_size, sif, float_encoding)
 
     if erased is not None:
-        program_extractor = ProgramExtractor(modules)
-        for file, text in analyzer.sources.items():
-            extr_module = program_extractor.process_module(analyzer.modules[file])
-            if extr_module is not None:
-                erased[file] = {
-                    'sha256': hashlib.sha256(text.encode()).hexdigest(),
-                    'text': ast.unparse(extr_module),
-                }
+        with phases.phase('erase'):
+            program_extractor = ProgramExtractor(modules)
+            for file, text in analyzer.sources.items():
+                extr_module = program_extractor.process_module(analyzer.modules[file])
+                if extr_module is not None:
+                    erased[file] = {
+                        'sha256': hashlib.sha256(text.encode()).hexdigest(),
+                        'text': ast.unparse(extr_module),
+                    }
 
     if extraction:
         program_extractor = ProgramExtractor(modules)
@@ -194,9 +195,11 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
 
     prog = translator.translate_program(modules, sil_programs, selected,
                                         arp=arp, ignore_global=ignore_global, sif=sif, float_encoding=float_encoding)
-    # The chopper inside translate_program times itself; report the rest.
-    phases.record('translate', time.time() - translate_start
-                  - phases.phases().get('chop', 0.0))
+    # The erasure and the chopper inside translate_program time themselves;
+    # report the rest.
+    phases.record('translate',
+                  time.time() - translate_start
+                  - sum(phases.phases().get(p, 0.0) for p in ('erase', 'chop')))
     if skip_verification:
         return modules, None
     if sif:
