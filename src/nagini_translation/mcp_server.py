@@ -410,7 +410,8 @@ async def verify_snippet(code: str, counterexample: bool = False,
             tmp_path, counterexample=counterexample, base_dir=tmp_dir,
             ignore_global=ignore_global, viper_args=viper_args,
             include_viper=include_viper, translate_only=translate_only,
-            job_token=job_token, request_meta=_request_meta(ctx)))
+            job_token=job_token, request_meta=_request_meta(ctx),
+            record_erased=False))
         return _slim_debug(result.to_dict())
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)

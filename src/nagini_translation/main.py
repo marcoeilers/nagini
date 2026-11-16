@@ -7,6 +7,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import argparse
 import ast
+import hashlib
 import inspect
 import json
 import logging
@@ -57,7 +58,7 @@ from nagini_translation.verifier import (
     ViperVerifier
 )
 from nagini_translation import verifier
-from typing import List, Set, Tuple, Union
+from typing import Dict, List, Set, Tuple, Union
 
 
 # Matches a mypy error line. The column and end-position fields are optional:
@@ -117,9 +118,12 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
               sif: bool = False, arp: bool = False, ignore_global: bool = False,
               reload_resources: bool = False, verbose: bool = False, skip_verification: bool = False,
               extraction: bool = False, check_consistency: bool = False, float_encoding: str = None,
-              counterexample: bool = False) -> Tuple[List['PythonModule'], Program]:
+              counterexample: bool = False,
+              erased: Dict[str, Dict[str, str]] = None) -> Tuple[List['PythonModule'], Program]:
     """
-    Translates the Python module at the given path to a Viper program
+    Translates the Python module at the given path to a Viper program. If given,
+    erased is filled with the ghost-erased text of every analyzed file, along
+    with the SHA-256 hash of the text it was extracted from.
     """
     path = os.path.abspath(path)
     error_manager.clear()
@@ -171,6 +175,16 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
     if 'sil_programs' not in globals() or reload_resources:
         global sil_programs
         sil_programs = load_sil_files(jvm, bv_size, sif, float_encoding)
+
+    if erased is not None:
+        program_extractor = ProgramExtractor(modules)
+        for file, text in analyzer.sources.items():
+            extr_module = program_extractor.process_module(analyzer.modules[file])
+            if extr_module is not None:
+                erased[file] = {
+                    'sha256': hashlib.sha256(text.encode()).hexdigest(),
+                    'text': ast.unparse(extr_module),
+                }
 
     if extraction:
         program_extractor = ProgramExtractor(modules)

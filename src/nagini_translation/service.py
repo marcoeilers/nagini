@@ -628,7 +628,8 @@ class VerificationService:
                arp: bool = False, counterexample: bool = False,
                ignore_global: bool = False, viper_args: List[str] = None,
                include_viper: bool = False, translate_only: bool = False,
-               job_token: str = None, request_meta: dict = None) -> VerifyResult:
+               job_token: str = None, request_meta: dict = None,
+               record_erased: bool = True) -> VerifyResult:
         """Translate and verify the file at ``path`` and return structured results.
 
         Multiple calls may run concurrently: translation is serialized and the
@@ -641,14 +642,16 @@ class VerificationService:
         translated Viper program in ``viper_program``. ``translate_only`` stops
         after translation (mypy + Nagini-to-Viper): success means the file is a
         valid Nagini program; no proof obligations are checked.
-        ``request_meta`` is recorded with the attempt.
+        ``request_meta`` is recorded with the attempt. ``record_erased`` keeps
+        the ghost-erased sources of the analyzed files (see _record_erased).
         """
         with self._activity:
             self._active += 1
         try:
             return self._verify(path, selected, base_dir, arp, counterexample,
                                 ignore_global, viper_args, include_viper,
-                                translate_only, job_token, request_meta)
+                                translate_only, job_token, request_meta,
+                                record_erased)
         finally:
             with self._activity:
                 self._active -= 1
@@ -656,7 +659,7 @@ class VerificationService:
 
     def _verify(self, path, selected, base_dir, arp, counterexample, ignore_global,
                 viper_args, include_viper, translate_only, job_token,
-                request_meta) -> VerifyResult:
+                request_meta, record_erased) -> VerifyResult:
         path = os.path.abspath(path)
         start = time.time()
         phases.reset()
@@ -681,19 +684,22 @@ class VerificationService:
         # Snapshot the source before verification: the agent may edit the file
         # while the run is in flight, and the record must show what was verified.
         source = self._read_source(path)
+        erased = {} if self._record_dir and record_erased else None
         try:
             if self._can_run_concurrently(arp):
                 result = self._verify_concurrent(path, selected, base_dir,
                                                  counterexample,
                                                  ignore_global, viper_args,
                                                  include_viper, job_token,
-                                                 translate_only=translate_only)
+                                                 translate_only=translate_only,
+                                                 erased=erased)
             else:
                 with self._state_lock:
                     result = self._verify_serial(path, selected, base_dir, arp,
                                                  counterexample, ignore_global,
                                                  viper_args, include_viper,
-                                                 translate_only=translate_only)
+                                                 translate_only=translate_only,
+                                                 erased=erased)
         except Exception as e:
             # Last-resort conversion of internal crashes (translator bugs,
             # unexpected error shapes) into a structured result: callers get a
@@ -705,6 +711,7 @@ class VerificationService:
                 'log).'.format(type(e).__name__, e), 'internal.error')],
                 time.time() - start)
         result.timings = phases.phases()
+        self._record_erased(erased)
         result.recorded_at = self._record(
             path, selected, base_dir, viper_args, source, start,
             result, translate_only, smtstate_dir=smtstate_dir,
@@ -712,6 +719,29 @@ class VerificationService:
         if smtstate_dir and os.path.isdir(smtstate_dir):
             shutil.rmtree(smtstate_dir, ignore_errors=True)
         return result
+
+    def _record_erased(self, erased) -> None:
+        """Keep the ghost-erased source of each file of an analysis (``erased``,
+        see translate) under the record dir's ``erased``, replacing the one of
+        an earlier analysis: ``path``, ``text`` and ``sources``, the hashes of
+        all files of the analysis, by which a reader tells whether the text is
+        that of the files' current contents.
+        """
+        if not erased:
+            return
+        try:
+            erased_dir = os.path.join(self._record_dir, 'erased')
+            os.makedirs(erased_dir, exist_ok=True)
+            sources = {file: entry['sha256'] for file, entry in erased.items()}
+            for file, entry in erased.items():
+                name = hashlib.sha256(file.encode()).hexdigest() + '.json'
+                fd, tmp = tempfile.mkstemp(dir=erased_dir, suffix='.tmp')
+                with os.fdopen(fd, 'w') as f:
+                    json.dump({'path': file, 'text': entry['text'],
+                               'sources': sources}, f)
+                os.replace(tmp, os.path.join(erased_dir, name))
+        except Exception:
+            logging.exception('Failed to record the erased sources.')
 
     @staticmethod
     def _read_source(path):
@@ -968,7 +998,8 @@ class VerificationService:
 
     def _verify_concurrent(self, path, selected, base_dir, counterexample,
                            ignore_global, viper_args, include_viper,
-                           job_token, translate_only=False) -> VerifyResult:
+                           job_token, translate_only=False,
+                           erased=None) -> VerifyResult:
         from nagini_translation.viper_server import (build_carbon_backend_args,
                                                      build_silicon_backend_args,
                                                      get_viper_server_manager)
@@ -983,7 +1014,8 @@ class VerificationService:
                     path, self.jvm, self._bv_size,
                     selected=set(selected) if selected else set(), sif=False,
                     base_dir=base_dir, arp=False, counterexample=counterexample,
-                    ignore_global=ignore_global, float_encoding=self._float_encoding)
+                    ignore_global=ignore_global, float_encoding=self._float_encoding,
+                    erased=erased)
             except (TypeException, InvalidProgramException, UnsupportedException) as e:
                 return VerifyResult(False, self._exception_diagnostics(e, path),
                                     time.time() - start, translation_failed=True)
@@ -1218,7 +1250,8 @@ class VerificationService:
 
     def _verify_serial(self, path, selected, base_dir, arp,
                        counterexample, ignore_global, viper_args,
-                       include_viper, translate_only=False) -> VerifyResult:
+                       include_viper, translate_only=False,
+                       erased=None) -> VerifyResult:
         start = time.time()
         try:
             self._reset_obligations()
@@ -1227,7 +1260,7 @@ class VerificationService:
                 path, self.jvm, self._bv_size, selected=selected_set,
                 sif=self._sif, base_dir=base_dir, arp=arp,
                 counterexample=counterexample, ignore_global=ignore_global,
-                float_encoding=self._float_encoding)
+                float_encoding=self._float_encoding, erased=erased)
             if translated is None:
                 return VerifyResult(False, [self._point_diagnostic(
                     path, 'Type checking failed.', 'type.error')],

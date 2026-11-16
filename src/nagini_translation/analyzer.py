@@ -105,6 +105,7 @@ class Analyzer(ast.NodeVisitor):
         self.modules = OrderedDict()
         self.modules[os.path.abspath(path)] = self.module
         self.asts = {}
+        self.sources = {}  # file -> its text as parsed
         # Are we defining an IOExists block?
         self._is_io_existential = False
         self._aliases = {}  # Dict[str, PythonBaseVar]
@@ -183,6 +184,7 @@ class Analyzer(ast.NodeVisitor):
         use_char_columns(parse_result, text)
         self.modules[abs_path].node = parse_result
         self.asts[abs_path] = parse_result
+        self.sources[abs_path] = text
         assert isinstance(parse_result, ast.Module)
         for stmt in parse_result.body:
             if isinstance(stmt, ast.Import):

@@ -29,6 +29,17 @@ class ProgramExtractor:
         """
         main_module = self.modules[1]
         return self.extract_Module(main_module.node)
+
+    def process_module(self, module: PythonModule) -> Optional[ast.AST]:
+        """
+        Run extraction on the given module and return its AST with ghost elements
+        removed; None for a module of Nagini's contract library, which is not
+        ghost checked.
+        """
+        prefix = module.type_prefix
+        if prefix and prefix.split('.')[0] == NAGINI_IMPORT:
+            return None
+        return self.extract_Module(module.node)
     
     def extract_Module(self, node: ast.Module) -> ast.AST:
         new_body = self._extract_body(node.body)
