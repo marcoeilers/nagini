@@ -23,7 +23,6 @@ from nagini_contracts.io_contracts import (
 )
 from nagini_contracts.obligations import OBLIGATION_CONTRACT_FUNCS
 from nagini_translation.analyzer_io import IOOperationAnalyzer
-from nagini_translation.external.ast_util import mark_text_ranges
 from nagini_translation.lib.constants import (
     BUILTIN_PREDICATES,
     CALLABLE_TYPE,
@@ -72,6 +71,7 @@ from nagini_translation.lib.util import (
     is_io_existential,
     isStr,
     UnsupportedException,
+    use_char_columns,
 )
 from nagini_translation.lib.views import PythonModuleView
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
@@ -180,11 +180,7 @@ class Analyzer(ast.NodeVisitor):
             # An invalid type comment must not prevent us from analyzing the
             # program; mypy reports the problem anyway.
             parse_result = ast.parse(text)
-        try:
-            mark_text_ranges(parse_result, text)
-        except Exception:
-            # Ignore
-            pass
+        use_char_columns(parse_result, text)
         self.modules[abs_path].node = parse_result
         self.asts[abs_path] = parse_result
         assert isinstance(parse_result, ast.Module)
