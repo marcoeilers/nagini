@@ -28,6 +28,7 @@ import os
 import re
 import shutil
 import signal
+import sys
 import tempfile
 import threading
 import time
@@ -443,6 +444,22 @@ def _is_await_timeout(exc: Exception) -> bool:
             or 'Futures timed out' in str(exc))
 
 
+def _child_processes() -> List[Tuple[int, str]]:
+    """The (pid, command name) of every direct child of this process."""
+    me = str(os.getpid())
+    children = []
+    for stat_path in glob.glob('/proc/[0-9]*/stat'):
+        try:
+            with open(stat_path) as f:
+                pid, rest = f.read().split(' (', 1)
+            comm, fields = rest.rsplit(') ', 1)
+            if fields.split()[1] == me:
+                children.append((int(pid), comm))
+        except (OSError, IndexError, ValueError):
+            continue
+    return children
+
+
 def _kill_child_provers() -> None:
     """SIGKILL any prover process (z3/boogie) spawned by this process.
 
@@ -454,37 +471,39 @@ def _kill_child_provers() -> None:
     quickly. Killing is process-wide, so the caller must ensure no concurrent
     job is in flight (it would lose its provers and fail as cancelled).
     """
-    me = str(os.getpid())
-    for stat_path in glob.glob('/proc/[0-9]*/stat'):
-        try:
-            with open(stat_path) as f:
-                fields = f.read().split()
-            comm, ppid = fields[1].strip('()'), fields[3]
-            if ppid == me and (comm.startswith('z3') or comm.startswith('boogie')):
-                os.kill(int(fields[0]), signal.SIGKILL)
-                logging.warning('Killed wedged prover process %s (%s).',
-                                fields[0], comm)
-        except (OSError, IndexError, ValueError):
-            continue
+    for pid, comm in _child_processes():
+        if comm.startswith('z3') or comm.startswith('boogie'):
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except OSError:
+                continue
+            logging.warning('Killed wedged prover process %s (%s).', pid, comm)
 
 
-def _process_memory() -> dict:
-    """This process's memory (bytes): its resident size now and at its peak (the
-    JVM is in-process, so both include it), and the JVM heap reserved, in use,
-    and live after the last collection. A value that cannot be read is left out."""
-    out = {}
+def _process_stats() -> dict:
+    """This process's resource use, the in-process JVM included. Memory in bytes:
+    resident now and at its peak, the JVM heap reserved, in use and live after
+    the last collection, the JVM's non-heap pools and its direct and mapped
+    buffers. Counts: live Python allocations, threads (all, and the JVM's own),
+    open file descriptors, child processes, loaded JVM classes. A value that
+    cannot be read is left out."""
+    out = {'pythonBlocks': sys.getallocatedblocks()}
     try:
         with open('/proc/self/status') as f:
             fields = dict(line.split(':', 1) for line in f if ':' in line)
         out['rss'] = int(fields['VmRSS'].split()[0]) * 1024
         out['rssPeak'] = int(fields['VmHWM'].split()[0]) * 1024
+        out['threads'] = int(fields['Threads'])
+        out['fds'] = len(os.listdir('/proc/self/fd'))
+        out['children'] = len(_child_processes())
     except (OSError, KeyError, ValueError):
         pass
     try:
         import jpype
         if jpype.isJVMStarted():
             mgmt = jpype.JClass('java.lang.management.ManagementFactory')
-            heap = mgmt.getMemoryMXBean().getHeapMemoryUsage()
+            memory = mgmt.getMemoryMXBean()
+            heap = memory.getHeapMemoryUsage()
             out['heapCommitted'] = int(heap.getCommitted())
             out['heapUsed'] = int(heap.getUsed())
             heap_type = jpype.JClass('java.lang.management.MemoryType').HEAP
@@ -492,6 +511,14 @@ def _process_memory() -> dict:
                 int(pool.getCollectionUsage().getUsed())
                 for pool in mgmt.getMemoryPoolMXBeans()
                 if pool.getType() == heap_type and pool.getCollectionUsage() is not None)
+            non_heap = memory.getNonHeapMemoryUsage()
+            out['nonHeapCommitted'] = int(non_heap.getCommitted())
+            out['nonHeapUsed'] = int(non_heap.getUsed())
+            out['jvmBuffers'] = sum(
+                int(pool.getMemoryUsed()) for pool in mgmt.getPlatformMXBeans(
+                    jpype.JClass('java.lang.management.BufferPoolMXBean')))
+            out['jvmThreads'] = int(mgmt.getThreadMXBean().getThreadCount())
+            out['jvmClasses'] = int(mgmt.getClassLoadingMXBean().getLoadedClassCount())
     except Exception:
         pass
     return out
@@ -843,7 +870,7 @@ class VerificationService:
                 'translateOnly': translate_only,
                 'diagnosticCount': len(result.diagnostics),
                 'pid': os.getpid(),
-                **_process_memory(),
+                **_process_stats(),
                 'requestMeta': request_meta,
             }
             with open(os.path.join(attempt, 'meta.json'), 'w') as f:
