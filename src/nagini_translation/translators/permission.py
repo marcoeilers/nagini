@@ -21,6 +21,7 @@ from nagini_translation.lib.util import (
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
 
+ARP_UNSUPPORTED = ('Abstract read permissions (Rd, ARP) are not supported.')
 
 class PermTranslator(CommonTranslator):
 
@@ -107,7 +108,7 @@ class PermTranslator(CommonTranslator):
         func_name = get_func_name(node)
         if func_name == 'ARP':
             if not ctx.arp:
-                raise UnsupportedException(node, 'ARP not supported. Use --arp flag.')
+                raise UnsupportedException(node, ARP_UNSUPPORTED)
             if len(node.args) == 0:
                 return self.get_arp_for_context(node, ctx)
             elif len(node.args) == 1:
@@ -122,7 +123,7 @@ class PermTranslator(CommonTranslator):
                                           [formal_arg])
         elif func_name == 'getARP':
             if not ctx.arp:
-                raise UnsupportedException(node, 'ARP not supported. Use --arp flag.')
+                raise UnsupportedException(node, ARP_UNSUPPORTED)
             if len(node.args) == 1:
                 formal_arg = self.viper.LocalVarDecl(
                     'tk', self.viper.Ref, self.to_position(node, ctx), self.no_info(ctx))
@@ -141,13 +142,15 @@ class PermTranslator(CommonTranslator):
     def translate_perm_Name(self, node: ast.Name, ctx: Context) -> Expr:
         if node.id == 'RD_PRED':
             if not ctx.arp:
-                raise UnsupportedException(node, 'ARP not supported. Use --arp flag.')
+                raise UnsupportedException(node, ARP_UNSUPPORTED)
             return self.viper.FuncApp('globalRd', [], self.to_position(node, ctx),
                                       self.no_info(ctx), self.viper.Perm, {})
         stmt, res = self.translate_expr(node, ctx)
         if stmt:
             raise InvalidProgramException(node, 'purity.violated')
-        return  res
+        if res.typ() not in (self.viper.Int, self.viper.Perm):
+            raise InvalidProgramException(node, 'invalid.perm.amount')
+        return res
 
     def translate_perm_Attribute(self, node: ast.Attribute, ctx: Context) -> Expr:
         stmt, expr = self.translate_expr(node, ctx, self.viper.Int)
@@ -161,7 +164,7 @@ class PermTranslator(CommonTranslator):
             return self.viper.WildcardPerm(self.to_position(node, ctx), self.no_info(ctx))
         else:
             if not ctx.arp:
-                raise UnsupportedException(node, 'ARP not supported. Use --arp flag.')
+                raise UnsupportedException(node, ARP_UNSUPPORTED)
             if ctx.current_thread_object is not None:
                 formal_arg = self.viper.LocalVarDecl('tk', self.viper.Ref,
                                                      self.to_position(node, ctx),

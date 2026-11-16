@@ -19,6 +19,7 @@ BUILTINS = ['cast',
             'float',
             'isinstance',
             'bool',
+            'id',
             'len',
             'str',
             'set',
@@ -136,6 +137,9 @@ INTERNAL_NAMES = [
     SINGLE_NAME,
     '_is_single',
     '_is_combined',
+    '_ObjectId',
+    '_object_id',
+    '_object_id_inv',
     'm',     # the following are used in various
     'X',     # places in the resources/... files.
     'Y',
@@ -278,6 +282,7 @@ LEGAL_MAGIC_METHODS = {
 
     '__getitem__',
     '__setitem__',
+    '__contains__',
 
     '__iadd__',
     '__isub__',

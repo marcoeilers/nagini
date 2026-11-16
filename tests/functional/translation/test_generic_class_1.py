@@ -17,5 +17,4 @@ class Super(Generic[T, V]):
 
 
 def constructor_client() -> None:
-    #:: ExpectedOutput(invalid.program:generic.constructor.without.type)
     Super('asd', True)

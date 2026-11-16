@@ -72,32 +72,33 @@ class PythonScope:
         self.sil_names = sil_names
         self.superscope = superscope
         self._module = None
+        # For a name already taken: the suffix to try next. Names are never
+        # released, so every smaller suffix is taken.
+        self._next_suffix = {}
+
+    def _naming_scope(self) -> 'PythonScope':
+        """The enclosing scope that holds the Silver names."""
+        scope = self
+        while scope.sil_names is None:
+            scope = scope.superscope
+        return scope
 
     def contains_name(self, name: str) -> bool:
-        if self.sil_names is not None:
-            result = name in self.sil_names
-        else:
-            result = self.superscope.contains_name(name)
-        return result
+        return name in self._naming_scope().sil_names
 
     def get_fresh_name(self, name: str) -> str:
-        if self.contains_name(name):
-            counter = 0
+        scope = self._naming_scope()
+        names = scope.sil_names
+        new_name = name
+        if name in names:
+            counter = scope._next_suffix.get(name, 0)
             new_name = name + '_' + str(counter)
-            while self.contains_name(new_name):
+            while new_name in names:
                 counter += 1
                 new_name = name + '_' + str(counter)
-            self._add_name(new_name)
-            return new_name
-        else:
-            self._add_name(name)
-            return name
-
-    def _add_name(self, new_name: str) -> None:
-        if self.sil_names is not None:
-            self.sil_names.add(new_name)
-        else:
-            self.superscope._add_name(new_name)
+            scope._next_suffix[name] = counter + 1
+        names.add(new_name)
+        return new_name
 
     @property
     def scope_prefix(self) -> List[str]:
@@ -168,6 +169,9 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
         self.defined_var = None
         self.names_var = None
         self.ghost_names = types.ghost_names[type_prefix] if type_prefix in types.ghost_names else set()
+        # (line, column) -> the type mypy inferred for the collection literal or
+        # constructor call there, recorded by the analyzer.
+        self.literal_types = {}
         if global_module and type_prefix != '__main__':
             self.add_builtin_vars()
 
@@ -572,7 +576,8 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         """
         if name in self.fields:
             field = self.fields[name]
-            if not isinstance(field.type, TypeVar):
+            if (isinstance(field, PythonField) and
+                    not isinstance(field.type, TypeVar)):
                 assert self.types_match(field.type.try_box(), type.try_box())
         elif name in self.static_fields:
             field = self.static_fields[name]
@@ -833,6 +838,11 @@ class GenericType(PythonType):
 
     def __init__(self, cls: PythonClass,
                  args: List[PythonType]) -> None:
+        if not isinstance(cls, PythonClass):
+            # Callers occasionally pass an already-instantiated GenericType
+            # (e.g. when re-instantiating with fresh args); every use of
+            # self.cls assumes the underlying class.
+            cls = cls.python_class
         self.name = cls.name
         self.module = cls.module
         self.cls = cls
@@ -1032,6 +1042,11 @@ class OptionalType(UnionType):
 
     def substitute(self, types: Dict['TypeVar', 'PythonType']):
         return OptionalType(self.optional_type.substitute(types))
+
+    def get_bound_type_vars(self) -> Dict['TypeVar', 'PythonType']:
+        # Optional[C[T]] behaves like C[T]; the inherited implementation
+        # would zip C's type variables against this union's [None, typ].
+        return self.optional_type.get_bound_type_vars()
 
     @property
     def cls(self):
@@ -1989,9 +2004,13 @@ class ProgramNodeFactory:
 def toposort_classes(class_set: Set[PythonClass]) -> List[PythonClass]:
     """
     Topological sorting of classes in a set, ensuring that derived classes
-    precede their base classes in the returned list
+    precede their base classes in the returned list. Members are
+    canonicalized to their PythonClass: callers pass union members, which
+    include GenericType instances (e.g. from Optional[Klass[T]]), and the
+    subclass relation is class-level.
     """
     map = {}
+    class_set = {type.python_class for type in class_set}
 
     for type in class_set:
         map[type] = set(type.all_subclasses) & class_set

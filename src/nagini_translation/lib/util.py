@@ -135,6 +135,25 @@ def get_column(node: ast.AST) -> Optional[int]:
     return node.col_offset if hasattr(node, 'col_offset') else None
 
 
+def use_char_columns(tree: ast.AST, source: str) -> None:
+    """
+    Converts the column offsets of all nodes of the given AST of the given
+    source from the UTF-8 byte offsets the parser reports to character offsets.
+    """
+    if source.isascii():
+        return
+    lines = [None if line.isascii() else line.encode('utf-8')
+             for line in source.split('\n')]
+    for node in ast.walk(tree):
+        for line_attr, col_attr in (('lineno', 'col_offset'),
+                                    ('end_lineno', 'end_col_offset')):
+            line = getattr(node, line_attr, None)
+            col = getattr(node, col_attr, None)
+            if line is None or col is None or lines[line - 1] is None:
+                continue
+            setattr(node, col_attr, len(lines[line - 1][:col].decode('utf-8')))
+
+
 def contains_stmt(container: Any, contained: ast.AST) -> bool:
     """
     Checks if 'contained' is a part of the partial AST

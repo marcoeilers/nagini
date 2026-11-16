@@ -12,7 +12,11 @@ name = "nagini"
 version = "1.3.1"
 dependencies = [
     "jpype1==1.7.1",
-    "mypy==1.5.0",
+    # The mypyc-compiled wheel is ~4x faster than an sdist build (type-checking
+    # dominates Nagini's translation time on large files). Which wheels leak
+    # memory on every re-checking build varies by release (1.8.0, 1.9.0 and
+    # 1.11.2 do, 1.10.1 does not): measure before changing the pin.
+    "mypy==1.10.1",
     "toposort==1.10",
     "z3-solver==4.16.0.0; platform_machine == 'arm64' or platform_machine == 'ARM64' or platform_machine == 'aarch64'",
     "z3-solver==4.8.7.0; platform_machine != 'arm64' and platform_machine != 'ARM64' and platform_machine != 'aarch64'"
@@ -37,7 +41,7 @@ classifiers=[
 [project.optional-dependencies]
 server = ["pyzmq==27.1.0"]
 lsp = ["pygls>=1.3.0"]
-mcp = ["mcp>=1.2.0,<2"]
+mcp = ["mcp>=2,<3", "zstandard>=0.22"]
 test = ["pytest==9.1.1"]
 
 [project.urls]

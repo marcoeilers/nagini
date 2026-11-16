@@ -277,7 +277,10 @@ class GhostChecker(ast.NodeVisitor):
 
         if current_function is None:
             raise InvalidProgramException(node, 'invalid.ghost.functionDef', f"Couldn't correctly resolve function {node.name}")
-        
+        if current_function.node is None:
+            # Resolved to a builtin function that this definition fails to override.
+            raise InvalidProgramException(node, 'invalid.override')
+
         self.ctx.current_function = current_function
         old_ghost_ctx = self.in_ghost_ctx
         self.in_ghost_ctx = current_function.is_ghost
@@ -784,9 +787,9 @@ class GhostChecker(ast.NodeVisitor):
         modules.extend(self.current_module.get_included_modules(()))
         modules.append(self.global_module)
         for module in modules:
-            cls = getattr(module, 'classes', {}).get(name)
-            if cls is not None:
-                return cls
+            classes = getattr(module, 'classes', {})
+            if name in classes:
+                return classes[name]
         return None
 
     def get_mixed_return_parts(self, ann: Optional[annotation_t]
@@ -923,7 +926,7 @@ class GhostChecker(ast.NodeVisitor):
                 # Empty object init
                 res = self.is_ghost(called_func) or self.in_ghost_ctx or is_receiver_ghost
                 call.is_ghost = res
-                call.contains_ghost = res
+                call.contains_ghost = res or self._args_contain_ghost(call)
                 call.is_pure = True
                 return res, None
             # Constructor calls return an instance of the class, not the result
@@ -1047,25 +1050,32 @@ class GhostChecker(ast.NodeVisitor):
                 contains_ghost = True
 
         call.is_ghost = False
-        call.contains_ghost = contains_ghost
+        call.contains_ghost = contains_ghost or self._args_contain_ghost(call)
 
         return False, self.get_return_info(called_func)
+
+    @staticmethod
+    def _args_contain_ghost(call: ast.Call) -> bool:
+        """
+        Whether a regular argument of the call contains ghost code, e.g. the
+        predicate of an Unfolding around a regular value, which the extractor
+        must then erase inside the call.
+        """
+        return any(getattr(arg, 'contains_ghost', False)
+                   for arg in list(call.args) + [kw.value for kw in call.keywords])
 
     def _check_thread_call(self, call: ast.Call) -> Tuple[bool, return_info_t]:
         """
         Handles calls of the methods of Thread objects, which Nagini translates
         specially. Their arguments must all be regular.
         """
-        contains_ghost = False
-        arguments = list(call.args) + [kw.value for kw in call.keywords]
-        for argument in arguments:
+        for argument in list(call.args) + [kw.value for kw in call.keywords]:
             if self.is_ghost(argument):
                 raise InvalidProgramException(
                     call, 'invalid.ghost.call',
                     "Threads cannot be used with ghost values.")
-            contains_ghost = contains_ghost or argument.contains_ghost
         call.is_ghost = False
-        call.contains_ghost = contains_ghost
+        call.contains_ghost = self._args_contain_ghost(call)
         call.is_pure = False
         return False, None
 
@@ -1094,7 +1104,7 @@ class GhostChecker(ast.NodeVisitor):
         for kw in call.keywords:
             is_func_ghost = self.is_ghost(kw.value) or is_func_ghost
         call.is_ghost = is_func_ghost
-        call.contains_ghost = is_func_ghost
+        call.contains_ghost = is_func_ghost or self._args_contain_ghost(call)
         call.is_pure = True
         return is_func_ghost, None
 
@@ -1235,7 +1245,7 @@ class GhostChecker(ast.NodeVisitor):
         elif isinstance(expr, ast.Lambda):
             old_ctx = self.in_ghost_ctx
             self.in_ghost_ctx = True
-            self.check_for_call(expr.value)
+            self.check_for_call(expr.body)
             self.in_ghost_ctx = old_ctx
 
             items = []

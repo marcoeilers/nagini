@@ -13,7 +13,7 @@ from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import PythonMethod
 from nagini_translation.lib.util import (
     InvalidProgramException,
-    isStr
+    is_docstring
 )
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
@@ -40,14 +40,18 @@ class PredicateTranslator(CommonTranslator):
                                        self.no_position(ctx), ctx)
             arg_types = self.viper.And(arg_types, arg_type,
                                        self.no_position(ctx), self.no_info(ctx))
-        if len(pred.node.body) != 1:
+        body_start = 0
+        while (body_start < len(pred.node.body) and
+               is_docstring(pred.node.body[body_start])):
+            body_start += 1
+        if len(pred.node.body[body_start:]) != 1:
             raise InvalidProgramException(pred.node,
                                           'invalid.predicate')
 
         if pred.contract_only:
             body = None
         else:
-            content = pred.node.body[0]
+            content = pred.node.body[body_start]
             if isinstance(content, ast.Return):
                 content = content.value
             stmt, body = self.translate_expr(
@@ -124,8 +128,7 @@ class PredicateTranslator(CommonTranslator):
                 ctx.set_alias(current_name, root_var)
             actual_body_start = 0
             while (actual_body_start < len(instance.node.body) and
-                       isinstance(instance.node.body[actual_body_start], ast.Expr) and
-                    isStr(instance.node.body[actual_body_start].value)):
+                   is_docstring(instance.node.body[actual_body_start])):
                 actual_body_start += 1
             if len(instance.node.body[actual_body_start:]) != 1:
                 raise InvalidProgramException(instance.node,
