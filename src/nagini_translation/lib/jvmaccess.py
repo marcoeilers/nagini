@@ -45,6 +45,7 @@ class JVM:
     """
 
     def __init__(self, classpath: str):
+        self._array_types = {}
         # Only one JVM can exist per process; reuse it if one is already running
         # (e.g. started by another component or the test harness).
         if not jpype.isJVMStarted():
@@ -92,7 +93,10 @@ class JVM:
         return jpype.JProxy(supertype, inst=instance)
 
     def get_array(self, t, n):
-        return jpype.JArray(t)(n)
+        array_type = self._array_types.get(t)
+        if array_type is None:
+            array_type = self._array_types[t] = jpype.JArray(t)
+        return array_type(n)
 
     def is_known_class(self, package_object, class_name) -> bool:
         return hasattr(package_object, class_name)

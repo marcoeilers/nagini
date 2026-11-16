@@ -72,32 +72,33 @@ class PythonScope:
         self.sil_names = sil_names
         self.superscope = superscope
         self._module = None
+        # For a name already taken: the suffix to try next. Names are never
+        # released, so every smaller suffix is taken.
+        self._next_suffix = {}
+
+    def _naming_scope(self) -> 'PythonScope':
+        """The enclosing scope that holds the Silver names."""
+        scope = self
+        while scope.sil_names is None:
+            scope = scope.superscope
+        return scope
 
     def contains_name(self, name: str) -> bool:
-        if self.sil_names is not None:
-            result = name in self.sil_names
-        else:
-            result = self.superscope.contains_name(name)
-        return result
+        return name in self._naming_scope().sil_names
 
     def get_fresh_name(self, name: str) -> str:
-        if self.contains_name(name):
-            counter = 0
+        scope = self._naming_scope()
+        names = scope.sil_names
+        new_name = name
+        if name in names:
+            counter = scope._next_suffix.get(name, 0)
             new_name = name + '_' + str(counter)
-            while self.contains_name(new_name):
+            while new_name in names:
                 counter += 1
                 new_name = name + '_' + str(counter)
-            self._add_name(new_name)
-            return new_name
-        else:
-            self._add_name(name)
-            return name
-
-    def _add_name(self, new_name: str) -> None:
-        if self.sil_names is not None:
-            self.sil_names.add(new_name)
-        else:
-            self.superscope._add_name(new_name)
+            scope._next_suffix[name] = counter + 1
+        names.add(new_name)
+        return new_name
 
     @property
     def scope_prefix(self) -> List[str]:
