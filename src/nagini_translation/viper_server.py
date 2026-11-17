@@ -133,21 +133,25 @@ class ViperServerManager:
         return self._await(self.result_future(job_id), timeout_ms=timeout_ms)
 
     def messages_future(self, job_id):
-        return self.jvm.viper.server.core.ViperCoreServerUtils.getMessagesFuture(
-            self.server, job_id, self.executor)
-
-    def await_messages(self, job_id, timeout_ms=None):
-        """Block until ``job_id``'s message stream completes; returns the
-        Scala ``List[Message]`` of everything the job reported.
+        """A Scala Future of the ``List[Message]`` of everything ``job_id``
+        reports, complete when its message stream is.
 
         Unlike ``await_result`` (whose future *asserts* that the stream holds
         exactly one overall success/failure message and hence fails uselessly
         for jobs that died or were cancelled), this completes with the partial
         stream in every case, letting the caller classify the outcome — an
         overall result message, an ``ExceptionReport`` (backend crash), or
-        neither (cancellation). Timeout semantics are as in ``await_result``.
+        neither (cancellation).
         """
-        return self._await(self.messages_future(job_id), timeout_ms=timeout_ms)
+        return self.jvm.viper.server.core.ViperCoreServerUtils.getMessagesFuture(
+            self.server, job_id, self.executor)
+
+    def await_future(self, future, timeout_ms=None):
+        """Block until ``future`` (``messages_future``) completes and return its
+        value. Timeout semantics are as in ``await_result``; the future can be
+        awaited again after one, e.g. for what a job cancelled since reported.
+        """
+        return self._await(future, timeout_ms=timeout_ms)
 
     def cancel_job(self, job_id) -> None:
         """Precisely stop a single running job by sending its actor StopVerification."""

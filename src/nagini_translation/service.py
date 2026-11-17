@@ -1094,9 +1094,10 @@ class VerificationService:
             with self._jobs_lock:
                 self._inflight += 1
             verify_start = time.time()
+            stream = manager.messages_future(job_id)
             try:
-                messages = manager.await_messages(
-                    job_id, timeout_ms=wall_cap * 1000 if wall_cap else None)
+                messages = manager.await_future(
+                    stream, timeout_ms=wall_cap * 1000 if wall_cap else None)
             except Exception as e:
                 if wall_cap is not None and _is_await_timeout(e):
                     # The backend blew through its own --timeout plus the grace
