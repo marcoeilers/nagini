@@ -197,6 +197,33 @@ def test_members_of_a_finished_run(service, tmp_path):
     assert result.members == {"quick": "passed", "wrong": "failed"}
 
 
+def test_timeout_says_how_far_each_member_got(service, tmp_path):
+    path = _write(tmp_path, "members_cut.py", _UNFINISHED_SRC)
+    cut = ["--timeout=15", "--disableCaching"]
+    result = service.verify(path, viper_args=cut)
+    assert result.members == {"quick": "passed", "wrong": "failed", "slow": "inFlight"}
+    # The error of the member that failed before the timeout is reported too.
+    assert sorted(d.code for d in result.diagnostics) == [
+        "TimeoutOccurred", "postcondition.violated:assertion.false"]
+    assert not any(d.recorded_only for d in result.diagnostics)
+    # With one verifier a second slow member is queued behind the first.
+    two = _write(tmp_path, "members_queued.py",
+                 _UNFINISHED_SRC + _UNFINISHED_SRC[_UNFINISHED_SRC.index("def slow("):]
+                 .replace("def slow(", "def slow2(").replace("+ 7 *", "+ 9 *"))
+    queued = service.verify(two, viper_args=cut + ["--numberOfParallelVerifiers=1"])
+    assert sorted(queued.members[m] for m in ("slow", "slow2")) == ["inFlight", "notStarted"]
+    # Plain diagnostics record that error for the archive only.
+    service.plain_diagnostics = True
+    try:
+        plain = service.verify(path, viper_args=cut)
+    finally:
+        service.plain_diagnostics = False
+    assert plain.members == result.members
+    assert [d.code for d in plain.diagnostics if not d.recorded_only] == ["TimeoutOccurred"]
+    assert [d.code for d in plain.diagnostics if d.recorded_only] == [
+        "postcondition.violated:assertion.false"]
+
+
 def test_concurrent_requests_keep_their_own_backend_options(service, tmp_path):
     # Silicon's configuration is process-global: a job started next to one with
     # other options would change that job's per-check budget mid-run.

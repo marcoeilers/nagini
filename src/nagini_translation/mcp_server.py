@@ -210,6 +210,8 @@ def _slim_debug(result: dict) -> dict:
         result.pop('recordedAt', None)
         result.pop('viperProgram', None)
         result.pop('members', None)
+        result['diagnostics'] = [d for d in result.get('diagnostics', [])
+                                 if not d.get('recordedOnly')]
         for d in result.get('diagnostics', []):
             d.pop('debug', None)
             d.pop('counterexample', None)
@@ -356,7 +358,8 @@ async def verify_file(path: str, methods: Optional[List[str]] = None,
     like such a timeout: a `TimeoutOccurred` diagnostic saying so. A run that
     such a timeout or a backend crash ended also returns `members`, for each
     member it was to verify how far it got (`passed`, `failed`, `inFlight`:
-    started and unfinished, `notStarted`).
+    started and unfinished, `notStarted`), and the errors of the members that
+    failed before it beside the `TimeoutOccurred` diagnostic.
 
     `counterexample` adds to each diagnostic a `counterexample`, the model of a
     failing state; `include_viper` returns the whole translated program in

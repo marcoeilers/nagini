@@ -85,6 +85,8 @@ class Diagnostic:
     counterexample: Optional[str] = None
     branch_conditions: List[str] = field(default_factory=list)
     debug: Optional[dict] = None
+    # Kept in the recorded result only: plain diagnostics leave it out of the client's.
+    recorded_only: bool = False
 
     def to_dict(self) -> dict:
         result = {
@@ -105,6 +107,8 @@ class Diagnostic:
         }
         if self.debug is not None:
             result['debug'] = self.debug
+        if self.recorded_only:
+            result['recordedOnly'] = True
         return result
 
 
@@ -1255,13 +1259,25 @@ class VerificationService:
                             path, str(err.readableMessage()), phases, viper_args, modules))
                     else:
                         errors.append(err)
+                early = []
+                if diagnostics:
+                    # The timeout result drops the errors of the members that
+                    # failed before it.
+                    failure_cls = self.jvm.viper.silver.verifier.Failure
+                    for entity in entities.values():
+                        if isinstance(entity, failure_cls):
+                            early.extend(self._iterate(entity.errors().toIterator()))
+                    errors.extend(early)
                 try:
                     if errors:
                         failure = Failure(errors, self.jvm, modules, self._sif)
-                        diagnostics.extend(self._failure_diagnostics(
+                        converted = self._failure_diagnostics(
                             failure, path,
                             smt_state_requested='--smtStateOnError' in viper_args,
-                            modules=modules, prog=prog))
+                            modules=modules, prog=prog)
+                        for d in converted if early and self.plain_diagnostics else ():
+                            d.recorded_only = True
+                        diagnostics.extend(converted)
                 except Exception:
                     # Even a failed conversion must yield the raw Viper
                     # messages rather than crash the request.
