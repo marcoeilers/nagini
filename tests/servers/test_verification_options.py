@@ -175,6 +175,28 @@ def test_prover_out_of_memory_reported_as_timeout(service, tmp_path):
     assert plain.diagnostics[0].code == "verifier.crashed"
 
 
+_UNFINISHED_SRC = (
+    "from nagini_contracts.contracts import *\n\n"
+    "def quick(x: int) -> int:\n"
+    "    Ensures(Result() == x + 1)\n"
+    "    return x + 1\n\n"
+    "def wrong(x: int) -> int:\n"
+    "    Ensures(Result() > x + 1)\n"
+    "    return x + 1\n\n"
+    "def slow(a: int, b: int, c: int, n: int) -> None:\n"
+    "    Requires(a > 0 and b > 0 and c > 0 and n > 2)\n"
+    "    Requires(n < 6)\n"
+    "    Assert(a * a * a * a * a + b * b * b * b * b != c * c * c * c * c"
+    " or a * b * c * n * n != a * a * b + 7 * c * c * n)\n"
+)
+
+
+def test_members_of_a_finished_run(service, tmp_path):
+    path = _write(tmp_path, "members_done.py", _UNFINISHED_SRC)
+    result = service.verify(path, selected=["quick", "wrong"])
+    assert result.members == {"quick": "passed", "wrong": "failed"}
+
+
 def test_concurrent_requests_keep_their_own_backend_options(service, tmp_path):
     # Silicon's configuration is process-global: a job started next to one with
     # other options would change that job's per-check budget mid-run.

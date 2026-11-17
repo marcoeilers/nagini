@@ -128,6 +128,9 @@ class VerifyResult:
     # Attempt directory this run was archived under (record dir enabled only);
     # its result.json holds the untruncated debug payloads.
     recorded_at: Optional[str] = None
+    # Python member -> how far the backend got with it (MEMBER_*); None when the
+    # backend did not say (no backend run, Carbon, a job that left no messages).
+    members: Optional[dict] = None
 
     def to_dict(self) -> dict:
         result = {
@@ -143,9 +146,22 @@ class VerifyResult:
             # oversized result must not eat the pointer to the full archive.
             result['recordedAt'] = self.recorded_at
         result['diagnostics'] = [d.to_dict() for d in self.diagnostics]
+        if self.members is not None:
+            result['members'] = self.members
         if self.viper_program is not None:
             result['viperProgram'] = self.viper_program
         return result
+
+
+# How far the backend got with a member, worst first: a member of several Viper
+# members has the worst of theirs.
+MEMBER_FAILED = 'failed'
+MEMBER_IN_FLIGHT = 'inFlight'        # started, no result when the run ended
+MEMBER_NOT_STARTED = 'notStarted'
+MEMBER_PASSED = 'passed'
+MEMBER_OUTCOMES = (MEMBER_FAILED, MEMBER_IN_FLIGHT, MEMBER_NOT_STARTED, MEMBER_PASSED)
+# The category of the message Silicon reports when it starts on a member (its payload).
+MEMBER_STARTED = 'member_started'
 
 
 def _scala_items(collection):
@@ -354,6 +370,8 @@ def _viper_excerpt(error, modules, prog) -> Optional[dict]:
 # Grace period on top of the backend's own --timeout before the service declares a
 # verification wedged and force-kills its prover processes (see _hard_wall_seconds).
 HARD_DEADLINE_GRACE = 60
+# Seconds a job cancelled at the hard wall has to close its message stream.
+CANCELLED_STREAM_WAIT = 10
 # How long shutdown() waits for the cancelled verifications to record.
 SHUTDOWN_WAIT = 30
 
@@ -1121,7 +1139,8 @@ class VerificationService:
                     return VerifyResult(False, [self._timeout_diagnostic(
                         path, 'Timeout occurred: verification exceeded %s second(s) '
                         '(hard wall).' % wall_cap, phases, viper_args, modules)],
-                        time.time() - start, viper_program=viper_text)
+                        time.time() - start, viper_program=viper_text,
+                        members=self._cancelled_members(manager, stream, modules, prog))
                 # Most commonly this is a cancelled job (its actor was stopped) —
                 # either explicitly via the cancel tool, or because the backend's own
                 # --timeout ended the run. Tell those apart by the elapsed time, and
@@ -1161,7 +1180,9 @@ class VerificationService:
 
         duration = time.time() - start
         phases.record('verify', time.time() - verify_start)
-        result, crash_texts, invalid_args_texts = self._split_messages(messages)
+        result, crash_texts, invalid_args_texts, entities = self._split_messages(messages)
+        members = (None if self._backend == 'carbon' else
+                   self._member_outcomes(entities, modules, prog))
         if result is None:
             # A rejected command line (unknown, duplicated, or contradictory
             # viper_args) is either reported properly (InvalidArgumentsReport)
@@ -1176,7 +1197,7 @@ class VerificationService:
                     path, 'Invalid Viper backend arguments: %s'
                     % '; '.join(arg_error_texts),
                     'invalid.viper.args')], duration,
-                    viper_program=viper_text)
+                    viper_program=viper_text, members=members)
             if crash_texts and not self.plain_diagnostics and any(
                     PROVER_OUT_OF_MEMORY in t for t in crash_texts):
                 # The prover ran past its memory cap: a budget, reported like
@@ -1186,7 +1207,7 @@ class VerificationService:
                     path, 'Out of memory: the prover exceeded its memory limit%s.'
                     % (' of %d MB' % cap if cap else ''),
                     phases, viper_args, modules)], duration,
-                    viper_program=viper_text)
+                    viper_program=viper_text, members=members)
             if crash_texts and not self.plain_diagnostics and any(
                     PROVER_SEGFAULT in t for t in crash_texts):
                 logging.warning('Prover segfault for %s: %s', path, crash_texts[0])
@@ -1194,7 +1215,7 @@ class VerificationService:
                     path, 'Z3 crashed with a segmentation fault.', 'verifier.crashed')
                 self._add_in_flight(diag, viper_args, modules)
                 return VerifyResult(False, [diag], duration, crashed=True,
-                                    viper_program=viper_text)
+                                    viper_program=viper_text, members=members)
             if crash_texts:
                 # The backend died with an exception instead of producing a
                 # result (e.g. a prover crash). Surface it as a distinct
@@ -1208,16 +1229,16 @@ class VerificationService:
                     path, 'The verification backend crashed: %s%s'
                     % (crash_texts[0], more),
                     'verifier.crashed')], duration, crashed=True,
-                    viper_program=viper_text)
+                    viper_program=viper_text, members=members)
             # No overall result and no reported exception: the job's actor was
             # stopped before finishing, i.e. the job was cancelled.
             return VerifyResult(False, [], duration, cancelled=True,
-                                viper_program=viper_text)
+                                viper_program=viper_text, members=members)
 
         # 3. Convert the result with this job's snapshot installed (serialized).
         is_failure = isinstance(result, self.jvm.viper.silver.verifier.Failure)
         if not is_failure:
-            return VerifyResult(True, [], duration, viper_program=viper_text)
+            return VerifyResult(True, [], duration, viper_program=viper_text, members=members)
         with self._request_lock():
             error_manager._items, error_manager._conversion_rules = snapshot
             try:
@@ -1254,29 +1275,37 @@ class VerificationService:
                         'verifier.error')]
             finally:
                 error_manager.clear()
-        return VerifyResult(False, diagnostics, duration, viper_program=viper_text)
+        return VerifyResult(False, diagnostics, duration, viper_program=viper_text, members=members)
 
     @staticmethod
     def _iterate(scala_iterator):
         while scala_iterator.hasNext():
             yield scala_iterator.next()
 
-    def _split_messages(self, messages) -> Tuple[object, List[str], List[str]]:
+    def _split_messages(self, messages) -> Tuple[object, List[str], List[str], dict]:
         """Partition a finished job's reported messages into the overall
         verification result, the texts of any reported backend exceptions, and
         the texts of any invalid-backend-arguments errors.
 
-        Returns ``(result, crash_texts, invalid_args_texts)`` where ``result``
-        is the ``viper.silver.verifier.VerificationResult`` from the job's
-        overall success/failure message, or ``None`` if the job never produced
-        one (invalid arguments, crashed, or cancelled).
+        Returns ``(result, crash_texts, invalid_args_texts, entities)`` where
+        ``result`` is the ``viper.silver.verifier.VerificationResult`` from the
+        job's overall success/failure message, or ``None`` if the job never
+        produced one (invalid arguments, crashed, or cancelled), and
+        ``entities`` maps each Viper member the backend started on to its
+        result (``Success``, a ``Failure``, or ``None`` without one).
         """
         reporter = self.jvm.viper.silver.reporter
         result = None
         crash_texts = []
         invalid_args_texts = []
+        entities = {}
         for msg in self._iterate(messages.iterator()):
-            if isinstance(msg, reporter.OverallFailureMessage):
+            if isinstance(msg, (reporter.EntitySuccessMessage, reporter.EntityFailureMessage)):
+                entities[str(msg.concerning().name())] = msg.result()
+            elif (isinstance(msg, reporter.BenchmarkingMessage)
+                    and str(msg.category()) == MEMBER_STARTED):
+                entities.setdefault(str(msg.payload()), None)
+            elif isinstance(msg, reporter.OverallFailureMessage):
                 result = msg.result()
             elif isinstance(msg, reporter.OverallSuccessMessage):
                 result = self.jvm.viper.silver.verifier.Success
@@ -1286,7 +1315,46 @@ class VerificationService:
                 invalid_args_texts.extend(
                     str(e.readableMessage())
                     for e in self._iterate(msg.errors().iterator()))
-        return result, crash_texts, invalid_args_texts
+        return result, crash_texts, invalid_args_texts, entities
+
+    def _cancelled_members(self, manager, stream, modules, prog) -> Optional[dict]:
+        """The member outcomes of a job cancelled at the hard wall, from what it
+        had reported when its message stream closed; None when it does not
+        close or the backend does not say."""
+        if self._backend == 'carbon':
+            return None
+        try:
+            messages = manager.await_future(stream, timeout_ms=CANCELLED_STREAM_WAIT * 1000)
+        except Exception:
+            logging.debug('No messages from the cancelled job.', exc_info=True)
+            return None
+        return self._member_outcomes(self._split_messages(messages)[3], modules, prog)
+
+    def _member_outcomes(self, entities, modules, prog) -> dict:
+        """Python member -> its MEMBER_* outcome, for the program's own members
+        the backend verifies: those of `prog` with a body, and any it reported."""
+        failure_cls = self.jvm.viper.silver.verifier.Failure
+        bodied = set()
+        for group in (prog.methods(), prog.functions(), prog.predicates()):
+            for m in _scala_items(group):
+                if m.body().isDefined():
+                    bodied.add(str(m.name()))
+        out = {}
+        for module in modules or ():
+            for m in _members(module):
+                sil = m.sil_name
+                if getattr(m, 'interface', False) or (sil not in bodied and sil not in entities):
+                    continue
+                if sil not in entities:
+                    outcome = MEMBER_NOT_STARTED
+                elif entities[sil] is None:
+                    outcome = MEMBER_IN_FLIGHT
+                else:
+                    outcome = (MEMBER_FAILED if isinstance(entities[sil], failure_cls)
+                               else MEMBER_PASSED)
+                name = _python_name(m)
+                out[name] = min(out.get(name, outcome), outcome, key=MEMBER_OUTCOMES.index)
+        return out
 
     def _verify_serial(self, path, selected, base_dir, arp,
                        counterexample, ignore_global, viper_args,

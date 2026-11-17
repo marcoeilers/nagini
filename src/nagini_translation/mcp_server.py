@@ -32,7 +32,8 @@ from typing import List, Optional
 
 from mcp.server.mcpserver import Context, MCPServer
 
-from nagini_translation.service import (add_service_arguments, make_service,
+from nagini_translation.service import (MEMBER_IN_FLIGHT, MEMBER_NOT_STARTED,
+                                        add_service_arguments, make_service,
                                         options_to_kwargs)
 
 
@@ -208,10 +209,13 @@ def _slim_debug(result: dict) -> dict:
         result.pop('timings', None)
         result.pop('recordedAt', None)
         result.pop('viperProgram', None)
+        result.pop('members', None)
         for d in result.get('diagnostics', []):
             d.pop('debug', None)
             d.pop('counterexample', None)
         return result
+    if not set((result.get('members') or {}).values()) & {MEMBER_IN_FLIGHT, MEMBER_NOT_STARTED}:
+        result.pop('members', None)  # every member has a result: the diagnostics say it all
     diagnostics = result.get('diagnostics', [])
     debugs = []
     for d in diagnostics:
@@ -349,7 +353,10 @@ async def verify_file(path: str, methods: Optional[List[str]] = None,
 
     For example, `viper_args=["--timeout=60"]` sets a per-run verification
     timeout in seconds. A prover that runs past its memory limit is reported
-    like such a timeout: a `TimeoutOccurred` diagnostic saying so.
+    like such a timeout: a `TimeoutOccurred` diagnostic saying so. A run that
+    such a timeout or a backend crash ended also returns `members`, for each
+    member it was to verify how far it got (`passed`, `failed`, `inFlight`:
+    started and unfinished, `notStarted`).
 
     `counterexample` adds to each diagnostic a `counterexample`, the model of a
     failing state; `include_viper` returns the whole translated program in
