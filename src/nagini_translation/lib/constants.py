@@ -386,6 +386,15 @@ MYPY_SUPERCLASSES = {
 
 EVAL_IO_SIGNATURE = ('eval_io', 'func', 'arg', 'result')
 
+# Types of mypy that are represented by another class in Nagini.
+TYPE_ALIASES = {
+    # We cheat and represent type enumerate as a list of pairs.
+    'builtins.enumerate': 'builtins.list',
+    # Nothing but int is supported as an index.
+    'typing.SupportsIndex': 'builtins.int',
+    'typing_extensions.SupportsIndex': 'builtins.int',
+}
+
 IGNORED_IMPORTS = {'_importlib_modulespec',
                    'abc',
                    'builtins',

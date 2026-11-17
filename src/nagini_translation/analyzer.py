@@ -35,6 +35,7 @@ from nagini_translation.lib.constants import (
     MYPY_SUPERCLASSES,
     OBJECT_TYPE,
     TUPLE_TYPE,
+    TYPE_ALIASES,
 )
 from nagini_translation.lib.program_nodes import (
     ContainerInterface,
@@ -1836,12 +1837,9 @@ class Analyzer(ast.NodeVisitor):
         return result
 
     def _convert_normal_type(self, mypy_type) -> PythonType:
-        prefix = mypy_type._fullname
-        name = mypy_type.name
-        if prefix == 'builtins.enumerate':
-            # We cheat and represent type enumerate as a list of pairs.
-            prefix = 'builtins.list'
-            name = 'list'
+        prefix = TYPE_ALIASES.get(mypy_type._fullname, mypy_type._fullname)
+        name = (mypy_type.name if prefix == mypy_type._fullname
+                else prefix.rsplit('.', 1)[-1])
         if prefix.endswith('.' + name):
             prefix = prefix[:-(len(name) + 1)]
         target_module = None
