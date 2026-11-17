@@ -14,6 +14,7 @@ import sys
 
 from mypy.build import BuildSource
 from mypy.checkexpr import has_any_type
+from mypy.type_visitor import TypeQuery
 from nagini_translation.lib import phases
 from nagini_translation.lib.constants import IGNORED_IMPORTS, LITERALS
 from nagini_translation.mypy_patches.visitor import TraverserVisitor
@@ -25,6 +26,19 @@ from typing import List, Optional
 
 
 logger = logging.getLogger('nagini_translation.lib.typeinfo')
+
+
+class HasTypeObject(TypeQuery[bool]):
+    """Whether a type has a part that is a class seen as its constructor."""
+
+    def __init__(self) -> None:
+        super().__init__(any)
+
+    def visit_callable_type(self, t: mypy.types.CallableType) -> bool:
+        return t.is_type_obj() or super().visit_callable_type(t)
+
+    def visit_overloaded(self, t: mypy.types.Overloaded) -> bool:
+        return t.is_type_obj() or super().visit_overloaded(t)
 
 
 def col(node) -> Optional[int]:
@@ -271,9 +285,11 @@ class TypeVisitor(TraverserVisitor):
         Records mypy's type for a collection literal or a constructor call,
         whose type arguments mypy infers from the context (an annotation, the
         callee's parameter, an enclosing literal) as well as the elements.
+        A type mypy made of classes seen as their constructors is not recorded.
         """
         expr_type = self.type_map.get(node)
-        if expr_type is not None and not has_any_type(expr_type):
+        if (expr_type is not None and not has_any_type(expr_type)
+                and not expr_type.accept(HasTypeObject())):
             self.expr_types[(node.line, col(node))] = expr_type
 
     def type_of(self, node):
