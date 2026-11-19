@@ -25,6 +25,7 @@ import shutil
 import signal
 import sys
 import tempfile
+import uuid
 
 from concurrent.futures import ThreadPoolExecutor
 from inspect import getdoc, signature
@@ -298,9 +299,15 @@ def _request_meta(ctx: Optional[Context]) -> Optional[dict]:
         return None
 
 
-async def _run(fn):
+async def _run(job_token, fn):
+    """``fn``, a verification under ``job_token``, on a verification thread.
+    One whose call the client gives up (notifications/cancelled, as it sends
+    when its tool-call timeout passes) is stopped."""
     try:
         return await asyncio.get_event_loop().run_in_executor(_executor, fn)
+    except asyncio.CancelledError:
+        _service.abandon(job_token)
+        raise
     except Refused as e:
         raise ToolError(str(e)) from None
     except Exception:
@@ -369,7 +376,8 @@ async def verify_file(path: str, methods: Optional[List[str]] = None,
     `viperProgram` (thousands of lines for a large module).
     """
     selected = _as_selected(methods)
-    result = await _run(lambda: _service.verify(
+    job_token = job_token or uuid.uuid4().hex
+    result = await _run(job_token, lambda: _service.verify(
         path, selected=selected, counterexample=counterexample, base_dir=base_dir,
         ignore_global=ignore_global, viper_args=viper_args,
         include_viper=include_viper, translate_only=translate_only,
@@ -393,7 +401,8 @@ async def verify_method(path: str, methods: List[str],
     whole class by `ClassName`. Verifying several methods in one call is
     cheaper than one call per method: one translation, verified in parallel.
     """
-    result = await _run(lambda: _service.verify(
+    job_token = job_token or uuid.uuid4().hex
+    result = await _run(job_token, lambda: _service.verify(
         path, selected=_as_selected(methods), counterexample=counterexample,
         viper_args=viper_args, include_viper=include_viper,
         translate_only=translate_only,
@@ -414,20 +423,27 @@ async def verify_snippet(code: str, counterexample: bool = False,
     Set `ignore_global` to skip verification of top-level statements. The other
     parameters are as in `verify_file`.
     """
-    tmp_dir = tempfile.mkdtemp(prefix='nagini_mcp_')
-    tmp_path = os.path.join(tmp_dir, 'snippet.py')
-    try:
-        with open(tmp_path, 'w') as f:
-            f.write(code)
-        result = await _run(lambda: _service.verify(
-            tmp_path, counterexample=counterexample, base_dir=tmp_dir,
-            ignore_global=ignore_global, viper_args=viper_args,
-            include_viper=include_viper, translate_only=translate_only,
-            job_token=job_token, request_meta=_request_meta(ctx),
-            record_erased=False))
-        return _slim_debug(result.to_dict())
-    finally:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
+    job_token = job_token or uuid.uuid4().hex
+    meta = _request_meta(ctx)
+
+    def verify():
+        # The temp dir is the thread's: a call the client gives up still
+        # records what it verified.
+        tmp_dir = tempfile.mkdtemp(prefix='nagini_mcp_')
+        tmp_path = os.path.join(tmp_dir, 'snippet.py')
+        try:
+            with open(tmp_path, 'w') as f:
+                f.write(code)
+            return _service.verify(
+                tmp_path, counterexample=counterexample, base_dir=tmp_dir,
+                ignore_global=ignore_global, viper_args=viper_args,
+                include_viper=include_viper, translate_only=translate_only,
+                job_token=job_token, request_meta=meta, record_erased=False)
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    result = await _run(job_token, verify)
+    return _slim_debug(result.to_dict())
 
 
 @mcp.tool()

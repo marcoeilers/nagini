@@ -631,6 +631,9 @@ class VerificationService:
         # per-job cancellation.
         self._jobs = {}
         self._jobs_lock = threading.Lock()
+        # Tokens of the requests their callers gave up (abandon) that have
+        # not ended yet.
+        self._abandoned = set()
         # Number of verify() calls currently awaiting a ViperServer result; the
         # hard-deadline path only force-kills prover processes when the wedged
         # job is the sole one in flight (killing is process-wide, so a
@@ -706,6 +709,8 @@ class VerificationService:
                                 translate_only, job_token, request_meta,
                                 record_erased)
         finally:
+            with self._jobs_lock:
+                self._abandoned.discard(job_token)
             with self._activity:
                 self._active -= 1
                 self._activity.notify_all()
@@ -968,6 +973,13 @@ class VerificationService:
         except Exception:
             logging.exception('Error cancelling verification.')
 
+    def abandon(self, job_token: str) -> None:
+        """Stops the request of ``job_token``, whose caller no longer waits
+        for it: its job when it has one, else the job as it is submitted."""
+        with self._jobs_lock:
+            self._abandoned.add(job_token)
+        self.cancel(job_token)
+
     def _can_run_concurrently(self, arp: bool) -> bool:
         if (arp or self._sif or self._backend not in ('silicon', 'carbon')
                 or not config.use_viper_server):
@@ -1117,6 +1129,9 @@ class VerificationService:
             if job_token is not None:
                 with self._jobs_lock:
                     self._jobs[job_token] = job_id
+                    abandoned = job_token in self._abandoned
+                if abandoned:
+                    manager.cancel_job(job_id)
             wall_cap = _hard_wall_seconds(backend_args)
             with self._jobs_lock:
                 self._inflight += 1

@@ -107,6 +107,30 @@ def erroring_programs(tmp_path):
     return {"post": str(post), "mid": str(middle), "assert": str(asrt)}
 
 
+def test_abandon_stops_a_job_running_or_not_yet_submitted(concurrent_service, heavy_copies):
+    results = {}
+
+    def run(token, path):
+        results[token] = concurrent_service.verify(path, job_token=token)
+
+    running = threading.Thread(target=run, args=("running", heavy_copies[0]))
+    running.start()
+    assert _wait_until_in_flight(concurrent_service, ["running"]), "job did not start in time"
+    concurrent_service.abandon("running")
+    # Given up before its job exists: stopped as the job is submitted.
+    concurrent_service.abandon("early")
+    early = threading.Thread(target=run, args=("early", heavy_copies[1]))
+    early.start()
+    for t in (running, early):
+        t.join(timeout=240)
+    assert not running.is_alive() and not early.is_alive(), "a verification did not finish"
+    assert results["running"].cancelled is True
+    assert results["early"].cancelled is True
+    # The tokens are forgotten with their requests.
+    run("early", heavy_copies[1])
+    assert results["early"].success
+
+
 def test_three_jobs_cancel_middle_distinct_errors_backtranslate(
         concurrent_service, erroring_programs):
     # Three concurrent jobs: two different failing programs and a heavy correct
