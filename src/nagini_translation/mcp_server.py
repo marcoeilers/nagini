@@ -31,10 +31,11 @@ from inspect import getdoc, signature
 from typing import List, Optional
 
 from mcp.server.mcpserver import Context, MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 
 from nagini_translation.service import (MEMBER_IN_FLIGHT, MEMBER_NOT_STARTED,
-                                        add_service_arguments, make_service,
-                                        options_to_kwargs)
+                                        Refused, add_service_arguments,
+                                        make_service, options_to_kwargs)
 
 
 mcp = MCPServer('nagini')
@@ -300,6 +301,8 @@ def _request_meta(ctx: Optional[Context]) -> Optional[dict]:
 async def _run(fn):
     try:
         return await asyncio.get_event_loop().run_in_executor(_executor, fn)
+    except Refused as e:
+        raise ToolError(str(e)) from None
     except Exception:
         # The MCP layer reports tool exceptions as a bare str(e); make sure
         # the traceback is at least recoverable from the server's stderr.
@@ -348,7 +351,7 @@ async def verify_file(path: str, methods: Optional[List[str]] = None,
     (the CLI's `--viper-arg`, as a list); they override same-named backend
     defaults, and a rejected command line is reported as an
     `invalid.viper.args` diagnostic. A verification whose `viper_args` differ
-    from those of the verifications already running waits until they finish.
+    from those of the verifications already running is refused.
     `translate_only` stops after translation
     (mypy + Nagini-to-Viper): fast validity check that the file is a
     well-formed Nagini program; no proof obligations are checked.

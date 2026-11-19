@@ -1,6 +1,6 @@
 """Per-request phase timings (ORDER): the pipeline's phases, the parts of
 typecheck (``typecheck.*``, contained in it) and the waits between them
-(``lock``: for the service's translation lock, ``queued``: for the backend).
+(``lock``: for the service's translation lock).
 
 Kept in a thread-local so concurrent service requests do not mix: each
 request runs its whole translate-and-verify pipeline on one thread.
@@ -15,9 +15,9 @@ _local = threading.local()
 TYPECHECK_PARTS = ('typecheck.evict', 'typecheck.strict', 'typecheck.nonstrict',
                    'typecheck.visit')
 ORDER = ('lock', 'typecheck', *TYPECHECK_PARTS, 'translate', 'erase', 'chop',
-         'queued', 'verify')
+         'verify')
 # in a recorded attempt's meta, not in a result
-RECORDED_ONLY = ('lock', *TYPECHECK_PARTS, 'erase', 'queued')
+RECORDED_ONLY = ('lock', *TYPECHECK_PARTS, 'erase')
 
 
 def reset() -> None:

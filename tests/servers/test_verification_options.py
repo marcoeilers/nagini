@@ -13,6 +13,10 @@ backend arguments, and include_viper."""
 import threading
 import time
 
+import pytest
+
+from nagini_translation.service import Refused
+
 
 _TOPLEVEL_ASSERT_SRC = (
     "from nagini_contracts.contracts import *\n\n"
@@ -224,7 +228,7 @@ def test_timeout_says_how_far_each_member_got(service, tmp_path):
         "postcondition.violated:assertion.false"]
 
 
-def test_concurrent_requests_keep_their_own_backend_options(service, tmp_path):
+def test_a_request_with_other_backend_options_is_refused(service, tmp_path):
     # Silicon's configuration is process-global: a job started next to one with
     # other options would change that job's per-check budget mid-run.
     slow = _write(tmp_path, "gate_slow.py", _SLOW_THEN_FAILING_SRC)
@@ -238,8 +242,11 @@ def test_concurrent_requests_keep_their_own_backend_options(service, tmp_path):
     first = threading.Thread(target=run, args=(slow, 5000))
     first.start()
     time.sleep(3)  # the slow job is verifying when the quick one arrives
-    run(quick, 500)
+    with pytest.raises(Refused):
+        run(quick, 500)
+    run(quick, 5000)  # the same options run beside it
     first.join()
+    run(quick, 500)
     budgets = lambda r: [d.debug["failingCheck"]["budgetMs"] for d in r.diagnostics]
     assert budgets(results[slow]) == [5000]
     assert budgets(results[quick]) == [500]

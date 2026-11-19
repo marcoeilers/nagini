@@ -18,7 +18,6 @@ servers build on; it can also be reused by the existing ZMQ server.
 
 import argparse
 import ast
-import collections
 import contextlib
 import glob
 import hashlib
@@ -422,20 +421,28 @@ def _hard_wall_seconds(backend_args) -> Optional[int]:
     return seconds + HARD_DEADLINE_GRACE if seconds else None
 
 
+class Refused(Exception):
+    """A verification the service does not start: nothing is verified and
+    nothing recorded. The message is for the caller."""
+
+
 class _BackendGate:
-    """Admits backend jobs: jobs with the same options overlap, a job with other
-    options waits until the running ones finish. Silicon keeps its configuration
-    in a process-wide global that every new job overwrites, so a job started
-    next to one with other options would change that job's options (its
-    budgets, among others) mid-run. Admission is first come, first served: a
-    waiting job holds back the jobs after it, so neither side starves.
+    """Admits requests for the backend, from translation on: those with the
+    same options overlap, one with other options is refused (Refused) while
+    those run. Silicon keeps its configuration in a process-wide global that
+    every new job overwrites, so a job started next to one with other options
+    would change that job's options (its budgets, among others) mid-run.
     ``--smtStateDir`` differs per request and is not compared; concurrent jobs
     may still dump their SMT state into each other's directory."""
 
+    REFUSAL = ('Not started: a verification with other viper_args is still '
+               'running, and verifications run side by side only with the same '
+               'viper_args. Wait for it to finish, cancel it, or use its '
+               'viper_args.')
+
     def __init__(self):
-        self._cond = threading.Condition()
-        self._queue = collections.deque()  # waiting tickets, in arrival order
-        self._options = None               # the running jobs' options
+        self._lock = threading.Lock()
+        self._options = None  # the running jobs' options
         self._running = 0
 
     @staticmethod
@@ -445,21 +452,16 @@ class _BackendGate:
 
     @contextlib.contextmanager
     def admit(self, backend_args):
-        key, ticket = self._key(backend_args), object()
-        with self._cond:
-            self._queue.append(ticket)
-            while not (self._queue[0] is ticket
-                       and (self._running == 0 or self._options == key)):
-                self._cond.wait()
-            self._queue.popleft()
+        key = self._key(backend_args)
+        with self._lock:
+            if self._running and self._options != key:
+                raise Refused(self.REFUSAL)
             self._options, self._running = key, self._running + 1
-            self._cond.notify_all()  # the next in line may share these options
         try:
             yield
         finally:
-            with self._cond:
+            with self._lock:
                 self._running -= 1
-                self._cond.notify_all()
 
 
 def _is_await_timeout(exc: Exception) -> bool:
@@ -751,6 +753,10 @@ class VerificationService:
                                                  viper_args, include_viper,
                                                  translate_only=translate_only,
                                                  erased=erased)
+        except Refused:
+            if smtstate_dir:
+                shutil.rmtree(smtstate_dir, ignore_errors=True)
+            raise
         except Exception as e:
             # Last-resort conversion of internal crashes (translator bugs,
             # unexpected error shapes) into a structured result: callers get a
@@ -1067,47 +1073,46 @@ class VerificationService:
         manager = get_viper_server_manager(self.jvm)
         self._set_journal_location(manager)
         start = time.time()
-        # 1. Translate and snapshot this job's error-mapping state (serialized).
-        with self._request_lock():
-            self._reset_obligations()
-            try:
-                translated = translate(
-                    path, self.jvm, self._bv_size,
-                    selected=set(selected) if selected else set(), sif=False,
-                    base_dir=base_dir, arp=False, counterexample=counterexample,
-                    ignore_global=ignore_global, float_encoding=self._float_encoding,
-                    erased=erased)
-            except (TypeException, InvalidProgramException, UnsupportedException) as e:
-                return VerifyResult(False, self._exception_diagnostics(e, path),
-                                    time.time() - start, translation_failed=True)
-            except ConsistencyException as e:
-                return VerifyResult(False, [self._point_diagnostic(
-                    path, e.message + ': Translated AST contains inconsistencies.',
-                    'consistency.error')], time.time() - start,
-                    translation_failed=True)
-            if translated is None:
-                return VerifyResult(False, [self._point_diagnostic(
-                    path, 'Type checking failed.', 'type.error')],
-                    time.time() - start, translation_failed=True)
-            modules, prog = translated
-            viper_text = str(prog) if include_viper else None
-            if translate_only:
-                return VerifyResult(True, [], time.time() - start,
-                                    viper_program=viper_text)
-            snapshot = (dict(error_manager._items),
-                        dict(error_manager._conversion_rules))
-            error_manager.clear()
-
-        # 2. Submit and await the result lock-free, so jobs overlap in Viper.
         if self._backend == 'carbon':
             backend_args = build_carbon_backend_args(viper_args)
         else:
             backend_args = build_silicon_backend_args(
                 viper_args, counterexample, self._disable_branch_conditions)
-        queued = time.time()
-        with self._backend_gate.admit(backend_args):
-            if time.time() - queued > 0.01:
-                phases.record('queued', time.time() - queued)
+        # Admitted for the whole request: one refused is refused before translating.
+        with (contextlib.nullcontext() if translate_only
+              else self._backend_gate.admit(backend_args)):
+            # 1. Translate and snapshot this job's error-mapping state (serialized).
+            with self._request_lock():
+                self._reset_obligations()
+                try:
+                    translated = translate(
+                        path, self.jvm, self._bv_size,
+                        selected=set(selected) if selected else set(), sif=False,
+                        base_dir=base_dir, arp=False, counterexample=counterexample,
+                        ignore_global=ignore_global, float_encoding=self._float_encoding,
+                        erased=erased)
+                except (TypeException, InvalidProgramException, UnsupportedException) as e:
+                    return VerifyResult(False, self._exception_diagnostics(e, path),
+                                        time.time() - start, translation_failed=True)
+                except ConsistencyException as e:
+                    return VerifyResult(False, [self._point_diagnostic(
+                        path, e.message + ': Translated AST contains inconsistencies.',
+                        'consistency.error')], time.time() - start,
+                        translation_failed=True)
+                if translated is None:
+                    return VerifyResult(False, [self._point_diagnostic(
+                        path, 'Type checking failed.', 'type.error')],
+                        time.time() - start, translation_failed=True)
+                modules, prog = translated
+                viper_text = str(prog) if include_viper else None
+                if translate_only:
+                    return VerifyResult(True, [], time.time() - start,
+                                        viper_program=viper_text)
+                snapshot = (dict(error_manager._items),
+                            dict(error_manager._conversion_rules))
+                error_manager.clear()
+
+            # 2. Submit and await the result lock-free, so jobs overlap in Viper.
             job_id = manager.submit(prog, path, backend_args, backend=self._backend)
             if job_token is not None:
                 with self._jobs_lock:
