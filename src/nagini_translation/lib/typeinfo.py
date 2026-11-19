@@ -486,10 +486,12 @@ class TypeInfo:
                     except OSError:
                         pass
 
-    def check(self, filename: str, base_dir: str = None) -> bool:
+    def check(self, filename: str, base_dir: str = None,
+              confirm: bool = True) -> bool:
         """
         Typechecks the given file and collects all type information needed for
-        the translation to Viper
+        the translation to Viper. With ``confirm``, any errors of the first
+        strict build are confirmed by a second non-strict one.
         """
 
         def report_errors(errors: List[str]) -> None:
@@ -536,7 +538,7 @@ class TypeInfo:
             # agent-in-development file shape.
             confirmable = [e for e in res_strict.errors
                            if 'implicitly returns "None"' not in e]
-            if confirmable:
+            if confirmable and confirm:
                 # Run mypy a second time with strict optional checking disabled,
                 # s.t. we don't get overapproximated none-related errors.
                 options_non_strict = self._create_options(False)
