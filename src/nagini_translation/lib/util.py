@@ -134,6 +134,10 @@ class UnsupportedException(Exception):
         super().__init__(desc)
 
 
+UNKNOWN_ELEMENT_TYPE = ('collection whose element type is not known, e.g. the '
+                        'result of dict.keys() or dict.values()')
+
+
 class InvalidProgramException(Exception):
     """
     Signals that the input program is invalid and cannot be translated

@@ -739,6 +739,10 @@ class Analyzer(ast.NodeVisitor):
         container = self.module if self.current_class is None else self.current_class
         self.define_new(container, name, node)
         cls = self.find_or_create_class(name, defining=True)
+        if container.classes.get(name) is not cls:
+            raise UnsupportedException(
+                node, "class with the name of the built-in or imported class "
+                      "'{}'".format(name))
         cls.defined = True
         cls.node = node
         cls.is_ghost = self.defines_ghost(node)
@@ -1768,6 +1772,12 @@ class Analyzer(ast.NodeVisitor):
     def visit_Nonlocal(self, node: ast.Nonlocal) -> None:
         raise UnsupportedException(node, 'nonlocal statement')
 
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        raise UnsupportedException(node, 'async function')
+
+    def visit_GeneratorExp(self, node: ast.GeneratorExp) -> None:
+        raise UnsupportedException(node, 'generator expression; use a list comprehension')
+
     def convert_type(self, mypy_type, node, bound_type_vars: Dict[str, PythonType] = None) -> PythonType:
         """
         Converts an internal mypy type to a PythonType.
@@ -1929,7 +1939,10 @@ class Analyzer(ast.NodeVisitor):
         name = mypy_type.name
         if bound_type_vars and name in bound_type_vars:
             return bound_type_vars[name]
-        assert name in self.module.type_vars
+        if name not in self.module.type_vars:
+            raise UnsupportedException(
+                node, 'type variable {} that this module does not declare (typing.Self '
+                      'and unparameterized generic types are not supported)'.format(name))
         if (self.current_class and name in self.current_class.type_vars):
             return self.current_class.type_vars[name]
         if name in self.current_function.type_vars:

@@ -213,6 +213,11 @@ class TypeVisitor(TraverserVisitor):
                 raise TypeException([msg])
         key = tuple(fqn)
         if key in self.all_types:
+            if (str(type) != str(self.all_types[key]) and
+                    any(isinstance(t, mypy.types.Overloaded)
+                        for t in (type, self.all_types[key]))):
+                error = ' error: Overloaded function or method {} is used at different types.'.format(fqn[-1])
+                raise TypeException([':'.join([self.path, str(line), error])])
             if not self.type_equals(self.all_types[key], type):
                 # Type change after isinstance
                 if key not in self.alt_types:

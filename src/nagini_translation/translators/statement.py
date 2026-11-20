@@ -64,6 +64,7 @@ from nagini_translation.lib.util import (
     is_type_checking_block,
     isEllipsis,
     isStr,
+    UNKNOWN_ELEMENT_TYPE,
     UnsupportedException,
 )
 from nagini_translation.translators.abstract import Context
@@ -840,6 +841,8 @@ class StatementTranslator(CommonTranslator):
                                                    node, ctx)
         # Find type of the collection content we're iterating over.
         if iterable_type.name in (LIST_TYPE, DICT_TYPE, SET_TYPE):
+            if not hasattr(iterable_type, 'type_args'):
+                raise UnsupportedException(node.iter, UNKNOWN_ELEMENT_TYPE)
             target_type = iterable_type.type_args[0]
         elif iterable_type.name in (RANGE_TYPE, BYTES_TYPE, BYTEARRAY_TYPE):
             target_type = ctx.module.global_module.classes[INT_TYPE]
@@ -985,6 +988,8 @@ class StatementTranslator(CommonTranslator):
         enter_method = ctx_type.get_method('__enter__')
         # Create temp var
         enter_res_type = enter_method.type
+        if enter_res_type is None:
+            raise UnsupportedException(node, 'with statement on an __enter__ that returns None')
         with_ctx = ctx.current_function.create_variable('with_ctx',
                                                          ctx_type,
                                                          self.translator)

@@ -160,6 +160,10 @@ class ExpressionTranslator(CommonTranslator):
             stmt, result = visitor(node, ctx, impure)
         else:
             stmt, result = visitor(node, ctx)
+        if result is None:
+            raise InvalidProgramException(
+                node, 'invalid.none.value',
+                'the result of a call that returns None is used as a value.')
         return stmt, result
 
     def translate_Return(self, node: ast.Return, ctx: Context,
@@ -946,6 +950,8 @@ class ExpressionTranslator(CommonTranslator):
             var = var.ref()
         cases = []
         position = self.to_position(call, ctx)
+        if ctx.error_var is None:
+            raise UnsupportedException(call, 'exception that may be raised at module level')
         err_var = ctx.error_var.ref()
         relevant_try_blocks = get_surrounding_try_blocks(try_blocks, call)
         goto_finally = self._create_goto_finally(relevant_try_blocks, ctx)
@@ -1109,6 +1115,8 @@ class ExpressionTranslator(CommonTranslator):
                 var = ctx.var_aliases[node.id]
             else:
                 var = ctx.actual_function.get_variable(node.id)
+            if var is None:
+                raise UnsupportedException(node, "name '{}'".format(node.id))
             if (isinstance(var, PythonIOExistentialVar) and
                     not var.is_defined()):
                 raise InvalidProgramException(

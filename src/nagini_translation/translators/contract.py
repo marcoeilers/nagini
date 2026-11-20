@@ -58,6 +58,7 @@ from nagini_translation.lib.util import (
     isStr,
     OldExpressionTransformer,
     pprint,
+    UNKNOWN_ELEMENT_TYPE,
     UnsupportedException,
 )
 from nagini_translation.translators.abstract import Context
@@ -761,6 +762,8 @@ class ContractTranslator(CommonTranslator):
         if coll_type.name not in (SET_TYPE, DICT_TYPE):
             raise UnsupportedException(
                 node, 'ToSet takes a set, a dict (its keys) or a PSet')
+        if not hasattr(coll_type, 'type_args'):
+            raise UnsupportedException(node.args[0], UNKNOWN_ELEMENT_TYPE)
         set_call = self.get_function_call(coll_type, '__sil_set__', [arg], [None],
                                           node, ctx)
         set_class = ctx.module.global_module.classes[PSET_TYPE]

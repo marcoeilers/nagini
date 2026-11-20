@@ -698,6 +698,9 @@ class MethodTranslator(CommonTranslator):
             ctx_type = self.get_type(block.with_item.context_expr, ctx)
             ctx_var = block.with_var
             exit_type = ctx_type.get_method('__exit__').type
+            if exit_type is None:
+                raise UnsupportedException(
+                    block.node, 'with statement on an __exit__ that returns None')
             exit_res = ctx.current_function.create_variable('exit_res',
                                                             exit_type,
                                                             self.translator)

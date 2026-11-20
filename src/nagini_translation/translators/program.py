@@ -68,11 +68,31 @@ from nagini_translation.lib.util import (
     defers_annotations,
     InvalidProgramException,
     isNameConstant,
+    UnsupportedException,
     isStr
 )
 from nagini_translation.sif.lib.viper_ast_extended import ViperASTExtended
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
+
+
+class DefinitionScope:
+    """
+    Stands in for the current function while a default argument or a class
+    attribute value is translated: it is evaluated outside any method and
+    has to be a pure expression, so it gets no temporaries.
+    """
+
+    def __init__(self, node: ast.expr) -> None:
+        self.node = node
+
+    def __bool__(self) -> bool:
+        return False
+
+    def create_variable(self, *args, **kwargs) -> None:
+        raise UnsupportedException(
+            self.node, 'default argument or class attribute value that is not '
+                       'a pure expression')
 
 
 class ProgramTranslator(CommonTranslator):
@@ -153,11 +173,13 @@ class ProgramTranslator(CommonTranslator):
             ctx.current_class = field.cls
             ctx.module = field.cls.module
             # Compute the field value
+            ctx.current_function = DefinitionScope(field.value)
             if cls.enum:
                 stmt, value = self.translate_expr(field.value, ctx, self.viper.Int)
                 value = self.viper.FuncApp(cls.name + '__box__', [value], position, info, self.viper.Ref)
             else:
                 stmt, value = self.translate_expr(field.value, ctx)
+            ctx.current_function = None
             if stmt:
                 raise InvalidProgramException('purity.violated', field.node)
             field_position = self.to_position(field.node, ctx)
@@ -293,6 +315,14 @@ class ProgramTranslator(CommonTranslator):
         subtyping.
         """
         assert not method.pure
+        if (method.overrides.interface and method.overrides.type and
+                method.overrides.type.name not in PRIMITIVES):
+            # The contract of a built-in method is in the Viper library; the
+            # override cannot be checked against it.
+            raise InvalidProgramException(
+                method.node, 'invalid.override',
+                '{} overrides the built-in {}.{} and has to be @Pure.'.format(
+                    method.name, method.overrides.cls.name, method.name))
         old_function = ctx.current_function
         ctx.current_function = method.overrides
         pos = self.viper.to_position(method.node, ctx.position, py_node=method)
@@ -464,7 +494,9 @@ class ProgramTranslator(CommonTranslator):
                     definition_deps.add((arg.node.annotation, type.python_class,
                                          method.module))
             if arg.default and not arg.default_factory:
+                ctx.current_function = DefinitionScope(arg.default)
                 stmt, expr = self.translate_expr(arg.default, ctx)
+                ctx.current_function = None
                 if not stmt and expr:
                     arg.default_expr = expr
         if method.node and evaluated(method.node.returns):

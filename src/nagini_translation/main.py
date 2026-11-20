@@ -140,7 +140,12 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
         raise Exception('Viper AST SIF extension not found on classpath.')
     types = TypeInfo()
     with phases.phase('typecheck'):
-        type_correct = types.check(path, base_dir)
+        try:
+            type_correct = types.check(path, base_dir)
+        except RecursionError:
+            raise UnsupportedException(
+                None, 'program nested too deeply for the type analysis, e.g. a '
+                      'chain of several hundred elif branches')
     if not type_correct:
         return None
 

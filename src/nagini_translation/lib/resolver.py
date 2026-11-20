@@ -662,6 +662,9 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 return UnionType(list(set_of_return_types))
         elif isinstance(rectype, PythonType):
             target = rectype.get_func_or_method(node.func.attr)
+            if target is None:
+                raise UnsupportedException(
+                    node, "Unsupported builtin function '{}'.".format(node.func.attr))
             if target.generic_type != -1:
                 return rectype.type_args[target.generic_type]
             else:

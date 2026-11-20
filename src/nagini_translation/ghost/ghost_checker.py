@@ -746,6 +746,8 @@ class GhostChecker(ast.NodeVisitor):
                 alternatives[:1] = [alternatives[0].left, alternatives[0].right]
             return self.check_annotations(ann, alternatives)
         else:
+            if isinstance(ann, ast.List):
+                raise UnsupportedException(ann, 'Callable type with a parameter list')
             assert isinstance(ann, ast.Subscript), f"Unexpected type of {type(ann)}"
             # A generic ghost type, e.g. PSeq[int], is ghost no matter what its
             # type arguments are.

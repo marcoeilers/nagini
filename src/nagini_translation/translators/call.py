@@ -84,12 +84,15 @@ from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
 
 
+# The builtins that are only modelled for one number of positional arguments.
+BUILTIN_ARITY = {'isinstance': 2, 'type': 1, 'len': 1, 'id': 1, 'str': 1,
+                 'int': 1, 'float': 1, 'bool': 1}
+
 class CallTranslator(CommonTranslator):
 
 
     def _translate_isinstance(self, node: ast.Call,
                               ctx: Context) -> StmtsAndExpr:
-        assert len(node.args) == 2
         target = self.get_target(node.args[1], ctx)
         type_arg_type = self.get_type(node.args[1], ctx)
         stmt, obj = self.translate_expr(node.args[0], ctx)
@@ -133,7 +136,6 @@ class CallTranslator(CommonTranslator):
 
     def _translate_type_func(self, node: ast.Call,
                              ctx: Context) -> StmtsAndExpr:
-        assert len(node.args) == 1
         stmt, obj = self.translate_expr(node.args[0], ctx)
         pos = self.to_position(node, ctx)
         result = self.type_factory.typeof(obj, ctx)
@@ -154,7 +156,6 @@ class CallTranslator(CommonTranslator):
         return stmt, result
 
     def _translate_len(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
         arg_type = self.get_type(node.args[0], ctx).try_box()
         len_stmt, len_val = self.get_func_or_method_call(arg_type, '__len__', [target],
@@ -162,7 +163,6 @@ class CallTranslator(CommonTranslator):
         return stmt + len_stmt, len_val
 
     def _translate_id(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
         object_class = ctx.module.global_module.classes['object']
         id_val = self.get_function_call(object_class, '__id__', [target],
@@ -170,7 +170,6 @@ class CallTranslator(CommonTranslator):
         return stmt, id_val
 
     def _translate_str(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
         arg_type = self.get_type(node.args[0], ctx)
         str_stmt, str_val = self.get_func_or_method_call(arg_type, '__str__', [target],
@@ -179,7 +178,6 @@ class CallTranslator(CommonTranslator):
 
 
     def _translate_int(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
         arg_type = self.get_type(node.args[0], ctx)
         str_stmt, str_val = self.get_func_or_method_call(arg_type, '__int__', [target],
@@ -187,7 +185,6 @@ class CallTranslator(CommonTranslator):
         return stmt + str_stmt, str_val
 
     def _translate_float(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        assert len(node.args) == 1
         if isStr(node.args[0]):
             string_val = node.args[0].value
             try:
@@ -199,7 +196,6 @@ class CallTranslator(CommonTranslator):
         raise UnsupportedException(node, msg)
 
     def _translate_bool(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
         arg_type = self.get_type(node.args[0], ctx)
         bool_stmt, bool_val = self.get_func_or_method_call(arg_type, '__bool__', [target],
@@ -676,6 +672,11 @@ class CallTranslator(CommonTranslator):
         Translates a call to a builtin function like len() or isinstance()
         """
         func_name = get_func_name(node)
+        arity = BUILTIN_ARITY.get(func_name)
+        if arity is not None and len(node.args) != arity:
+            raise UnsupportedException(
+                node, '{}() with {} argument(s); only the form with {} is '
+                      'supported'.format(func_name, len(node.args), arity))
         if func_name == 'isinstance':
             return self._translate_isinstance(node, ctx)
         elif func_name == 'super':
@@ -874,7 +875,10 @@ class CallTranslator(CommonTranslator):
         # If normal
         if not isinstance(called_func, PythonMethod):
             called_func = self.get_target(node.func, ctx)
-        assert isinstance(called_func, PythonMethod)
+        if not isinstance(called_func, PythonMethod):
+            raise UnsupportedException(
+                node, 'call of a value that is not a function, method or class, '
+                      'e.g. a parameter of type Callable')
         if (isinstance(node.func, ast.Attribute) and
                 get_func_name(node.func.value) == 'super'):
             return True

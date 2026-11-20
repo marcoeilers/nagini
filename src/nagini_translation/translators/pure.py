@@ -198,7 +198,8 @@ class PureTranslator(CommonTranslator):
         """
         Translates an augmented assign statement to an AssignWrapper
         """
-        assert isinstance(node.target, ast.Name)
+        if not isinstance(node.target, ast.Name):
+            raise UnsupportedException(node, "Only assignments to single variables are supported in pure functions.")
         val = BinOpWrapper(node.op, node.value)
         wrapper = AssignWrapper(node.target.id, conds, val, node, user_var=True)
         return [wrapper]
