@@ -8,7 +8,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import ast
 import builtins
 from collections import OrderedDict
-from typing import List, Set, Tuple
+from typing import List, Optional, Set, Tuple
 
 from nagini_translation.lib import phases
 from nagini_translation.lib.constants import (
@@ -65,6 +65,7 @@ from nagini_translation.lib.typedefs import (
     VarDecl,
 )
 from nagini_translation.lib.util import (
+    defers_annotations,
     InvalidProgramException,
     isNameConstant,
     isStr
@@ -449,9 +450,15 @@ class ProgramTranslator(CommonTranslator):
         definition_deps = method.definition_deps
         if method.cls:
             definition_deps = method.cls.definition_deps
+        deferred = defers_annotations(method.module.node)
+
+        def evaluated(annotation: Optional[ast.expr]) -> bool:
+            # Whether the annotation is evaluated when the method is defined.
+            return bool(annotation) and not (
+                deferred or isStr(annotation) or isNameConstant(annotation))
+
         for arg in method.args.values():
-            if (arg.node and arg.node.annotation and
-                    not (isStr(arg.node.annotation) or isNameConstant(arg.node.annotation))):
+            if arg.node and evaluated(arg.node.annotation):
                 type = self.get_target(arg.node.annotation, ctx)
                 if type and not type.python_class.interface and not type.contains_type_var():
                     definition_deps.add((arg.node.annotation, type.python_class,
@@ -460,8 +467,7 @@ class ProgramTranslator(CommonTranslator):
                 stmt, expr = self.translate_expr(arg.default, ctx)
                 if not stmt and expr:
                     arg.default_expr = expr
-        if (method.node and method.node.returns and
-                not (isStr(method.node.returns) or isNameConstant(method.node.returns))):
+        if method.node and evaluated(method.node.returns):
             type = self.get_target(method.node.returns, ctx)
             if type and not type.python_class.interface and not type.contains_type_var():
                 definition_deps.add((method.node.returns, type.python_class,

@@ -395,7 +395,8 @@ TYPE_ALIASES = {
     'typing_extensions.SupportsIndex': 'builtins.int',
 }
 
-IGNORED_IMPORTS = {'_importlib_modulespec',
+IGNORED_IMPORTS = {'__future__',
+                   '_importlib_modulespec',
                    'abc',
                    'builtins',
                    'dataclasses',

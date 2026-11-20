@@ -22,6 +22,17 @@ T = TypeVar('T')
 V = TypeVar('V')
 
 
+def defers_annotations(module: Optional[ast.Module]) -> bool:
+    """
+    Whether the module has `from __future__ import annotations`, with which
+    no annotation is evaluated.
+    """
+    return module is not None and any(
+        isinstance(stmt, ast.ImportFrom) and stmt.module == '__future__' and
+        any(alias.name == 'annotations' for alias in stmt.names)
+        for stmt in module.body)
+
+
 def flatten(lists: List[List[T]]) -> List[T]:
     """
     Flattens a list of lists into a flat list
