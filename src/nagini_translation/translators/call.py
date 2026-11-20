@@ -763,9 +763,6 @@ class CallTranslator(CommonTranslator):
             result_var = ctx.current_function.create_variable(
                 target.name + '_res', target.type, self.translator)
             targets.append(result_var.ref())
-        if target.declared_exceptions:
-            error_var = self.get_error_var(node, ctx)
-            targets.append(error_var)
         defined_check = []
         if target.module is not target.module.global_module:
             # Mark the current function as depending on the called method. If we're in
@@ -775,12 +772,7 @@ class CallTranslator(CommonTranslator):
             if self.is_main_method(ctx) and not target.cls:
                 defined_check = self.assert_global_defined(target, ctx.module, node.func,
                                                            ctx)
-        call = self.create_method_call_node(
-            ctx, target.sil_name, args, targets, position, self.no_info(ctx),
-            target_method=target, target_node=node)
-        if target.declared_exceptions:
-            call = call + self.create_exception_catchers(error_var,
-                ctx.actual_function.try_blocks, node, ctx)
+        call = self.call_method(target, args, targets, position, node, ctx)
         return (defined_check + call,
                 result_var.ref(node, ctx) if result_var else None)
 

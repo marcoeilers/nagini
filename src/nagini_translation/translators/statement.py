@@ -1461,8 +1461,7 @@ class StatementTranslator(CommonTranslator):
             assert isinstance(lhs, ast.Attribute)
             assert target.setter
             arg_stmt, arg = self.translate_expr(lhs.value, ctx)
-            call = self.create_method_call_node(ctx, target.setter.sil_name, [arg, rhs],
-                                                [], position, info, target.setter, lhs)
+            call = self.call_method(target.setter, [arg, rhs], [], position, lhs, ctx)
             getter_type = self.translate_type(target.type, ctx)
             self_arg = self.viper.LocalVarDecl('self', self.viper.Ref, position, info)
             getter = self.viper.FuncApp(target.sil_name, [arg], position, info,

@@ -870,11 +870,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             else:
                 actual_arg = self.to_ref(arg, ctx)
             actual_args.append(actual_arg)
-        sil_name = func.sil_name
-        call = self.create_method_call_node(
-            ctx, sil_name, actual_args, targets, self.to_position(node, ctx),
-            self.no_info(ctx), target_method=func, target_node=node)
-        return call
+        return self.call_method(func, actual_args, targets,
+                                self.to_position(node, ctx), node, ctx)
 
     def get_method_call(self, receiver: PythonType,
                         func_name: str, args: List[Expr],
@@ -914,6 +911,26 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             # Pass-through
             return self._get_method_call(receiver, func_name, args, arg_types,
                                          targets, node, ctx)
+
+    def call_method(self, target: PythonMethod, args: List[Expr],
+                    targets: List['silver.ast.LocalVarRef'],
+                    position: 'silver.ast.Position', node: ast.AST,
+                    ctx: Context) -> List[Stmt]:
+        """
+        Calls the impure method target, assigning its result to targets. An
+        exception it raises goes to the handlers protecting node or to the
+        caller.
+        """
+        if not target.declared_exceptions:
+            return self.create_method_call_node(
+                ctx, target.sil_name, args, targets, position, self.no_info(ctx),
+                target_method=target, target_node=node)
+        error_var = self.get_error_var(node, ctx)
+        call = self.create_method_call_node(
+            ctx, target.sil_name, args, targets + [error_var], position,
+            self.no_info(ctx), target_method=target, target_node=node)
+        return call + self.create_exception_catchers(
+            error_var, ctx.actual_function.try_blocks, node, ctx)
 
     def get_error_var(self, stmt: ast.AST,
                       ctx: Context) -> 'silver.ast.LocalVarRef':
