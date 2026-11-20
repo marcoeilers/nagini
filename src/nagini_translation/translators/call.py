@@ -1314,14 +1314,10 @@ class CallTranslator(CommonTranslator):
                     raise UnsupportedException(
                         node, 'builtin exceptions ({}) can only be '
                               'constructed in a raise statement, Exsures, or '
-                              'except clause. Raise it directly, or define a '
-                              'module-level subclass of Exception '
-                              'instead.'.format(node.func.id))
+                              'except clause.'.format(node.func.id))
             if func_name == 'pow' and len(node.args) == 3:
                 raise UnsupportedException(
-                    node, 'the 3-argument form of pow() is not modeled; '
-                          'implement modular exponentiation as a helper '
-                          '(e.g. square-and-multiply).')
+                    node, 'the 3-argument form of pow() is not modeled.')
             msg = ("Unsupported builtin function '{}'".format(func_name)
                    if func_name else 'Unsupported builtin function')
             if ctx.actual_function.method_type == MethodType.class_method:

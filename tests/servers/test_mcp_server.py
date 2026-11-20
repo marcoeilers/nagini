@@ -7,7 +7,6 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 
 import asyncio
-import inspect
 import json
 import os
 import sys
@@ -16,6 +15,9 @@ import tempfile
 import pytest
 
 pytest.importorskip("mcp")
+
+from mcp.server.mcpserver.exceptions import ToolError
+from mcp.server.mcpserver.tools import Tool
 
 from nagini_translation import mcp_server
 
@@ -248,13 +250,30 @@ def test_configure_disable_branch_conditions_via_tool(service):
             disable_branch_conditions=original["disableBranchConditions"])
 
 
-def test_plain_tools_lack_the_viper_level_parameters():
+def test_a_timeout_the_clients_limit_cannot_hold_is_refused(service, pass_src, monkeypatch):
+    monkeypatch.setenv(mcp_server.TOOL_TIMEOUT_ENV, "120000")  # 60 s with the hard-wall grace
+    call = lambda timeout: asyncio.run(
+        mcp_server.verify_snippet(pass_src, viper_args=["--timeout=%d" % timeout]))
+    with pytest.raises(ToolError, match="at most 60 seconds.*asks for 61"):
+        call(61)
+    with pytest.raises(ToolError, match="asks for no limit"):
+        call(0)
+    assert call(60)["success"]
+    assert asyncio.run(mcp_server.verify_snippet(pass_src))["success"]
+    service.plain_diagnostics = True
+    try:
+        assert call(61)["success"]
+    finally:
+        service.plain_diagnostics = False
+
+
+def test_plain_tools_hide_the_viper_level_parameters_and_take_them():
     for tool in (mcp_server.verify_file, mcp_server.verify_method, mcp_server.verify_snippet):
-        plain = mcp_server._without_debug_params(tool)
-        assert set(inspect.signature(plain).parameters) == \
-            set(inspect.signature(tool).parameters) - set(mcp_server.DEBUG_PARAMS)
-        assert not any(name in plain.__doc__ for name in mcp_server.DEBUG_PARAMS)
-        assert "counterexample" not in plain.__doc__
-        assert "--timeout" not in plain.__doc__
-        assert "viper_args" not in plain.__doc__
+        full, plain = Tool.from_function(tool), Tool.from_function(mcp_server._plain_tool(tool))
+        assert set(plain.parameters["properties"]) == \
+            set(full.parameters["properties"]) - set(mcp_server.HIDDEN_PARAMS)
+        assert set(plain.fn_metadata.arg_model.model_fields) == \
+            set(full.fn_metadata.arg_model.model_fields)
+        assert not any(name in plain.description for name in mcp_server.HIDDEN_PARAMS)
+        assert "--timeout" not in plain.description
     assert "--timeout" in mcp_server.verify_file.__doc__

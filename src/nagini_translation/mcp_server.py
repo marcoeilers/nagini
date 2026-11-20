@@ -33,10 +33,13 @@ from typing import List, Optional
 
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
+from pydantic.json_schema import SkipJsonSchema
 
-from nagini_translation.service import (MEMBER_IN_FLIGHT, MEMBER_NOT_STARTED,
-                                        Refused, add_service_arguments,
-                                        make_service, options_to_kwargs)
+from nagini_translation.service import (HARD_DEADLINE_GRACE, MEMBER_IN_FLIGHT,
+                                        MEMBER_NOT_STARTED, Refused,
+                                        add_service_arguments,
+                                        backend_timeout_seconds, make_service,
+                                        options_to_kwargs)
 
 
 mcp = MCPServer('nagini')
@@ -207,7 +210,7 @@ def _slim_debug(result: dict) -> dict:
     if _service.plain_diagnostics:
         # Plain diagnostics (--plain-diagnostics): no debug payloads, no phase
         # timings, no pointer to the recorded archive, nothing of the Viper
-        # level (see _without_debug_params).
+        # level.
         result.pop('timings', None)
         result.pop('recordedAt', None)
         result.pop('viperProgram', None)
@@ -262,31 +265,30 @@ def _slim_debug(result: dict) -> dict:
         break  # nothing left to shrink (oversize is outside the payloads)
     return result
 
-# The Viper-level parameters of the verify tools: under --plain-diagnostics the
-# tools are registered without them and without the description paragraphs that
-# name them, the backend arguments or a verifier budget (PLAIN_HIDDEN): neither
-# the budgets nor the way to set them are advertised.
-DEBUG_PARAMS = ('counterexample', 'include_viper')
-PLAIN_HIDDEN = tuple('`{}`'.format(name) for name in DEBUG_PARAMS + ('viper_args',)) \
-    + ('--timeout',)
+# The parameters of the verify tools that plain tools do not list: under
+# --plain-diagnostics the tools' schemas lack them and their descriptions the
+# paragraphs that name them or a verifier budget (HIDDEN_TERMS). A call that
+# passes one all the same has it taken.
+HIDDEN_PARAMS = ('counterexample', 'include_viper', 'translate_only', 'viper_args')
+HIDDEN_TERMS = tuple('`{}`'.format(name) for name in HIDDEN_PARAMS) + ('--timeout',)
 
 
-def _without_debug_params(tool):
-    """`tool` re-signed without DEBUG_PARAMS and the paragraphs naming
-    PLAIN_HIDDEN, for plain diagnostics."""
+def _plain_tool(tool):
+    """`tool` with HIDDEN_PARAMS out of its schema and without the paragraphs
+    naming HIDDEN_TERMS."""
     sig = signature(tool)
-    kept = [p for name, p in sig.parameters.items() if name not in DEBUG_PARAMS]
+    params = [p.replace(annotation=SkipJsonSchema[p.annotation])
+              if name in HIDDEN_PARAMS else p for name, p in sig.parameters.items()]
 
     async def plain(**kwargs):
         return await tool(**kwargs)
 
     plain.__name__ = tool.__name__
-    plain.__signature__ = sig.replace(parameters=kept)
-    plain.__annotations__ = {k: v for k, v in tool.__annotations__.items()
-                             if k not in DEBUG_PARAMS}
+    plain.__signature__ = sig.replace(parameters=params)
+    plain.__annotations__ = {p.name: p.annotation for p in params}
     plain.__doc__ = '\n\n'.join(
         para for para in getdoc(tool).split('\n\n')
-        if not any(term in para for term in PLAIN_HIDDEN))
+        if not any(term in para for term in HIDDEN_TERMS))
     return plain
 
 
@@ -299,10 +301,38 @@ def _request_meta(ctx: Optional[Context]) -> Optional[dict]:
         return None
 
 
-async def _run(job_token, fn):
-    """``fn``, a verification under ``job_token``, on a verification thread.
-    One whose call the client gives up (notifications/cancelled, as it sends
-    when its tool-call timeout passes) is stopped."""
+# The client's limit on a tool call (ms), as Claude Code has it; a server it
+# starts inherits it.
+TOOL_TIMEOUT_ENV = 'MCP_TOOL_TIMEOUT'
+OVERLONG_REFUSAL = (
+    'Not started: a verification may run for at most %d seconds here, and '
+    'this one asks for %s (--timeout). Use --timeout=%d or less.')
+
+
+def _refuse_overlong(viper_args):
+    """Refuse a call whose `viper_args` ask for a --timeout the client's
+    tool-call limit (TOOL_TIMEOUT_ENV) cannot hold with the hard-wall grace.
+    Not with plain diagnostics, where the client's own error is what a caller
+    gets."""
+    if _service.plain_diagnostics or not any(
+            arg.split('=')[0] == '--timeout' for arg in viper_args or ()):
+        return
+    try:
+        limit = int(os.environ[TOOL_TIMEOUT_ENV]) // 1000 - HARD_DEADLINE_GRACE
+    except (KeyError, ValueError):
+        return
+    asked = backend_timeout_seconds(viper_args)
+    if limit > 0 and (asked is None or asked > limit):
+        raise ToolError(OVERLONG_REFUSAL % (
+            limit, 'no limit' if asked is None else '%d' % asked, limit))
+
+
+async def _run(job_token, viper_args, fn):
+    """``fn``, a verification with ``viper_args`` under ``job_token``, on a
+    verification thread. One whose call the client gives up
+    (notifications/cancelled, as it sends when its tool-call timeout passes)
+    is stopped."""
+    _refuse_overlong(viper_args)
     try:
         return await asyncio.get_event_loop().run_in_executor(_executor, fn)
     except asyncio.CancelledError:
@@ -338,14 +368,11 @@ async def verify_file(path: str, methods: Optional[List[str]] = None,
     plus `success` and `duration` — and two abnormal-
     end flags: `cancelled` (the job was stopped, e.g. via the `cancel` tool)
     and `crashed` (the verification backend died with an exception, reported
-    in a `verifier.crashed` diagnostic; unlike a timeout, retrying an
-    identical crashed run is usually pointless). Optionally restrict
+    in a `verifier.crashed` diagnostic). Optionally restrict
     to a list of `methods`; each entry is a top-level function by its bare name
     (e.g. `my_func`), a method as `ClassName.method_name` (its bare name also
     matches), or a whole class by `ClassName` to verify all its methods.
-    Passing several methods in one call is cheaper than one call per method:
-    the file is translated once and the selected methods are verified in
-    parallel. Set `ignore_global` to skip verification of top-level
+    Set `ignore_global` to skip verification of top-level
     (module-global) statements.
 
     `base_dir` is the package root used to resolve intra-package imports during
@@ -364,8 +391,8 @@ async def verify_file(path: str, methods: Optional[List[str]] = None,
     well-formed Nagini program; no proof obligations are checked.
 
     For example, `viper_args=["--timeout=60"]` sets a per-run verification
-    timeout in seconds. A prover that runs past its memory limit is reported
-    like such a timeout: a `TimeoutOccurred` diagnostic saying so. A run that
+    timeout in seconds. A prover that runs past its memory limit is a crash:
+    a `verifier.crashed` diagnostic saying so. A run that
     such a timeout or a backend crash ended also returns `members`, for each
     member it was to verify how far it got (`passed`, `failed`, `inFlight`:
     started and unfinished, `notStarted`), and the errors of the members that
@@ -377,7 +404,7 @@ async def verify_file(path: str, methods: Optional[List[str]] = None,
     """
     selected = _as_selected(methods)
     job_token = job_token or uuid.uuid4().hex
-    result = await _run(job_token, lambda: _service.verify(
+    result = await _run(job_token, viper_args, lambda: _service.verify(
         path, selected=selected, counterexample=counterexample, base_dir=base_dir,
         ignore_global=ignore_global, viper_args=viper_args,
         include_viper=include_viper, translate_only=translate_only,
@@ -398,11 +425,10 @@ async def verify_method(path: str, methods: List[str],
     `path` should be absolute (see `verify_file`). `methods` is a list of
     member names: a top-level function by its bare name (e.g. `["my_func"]`),
     a method as `ClassName.method_name` (its bare name also matches), or a
-    whole class by `ClassName`. Verifying several methods in one call is
-    cheaper than one call per method: one translation, verified in parallel.
+    whole class by `ClassName`.
     """
     job_token = job_token or uuid.uuid4().hex
-    result = await _run(job_token, lambda: _service.verify(
+    result = await _run(job_token, viper_args, lambda: _service.verify(
         path, selected=_as_selected(methods), counterexample=counterexample,
         viper_args=viper_args, include_viper=include_viper,
         translate_only=translate_only,
@@ -442,7 +468,7 @@ async def verify_snippet(code: str, counterexample: bool = False,
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
-    result = await _run(job_token, verify)
+    result = await _run(job_token, viper_args, verify)
     return _slim_debug(result.to_dict())
 
 
@@ -597,11 +623,9 @@ def main():
     global _service
     _service = make_service(args)
     if args.plain_diagnostics:
-        # Nothing of the Viper level: the verify tools without DEBUG_PARAMS, and
-        # no inspect (no archive pointer to read).
         for tool in (verify_file, verify_method, verify_snippet):
             mcp.remove_tool(tool.__name__)
-            mcp.add_tool(_without_debug_params(tool))
+            mcp.add_tool(_plain_tool(tool))
         mcp.remove_tool(inspect.__name__)
     # SIGTERM unwinds like SIGINT, so the service shuts down (see finally).
     signal.signal(signal.SIGTERM, signal.default_int_handler)

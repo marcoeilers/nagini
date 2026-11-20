@@ -238,7 +238,7 @@ VAGUE_REASONS = {
 }
 
 # Explanatory prose in messages: raise-site explanations, named termination
-# errors, and the code prose below. Off (VerificationService plain_messages),
+# errors, and the code prose below. Off (VerificationService plain_diagnostics),
 # messages carry bare codes and generic text.
 PROSE = True
 

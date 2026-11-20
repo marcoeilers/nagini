@@ -379,7 +379,12 @@ CANCELLED_STREAM_WAIT = 10
 SHUTDOWN_WAIT = 30
 
 
-def _backend_timeout_seconds(backend_args) -> Optional[int]:
+# Silicon's message for its whole-run --timeout; the timeouts the service
+# reports itself read the same.
+TIMEOUT_MESSAGE = 'Timeout occurred after %d second(s)'
+
+
+def backend_timeout_seconds(backend_args) -> Optional[int]:
     """The backend's own --timeout in seconds, or None when unset/0."""
     timeout = None
     args = list(backend_args)
@@ -417,7 +422,7 @@ def _hard_wall_seconds(backend_args) -> Optional[int]:
     for many extra minutes. Cap the wait at T plus a grace period; None (no
     --timeout, or --timeout=0) means wait indefinitely.
     """
-    seconds = _backend_timeout_seconds(backend_args)
+    seconds = backend_timeout_seconds(backend_args)
     return seconds + HARD_DEADLINE_GRACE if seconds else None
 
 
@@ -571,8 +576,7 @@ class VerificationService:
                  force_obligations: bool = False,
                  default_viper_args: List[str] = None,
                  record_dir: str = None,
-                 plain_diagnostics: bool = False,
-                 plain_messages: bool = False):
+                 plain_diagnostics: bool = False):
         if viper_jar_path:
             config.classpath = viper_jar_path
         if z3_path:
@@ -598,11 +602,11 @@ class VerificationService:
         self._bv_size = int_bitops_size
         self._disable_branch_conditions = disable_branch_conditions
         self._record_dir = record_dir
-        # Plain diagnostics: no phase timings or archive pointer, and the MCP
-        # frontend drops the SMT debug payloads (the recorded attempts keep
-        # everything). Plain messages: no explanatory prose.
+        # Plain diagnostics: no phase timings or archive pointer, no explanatory
+        # prose in messages, and the MCP frontend drops the SMT debug payloads
+        # (the recorded attempts keep everything).
         self.plain_diagnostics = plain_diagnostics
-        messages.PROSE = not plain_messages
+        messages.PROSE = not plain_diagnostics
         # Continue the attempt numbering of any earlier server that recorded
         # into the same directory (e.g. a session resume, or a harness-side
         # sweep sharing the agent's log) instead of clobbering attempt-0001.
@@ -1141,11 +1145,12 @@ class VerificationService:
                 messages = manager.await_future(
                     stream, timeout_ms=wall_cap * 1000 if wall_cap else None)
             except Exception as e:
+                backend_timeout = backend_timeout_seconds(backend_args)
                 if wall_cap is not None and _is_await_timeout(e):
                     # The backend blew through its own --timeout plus the grace
                     # period: cancel the job and, when no other job would be hit,
                     # hard-kill the prover processes so the server is immediately
-                    # usable again; either way report a plain timeout.
+                    # usable again; either way report the backend's timeout.
                     with self._jobs_lock:
                         alone = self._inflight == 1
                     logging.warning('Verification of %s exceeded the hard %ss wall '
@@ -1161,33 +1166,22 @@ class VerificationService:
                             _kill_child_provers()
                     phases.record('verify', time.time() - verify_start)
                     return VerifyResult(False, [self._timeout_diagnostic(
-                        path, 'Timeout occurred: verification exceeded %s second(s) '
-                        '(hard wall).' % wall_cap, phases, viper_args, modules)],
-                        time.time() - start, viper_program=viper_text,
+                        path, TIMEOUT_MESSAGE % backend_timeout, phases, viper_args,
+                        modules)], time.time() - start, viper_program=viper_text,
                         members=self._cancelled_members(manager, stream, modules, prog))
                 # Most commonly this is a cancelled job (its actor was stopped) —
                 # either explicitly via the cancel tool, or because the backend's own
                 # --timeout ended the run. Tell those apart by the elapsed time, and
-                # report the timeout as a real diagnostic instead of an inexplicable
-                # empty result: this is the whole-run budget expiring while every
-                # individual SMT check stayed within its per-check budget (otherwise
-                # a located failure would have been reported).
+                # report the timeout as Silicon does instead of an empty result.
                 elapsed = time.time() - start
                 phases.record('verify', time.time() - verify_start)
-                backend_timeout = _backend_timeout_seconds(backend_args)
                 if (backend_timeout is not None
                         and time.time() - verify_start >= backend_timeout - 1):
                     logging.debug('Verification job ended by backend --timeout.',
                                   exc_info=True)
                     return VerifyResult(False, [self._timeout_diagnostic(
-                        path,
-                        'Timeout occurred: the whole-run --timeout=%ds expired '
-                        'before verification finished.%s'
-                        % (backend_timeout,
-                           '' if self.plain_diagnostics else
-                           ' No individual obligation failed or exceeded its '
-                           'per-check budget.'),
-                        phases, viper_args, modules)], elapsed, cancelled=True,
+                        path, TIMEOUT_MESSAGE % backend_timeout, phases, viper_args,
+                        modules)], elapsed, cancelled=True,
                         viper_program=viper_text)
                 logging.debug('Verification job failed or was cancelled.', exc_info=True)
                 return VerifyResult(False, [], elapsed, cancelled=True,
@@ -1224,14 +1218,13 @@ class VerificationService:
                     viper_program=viper_text, members=members)
             if crash_texts and not self.plain_diagnostics and any(
                     PROVER_OUT_OF_MEMORY in t for t in crash_texts):
-                # The prover ran past its memory cap: a budget, reported like
-                # the whole-run timeout.
                 cap = _prover_memory_mb(backend_args)
-                return VerifyResult(False, [self._timeout_diagnostic(
+                diag = self._point_diagnostic(
                     path, 'Out of memory: the prover exceeded its memory limit%s.'
-                    % (' of %d MB' % cap if cap else ''),
-                    phases, viper_args, modules)], duration,
-                    viper_program=viper_text, members=members)
+                    % (' of %d MB' % cap if cap else ''), 'verifier.crashed')
+                self._add_in_flight(diag, viper_args, modules)
+                return VerifyResult(False, [diag], duration, crashed=True,
+                                    viper_program=viper_text, members=members)
             if crash_texts and not self.plain_diagnostics and any(
                     PROVER_SEGFAULT in t for t in crash_texts):
                 logging.warning('Prover segfault for %s: %s', path, crash_texts[0])
@@ -1452,11 +1445,11 @@ class VerificationService:
         "was collected. Re-verify with viper_args=['--disableCaching'] to "
         'run this member live and collect the state; the cache is kept.]')
 
-    def _phase_note(self, phases) -> str:
-        """Per-phase timing suffix for a timeout message ('' when plain)."""
+    def _with_phases(self, message, phases) -> str:
+        """A timeout message followed by the per-phase timings (as it is when plain)."""
         if self.plain_diagnostics:
-            return ''
-        return ' Phases: %s.' % phases.summary()
+            return message
+        return '%s. Phases: %s.' % (message.rstrip('.'), phases.summary())
 
     @staticmethod
     def _smtstate_dir(viper_args) -> Optional[str]:
@@ -1471,7 +1464,7 @@ class VerificationService:
         the in-flight checks, the slowest completed checks and the check count
         and time per member, read from the session logs the backend left in
         its SMT state dir."""
-        diag = self._point_diagnostic(path, message + self._phase_note(phases),
+        diag = self._point_diagnostic(path, self._with_phases(message, phases),
                                       'TimeoutOccurred')
         self._add_in_flight(diag, viper_args, modules)
         return diag
@@ -1686,10 +1679,8 @@ def add_service_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     parser.add_argument('--plain-diagnostics', action='store_true',
                         help='report plain diagnostics: no phase timings and '
                              'no SMT debug payloads in responses (recorded '
-                             'attempts keep everything)')
-    parser.add_argument('--plain-messages', action='store_true',
-                        help='report plain messages: no explanatory prose on '
-                             'invalid-program errors and no member names in '
+                             'attempts keep everything), no explanatory prose '
+                             'on invalid-program errors and no member names in '
                              'termination messages')
     return parser
 
@@ -1710,8 +1701,7 @@ def service_kwargs_from_args(args: argparse.Namespace) -> dict:
         force_obligations=args.force_obligations,
         default_viper_args=args.viper_arg.split(',') if args.viper_arg else None,
         record_dir=args.record_dir,
-        plain_diagnostics=args.plain_diagnostics,
-        plain_messages=args.plain_messages)
+        plain_diagnostics=args.plain_diagnostics)
 
 
 
