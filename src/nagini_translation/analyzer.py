@@ -1293,6 +1293,9 @@ class Analyzer(ast.NodeVisitor):
     def visit_arg(self, node: ast.arg) -> None:
         assert self.current_function is not None
         node_type = self.typeof(node)
+        if node_type is None:
+            # A parameter annotated None: its only value is None.
+            node_type = self.module.global_module.classes['NoneType']
         self.current_function.args[node.arg] = \
             self.node_factory.create_python_var(node.arg, node, node_type)
         # If we just introduced new type variables, create the expression that
