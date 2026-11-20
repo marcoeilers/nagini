@@ -33,7 +33,7 @@ from nagini_translation.lib.util import (
     UnsupportedException,
 )
 
-annotation_t = Union[ast.Name, ast.Constant, ast.Attribute, ast.Subscript]
+annotation_t = Union[ast.Name, ast.Constant, ast.Attribute, ast.Subscript, ast.BinOp]
 
 ALL_CONTRACT_ELEMS = (CONTRACT_FUNCS + CONTRACT_WRAPPER_FUNCS +
                         IO_CONTRACT_FUNCS + IO_OPERATION_PROPERTY_FUNCS +
@@ -739,6 +739,12 @@ class GhostChecker(ast.NodeVisitor):
                 return self.is_ghost_type(target.classes.get(ann.attr))
             raise InvalidProgramException(ann, 'invalid.ghost.annotation',
                                           "Couldn't correctly resolve module of annotation.")
+        elif isinstance(ann, ast.BinOp) and isinstance(ann.op, ast.BitOr):
+            # X | Y, checked like Union[X, Y].
+            alternatives = [ann]
+            while isinstance(alternatives[0], ast.BinOp) and isinstance(alternatives[0].op, ast.BitOr):
+                alternatives[:1] = [alternatives[0].left, alternatives[0].right]
+            return self.check_annotations(ann, alternatives)
         else:
             assert isinstance(ann, ast.Subscript), f"Unexpected type of {type(ann)}"
             # A generic ghost type, e.g. PSeq[int], is ghost no matter what its
@@ -749,28 +755,34 @@ class GhostChecker(ast.NodeVisitor):
             if isinstance(ann.slice, (ast.Name, ast.Constant, ast.Subscript, ast.Attribute)):
                 return self.check_annotation(ann.slice)
             assert isinstance(ann.slice, (ast.Tuple, ast.List)), f"Unexpected type of {type(ann.slice)}"
-            sub_anns = ann.slice.elts
-            if not sub_anns:
-                # The empty tuple type, Tuple[()]. There are no type arguments,
-                # so nothing here can make the annotation ghost.
-                return False
-            if len(sub_anns) == 1:
-                return self.check_annotation(sub_anns[0])
+            return self.check_annotations(ann, ann.slice.elts)
 
-            if isinstance(sub_anns[0], ast.Constant) and sub_anns[0].value is None:
-                start_idx = 1
-            else:
-                start_idx = 0
-            fst = self.check_annotation(sub_anns[start_idx])
-            for idx in range(start_idx+1, len(sub_anns)):
-                sub_ann = sub_anns[idx]
-                if isinstance(sub_ann, ast.Constant) and sub_ann.value is None:
-                    # We ignore None and assume there is at least one other value in the subscript
-                    continue
-                next = self.check_annotation(sub_ann)
-                if fst != next:
-                    raise InvalidProgramException(ann, 'invalid.ghost.annotation')
-            return fst
+    def check_annotations(self, ann: annotation_t, sub_anns: List[annotation_t]) -> bool:
+        """
+        Checks the type arguments of the annotation, or the alternatives of a
+        union: all of them have to agree on being ghost.
+        """
+        if not sub_anns:
+            # The empty tuple type, Tuple[()]. There are no type arguments,
+            # so nothing here can make the annotation ghost.
+            return False
+        if len(sub_anns) == 1:
+            return self.check_annotation(sub_anns[0])
+
+        if isinstance(sub_anns[0], ast.Constant) and sub_anns[0].value is None:
+            start_idx = 1
+        else:
+            start_idx = 0
+        fst = self.check_annotation(sub_anns[start_idx])
+        for idx in range(start_idx+1, len(sub_anns)):
+            sub_ann = sub_anns[idx]
+            if isinstance(sub_ann, ast.Constant) and sub_ann.value is None:
+                # We ignore None and assume there is at least one other value in the subscript
+                continue
+            next = self.check_annotation(sub_ann)
+            if fst != next:
+                raise InvalidProgramException(ann, 'invalid.ghost.annotation')
+        return fst
 
     def is_ghost_name(self, name: str) -> bool:
         """

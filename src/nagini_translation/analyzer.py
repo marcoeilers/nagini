@@ -449,6 +449,10 @@ class Analyzer(ast.NodeVisitor):
                         and len(ann.slice.elts) > 1:
                     sub_ann = ann.slice.elts[1]
                 return self.is_ghost_annotation(sub_ann)
+        elif isinstance(ann, ast.BinOp) and isinstance(ann.op, ast.BitOr):
+            # X | Y, read like Union[X, Y].
+            none_first = isinstance(ann.left, ast.Constant) and ann.left.value is None
+            return self.is_ghost_annotation(ann.right if none_first else ann.left)
         return False
 
     def is_ghost_type_name(self, name: str) -> bool:
