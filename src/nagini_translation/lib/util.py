@@ -11,6 +11,7 @@ from typing import (
     Any,
     Callable,
     Dict,
+    Iterable,
     List,
     Optional,
     Tuple,
@@ -20,6 +21,68 @@ from typing import (
 
 T = TypeVar('T')
 V = TypeVar('V')
+
+
+TYPING_MODULES = ('typing', 'typing_extensions')
+
+# What an UnsupportedException says of any other use of TYPE_CHECKING.
+TYPE_CHECKING_USE = ('TYPE_CHECKING is only supported as the test of a '
+                     'module-level if without else that holds only imports')
+
+
+def is_type_checking(node: ast.expr, module: ast.Module) -> bool:
+    """
+    Whether the expression is typing.TYPE_CHECKING by the imports of the
+    module: a constant that is False when the program runs, and True for the
+    type checker.
+    """
+    def binds(stmt: ast.stmt, bound: str, name: str) -> bool:
+        return any(alias.name == name and (alias.asname or alias.name) == bound
+                   for alias in stmt.names)
+
+    if isinstance(node, ast.Name):
+        return any(isinstance(stmt, ast.ImportFrom) and
+                   stmt.module in TYPING_MODULES and
+                   binds(stmt, node.id, 'TYPE_CHECKING')
+                   for stmt in module.body)
+    if (isinstance(node, ast.Attribute) and node.attr == 'TYPE_CHECKING' and
+            isinstance(node.value, ast.Name)):
+        return any(isinstance(stmt, ast.Import) and
+                   any(binds(stmt, node.value.id, name) for name in TYPING_MODULES)
+                   for stmt in module.body)
+    return False
+
+
+def is_type_checking_block(stmt: ast.stmt, module: ast.Module) -> bool:
+    """
+    Whether the statement is an `if TYPE_CHECKING:` at module level, whose
+    body is never run and holds the imports only the annotations need.
+    """
+    return (isinstance(stmt, ast.If) and is_type_checking(stmt.test, module) and
+            any(stmt is other for other in module.body))
+
+
+def unsupported_under_type_checking(block: ast.If) -> Optional[ast.stmt]:
+    """
+    The first statement of an `if TYPE_CHECKING:` block that is not supported:
+    one of its body that is no import, or one of its else. Nothing that runs
+    may depend on the constant: the type checker takes the other value for it
+    and does not check what it skips.
+    """
+    refused = [stmt for stmt in block.body
+               if not isinstance(stmt, (ast.Import, ast.ImportFrom, ast.Pass))]
+    return next(iter(refused + block.orelse), None)
+
+
+def typed_statements(module: ast.Module) -> Iterable[ast.stmt]:
+    """
+    The statements at module level as a type checker reads them: with those
+    of each `if TYPE_CHECKING:` block.
+    """
+    for stmt in module.body:
+        yield stmt
+        if is_type_checking_block(stmt, module):
+            yield from stmt.body
 
 
 def defers_annotations(module: Optional[ast.Module]) -> bool:

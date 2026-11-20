@@ -70,7 +70,12 @@ from nagini_translation.lib.util import (
     get_parent_of_type,
     InvalidProgramException,
     is_io_existential,
+    is_type_checking,
+    is_type_checking_block,
     isStr,
+    TYPE_CHECKING_USE,
+    typed_statements,
+    unsupported_under_type_checking,
     UnsupportedException,
     use_char_columns,
 )
@@ -187,7 +192,7 @@ class Analyzer(ast.NodeVisitor):
         self.asts[abs_path] = parse_result
         self.sources[abs_path] = text
         assert isinstance(parse_result, ast.Module)
-        for stmt in parse_result.body:
+        for stmt in typed_statements(parse_result):
             if isinstance(stmt, ast.Import):
                 for name in stmt.names:
                     module_name = name.name
@@ -901,6 +906,16 @@ class Analyzer(ast.NodeVisitor):
         self.visit_module(module)
         self.module = old_module
         self.contract_only = old_contract_only
+
+    def visit_If(self, node: ast.If) -> None:
+        if not is_type_checking_block(node, self.module.node):
+            self.visit_default(node)
+            return
+        refused = unsupported_under_type_checking(node)
+        if refused is not None:
+            raise UnsupportedException(refused, TYPE_CHECKING_USE)
+        for stmt in node.body:
+            self.visit(stmt, node)
 
     def visit_Import(self, node: ast.Import):
         for name in node.names:
@@ -1707,6 +1722,8 @@ class Analyzer(ast.NodeVisitor):
         """
         Tracks field accesses to find out which fields exist.
         """
+        if is_type_checking(node, self.module.node):
+            return
         self.visit_default(node)
         # If the LHS of this attribute is a module, or if this
         # is part of a complex expression and it's guaranteed that the field

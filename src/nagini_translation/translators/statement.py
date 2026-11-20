@@ -61,6 +61,7 @@ from nagini_translation.lib.util import (
     get_surrounding_try_blocks,
     InvalidProgramException,
     is_get_ghost_output,
+    is_type_checking_block,
     isEllipsis,
     isStr,
     UnsupportedException,
@@ -1128,6 +1129,8 @@ class StatementTranslator(CommonTranslator):
             raise UnsupportedException(node, 'unsupported expression statement')
 
     def translate_stmt_If(self, node: ast.If, ctx: Context) -> List[Stmt]:
+        if is_type_checking_block(node, ctx.module.node):
+            return []
         cond_stmt, cond = self.translate_expr(node.test, ctx,
                                               target_type=self.viper.Bool)
         then_body = flatten([self.translate_stmt(stmt, ctx)

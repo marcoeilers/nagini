@@ -62,6 +62,7 @@ from nagini_translation.lib.util import (
     get_func_name,
     get_surrounding_try_blocks,
     InvalidProgramException,
+    is_type_checking,
     isBytes,
     isEllipsis,
     isNameConstant,
@@ -69,6 +70,7 @@ from nagini_translation.lib.util import (
     isStr,
     join_three_expressions,
     join_expressions,
+    TYPE_CHECKING_USE,
     UnsupportedException,
 )
 from nagini_translation.translators.abstract import Context
@@ -1084,6 +1086,8 @@ class ExpressionTranslator(CommonTranslator):
         target = self.get_target(node, ctx)
         if node.id == 'Ellipsis':
             return self.translate_Ellipsis(node, ctx)
+        if target is None and is_type_checking(node, ctx.module.node):
+            raise UnsupportedException(node, TYPE_CHECKING_USE)
         if isinstance(target, PythonGlobalVar):
             return self.translate_global_var_reference(target, node, ctx)
         elif isinstance(target, PythonMethod):
@@ -1253,6 +1257,8 @@ class ExpressionTranslator(CommonTranslator):
         position = self.to_position(node, ctx)
         target = self.get_target(node.value, ctx)
         func_name = get_func_name(node.value)
+        if target is None and is_type_checking(node, ctx.module.node):
+            raise UnsupportedException(node, TYPE_CHECKING_USE)
         if isinstance(target, PythonModule):
             target = self.get_target(node, ctx)
             if isinstance(target, PythonGlobalVar):
