@@ -1649,8 +1649,10 @@ class Analyzer(ast.NodeVisitor):
                     return
                 
                 assign = node._parent
-                if (not isinstance(assign, ast.Assign)
-                        or len(assign.targets) != 1):
+                annotated = (isinstance(assign, ast.AnnAssign) and assign.simple == 1
+                             and assign.value is not None)
+                if not annotated and (not isinstance(assign, ast.Assign)
+                                      or len(assign.targets) != 1):
                     msg = ('only simple assignments and reads allowed for '
                             'static fields')
                     raise UnsupportedException(assign, msg)
