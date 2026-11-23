@@ -42,7 +42,6 @@ from nagini_translation.lib.program_nodes import (
     OptionalType,
     PythonClass,
     PythonField,
-    PythonIOOperation,
     PythonMethod,
     PythonModule,
     PythonNode,
@@ -51,7 +50,7 @@ from nagini_translation.lib.program_nodes import (
     toposort_classes,
     UnionType,
 )
-from nagini_translation.lib.resolver import get_target as do_get_target
+from nagini_translation.lib.resolver import get_target as do_get_target, lookup_scopes
 from nagini_translation.lib.typedefs import (
     Expr,
     FuncApp,
@@ -1032,23 +1031,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return False
 
     def get_target(self, node: ast.AST, ctx: Context) -> PythonModule:
-        container = ctx.actual_function if ctx.actual_function else ctx.module
-        containers = [ctx]
-        current_class = ctx.current_class
-        class_scopes = []
-        while current_class:
-            class_scopes.append(current_class)
-            current_class = current_class.superscope if isinstance(current_class.superscope, PythonClass) else None
-        # Innermost first, so that a nested class shadows an enclosing one.
-        containers[1:1] = class_scopes
-        if isinstance(container, (PythonMethod, PythonIOOperation)):
-            containers.append(container)
-            containers.extend(container.module.get_included_modules())
-        else:
-            # Assume module
-            containers.extend(container.get_included_modules(()))
-        result = do_get_target(node, containers, container)
-        return result
+        containers, container = lookup_scopes(ctx)
+        return do_get_target(node, containers, container)
 
     def get_fresh_int_lit(self, ctx: Context) -> Expr:
         """

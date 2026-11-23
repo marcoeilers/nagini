@@ -26,6 +26,7 @@ from nagini_translation.lib.context import Context
 from collections import OrderedDict
 from nagini_translation.lib.resolver import get_target as do_get_target
 from nagini_translation.lib.resolver import get_type as do_get_type
+from nagini_translation.lib.resolver import lookup_scopes
 from nagini_translation.lib.util import (
     get_func_name,
     construct_lambda_prefix,
@@ -1397,32 +1398,13 @@ class GhostChecker(ast.NodeVisitor):
         return sub.value.id if isinstance(sub.value, ast.Name) else None
 
     def get_target(self, node: ast.AST, ctx: Context) -> Optional[PythonNode]:
-        container = ctx.actual_function if ctx.actual_function else ctx.module
-        containers = [ctx]
-        if ctx.current_class:
-            containers.append(ctx.current_class)
-        if isinstance(container, (PythonMethod, PythonIOOperation)):
-            containers.append(container)
-            containers.extend(container.module.get_included_modules())
-        else:
-            # Assume module
-            containers.extend(container.get_included_modules(()))
-        result = do_get_target(node, containers, container)
-        return result
+        containers, container = lookup_scopes(ctx)
+        return do_get_target(node, containers, container)
 
     def get_type(self, node: ast.AST, ctx: Context) -> Optional[PythonType]:
         """
         Returns the type of the expression represented by node as a PythonType,
         or None if the type is void.
         """
-        container = ctx.actual_function if ctx.actual_function else ctx.module
-        containers = [ctx]
-        if ctx.current_class:
-            containers.append(ctx.current_class)
-        if isinstance(container, (PythonMethod, PythonIOOperation)):
-            containers.append(container)
-            containers.extend(container.module.get_included_modules())
-        else:
-            # Assume module
-            containers.extend(container.get_included_modules())
+        containers, container = lookup_scopes(ctx)
         return do_get_type(node, containers, container)

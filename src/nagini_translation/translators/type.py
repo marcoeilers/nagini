@@ -15,13 +15,11 @@ from nagini_translation.lib.constants import (
 )
 from nagini_translation.lib.program_nodes import (
     PythonClass,
-    PythonIOOperation,
-    PythonMethod,
     PythonType,
     SilverType,
 )
 from nagini_translation.lib.jvmaccess import JVM
-from nagini_translation.lib.resolver import get_type as do_get_type
+from nagini_translation.lib.resolver import get_type as do_get_type, lookup_scopes
 from nagini_translation.lib.typedefs import (
     Expr,
 )
@@ -73,16 +71,7 @@ class TypeTranslator(CommonTranslator):
         Returns the type of the expression represented by node as a PythonType,
         or None if the type is void.
         """
-        container = ctx.actual_function if ctx.actual_function else ctx.module
-        containers = [ctx]
-        if ctx.current_class:
-            containers.append(ctx.current_class)
-        if isinstance(container, (PythonMethod, PythonIOOperation)):
-            containers.append(container)
-            containers.extend(container.module.get_included_modules())
-        else:
-            # Assume module
-            containers.extend(container.get_included_modules())
+        containers, container = lookup_scopes(ctx)
         return do_get_type(node, containers, container)
 
     def type_check(self, lhs: Expr, type: PythonType,

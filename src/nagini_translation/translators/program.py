@@ -193,6 +193,7 @@ class ProgramTranslator(CommonTranslator):
             posts.append(self.viper.Implies(exact_type, has_value,
                                             field_position, info))
         ctx.module = current_module
+        ctx.current_class = None
         # Create a single function that represents all
         return self.viper.Function(root.sil_name, [type_decl], type, [], posts,
                                    None, position, info)

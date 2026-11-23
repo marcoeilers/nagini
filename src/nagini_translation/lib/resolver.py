@@ -57,7 +57,32 @@ from nagini_translation.lib.util import (
     isStr,
     UnsupportedException,
 )
-from typing import List, Optional
+from typing import List, Optional, Tuple
+
+
+def lookup_scopes(ctx: 'Context') -> Tuple[List[ContainerInterface], PythonNode]:
+    """
+    Returns the scopes in which a name of the code being translated is looked
+    up, innermost first, and the function or module that contains that code.
+    """
+    container = ctx.actual_function if ctx.actual_function else ctx.module
+    in_method = isinstance(container, PythonMethod) and container.cls
+    classes = []
+    current_class = container.cls if in_method else ctx.current_class
+    while current_class:
+        # Innermost first, so that a nested class shadows an enclosing one.
+        classes.append(current_class)
+        superscope = current_class.superscope
+        current_class = superscope if isinstance(superscope, PythonClass) else None
+    if isinstance(container, (PythonMethod, PythonIOOperation)):
+        own = [container] + container.module.get_included_modules()
+    else:
+        own = container.get_included_modules()
+    if in_method:
+        # A class body is no scope of its methods; they look there last, for
+        # its type variables, which no module holds.
+        return [ctx] + own + classes, container
+    return [ctx] + classes + own, container
 
 
 def get_target(node: ast.AST,
