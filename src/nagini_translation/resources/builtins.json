@@ -592,6 +592,79 @@
         "__mod__": {
             "args": ["str", "tuple"],
             "type": "str"
+        },
+        "__getitem__": {
+            "args": ["str", "__prim__int"],
+            "type": "str"
+        },
+        "__getitem_slice__": {
+            "args": ["str", "slice"],
+            "type": "str",
+            "display_name": "__getitem__"
+        },
+        "__contains__": {
+            "args": ["str", "str"],
+            "type": "__prim__bool"
+        },
+        "startswith": {
+            "args": ["str", "str"],
+            "type": "__prim__bool"
+        },
+        "endswith": {
+            "args": ["str", "str"],
+            "type": "__prim__bool"
+        },
+        "__mul__": {
+            "args": ["str", "__prim__int"],
+            "type": "str"
+        },
+        "lower": {
+            "args": ["str"],
+            "type": "str"
+        },
+        "upper": {
+            "args": ["str"],
+            "type": "str"
+        },
+        "strip": {
+            "args": ["str", "str"],
+            "type": "str"
+        },
+        "lstrip": {
+            "args": ["str", "str"],
+            "type": "str"
+        },
+        "rstrip": {
+            "args": ["str", "str"],
+            "type": "str"
+        },
+        "replace": {
+            "args": ["str", "str", "str"],
+            "type": "str"
+        },
+        "isdigit": {
+            "args": ["str"],
+            "type": "__prim__bool"
+        },
+        "isalpha": {
+            "args": ["str"],
+            "type": "__prim__bool"
+        },
+        "isalnum": {
+            "args": ["str"],
+            "type": "__prim__bool"
+        },
+        "isupper": {
+            "args": ["str"],
+            "type": "__prim__bool"
+        },
+        "islower": {
+            "args": ["str"],
+            "type": "__prim__bool"
+        },
+        "isspace": {
+            "args": ["str"],
+            "type": "__prim__bool"
         }
     },
     "methods": {
@@ -1231,6 +1304,10 @@
         },
         "sum": {
             "args": ["list"],
+            "type": "__prim__int"
+        },
+        "ord": {
+            "args": ["str"],
             "type": "__prim__int"
         }
     },
