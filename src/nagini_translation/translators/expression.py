@@ -14,7 +14,6 @@ from nagini_translation.lib.constants import (
     CHECK_DEFINED_FUNC,
     DICT_TYPE,
     ELLIPSIS_TYPE,
-    END_LABEL,
     FLOAT_TYPE,
     FUNCTION_DOMAIN_NAME,
     GET_METHOD_FUNC,
@@ -35,6 +34,7 @@ from nagini_translation.lib.constants import (
 )
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
+    Exit,
     GenericType,
     OptionalType,
     PythonClass,
@@ -60,7 +60,6 @@ from nagini_translation.lib.typedefs import (
 from nagini_translation.lib.util import (
     construct_lambda_prefix,
     get_func_name,
-    get_surrounding_try_blocks,
     InvalidProgramException,
     isBytes,
     isEllipsis,
@@ -73,7 +72,7 @@ from nagini_translation.lib.util import (
 )
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
-from typing import List, Optional, Tuple, Union
+from typing import List, Tuple, Union
 from math import isnan, isinf
 
 
@@ -808,104 +807,19 @@ class ExpressionTranslator(CommonTranslator):
         """
         if isinstance(var, PythonVar):
             var = var.ref()
-        cases = []
         position = self.to_position(call, ctx)
-        err_var = ctx.error_var.ref()
-        relevant_try_blocks = get_surrounding_try_blocks(try_blocks, call)
-        goto_finally = self._create_goto_finally(relevant_try_blocks, ctx)
-        if goto_finally:
-            uncaught_option = goto_finally
-        else:
-            end_label = ctx.get_label_name(END_LABEL)
-            goto_end = self.viper.Goto(end_label, position, self.no_info(ctx))
-            if ctx.actual_function.declared_exceptions or ctx.actual_function.inline:
-                assignerror = self.viper.LocalVarAssign(err_var, var, position,
-                                                        self.no_info(ctx))
-                uncaught_option = self.translate_block([assignerror, goto_end],
-                                                       position,
-                                                       self.no_info(ctx))
-            else:
-                error_string = '"method raises no exceptions"'
-                error_pos = self.to_position(ctx.actual_function.node, ctx, error_string)
-                exhale_false = self.viper.Exhale(
-                    self.viper.FalseLit(error_pos, self.no_info(ctx)),
-                    error_pos,
-                    self.no_info(ctx))
-                uncaught_option = self.translate_block([exhale_false, goto_end],
-                                                       position,
-                                                       self.no_info(ctx))
-
-        for block in relevant_try_blocks:
-            for handler in block.handlers:
-                condition_pos = self.to_position(handler.node, ctx,
-                                                 error_string='isinstance(RaisedException(), {0})'.format(handler.exception.name))
-                condition = self.type_check(var, handler.exception,
-                                            condition_pos,
-                                            ctx, inhale_exhale=False)
-                label_name = ctx.get_label_name(handler.name)
-                goto = self.viper.Goto(label_name,
-                                       self.to_position(handler.node, ctx),
-                                       self.no_info(ctx))
-                cases.insert(0, (condition, goto))
-            if block.finally_block:
-                break
-
-        result = None
-        for cond, goto in cases:
-            if result is None:
-                result = self.viper.If(cond, goto,
-                                       uncaught_option,
-                                       self.to_position(handler.node, ctx),
-                                       self.no_info(ctx))
-            else:
-                result = self.viper.If(cond, goto, result,
-                                       self.to_position(handler.node, ctx),
-                                       self.no_info(ctx))
-        if result is None:
-            error_case = uncaught_option
-        else:
-            error_case = result
+        info = self.no_info(ctx)
+        error_case = self.translate_block(
+            self.translate_exit(Exit.RAISE, call, ctx), position, info)
         some_error_pos = self.to_position(call, ctx, error_string='(exception has been raised)')
         errnotnull = self.viper.NeCmp(var,
                                       self.viper.NullLit(self.no_position(ctx),
-                                                         self.no_info(ctx)),
-                                      some_error_pos, self.no_info(ctx))
-        emptyblock = self.translate_block([], self.no_position(ctx),
-                                          self.no_info(ctx))
-        errcheck = self.viper.If(errnotnull, error_case, emptyblock,
-                                 position,
-                                 self.no_info(ctx))
+                                                         info),
+                                      some_error_pos, info)
+        emptyblock = self.translate_block([], self.no_position(ctx), info)
+        errcheck = self.viper.If(errnotnull, error_case, emptyblock, position,
+                                 info)
         return [errcheck]
-
-    def _create_goto_finally(self, tries: List[PythonTryBlock],
-                             ctx: Context) -> Optional[Stmt]:
-        """
-        If any of the blocks in tries has a finally-block, creates and
-        returns the statements to jump there.
-        """
-        for try_ in tries:
-            if try_.finally_block or try_.with_item:
-                # Propagate return value
-                var_next = try_.get_finally_var(self.translator)
-                if var_next.sil_name in ctx.var_aliases:
-                    var_next = ctx.var_aliases[var_next.sil_name]
-                number_two = self.viper.IntLit(2, self.no_position(ctx),
-                                               self.no_info(ctx))
-                next_assign = self.viper.LocalVarAssign(var_next.ref(),
-                                                        number_two,
-                                                        self.no_position(ctx),
-                                                        self.no_info(ctx))
-                # Goto finally block
-                label_name = ctx.get_label_name(try_.finally_name)
-                goto_next = self.viper.Goto(label_name,
-                                            self.no_position(ctx),
-                                            self.no_info(ctx))
-                return_block = [next_assign, goto_next]
-                result = self.translate_block(return_block,
-                                              self.no_position(ctx),
-                                              self.no_info(ctx))
-                return result
-        return None
 
     def translate_Expr(self, node: ast.Expr, ctx: Context) -> StmtsAndExpr:
         return self.translate_expr(node.value, ctx)
@@ -1431,6 +1345,7 @@ class ExpressionTranslator(CommonTranslator):
         pair_node.col_offset = left_operand.col_offset
         pair_node.end_lineno = getattr(right_operand, 'end_lineno', None)
         pair_node.end_col_offset = getattr(right_operand, 'end_col_offset', None)
+        pair_node._parent = node
         return pair_node
 
     def _translate_comparison(self, op: ast.cmpop, left: Expr,

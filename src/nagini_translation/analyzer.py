@@ -37,6 +37,7 @@ from nagini_translation.lib.constants import (
 )
 from nagini_translation.lib.program_nodes import (
     ContainerInterface,
+    Exit,
     GenericType,
     MethodType,
     OptionalType,
@@ -319,6 +320,8 @@ class Analyzer(ast.NodeVisitor):
                     cls.type_vars[name] = TypeVar(
                         name, object_class, self.module.global_module,
                         target_type=cls, index=i)
+            else:
+                cls.ignore_type_args = True
             if 'extends' in if_cls:
                 superclass = self.find_or_create_class(
                     if_cls['extends'], module=self.module.global_module)
@@ -1669,7 +1672,7 @@ class Analyzer(ast.NodeVisitor):
             result = None
         elif self.types.is_instance_type(mypy_type):
             result = self.convert_type(mypy_type.type, node)
-            if mypy_type.args:
+            if mypy_type.args and not result.ignore_type_args:
                 args = [self.convert_type(arg, node) for arg in mypy_type.args]
                 if mypy_type.type.name == 'enumerate':
                     # We cheat and represent type enumerate as a list of pairs.
@@ -1991,14 +1994,25 @@ class Analyzer(ast.NodeVisitor):
         post_name = self.stmt_container.get_fresh_name('post_with')
         try_block.post_name = post_name
         self.stmt_container.labels.append(post_name)
-        finally_name = self.stmt_container.get_fresh_name('with_finally')
         if len(node.items) != 1:
             msg = 'with block may only have one item'
             raise UnsupportedException(node, msg)
         try_block.with_item = node.items[0]
-        try_block.finally_name = finally_name
-        self.stmt_container.labels.append(finally_name)
+        self._add_finally_labels(try_block, 'with_finally')
         self.stmt_container.try_blocks.append(try_block)
+
+    def _add_finally_labels(self, try_block: PythonTryBlock, name: str) -> None:
+        """
+        Creates the label of the finally block of try_block and those of its
+        entries, one for each way of leaving the block.
+        """
+        try_block.finally_name = self.stmt_container.get_fresh_name(name)
+        self.stmt_container.labels.append(try_block.finally_name)
+        for exit in Exit:
+            entry_name = self.stmt_container.get_fresh_name(
+                name + '_' + exit.name.lower())
+            try_block.entry_names[exit] = entry_name
+            self.stmt_container.labels.append(entry_name)
 
     def visit_Try(self, node: ast.Try) -> None:
         """
@@ -2033,10 +2047,8 @@ class Analyzer(ast.NodeVisitor):
                                                 handler_name, node.orelse, None)
             try_block.else_block = py_handler
         if node.finalbody:
-            finally_name = self.stmt_container.get_fresh_name('try_finally')
             try_block.finally_block = node.finalbody
-            try_block.finally_name = finally_name
-            self.stmt_container.labels.append(finally_name)
+            self._add_finally_labels(try_block, 'try_finally')
         self.visit_default(node)
 
     def _class_incompatible_decorators(self, decorators: set[str]) -> bool:

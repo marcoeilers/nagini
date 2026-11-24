@@ -14,7 +14,6 @@ from nagini_translation.lib.constants import (
     COMBINED_NAME_ACCESSOR,
     DICT_TYPE,
     BYTEARRAY_TYPE,
-    END_LABEL,
     IGNORED_IMPORTS,
     IGNORED_MODULE_NAMES,
     INT_TYPE,
@@ -31,13 +30,13 @@ from nagini_translation.lib.constants import (
     INPLACE_OPERATOR_FUNCTIONS,
 )
 from nagini_translation.lib.program_nodes import (
+    Exit,
     OptionalType,
     PythonField,
     PythonGlobalVar,
     PythonMethod,
     PythonModule,
     PythonNode,
-    PythonTryBlock,
     PythonType,
     PythonVar,
     SilverType,
@@ -57,8 +56,7 @@ from nagini_translation.lib.util import (
     contains_stmt,
     flatten,
     get_body_indices,
-    get_parent_of_type,
-    get_surrounding_try_blocks,
+    get_exit_frames,
     InvalidProgramException,
     is_get_ghost_output,
     isEllipsis,
@@ -75,8 +73,6 @@ class StatementTranslator(CommonTranslator):
     def __init__(self, config: 'TranslatorConfig', jvm: 'JVM', source_file: str,
                  type_info: 'TypeInfo', viper_ast: 'ViperAST') -> None:
         super().__init__(config, jvm, source_file, type_info, viper_ast)
-        # Keep track of the end and after labels of loops we are currently in.
-        self.loops = {}
         self.imported_modules = set()
         self.in_terminating_block = False
 
@@ -760,6 +756,15 @@ class StatementTranslator(CommonTranslator):
                                           self.no_position(ctx), ctx))
         return result
 
+    def _keep_exit_vars(self, node: Union[ast.While, ast.For],
+                        ctx: Context) -> Tuple[List[Stmt], List[Stmt]]:
+        """
+        Hook for an encoding in which the loop node makes the result and the
+        error of the function unknown: returns statements that save them, to be
+        put before the loop, and statements that restore them.
+        """
+        return [], []
+
     def translate_stmt_For(self, node: ast.For, ctx: Context) -> List[Stmt]:
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
@@ -829,7 +834,7 @@ class StatementTranslator(CommonTranslator):
         seq_temp_assign = self.viper.LocalVarAssign(seq_temp_var.ref(), iter_seq,
                                                     position, info)
 
-        self.enter_loop_translation(node, post_label, end_label, ctx, err_var)
+        self.enter_loop_translation(node, ctx, err_var)
         ctx.allow_statements = False
         invariant = self._create_for_loop_invariant(iter_var, seq_temp_var, target_var,
                                                     err_var, iterable,
@@ -839,6 +844,7 @@ class StatementTranslator(CommonTranslator):
 
         global_stmts, global_inv = self._get_havocked_module_var_info(ctx)
         invariant.append(global_inv)
+        exit_stmts, exit_restore = self._keep_exit_vars(node, ctx)
         # Remember type information about havocked local variables.
         invariant.extend(self._get_havocked_var_type_info(node.body[start:end],
                                                           ctx))
@@ -860,7 +866,7 @@ class StatementTranslator(CommonTranslator):
             with ctx.additional_aliases(aliases):
                 invariant.append(self.translate_contract(expr, ctx))
         ctx.allow_statements = True
-        body = flatten(
+        body = exit_restore + flatten(
             [self.translate_stmt(stmt, ctx) for stmt in node.body[start:end]])
         # Label for continue to jump to
         body.append(self.viper.Label(end_label, position, info))
@@ -868,17 +874,16 @@ class StatementTranslator(CommonTranslator):
         body.extend(cond_low)
         body.extend(assign_stmt)
 
-        loop = global_stmts + self.create_while_node(
+        loop = global_stmts + exit_stmts + self.create_while_node(
             ctx, cond, invariant, [], body, node)
         iter_del = self._get_iterator_delete(iter_var, node, ctx)
         self.leave_loop_translation(ctx)
         del ctx.loop_iterators[node]
         result = (iterable_stmt + iter_assign + next_call + cond_low + assign_stmt +
                   [seq_temp_assign] + loop + iter_del)
-        result += self._set_result_none(ctx)
         if node.orelse:
-            translated_block = flatten([self.translate_stmt(stmt, ctx) for stmt
-                                        in node.orelse])
+            translated_block = exit_restore + flatten(
+                [self.translate_stmt(stmt, ctx) for stmt in node.orelse])
             if ctx.sif:
                 translated_block = self.translate_block(translated_block, self.no_position(ctx), self.no_info(ctx))
                 i = 0
@@ -891,8 +896,7 @@ class StatementTranslator(CommonTranslator):
                 result += translated_block
         # Label for break to jump to
         result.append(self.viper.Label(post_label, position, info))
-        result += self._set_result_none(ctx)
-        return result
+        return result + exit_restore
 
     def translate_stmt_Assert(self, node: ast.Assert,
                               ctx: Context) -> List[Stmt]:
@@ -901,22 +905,9 @@ class StatementTranslator(CommonTranslator):
                                       self.no_info(ctx))
         return stmt + [assertion]
 
-    def _get_try_block(self, node: Stmt, ctx: Context) -> PythonTryBlock:
-        try_block = None
-        for block in ctx.actual_function.try_blocks:
-            if block.node is node:
-                try_block = block
-                break
-        return try_block
-
     def translate_stmt_With(self, node: ast.With, ctx: Context) -> List[Stmt]:
         try_block = self._get_try_block(node, ctx)
         assert try_block
-        code_var = try_block.get_finally_var(self.translator)
-        if code_var.sil_name in ctx.var_aliases:
-            code_var = ctx.var_aliases[code_var.sil_name]
-        code_var = code_var.ref()
-        zero = self.viper.IntLit(0, self.no_position(ctx), self.no_info(ctx))
         # Get context mgr
         ctx_stmt, ctx_mgr = self.translate_expr(try_block.with_item.context_expr,
                                                 ctx)
@@ -940,9 +931,6 @@ class StatementTranslator(CommonTranslator):
                                           [ctx_type],
                                           [enter_res.ref(node, ctx)], node, ctx)
 
-        assign = self.viper.LocalVarAssign(code_var, zero,
-                                           self.no_position(ctx),
-                                           self.no_info(ctx))
         if try_block.with_item.optional_vars:
             as_expr = try_block.with_item.optional_vars
             as_var = ctx.current_function.get_variable(as_expr.id)
@@ -953,11 +941,11 @@ class StatementTranslator(CommonTranslator):
                                                      self.no_info(ctx))
             define_var = self.set_var_defined(as_var, self.no_position(ctx),
                                               self.no_info(ctx))
-            body = [enter_assign, define_var, assign]
+            body = [enter_assign, define_var]
         else:
-            body = [assign]
+            body = []
         body += flatten([self.translate_stmt(stmt, ctx) for stmt in node.body])
-        finally_name = ctx.get_label_name(try_block.finally_name)
+        finally_name = ctx.get_label_name(try_block.entry_names[Exit.NORMAL])
         goto = self.viper.Goto(finally_name,
                                self.to_position(node, ctx),
                                self.no_info(ctx))
@@ -971,16 +959,7 @@ class StatementTranslator(CommonTranslator):
     def translate_stmt_Try(self, node: ast.Try, ctx: Context) -> List[Stmt]:
         try_block = self._get_try_block(node, ctx)
         assert try_block
-        code_var = try_block.get_finally_var(self.translator)
-        if code_var.sil_name in ctx.var_aliases:
-            code_var = ctx.var_aliases[code_var.sil_name]
-        code_var = code_var.ref()
-        zero = self.viper.IntLit(0, self.no_position(ctx), self.no_info(ctx))
-        assign = self.viper.LocalVarAssign(code_var, zero,
-                                           self.no_position(ctx),
-                                           self.no_info(ctx))
-        body = [assign]
-        body += flatten([self.translate_stmt(stmt, ctx) for stmt in node.body])
+        body = flatten([self.translate_stmt(stmt, ctx) for stmt in node.body])
         try_block.handler_aliases = ctx.var_aliases.copy()
         if try_block.else_block:
             else_label = ctx.get_label_name(try_block.else_block.name)
@@ -989,7 +968,7 @@ class StatementTranslator(CommonTranslator):
                                    self.no_info(ctx))
             body.append(goto)
         elif try_block.finally_block:
-            finally_name = ctx.get_label_name(try_block.finally_name)
+            finally_name = ctx.get_label_name(try_block.entry_names[Exit.NORMAL])
             goto = self.viper.Goto(finally_name,
                                    self.to_position(node, ctx),
                                    self.no_info(ctx))
@@ -1698,10 +1677,8 @@ class StatementTranslator(CommonTranslator):
         return body
 
     def _while_postamble(self, node: ast.While, post_label: str, ctx: Context) -> List[Stmt]:
-        postamble = [self.viper.Label(post_label, self.to_position(node, ctx),
-                                      self.no_info(ctx))]
-        postamble += self._set_result_none(ctx)
-        return postamble
+        return [self.viper.Label(post_label, self.to_position(node, ctx),
+                                 self.no_info(ctx))]
 
     def translate_stmt_While(self, node: ast.While,
                              ctx: Context) -> List[Stmt]:
@@ -1709,7 +1686,7 @@ class StatementTranslator(CommonTranslator):
         end_label = ctx.actual_function.get_fresh_name('loop_end')
         node.post_label = post_label
         node.end_label = end_label
-        self.enter_loop_translation(node, post_label, end_label, ctx)
+        self.enter_loop_translation(node, ctx)
         cond_stmt, cond = self.translate_expr(node.test, ctx,
                                               target_type=self.viper.Bool)
         if cond_stmt:
@@ -1723,16 +1700,17 @@ class StatementTranslator(CommonTranslator):
         start, end = get_body_indices(node.body)
         var_types = self._get_havocked_var_type_info(node.body[start:end], ctx)
         global_stmts, global_inv = self._get_havocked_module_var_info(ctx)
+        exit_stmts, exit_restore = self._keep_exit_vars(node, ctx)
         invariants = [global_inv] + var_types + invariants
-        body = self._translate_while_body(node, ctx, end_label)
+        body = exit_restore + self._translate_while_body(node, ctx, end_label)
         ctx.allow_statements = False
-        loop = global_stmts + cond_low + self.create_while_node(
+        loop = global_stmts + exit_stmts + cond_low + self.create_while_node(
             ctx, cond, invariants, locals, body, node)
         ctx.allow_statements = True
         self.leave_loop_translation(ctx)
         if node.orelse:
-            translated_block = flatten([self.translate_stmt(stmt, ctx) for stmt
-                                        in node.orelse])
+            translated_block = exit_restore + flatten(
+                [self.translate_stmt(stmt, ctx) for stmt in node.orelse])
 
             if ctx.sif:
                 translated_block = self.translate_block(translated_block, self.no_position(ctx), self.no_info(ctx))
@@ -1745,96 +1723,19 @@ class StatementTranslator(CommonTranslator):
             else:
                 loop += translated_block
         loop += self._while_postamble(node, post_label, ctx)
-        return loop
-
-    def enter_loop_translation(
-            self, node: Union[ast.While, ast.For], post_label: str,
-            end_label: str, ctx: Context,
-            err_var: PythonVar = None) -> None:
-        self.loops[node] = (post_label, end_label)
-        super().enter_loop_translation(node, ctx, err_var)
-
-    def leave_loop_translation(self, ctx: Context) -> None:
-        super().leave_loop_translation(ctx)
-
-    def _set_result_none(self, ctx: Context) -> List[Stmt]:
-        """
-        Sets the return variable of the current function to null (the default
-        return variable), to be used after loops which may havoc the result
-        variable (if there is a return within the loop body).
-        """
-        result = []
-        null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
-        if ctx.actual_function.type:
-            result_none = self.viper.LocalVarAssign(
-                ctx.result_var.ref(),
-                null, self.no_position(ctx),
-                self.no_info(ctx))
-            result.append(result_none)
-        # Do the same for the error variable
-        if ctx.actual_function.declared_exceptions or ctx.actual_function.inline:
-            error_none = self.viper.LocalVarAssign(
-                ctx.error_var.ref(),
-                null, self.no_position(ctx), self.no_info(ctx))
-            result.append(error_none)
-        return result
+        return loop + exit_restore
 
     def translate_stmt_Break(self, node: ast.Break, ctx: Context) -> List[Stmt]:
-        loop = get_parent_of_type(node, (ast.While, ast.For))
-        loop_and_label = self.loops[loop]
-        result = self.viper.Goto(loop_and_label[0], self.to_position(node, ctx),
-                                 self.no_info(ctx))
-
-        tries = get_surrounding_try_blocks(ctx.actual_function.try_blocks,
-                                           node)
-        for try_block in tries:
-            if try_block.finally_block or try_block.with_item:
-                lhs = try_block.get_finally_var(self.translator).ref()
-                rhs = self.viper.IntLit(3, self.no_position(ctx),
-                                        self.no_info(ctx))
-                finally_assign = self.viper.LocalVarAssign(lhs, rhs,
-                                                           self.no_position(ctx), self.no_info(ctx))
-                label_name = ctx.get_label_name(try_block.finally_name)
-                jmp = self.viper.Goto(label_name,
-                                      self.to_position(node, ctx),
-                                      self.no_info(ctx))
-                return [finally_assign, jmp]
-        return [result]
+        return self.translate_exit(Exit.BREAK, node, ctx)
 
     def translate_stmt_Continue(self, node: ast.Continue,
                                 ctx: Context) -> List[Stmt]:
-
-        parent = node
-        # Find the loop surrounding this node.
-        while not isinstance(parent._parent, (ast.While, ast.For)):
-            # If we find, on the way, that we're in a try block, namely in the finally branch
-            if isinstance(parent._parent, ast.Try) and parent in parent._parent.finalbody:
-                # this is illegal in Python any mypy doesn't check it.
+        for stmt, field in get_exit_frames(node):
+            if isinstance(stmt, (ast.While, ast.For)):
+                break
+            if field == 'finalbody':
                 raise InvalidProgramException(node, 'continue.in.finally')
-            else:
-                parent = parent._parent
-
-        loop = parent._parent
-        loop_and_label = self.loops[loop]
-        result = self.viper.Goto(loop_and_label[1], self.to_position(node, ctx),
-                                 self.no_info(ctx))
-
-        tries = get_surrounding_try_blocks(ctx.actual_function.try_blocks,
-                                           node)
-        for try_block in tries:
-            if try_block.finally_block or try_block.with_item:
-                lhs = try_block.get_finally_var(self.translator).ref()
-                rhs = self.viper.IntLit(4, self.no_position(ctx),
-                                        self.no_info(ctx))
-                finally_assign = self.viper.LocalVarAssign(lhs, rhs,
-                                                           self.no_position(ctx), self.no_info(ctx))
-                label_name = ctx.get_label_name(try_block.finally_name)
-                jmp = self.viper.Goto(label_name,
-                                      self.to_position(node, ctx),
-                                      self.no_info(ctx))
-                return [finally_assign, jmp]
-
-        return [result]
+        return self.translate_exit(Exit.CONTINUE, node, ctx)
 
     def _translate_return(self, node: ast.Return, ctx: Context) -> List[Stmt]:
         if not node.value:
@@ -1857,22 +1758,5 @@ class StatementTranslator(CommonTranslator):
 
     def translate_stmt_Return(self, node: ast.Return,
                               ctx: Context) -> List[Stmt]:
-        return_stmts = self._translate_return(node, ctx)
-        tries = get_surrounding_try_blocks(ctx.actual_function.try_blocks,
-                                           node)
-        for try_block in tries:
-            if try_block.finally_block or try_block.with_item:
-                lhs = try_block.get_finally_var(self.translator).ref()
-                rhs = self.viper.IntLit(1, self.no_position(ctx),
-                                        self.no_info(ctx))
-                finally_assign = self.viper.LocalVarAssign(lhs, rhs,
-                    self.no_position(ctx), self.no_info(ctx))
-                label_name = ctx.get_label_name(try_block.finally_name)
-                jmp = self.viper.Goto(label_name,
-                                      self.to_position(node, ctx),
-                                      self.no_info(ctx))
-                return return_stmts + [finally_assign, jmp]
-        end_label = ctx.get_label_name(END_LABEL)
-        jmp_to_end = self.viper.Goto(end_label, self.to_position(node, ctx),
-                                     self.no_info(ctx))
-        return return_stmts + [jmp_to_end]
+        return (self._translate_return(node, ctx) +
+                self.translate_exit(Exit.RETURN, node, ctx))

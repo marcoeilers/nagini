@@ -13,6 +13,7 @@ from nagini_translation.lib.constants import (
     ASSERTING_FUNC,
     COMBINE_NAME_FUNC,
     DICT_TYPE,
+    END_LABEL,
     FLOAT_TYPE,
     INT_TYPE,
     IS_DEFINED_FUNC,
@@ -49,6 +50,8 @@ from nagini_translation.lib.program_nodes import (
     PythonVar,
     toposort_classes,
     UnionType,
+    Exit,
+    PythonTryBlock,
 )
 from nagini_translation.lib.resolver import get_target as do_get_target
 from nagini_translation.lib.typedefs import (
@@ -60,7 +63,7 @@ from nagini_translation.lib.typedefs import (
     StmtsAndExpr,
 )
 from nagini_translation.lib.util import (
-    get_surrounding_try_blocks,
+    get_exit_frames,
     InvalidProgramException,
     isStr,
     string_to_int,
@@ -896,23 +899,98 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
     def get_error_var(self, stmt: ast.AST,
                       ctx: Context) -> 'silver.ast.LocalVarRef':
         """
-        Returns the error variable of the try-block protecting stmt, otherwise
-        the error return variable of the surrounding function, otherwise
-        creates a new local variable of type Exception.
+        Returns the variable that holds the exception the current function is
+        raising at stmt, until a handler catches it or the function is left.
         """
-        tries = get_surrounding_try_blocks(ctx.actual_function.try_blocks,
-                                           stmt)
-        if tries:
-            err_var = tries[0].get_error_var(self.translator)
-            if err_var.sil_name in ctx.var_aliases:
-                err_var = ctx.var_aliases[err_var.sil_name]
-            return err_var.ref()
-        if ctx.actual_function.declared_exceptions or ctx.actual_function.inline:
-            return ctx.error_var.ref()
+        if ctx.error_var is None:
+            raise UnsupportedException(
+                stmt, 'exception that may be raised at module level')
+        return ctx.error_var.ref()
+
+    def _get_try_block(self, node: ast.AST, ctx: Context) -> PythonTryBlock:
+        for block in ctx.actual_function.try_blocks:
+            if block.node is node:
+                return block
+        return None
+
+    def translate_exit(self, exit: Exit, node: ast.AST,
+                       ctx: Context) -> List[Stmt]:
+        """
+        Returns the statements that take control from node, which is being
+        left by exit, to where it goes next: a handler, the entry of the
+        innermost finally block around node, the loop that is left or
+        continued, or the end of the function. When raising, the exception is
+        in the error variable.
+        """
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        handlers = []
+        target = None
+        for stmt, field in get_exit_frames(node):
+            if isinstance(stmt, (ast.While, ast.For)):
+                if exit is Exit.BREAK:
+                    target = stmt.post_label
+                elif exit is Exit.CONTINUE:
+                    target = stmt.end_label
+            elif field != 'finalbody':
+                block = self._get_try_block(stmt, ctx)
+                if exit is Exit.RAISE and field == 'body':
+                    handlers.extend(block.handlers)
+                if block.has_finally:
+                    target = ctx.get_label_name(block.entry_names[exit])
+            if target:
+                break
+        if target:
+            result = [self.viper.Goto(target, position, info)]
         else:
-            new_var = ctx.current_function.create_variable('error',
-                ctx.module.global_module.classes['Exception'], self.translator)
-            return new_var.ref()
+            result = self.translate_function_exit(exit, position, ctx)
+        for handler in reversed(handlers):
+            handler_pos = self.to_position(handler.node, ctx)
+            condition_pos = self.to_position(
+                handler.node, ctx,
+                error_string='isinstance(RaisedException(), {0})'.format(
+                    handler.exception.name))
+            condition = self.type_check(self.get_error_var(node, ctx),
+                                        handler.exception, condition_pos, ctx,
+                                        inhale_exhale=False)
+            goto = self.viper.Goto(ctx.get_label_name(handler.name),
+                                   handler_pos, info)
+            result = [self.viper.If(
+                condition, self.translate_block([goto], position, info),
+                self.translate_block(result, position, info), handler_pos,
+                info)]
+        return result
+
+    def translate_function_exit(self, exit: Exit,
+                                position: 'silver.ast.Position',
+                                ctx: Context) -> List[Stmt]:
+        """
+        Returns the statements that leave the current function by exit, where
+        NORMAL stands for control reaching the end of its body. The result
+        of a return is in the result variable already.
+        """
+        assert exit in (Exit.NORMAL, Exit.RETURN, Exit.RAISE)
+        info = self.no_info(ctx)
+        function = ctx.actual_function
+        result = []
+        if exit is Exit.RAISE:
+            if not (function.declared_exceptions or function.inline):
+                error_string = '"method raises no exceptions"'
+                error_pos = self.to_position(function.node, ctx, error_string)
+                result.append(self.viper.Exhale(
+                    self.viper.FalseLit(error_pos, info), error_pos, info))
+        else:
+            no_position = self.no_position(ctx)
+            null = self.viper.NullLit(no_position, info)
+            if exit is Exit.NORMAL and ctx.result_var:
+                result.append(self.viper.LocalVarAssign(
+                    ctx.result_var.ref(), null, no_position, info))
+            if ctx.error_var is not None:
+                result.append(self.viper.LocalVarAssign(
+                    ctx.error_var.ref(), null, no_position, info))
+        result.append(self.viper.Goto(ctx.get_label_name(END_LABEL), position,
+                                      info))
+        return result
 
     def var_type_check(self, name: str, type: PythonType,
                        position: 'silver.ast.Position',
@@ -955,13 +1033,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             ctx.var_aliases = var_aliases
             ctx.label_aliases = lbl_aliases
             ctx.inlined_calls.append(added_method)
-            for block in added_method.try_blocks:
-                for handler in block.handlers:
-                    stmts += self.translate_handler(handler, ctx)
-                if block.else_block:
-                    stmts += self.translate_handler(block.else_block, ctx)
-                if block.finally_block:
-                    stmts += self.translate_finally(block, ctx)
+            stmts += self.translate_try_handlers(added_method, ctx)
             ctx.inlined_calls.remove(added_method)
         ctx.added_handlers = []
         ctx.var_aliases = old_var_valiases

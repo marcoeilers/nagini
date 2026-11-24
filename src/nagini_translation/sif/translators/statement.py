@@ -6,13 +6,13 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import ast
-from typing import List
+from typing import List, Tuple, Union
 
 from nagini_translation.lib.constants import ARBITRARY_BOOL_FUNC
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import PythonClass, PythonTryBlock, PythonVar
 from nagini_translation.lib.typedefs import Expr, Position, Seqn, Stmt, Var, VarDecl
-from nagini_translation.lib.util import flatten, get_body_indices, get_surrounding_try_blocks
+from nagini_translation.lib.util import flatten, get_body_indices
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.statement import StatementTranslator
 
@@ -49,9 +49,36 @@ class SIFStatementTranslator(StatementTranslator):
     def translate_stmt_Continue(self, node: ast.Continue, ctx: Context) -> List[Stmt]:
         return [self.viper.Continue(self.to_position(node, ctx), self.no_info(ctx))]
 
+    def _keep_exit_vars(self, node: Union[ast.While, ast.For],
+                        ctx: Context) -> Tuple[List[Stmt], List[Stmt]]:
+        """
+        A return in a loop body does not leave the loop here, so the loop makes
+        the result and the error of the function unknown. They are saved
+        before the loop and restored, which only happens for an execution that
+        has not returned.
+        """
+        function = ctx.actual_function
+        exit_vars = []
+        if function.type:
+            exit_vars.append(ctx.result_var)
+        if function.declared_exceptions or function.inline:
+            exit_vars.append(ctx.error_var)
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        save = []
+        restore = []
+        for var in exit_vars:
+            copy = ctx.current_function.create_variable('saved', var.type,
+                                                        self.translator)
+            save.append(self.viper.LocalVarAssign(copy.ref(), var.ref(),
+                                                  position, info))
+            restore.append(self.viper.LocalVarAssign(var.ref(), copy.ref(),
+                                                     position, info))
+        return save, restore
+
     def _while_postamble(self, node: ast.While, post_label: str,
                          ctx: Context) -> List[Stmt]:
-        return self._set_result_none(ctx)
+        return []
 
     def _translate_while_body(self, node: ast.While, ctx: Context,
                               end_label: str) -> List[Stmt]:
