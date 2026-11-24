@@ -432,10 +432,7 @@ class TypeInfo:
         def report_errors(errors: List[str]) -> None:
             for error in errors:
                 logger.info(error)
-            # mypy 1.8 appends "(it only ever returns None)" to
-            # func-returns-value messages; strip it for stable error texts.
-            raise TypeException([e.replace(' (it only ever returns None)', '')
-                                 for e in errors])
+            raise TypeException(errors)
 
         module_name = None
         if base_dir is not None:
