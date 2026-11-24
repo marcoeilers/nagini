@@ -34,11 +34,6 @@ def col(node) -> Optional[int]:
     return None
 
 
-# (path, module name) of a checked file -> name -> path of the modules its last
-# build imported
-_IMPORTED = {}
-
-
 class ContractPlugin(Plugin):
     """
     Gives Result() the return type of the function whose contract it is in
@@ -354,6 +349,7 @@ class TypeInfo:
         self.type_vars = {}
         self.ghost_names = {}
         self.module_name = None
+        self.imports = {}  # name -> path of the modules the checked file imports
 
     def _create_options(self, strict_optional: bool):
         """
@@ -388,28 +384,23 @@ class TypeInfo:
         full only for the sources of a build whose text it is given: a module
         it loads from its cache has no AST, and one it finds among the
         installed packages is checked only as far as its interface needs. So
-        the build's sources are the file and the modules its last build
-        imported, each where mypy finds it, and it is repeated until those are
-        the modules it imports.
+        the build's sources are the file and the modules it imports, each
+        where mypy finds it, and it is repeated until those are the modules it
+        imports.
         """
-        key = (filename, module_name)
-        imported = _IMPORTED.pop(key, {})
         while True:
             sources = [self._source(filename, module_name, base_dir)]
             sources += [self._source(path, name, base_dir)
-                        for name, path in imported.items() if os.path.isfile(path)]
+                        for name, path in self.imports.items()]
             result = mypy.build.build(sources, options,
                                       extra_plugins=[ContractPlugin(options)])
             find = result.manager.find_module_cache.find_module
-            read = {name: find(name) for name in self._imported(result)[1:]}
-            read = {name: path for name, path in read.items()
-                    if isinstance(path, str) and os.path.isfile(path)}
-            given = read.items() <= imported.items()
-            imported = read
-            if given:
-                if imported:
-                    _IMPORTED[key] = imported
+            imports = {name: find(name) for name in self._imported(result)[1:]}
+            imports = {name: path for name, path in imports.items()
+                       if isinstance(path, str) and os.path.isfile(path)}
+            if imports == self.imports:
                 return result
+            self.imports = imports
 
     def _source(self, path: str, module_name: str, base_dir: str) -> BuildSource:
         with tokenize.open(path) as f:
@@ -421,8 +412,13 @@ class TypeInfo:
         import."""
         names = [next(iter(result.graph))]
         for name in names:
-            for dep_name in result.graph[name].dep_line_map:
-                if (dep_name in result.graph and dep_name not in IGNORED_IMPORTS
+            state = result.graph[name]
+            for dep_name in state.dep_line_map:
+                # a module loaded from the cache also lists the modules its
+                # types refer to
+                if (state.priorities.get(dep_name) != mypy.build.PRI_INDIRECT
+                        and dep_name in result.graph
+                        and dep_name not in IGNORED_IMPORTS
                         and dep_name not in names):
                     names.append(dep_name)
         return names

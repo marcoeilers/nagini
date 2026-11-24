@@ -446,6 +446,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self.defined = False
         self._has_classmethod = False
         self.type_vars = OrderedDict()
+        self.ignore_type_args = False  # builtin modelled without type parameters
         self.definition_deps = set()
         self.is_adt = name == 'ADT' # This flag is set when the class is
         # defining an algebraic data type or one of its constructors.
