@@ -12,7 +12,7 @@ from typing import Dict, Optional
 
 _local = threading.local()
 
-TYPECHECK_PARTS = ('typecheck.evict', 'typecheck.strict', 'typecheck.nonstrict',
+TYPECHECK_PARTS = ('typecheck.strict', 'typecheck.nonstrict',
                    'typecheck.visit')
 ORDER = ('lock', 'typecheck', *TYPECHECK_PARTS, 'translate', 'erase', 'chop',
          'verify')

@@ -43,7 +43,7 @@ from nagini_translation.lib.errors import messages
 from nagini_translation.lib.errors.messages import invalid_program_message
 
 from nagini_translation.lib.jvmaccess import JVM
-from nagini_translation.lib.typeinfo import TypeException
+from nagini_translation.lib.typeinfo import TypeException, type_error
 from nagini_translation.lib.util import (
     ConsistencyException,
     InvalidProgramException,
@@ -52,7 +52,6 @@ from nagini_translation.lib.util import (
 from nagini_translation.main import (
     load_sil_files,
     translate,
-    TYPE_ERROR_MATCHER,
     verify as verify_program,
 )
 from nagini_translation.verifier import (Failure, merge_viper_args, option_groups,
@@ -1586,24 +1585,14 @@ class VerificationService:
         # TypeException
         diagnostics = []
         for msg in e.messages:
-            parts = TYPE_ERROR_MATCHER.match(msg)
-            if parts:
-                parts = parts.groupdict()
-                file = parts['file']
-                if file == '__main__':
-                    file = path
-                line = int(parts['line'])
-                # mypy gives a 1-based start column and an (exclusive) end
-                # position when available; Diagnostic uses 0-based columns (the
-                # same convention as verification errors here). Fall back to a
-                # zero-width span at column 0 for line-only messages.
-                col = int(parts['col']) - 1 if parts['col'] else 0
-                end_line = int(parts['end_line']) if parts['end_line'] else line
-                end_col = int(parts['end_col']) if parts['end_col'] else col
+            error = type_error(msg, path)
+            if error:
+                # a zero-width span where mypy gave no end
                 diagnostics.append(Diagnostic(
-                    file=file, start_line=line, start_col=col, end_line=end_line,
-                    end_col=end_col, message='Type error: ' + parts['msg'],
-                    code='type.error'))
+                    file=error.file, start_line=error.line, start_col=error.col,
+                    end_line=error.line if error.end_line is None else error.end_line,
+                    end_col=error.col if error.end_col is None else error.end_col,
+                    message='Type error: ' + error.msg, code='type.error'))
             else:
                 diagnostics.append(self._point_diagnostic(path, msg, 'type.error'))
         return diagnostics

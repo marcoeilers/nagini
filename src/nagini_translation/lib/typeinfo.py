@@ -5,24 +5,26 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
-import ast
-import json
 import logging
 import mypy.build
 import os
-import sys
+import re
+import tokenize
 
 from mypy.build import BuildSource
 from mypy.checkexpr import has_any_type
+from mypy.plugin import Plugin
 from mypy.type_visitor import TypeQuery
+from mypy.typevars import fill_typevars_with_any
 from nagini_translation.lib import phases
 from nagini_translation.lib.constants import IGNORED_IMPORTS, LITERALS
 from nagini_translation.mypy_patches.visitor import TraverserVisitor
 
 from nagini_translation.lib.util import (
+    char_columns,
     construct_lambda_prefix,
 )
-from typing import List, Optional
+from typing import List, NamedTuple, Optional
 
 
 logger = logging.getLogger('nagini_translation.lib.typeinfo')
@@ -31,8 +33,8 @@ logger = logging.getLogger('nagini_translation.lib.typeinfo')
 class HasTypeObject(TypeQuery[bool]):
     """Whether a type has a part that is a class seen as its constructor."""
 
-    def __init__(self) -> None:
-        super().__init__(any)
+    def strategy(self, items: List[bool]) -> bool:
+        return any(items)
 
     def visit_callable_type(self, t: mypy.types.CallableType) -> bool:
         return t.is_type_obj() or super().visit_callable_type(t)
@@ -41,13 +43,67 @@ class HasTypeObject(TypeQuery[bool]):
         return t.is_type_obj() or super().visit_overloaded(t)
 
 
-def col(node) -> Optional[int]:
+# (path, module name) of a checked file -> name -> path of the modules its last
+# build imported
+_IMPORTED = {}
+
+
+# A message of mypy or of the type collector; only mypy's has the column and
+# the end position. The file group is non-greedy so a Windows drive letter
+# (``C:\...``) or a ``: error:`` inside the message is not mistaken for the
+# separators.
+MESSAGE = re.compile(
+    r"^(?P<file>.*?):(?P<line>\d+)"
+    r"(?::(?P<col>\d+)(?::(?P<end_line>\d+):(?P<end_col>\d+))?)?"
+    r": (?P<severity>error|note): (?P<msg>.*)$")
+
+
+class ContractPlugin(Plugin):
     """
-    Returns the column in a mypy mypy AST node, if any.
+    Gives Result() the return type of the function whose contract it is in
+    and RaisedException() the exception type of the Exsures it is in.
     """
-    if hasattr(node, 'column'):
-        return node.column
-    return None
+
+    CONTRACTS = 'nagini_contracts.contracts.'
+
+    def __init__(self, options) -> None:
+        super().__init__(options)
+        self.raised = None
+
+    def get_function_signature_hook(self, fullname: str):
+        # called before the arguments of the call are checked
+        if fullname == self.CONTRACTS + 'Exsures':
+            return self._enter_exsures
+        return None
+
+    def get_function_hook(self, fullname: str):
+        return {
+            self.CONTRACTS + 'Result': self._result_type,
+            self.CONTRACTS + 'RaisedException': self._raised_type,
+            self.CONTRACTS + 'Exsures': self._leave_exsures,
+        }.get(fullname)
+
+    def _result_type(self, ctx) -> mypy.types.Type:
+        function = next((scope for scope in reversed(ctx.api.scope.stack)
+                         if isinstance(scope, mypy.nodes.FuncDef)), None)
+        signature = function and mypy.types.get_proper_type(function.type)
+        if isinstance(signature, mypy.types.CallableType):
+            return signature.ret_type
+        return ctx.default_return_type
+
+    def _enter_exsures(self, ctx) -> mypy.types.CallableType:
+        exception = ctx.args[0][0] if ctx.args and ctx.args[0] else None
+        info = getattr(exception, 'node', None)
+        self.raised = (fill_typevars_with_any(info)
+                       if isinstance(info, mypy.nodes.TypeInfo) else None)
+        return ctx.default_signature
+
+    def _raised_type(self, ctx) -> mypy.types.Type:
+        return self.raised or ctx.default_return_type
+
+    def _leave_exsures(self, ctx) -> mypy.types.Type:
+        self.raised = None
+        return ctx.default_return_type
 
 
 class TypeException(Exception):
@@ -55,8 +111,35 @@ class TypeException(Exception):
         self.messages = messages
 
 
+class LocatedTypeError(NamedTuple):
+    """An error of a TypeException: 0-based columns, and the end (exclusive)
+    if mypy gave one."""
+    file: str
+    line: int
+    col: int
+    end_line: Optional[int]
+    end_col: Optional[int]
+    msg: str
+
+
+def type_error(message: str, main_file: str = '__main__') -> Optional[LocatedTypeError]:
+    """The error that the given message of a TypeException reports, if it is
+    one, with main_file as the file of the checked module."""
+    match = MESSAGE.match(message)
+    if not match or match['severity'] != 'error':
+        return None
+    return LocatedTypeError(
+        main_file if match['file'] == '__main__' else match['file'],
+        int(match['line']),
+        int(match['col']) - 1 if match['col'] else 0,
+        int(match['end_line']) if match['end_line'] else None,
+        int(match['end_col']) if match['end_col'] else None,
+        match['msg'])
+
+
 class TypeVisitor(TraverserVisitor):
-    def __init__(self, type_map, path, ignored_lines, real_path):
+    def __init__(self, type_map, path, ignored_lines, real_path, source=''):
+        self.char_column = char_columns(source)
         self.prefix = []
         self.all_types = {}
         self.alt_types = {}
@@ -68,6 +151,12 @@ class TypeVisitor(TraverserVisitor):
         self.type_aliases = {}
         self.type_vars = {}
         self.real_path = real_path
+
+    def col(self, node) -> Optional[int]:
+        """The column of a mypy AST node, if any, as the analyzer has it."""
+        if hasattr(node, 'column'):
+            return self.char_column(node.line, node.column)
+        return None
 
     def _is_result_call(self, node: mypy.nodes.Node) -> bool:
         """Checks if call is either ``Result`` or ``RaisedException``."""
@@ -121,7 +210,7 @@ class TypeVisitor(TraverserVisitor):
                     continue
                 self.set_type(t.type.fullname.split('.') + [node.name],
                               self.type_of(node),
-                              node.line, col(node))
+                              node.line, self.col(node))
         super().visit_member_expr(node)
 
     def visit_del_stmt(self, node: mypy.nodes.DelStmt):
@@ -131,7 +220,7 @@ class TypeVisitor(TraverserVisitor):
         for var in node.vars:
             if var is not None:
                 self.set_type(self.prefix + [var.name], self.type_of(var),
-                              var.line, col(var))
+                              var.line, self.col(var))
         super().visit_try_stmt(node)
 
     def visit_assignment_stmt(self, node: mypy.nodes.AssignmentStmt):
@@ -163,7 +252,7 @@ class TypeVisitor(TraverserVisitor):
                                not name_type.is_type_obj())
             if not is_function_ref:
                 self.set_type(self.prefix + [node.name], name_type,
-                              node.line, col(node))
+                              node.line, self.col(node))
 
     def visit_star_expr(self, node: mypy.nodes.StarExpr):
         self.visit(node.expr)
@@ -172,20 +261,20 @@ class TypeVisitor(TraverserVisitor):
         oldprefix = self.prefix
         self.prefix = self.prefix + [node.name]
         functype = self.type_of(node)
-        self.set_type(self.prefix, functype, node.line, col(node), True)
+        self.set_type(self.prefix, functype, node.line, self.col(node), True)
         for arg in node.arguments:
             self.set_type(self.prefix + [arg.variable.name],
-                          arg.variable.type, arg.line, col(arg))
+                          arg.variable.type, arg.line, self.col(arg))
         super().visit_func_def(node)
         self.prefix = oldprefix
 
     def visit_lambda_expr(self, node: mypy.nodes.LambdaExpr):
         oldprefix = self.prefix
-        prefix_string = construct_lambda_prefix(node.line, col(node))
+        prefix_string = construct_lambda_prefix(node.line, self.col(node))
         self.prefix = self.prefix + [prefix_string]
         for arg in node.arguments:
             self.set_type(self.prefix + [arg.variable.name],
-                          arg.variable.type, arg.line, col(arg))
+                          arg.variable.type, arg.line, self.col(arg))
         self.visit(node.body)
         self.prefix = oldprefix
 
@@ -295,7 +384,7 @@ class TypeVisitor(TraverserVisitor):
         expr_type = self.type_map.get(node)
         if (expr_type is not None and not has_any_type(expr_type)
                 and not expr_type.accept(HasTypeObject())):
-            self.expr_types[(node.line, col(node))] = expr_type
+            self.expr_types[(node.line, self.col(node))] = expr_type
 
     def type_of(self, node):
         if hasattr(node, 'node') and isinstance(node.node, mypy.nodes.MypyFile):
@@ -314,15 +403,6 @@ class TypeVisitor(TraverserVisitor):
             # narrowing by isinstance, whereas the recorded one is whatever the
             # name had at its first occurrence, so preferring it would stop alt
             # types from ever being collected.
-        elif isinstance(node, mypy.nodes.CallExpr):
-            if isinstance(node.callee, mypy.nodes.NameExpr) and node.callee.name == 'Result':
-                key = tuple(self.prefix)
-                for i in range(len(key)):
-                    if key[i].startswith('lambda'):
-                        key = key[:i]
-                        break
-                type = self.all_types[key]
-                return type
         if node in self.type_map:
             result = self.type_map[node]
             return result
@@ -360,6 +440,7 @@ class TypeInfo:
         self.alt_types = {}
         self.expr_types = {}
         self.files = {}
+        self.sources = {}
         self.type_aliases = {}
         self.type_vars = {}
         self.ghost_names = {}
@@ -384,112 +465,76 @@ class TypeInfo:
         result.export_types = True
         result.preserve_asts = True
         result.warn_no_return = False
+        # mypy's nodes are matched with those of Python's parser by position
+        result.native_parser = False
         # Since we run mypy twice with different options, we use different cache dirs for different configurations,
         # otherwise Mypy throws away the cache every time.
         result.cache_dir = '.mypy_cache_strict' if strict_optional else '.mypy_cache_nonstrict'
         return result
 
-    def _evict_project_cache(self, options, filename: str,
-                             module_name: str, base_dir: str = None) -> None:
-        """Forces mypy to re-check every module Nagini needs the typed AST of,
-        which a cache hit does not materialize, by deleting its entry from the
-        on-disk cache before the build: every module whose source lives under
-        base_dir (the project) or whose name a project file has (mypy reuses
-        an entry cached from an identical file elsewhere), and every module
-        transitively imported from the main file (ignoring IGNORED_IMPORTS and
-        everything imported solely by those). Everything else keeps its cache
-        hit. The project sweep does not depend on cache metadata: mypy writes
-        none for a module with errors, so a walk from such a module would miss
-        what it imports.
-
-        Works on the on-disk cache because patching mypy.build.find_cache_meta
-        has no effect on the mypyc-compiled mypy wheel: compiled call sites
-        bind the original function.
+    def _build(self, filename: str, module_name: str, base_dir: str, options):
         """
-        cache_root = os.path.join(options.cache_dir,
-                                  '%d.%d' % sys.version_info[:2])
-        if not os.path.isdir(cache_root):
-            return
+        Runs mypy on the given file. Nagini reads the typed ASTs of the file
+        and of everything it transitively imports, and mypy builds those in
+        full only for the sources of a build whose text it is given: a module
+        it loads from its cache has no AST, and one it finds among the
+        installed packages is checked only as far as its interface needs. So
+        the build's sources are the file and the modules its last build
+        imported, each where mypy finds it, and it is repeated until those are
+        the modules it imports.
+        """
+        key = (filename, module_name)
+        imported = _IMPORTED.pop(key, {})
+        while True:
+            sources = [self._source(filename, module_name, base_dir)]
+            sources += [self._source(path, name, base_dir)
+                        for name, path in imported.items() if os.path.isfile(path)]
+            result = mypy.build.build(sources, options,
+                                      extra_plugins=[ContractPlugin(options)])
+            find = result.manager.find_module_cache.find_module
+            read = {name: find(name) for name in self._imported(result)[1:]}
+            read = {name: path for name, path in read.items()
+                    if isinstance(path, str) and os.path.isfile(path)}
+            given = read.items() <= imported.items()
+            imported = read
+            if given:
+                if imported:
+                    _IMPORTED[key] = imported
+                return result
 
-        project = os.path.abspath(base_dir or os.path.dirname(filename))
-        for dirpath, _, names in os.walk(cache_root):
-            for name in names:
-                if not name.endswith('.meta.json'):
-                    continue
-                stem = os.path.join(dirpath, name[:-len('.meta.json')])
-                rel = os.path.relpath(stem, cache_root)
-                named = any(os.path.exists(os.path.join(project, rel + ext))
-                            for ext in ('.py', '.pyi'))
-                try:
-                    with open(stem + '.meta.json') as f:
-                        source = json.load(f).get('path', '')
-                except (OSError, ValueError):
-                    source = ''
-                inside = os.path.abspath(source).startswith(project + os.sep)
-                if named or source and inside:
-                    for path in (stem + '.meta.json', stem + '.data.json'):
-                        try:
-                            os.remove(path)
-                        except OSError:
-                            pass
+    def _source(self, path: str, module_name: str, base_dir: str) -> BuildSource:
+        with tokenize.open(path) as f:
+            text = self.sources[os.path.abspath(path)] = f.read()
+        return BuildSource(path, module_name, text, base_dir=base_dir)
 
-        # Seeds: the main module under both ids mypy may know it by, plus every
-        # import in the current source text — a newly added import needs its
-        # (library-cached) entry evicted even though no prior project cache
-        # entry chains to it yet.
-        seeds = {'__main__'}
-        if module_name:
-            seeds.add(module_name)
-        try:
-            with open(filename, encoding='utf-8') as f:
-                tree = ast.parse(f.read())
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Import):
-                    seeds.update(a.name for a in node.names)
-                elif isinstance(node, ast.ImportFrom):
-                    if node.level == 0:
-                        if node.module:
-                            seeds.add(node.module)
-                    elif module_name:
-                        # Resolve relative imports the way Python does: one
-                        # leading dot is the package containing the main file
-                        # (the file itself if it is a package __init__), each
-                        # further dot strips one more level.
-                        parts = module_name.split('.')
-                        if not filename.endswith(('__init__.py', '__init__.pyi')):
-                            parts = parts[:-1]
-                        if node.level > 1:
-                            parts = parts[:-(node.level - 1)]
-                        if node.module:
-                            parts += node.module.split('.')
-                        if parts:
-                            seeds.add('.'.join(parts))
-        except (OSError, SyntaxError):
-            pass
+    def _char_positions(self, message: str) -> str:
+        """The given message of mypy with the columns of its position, UTF-8
+        byte offsets, as character offsets."""
+        match = MESSAGE.match(message)
+        source = match and self.sources.get(os.path.abspath(match['file']))
+        if not source or not match['col']:
+            return message
+        char_column = char_columns(source)
+        position = '%s:%d' % (
+            match['line'], char_column(int(match['line']), int(match['col']) - 1) + 1)
+        if match['end_col']:
+            position += ':%s:%d' % (
+                match['end_line'],
+                char_column(int(match['end_line']), int(match['end_col'])))
+        return '%s:%s: %s: %s' % (match['file'], position, match['severity'],
+                                  match['msg'])
 
-        todo = list(seeds)
-        seen = set()
-        while todo:
-            mod_id = todo.pop()
-            if mod_id in seen or mod_id in IGNORED_IMPORTS:
-                continue
-            seen.add(mod_id)
-            base = os.path.join(cache_root, *mod_id.split('.'))
-            for meta_path in (base + '.meta.json',
-                              os.path.join(base, '__init__.meta.json')):
-                if not os.path.exists(meta_path):
-                    continue
-                try:
-                    with open(meta_path) as f:
-                        todo.extend(json.load(f).get('dependencies', []))
-                except (OSError, ValueError):
-                    pass
-                for path in (meta_path,
-                             meta_path[:-len('.meta.json')] + '.data.json'):
-                    try:
-                        os.remove(path)
-                    except OSError:
-                        pass
+    def _imported(self, result) -> List[str]:
+        """The main module of the given mypy build and every module it
+        transitively imports, except IGNORED_IMPORTS and what only those
+        import."""
+        names = [next(iter(result.graph))]
+        for name in names:
+            for dep_name in result.graph[name].dep_line_map:
+                if (dep_name in result.graph and dep_name not in IGNORED_IMPORTS
+                        and dep_name not in names):
+                    names.append(dep_name)
+        return names
 
     def check(self, filename: str, base_dir: str = None,
               confirm: bool = True) -> bool:
@@ -504,8 +549,9 @@ class TypeInfo:
                 logger.info(error)
             # mypy 1.8 appends "(it only ever returns None)" to
             # func-returns-value messages; strip it for stable error texts.
-            raise TypeException([e.replace(' (it only ever returns None)', '')
-                                 for e in errors])
+            raise TypeException([
+                self._char_positions(e).replace(' (it only ever returns None)', '')
+                for e in errors])
 
         module_name = None
         if base_dir is not None:
@@ -521,18 +567,9 @@ class TypeInfo:
         try:
             options_strict = self._create_options(True)
 
-            # All files that Nagini needs to analyze must be re-checked by mypy
-            # even when their cache entries are fresh — a cache hit does not
-            # materialize the mypy ASTs Nagini reads. Evict exactly those
-            # entries; library stubs keep their hits.
-            with phases.phase('typecheck.evict'):
-                self._evict_project_cache(options_strict, filename, module_name,
-                                          base_dir)
-
-            sources = [BuildSource(filename, module_name, None, base_dir=base_dir)]
-
             with phases.phase('typecheck.strict'):
-                res_strict = mypy.build.build(sources, options_strict)
+                res_strict = self._build(filename, module_name, base_dir,
+                                         options_strict)
 
             # An implicit-None return incompatibility exists only under
             # strict-optional overapproximation: with strict_optional=False,
@@ -547,14 +584,9 @@ class TypeInfo:
                 # Run mypy a second time with strict optional checking disabled,
                 # s.t. we don't get overapproximated none-related errors.
                 options_non_strict = self._create_options(False)
-                with phases.phase('typecheck.evict'):
-                    self._evict_project_cache(options_non_strict, filename,
-                                              module_name, base_dir)
                 with phases.phase('typecheck.nonstrict'):
-                    res_non_strict = mypy.build.build(
-                        [BuildSource(filename, module_name, None, base_dir=base_dir)],
-                        options_non_strict
-                    )
+                    res_non_strict = self._build(filename, module_name, base_dir,
+                                                 options_non_strict)
                 if res_non_strict.errors:
                     report_errors(res_non_strict.errors)
             with phases.phase('typecheck.visit'):
@@ -566,17 +598,7 @@ class TypeInfo:
     def _collect(self, result, module_name: str) -> None:
         """Collects the type information of the main file of the given mypy
         build and of everything it transitively imports."""
-        relevant_files = [next(iter(result.graph))]
-        i = 0
-        while i < len(relevant_files):
-            name = relevant_files[i]
-            for dep_name in result.graph[name].dep_line_map:
-                if dep_name in IGNORED_IMPORTS:
-                    continue
-                if dep_name not in relevant_files:
-                    relevant_files.append(dep_name)
-            i += 1
-        relevant_files = [(name, result.graph[name]) for name in relevant_files]
+        relevant_files = [(name, result.graph[name]) for name in self._imported(result)]
 
         for name, file_graph in relevant_files:
             file = file_graph.tree
@@ -586,7 +608,8 @@ class TypeInfo:
                 name = '__main__'
             self.files[name] = file.path
             visitor = TypeVisitor(result.types, name,
-                                  file.ignored_lines, real_name)
+                                  file.ignored_lines, real_name,
+                                  self.sources.get(os.path.abspath(file.path), ''))
             visitor.prefix = name.split('.')
             visitor.visit(file)
             self.all_types.update(visitor.all_types)

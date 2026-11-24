@@ -22,5 +22,5 @@ def return_optional_fail(b: bool) -> None:
         result = None
     else:
         result = Cont2()
-    #:: ExpectedOutput(type.error:Parameterized generics cannot be used with class or instance checks  [misc])||ExpectedOutput(type.error:Argument 2 to "isinstance" has incompatible type "<typing special form>"; expected "_ClassInfo"  [arg-type])
+    #:: ExpectedOutput(type.error:Argument 2 to "isinstance" has incompatible type "<typing special form>"; expected "_ClassInfo"  [arg-type])
     assert isinstance(result, OptionalCont1)

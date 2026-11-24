@@ -213,23 +213,35 @@ def get_column(node: ast.AST) -> Optional[int]:
     return node.col_offset if hasattr(node, 'col_offset') else None
 
 
+def char_columns(source: str) -> Callable[[int, int], int]:
+    """
+    The function from a line of the given source and a column the parser
+    reports in it, a UTF-8 byte offset, to the character offset.
+    """
+    lines = {number: line.encode('utf-8')
+             for number, line in enumerate(source.split('\n'), 1)
+             if not line.isascii()}
+
+    def char_column(line: int, column: int) -> int:
+        if line not in lines:
+            return column
+        return len(lines[line][:column].decode('utf-8'))
+    return char_column
+
+
 def use_char_columns(tree: ast.AST, source: str) -> None:
     """
     Converts the column offsets of all nodes of the given AST of the given
-    source from the UTF-8 byte offsets the parser reports to character offsets.
+    source to character offsets.
     """
-    if source.isascii():
-        return
-    lines = [None if line.isascii() else line.encode('utf-8')
-             for line in source.split('\n')]
+    char_column = char_columns(source)
     for node in ast.walk(tree):
         for line_attr, col_attr in (('lineno', 'col_offset'),
                                     ('end_lineno', 'end_col_offset')):
             line = getattr(node, line_attr, None)
             col = getattr(node, col_attr, None)
-            if line is None or col is None or lines[line - 1] is None:
-                continue
-            setattr(node, col_attr, len(lines[line - 1][:col].decode('utf-8')))
+            if line is not None and col is not None:
+                setattr(node, col_attr, char_column(line, col))
 
 
 def contains_stmt(container: Any, contained: ast.AST) -> bool:

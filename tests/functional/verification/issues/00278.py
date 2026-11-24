@@ -18,7 +18,7 @@ class A(Generic[T]):
 
 def test_produce_seq2() -> A[PSeq[int]]:
     Ensures(Acc(Result()._value))
-    Ensures(isinstance(Result().value(), PSeq))
-    Ensures(len(Result().value()) == 3)
+    Ensures(isinstance(Result().value, PSeq))
+    Ensures(len(Result().value) == 3)
     Ensures(Forall(int, lambda i: Implies(0 <= i and i < 2, Result().value.drop(1)[i] == 1)))
     return A[PSeq[int]](PSeq(1,1,1))
