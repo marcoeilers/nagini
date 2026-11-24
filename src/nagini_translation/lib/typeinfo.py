@@ -394,10 +394,10 @@ class TypeInfo:
                         for name, path in self.imports.items()]
             result = mypy.build.build(sources, options,
                                       extra_plugins=[ContractPlugin(options)])
-            find = result.manager.find_module_cache.find_module
-            imports = {name: find(name) for name in self._imported(result)[1:]}
+            imports = {name: result.graph[name].path
+                       for name in self._imported(result)[1:]}
             imports = {name: path for name, path in imports.items()
-                       if isinstance(path, str) and os.path.isfile(path)}
+                       if path and os.path.isfile(path)}
             if imports == self.imports:
                 return result
             self.imports = imports
