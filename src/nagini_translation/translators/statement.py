@@ -756,14 +756,15 @@ class StatementTranslator(CommonTranslator):
                                           self.no_position(ctx), ctx))
         return result
 
-    def _keep_exit_vars(self, node: Union[ast.While, ast.For],
-                        ctx: Context) -> Tuple[List[Stmt], List[Stmt]]:
+    def _keep_exit_vars(self, node: Union[ast.While, ast.For], ctx: Context
+                        ) -> Tuple[List[Stmt], List[Stmt], List[Stmt]]:
         """
         Hook for an encoding in which the loop node makes the result and the
         error of the function unknown: returns statements that save them, to be
-        put before the loop, and statements that restore them.
+        put before the loop, statements that restore what the loop body and the
+        else block read, and statements that restore them after the loop.
         """
-        return [], []
+        return [], [], []
 
     def translate_stmt_For(self, node: ast.For, ctx: Context) -> List[Stmt]:
         position = self.to_position(node, ctx)
@@ -844,7 +845,7 @@ class StatementTranslator(CommonTranslator):
 
         global_stmts, global_inv = self._get_havocked_module_var_info(ctx)
         invariant.append(global_inv)
-        exit_stmts, exit_restore = self._keep_exit_vars(node, ctx)
+        exit_stmts, exit_in_loop, exit_after_loop = self._keep_exit_vars(node, ctx)
         # Remember type information about havocked local variables.
         invariant.extend(self._get_havocked_var_type_info(node.body[start:end],
                                                           ctx))
@@ -866,7 +867,7 @@ class StatementTranslator(CommonTranslator):
             with ctx.additional_aliases(aliases):
                 invariant.append(self.translate_contract(expr, ctx))
         ctx.allow_statements = True
-        body = exit_restore + flatten(
+        body = exit_in_loop + flatten(
             [self.translate_stmt(stmt, ctx) for stmt in node.body[start:end]])
         # Label for continue to jump to
         body.append(self.viper.Label(end_label, position, info))
@@ -882,7 +883,7 @@ class StatementTranslator(CommonTranslator):
         result = (iterable_stmt + iter_assign + next_call + cond_low + assign_stmt +
                   [seq_temp_assign] + loop + iter_del)
         if node.orelse:
-            translated_block = exit_restore + flatten(
+            translated_block = exit_in_loop + flatten(
                 [self.translate_stmt(stmt, ctx) for stmt in node.orelse])
             if ctx.sif:
                 translated_block = self.translate_block(translated_block, self.no_position(ctx), self.no_info(ctx))
@@ -896,7 +897,7 @@ class StatementTranslator(CommonTranslator):
                 result += translated_block
         # Label for break to jump to
         result.append(self.viper.Label(post_label, position, info))
-        return result + exit_restore
+        return result + exit_after_loop
 
     def translate_stmt_Assert(self, node: ast.Assert,
                               ctx: Context) -> List[Stmt]:
@@ -1700,16 +1701,16 @@ class StatementTranslator(CommonTranslator):
         start, end = get_body_indices(node.body)
         var_types = self._get_havocked_var_type_info(node.body[start:end], ctx)
         global_stmts, global_inv = self._get_havocked_module_var_info(ctx)
-        exit_stmts, exit_restore = self._keep_exit_vars(node, ctx)
+        exit_stmts, exit_in_loop, exit_after_loop = self._keep_exit_vars(node, ctx)
         invariants = [global_inv] + var_types + invariants
-        body = exit_restore + self._translate_while_body(node, ctx, end_label)
+        body = exit_in_loop + self._translate_while_body(node, ctx, end_label)
         ctx.allow_statements = False
         loop = global_stmts + exit_stmts + cond_low + self.create_while_node(
             ctx, cond, invariants, locals, body, node)
         ctx.allow_statements = True
         self.leave_loop_translation(ctx)
         if node.orelse:
-            translated_block = exit_restore + flatten(
+            translated_block = exit_in_loop + flatten(
                 [self.translate_stmt(stmt, ctx) for stmt in node.orelse])
 
             if ctx.sif:
@@ -1723,7 +1724,7 @@ class StatementTranslator(CommonTranslator):
             else:
                 loop += translated_block
         loop += self._while_postamble(node, post_label, ctx)
-        return loop + exit_restore
+        return loop + exit_after_loop
 
     def translate_stmt_Break(self, node: ast.Break, ctx: Context) -> List[Stmt]:
         return self.translate_exit(Exit.BREAK, node, ctx)
