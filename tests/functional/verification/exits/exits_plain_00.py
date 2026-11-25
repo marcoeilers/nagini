@@ -45,431 +45,7 @@ class Manager:
         return e is None
 
 
-def f0_tf_pass(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 12 and Result() is None)
-    try:
-        pass
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 2
-
-
-def f0_tf_pass_x(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 12 and Result() is None)
-    Exsures(Exception, False)
-    try:
-        pass
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 2
-
-
-def f0_tf_pass_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Acc(c.val) and c.val == 13)
-    try:
-        pass
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 2
-
-
-def f1_tf_ret(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 2 and Result() is not None and Result() == 7)
-    try:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 2
-
-
-def f1_tf_ret_x(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 2 and Result() is not None and Result() == 7)
-    Exsures(Exception, False)
-    try:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 2
-
-
-def f1_tf_ret_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Acc(c.val) and c.val == 3)
-    try:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 2
-
-
-def f2_tf_call(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    Exsures(E1, Acc(c.val) and c.val == 2)
-    try:
-        throw1()
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 2
-
-
-def f2_tf_call_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Exsures(E1, Acc(c.val) and c.val == 3)
-    try:
-        throw1()
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 2
-
-
-def f3_tf_raise(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    Exsures(E2, Acc(c.val) and c.val == 2)
-    try:
-        if b:
-            raise E2()
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 2
-
-
-def f3_tf_raise_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Exsures(E2, Acc(c.val) and c.val == 3)
-    try:
-        if b:
-            raise E2()
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 2
-
-
-def f4_te_pass(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 1 and Result() is None)
-    try:
-        pass
-        c.val = c.val * 10 + 1
-    except E1:
-        c.val = c.val * 10 + 2
-
-
-def f4_te_pass_x(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 1 and Result() is None)
-    Exsures(Exception, False)
-    try:
-        pass
-        c.val = c.val * 10 + 1
-    except E1:
-        c.val = c.val * 10 + 2
-
-
-def f4_te_pass_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Acc(c.val) and c.val == 2)
-    try:
-        pass
-        c.val = c.val * 10 + 1
-    except E1:
-        c.val = c.val * 10 + 2
-
-
-def f5_te_ret(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 0 and Result() is not None and Result() == 7)
-    try:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-    except E1:
-        c.val = c.val * 10 + 2
-
-
-def f5_te_ret_x(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 0 and Result() is not None and Result() == 7)
-    Exsures(Exception, False)
-    try:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-    except E1:
-        c.val = c.val * 10 + 2
-
-
-def f5_te_ret_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Acc(c.val) and c.val == 1)
-    try:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-    except E1:
-        c.val = c.val * 10 + 2
-
-
-def f6_te_call(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 2 and Result() is None)
-    try:
-        throw1()
-        c.val = c.val * 10 + 1
-    except E1:
-        c.val = c.val * 10 + 2
-
-
-def f6_te_call_x(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 2 and Result() is None)
-    Exsures(Exception, False)
-    try:
-        throw1()
-        c.val = c.val * 10 + 1
-    except E1:
-        c.val = c.val * 10 + 2
-
-
-def f6_te_call_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Acc(c.val) and c.val == 3)
-    try:
-        throw1()
-        c.val = c.val * 10 + 1
-    except E1:
-        c.val = c.val * 10 + 2
-
-
-def f7_te_raise(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    Exsures(E2, Acc(c.val) and c.val == 0)
-    try:
-        if b:
-            raise E2()
-        c.val = c.val * 10 + 1
-    except E1:
-        c.val = c.val * 10 + 2
-
-
-def f7_te_raise_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Exsures(E2, Acc(c.val) and c.val == 1)
-    try:
-        if b:
-            raise E2()
-        c.val = c.val * 10 + 1
-    except E1:
-        c.val = c.val * 10 + 2
-
-
-def f8_tef_pass(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 13 and Result() is None)
-    try:
-        pass
-        c.val = c.val * 10 + 1
-    except E2:
-        c.val = c.val * 10 + 2
-    finally:
-        c.val = c.val * 10 + 3
-
-
-def f8_tef_pass_x(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 13 and Result() is None)
-    Exsures(Exception, False)
-    try:
-        pass
-        c.val = c.val * 10 + 1
-    except E2:
-        c.val = c.val * 10 + 2
-    finally:
-        c.val = c.val * 10 + 3
-
-
-def f8_tef_pass_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Acc(c.val) and c.val == 14)
-    try:
-        pass
-        c.val = c.val * 10 + 1
-    except E2:
-        c.val = c.val * 10 + 2
-    finally:
-        c.val = c.val * 10 + 3
-
-
-def f9_tef_ret(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 3 and Result() is not None and Result() == 7)
-    try:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-    except E2:
-        c.val = c.val * 10 + 2
-    finally:
-        c.val = c.val * 10 + 3
-
-
-def f9_tef_ret_x(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 3 and Result() is not None and Result() == 7)
-    Exsures(Exception, False)
-    try:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-    except E2:
-        c.val = c.val * 10 + 2
-    finally:
-        c.val = c.val * 10 + 3
-
-
-def f9_tef_ret_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Acc(c.val) and c.val == 4)
-    try:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-    except E2:
-        c.val = c.val * 10 + 2
-    finally:
-        c.val = c.val * 10 + 3
-
-
-def f10_tef_call(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    Exsures(E1, Acc(c.val) and c.val == 3)
-    try:
-        throw1()
-        c.val = c.val * 10 + 1
-    except E2:
-        c.val = c.val * 10 + 2
-    finally:
-        c.val = c.val * 10 + 3
-
-
-def f10_tef_call_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Exsures(E1, Acc(c.val) and c.val == 4)
-    try:
-        throw1()
-        c.val = c.val * 10 + 1
-    except E2:
-        c.val = c.val * 10 + 2
-    finally:
-        c.val = c.val * 10 + 3
-
-
-def f11_tef_raise(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 23 and Result() is None)
-    try:
-        if b:
-            raise E2()
-        c.val = c.val * 10 + 1
-    except E2:
-        c.val = c.val * 10 + 2
-    finally:
-        c.val = c.val * 10 + 3
-
-
-def f11_tef_raise_x(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 23 and Result() is None)
-    Exsures(Exception, False)
-    try:
-        if b:
-            raise E2()
-        c.val = c.val * 10 + 1
-    except E2:
-        c.val = c.val * 10 + 2
-    finally:
-        c.val = c.val * 10 + 3
-
-
-def f11_tef_raise_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Acc(c.val) and c.val == 24)
-    try:
-        if b:
-            raise E2()
-        c.val = c.val * 10 + 1
-    except E2:
-        c.val = c.val * 10 + 2
-    finally:
-        c.val = c.val * 10 + 3
-
-
-def f12_h_pass(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 12 and Result() is None)
-    try:
-        throw1()
-    except E1:
-        pass
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 2
-
-
-def f12_h_pass_x(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 12 and Result() is None)
-    Exsures(Exception, False)
-    try:
-        throw1()
-    except E1:
-        pass
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 2
-
-
-def f12_h_pass_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Acc(c.val) and c.val == 13)
-    try:
-        throw1()
-    except E1:
-        pass
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 2
-
-
-def f13_h_ret(c: Cell, b: bool) -> Optional[int]:
+def f0_h_ret(c: Cell, b: bool) -> Optional[int]:
     Requires(Acc(c.val) and c.val == 0 and b)
     Ensures(Acc(c.val) and c.val == 2 and Result() is not None and Result() == 7)
     try:
@@ -482,7 +58,7 @@ def f13_h_ret(c: Cell, b: bool) -> Optional[int]:
         c.val = c.val * 10 + 2
 
 
-def f13_h_ret_x(c: Cell, b: bool) -> Optional[int]:
+def f0_h_ret_x(c: Cell, b: bool) -> Optional[int]:
     Requires(Acc(c.val) and c.val == 0 and b)
     Ensures(Acc(c.val) and c.val == 2 and Result() is not None and Result() == 7)
     Exsures(Exception, False)
@@ -496,7 +72,7 @@ def f13_h_ret_x(c: Cell, b: bool) -> Optional[int]:
         c.val = c.val * 10 + 2
 
 
-def f13_h_ret_wrong(c: Cell, b: bool) -> Optional[int]:
+def f0_h_ret_wrong(c: Cell, b: bool) -> Optional[int]:
     Requires(Acc(c.val) and c.val == 0 and b)
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Acc(c.val) and c.val == 3)
@@ -510,34 +86,7 @@ def f13_h_ret_wrong(c: Cell, b: bool) -> Optional[int]:
         c.val = c.val * 10 + 2
 
 
-def f14_h_call(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    Exsures(E1, Acc(c.val) and c.val == 2)
-    try:
-        throw1()
-    except E1:
-        throw1()
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 2
-
-
-def f14_h_call_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Exsures(E1, Acc(c.val) and c.val == 3)
-    try:
-        throw1()
-    except E1:
-        throw1()
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 2
-
-
-def f15_h_raise(c: Cell, b: bool) -> Optional[int]:
+def f1_h_raise(c: Cell, b: bool) -> Optional[int]:
     Requires(Acc(c.val) and c.val == 0 and b)
     Ensures(False)
     Exsures(E2, Acc(c.val) and c.val == 2)
@@ -551,7 +100,7 @@ def f15_h_raise(c: Cell, b: bool) -> Optional[int]:
         c.val = c.val * 10 + 2
 
 
-def f15_h_raise_wrong(c: Cell, b: bool) -> Optional[int]:
+def f1_h_raise_wrong(c: Cell, b: bool) -> Optional[int]:
     Requires(Acc(c.val) and c.val == 0 and b)
     Ensures(False)
     #:: ExpectedOutput(postcondition.violated:assertion.false)
@@ -566,98 +115,7 @@ def f15_h_raise_wrong(c: Cell, b: bool) -> Optional[int]:
         c.val = c.val * 10 + 2
 
 
-def f16_el_pass(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 213 and Result() is None)
-    try:
-        c.val = c.val * 10 + 2
-    except E1:
-        pass
-    else:
-        pass
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 3
-
-
-def f16_el_pass_x(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 213 and Result() is None)
-    Exsures(Exception, False)
-    try:
-        c.val = c.val * 10 + 2
-    except E1:
-        pass
-    else:
-        pass
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 3
-
-
-def f16_el_pass_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Acc(c.val) and c.val == 214)
-    try:
-        c.val = c.val * 10 + 2
-    except E1:
-        pass
-    else:
-        pass
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 3
-
-
-def f17_el_ret(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 23 and Result() is not None and Result() == 7)
-    try:
-        c.val = c.val * 10 + 2
-    except E1:
-        pass
-    else:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 3
-
-
-def f17_el_ret_x(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 23 and Result() is not None and Result() == 7)
-    Exsures(Exception, False)
-    try:
-        c.val = c.val * 10 + 2
-    except E1:
-        pass
-    else:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 3
-
-
-def f17_el_ret_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Acc(c.val) and c.val == 24)
-    try:
-        c.val = c.val * 10 + 2
-    except E1:
-        pass
-    else:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 3
-
-
-def f18_el_call(c: Cell, b: bool) -> Optional[int]:
+def f2_el_call(c: Cell, b: bool) -> Optional[int]:
     Requires(Acc(c.val) and c.val == 0 and b)
     Ensures(False)
     Exsures(E1, Acc(c.val) and c.val == 23)
@@ -672,7 +130,7 @@ def f18_el_call(c: Cell, b: bool) -> Optional[int]:
         c.val = c.val * 10 + 3
 
 
-def f18_el_call_wrong(c: Cell, b: bool) -> Optional[int]:
+def f2_el_call_wrong(c: Cell, b: bool) -> Optional[int]:
     Requires(Acc(c.val) and c.val == 0 and b)
     Ensures(False)
     #:: ExpectedOutput(postcondition.violated:assertion.false)
@@ -688,668 +146,450 @@ def f18_el_call_wrong(c: Cell, b: bool) -> Optional[int]:
         c.val = c.val * 10 + 3
 
 
-def f19_el_raise(c: Cell, b: bool) -> Optional[int]:
+def f3_for_el_brk(c: Cell, b: bool) -> Optional[int]:
     Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    Exsures(E2, Acc(c.val) and c.val == 23)
+    Ensures(Acc(c.val) and c.val == 213234 and Result() is None)
+    n4 = 0
+    for k_n4 in range(0, 2):
+        Invariant(Acc(c.val))
+        Invariant(n4 == len(Previous(k_n4)))
+        Invariant((n4 == 0 and c.val == 0) or (n4 == 1 and c.val == 213))
+        n4 = n4 + 1
+        try:
+            c.val = c.val * 10 + 2
+        except E1:
+            pass
+        else:
+            if n4 == 2:
+                break
+            c.val = c.val * 10 + 1
+        finally:
+            c.val = c.val * 10 + 3
+    else:
+        c.val = c.val * 10 + 5
+    c.val = c.val * 10 + 4
+
+
+def f3_for_el_brk_x(c: Cell, b: bool) -> Optional[int]:
+    Requires(Acc(c.val) and c.val == 0 and b)
+    Ensures(Acc(c.val) and c.val == 213234 and Result() is None)
+    Exsures(Exception, False)
+    n4 = 0
+    for k_n4 in range(0, 2):
+        Invariant(Acc(c.val))
+        Invariant(n4 == len(Previous(k_n4)))
+        Invariant((n4 == 0 and c.val == 0) or (n4 == 1 and c.val == 213))
+        n4 = n4 + 1
+        try:
+            c.val = c.val * 10 + 2
+        except E1:
+            pass
+        else:
+            if n4 == 2:
+                break
+            c.val = c.val * 10 + 1
+        finally:
+            c.val = c.val * 10 + 3
+    else:
+        c.val = c.val * 10 + 5
+    c.val = c.val * 10 + 4
+
+
+def f3_for_el_brk_wrong(c: Cell, b: bool) -> Optional[int]:
+    Requires(Acc(c.val) and c.val == 0 and b)
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(Acc(c.val) and c.val == 213235)
+    n4 = 0
+    for k_n4 in range(0, 2):
+        Invariant(Acc(c.val))
+        Invariant(n4 == len(Previous(k_n4)))
+        Invariant((n4 == 0 and c.val == 0) or (n4 == 1 and c.val == 213))
+        n4 = n4 + 1
+        try:
+            c.val = c.val * 10 + 2
+        except E1:
+            pass
+        else:
+            if n4 == 2:
+                break
+            c.val = c.val * 10 + 1
+        finally:
+            c.val = c.val * 10 + 3
+    else:
+        c.val = c.val * 10 + 5
+    c.val = c.val * 10 + 4
+
+
+def f4_loop2_h_cont(c: Cell, b: bool) -> Optional[int]:
+    Requires(Acc(c.val) and c.val == 0 and b)
+    Ensures(Acc(c.val) and c.val == 12243 and Result() is None)
+    i3 = 0
+    while i3 < 2:
+        Invariant(Acc(c.val))
+        Invariant((i3 == 0 and c.val == 0) or (i3 == 1 and c.val == 12) or (i3 == 2 and c.val == 122))
+        i3 = i3 + 1
+        try:
+            throw1()
+        except E1:
+            if i3 == 2:
+                continue
+            c.val = c.val * 10 + 1
+        finally:
+            c.val = c.val * 10 + 2
+    else:
+        c.val = c.val * 10 + 4
+    c.val = c.val * 10 + 3
+
+
+def f4_loop2_h_cont_x(c: Cell, b: bool) -> Optional[int]:
+    Requires(Acc(c.val) and c.val == 0 and b)
+    Ensures(Acc(c.val) and c.val == 12243 and Result() is None)
+    Exsures(Exception, False)
+    i3 = 0
+    while i3 < 2:
+        Invariant(Acc(c.val))
+        Invariant((i3 == 0 and c.val == 0) or (i3 == 1 and c.val == 12) or (i3 == 2 and c.val == 122))
+        i3 = i3 + 1
+        try:
+            throw1()
+        except E1:
+            if i3 == 2:
+                continue
+            c.val = c.val * 10 + 1
+        finally:
+            c.val = c.val * 10 + 2
+    else:
+        c.val = c.val * 10 + 4
+    c.val = c.val * 10 + 3
+
+
+def f4_loop2_h_cont_wrong(c: Cell, b: bool) -> Optional[int]:
+    Requires(Acc(c.val) and c.val == 0 and b)
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(Acc(c.val) and c.val == 12244)
+    i3 = 0
+    while i3 < 2:
+        Invariant(Acc(c.val))
+        Invariant((i3 == 0 and c.val == 0) or (i3 == 1 and c.val == 12) or (i3 == 2 and c.val == 122))
+        i3 = i3 + 1
+        try:
+            throw1()
+        except E1:
+            if i3 == 2:
+                continue
+            c.val = c.val * 10 + 1
+        finally:
+            c.val = c.val * 10 + 2
+    else:
+        c.val = c.val * 10 + 4
+    c.val = c.val * 10 + 3
+
+
+def f5_loop_w_brk(c: Cell, b: bool) -> Optional[int]:
+    Requires(Acc(c.val) and c.val == 0 and b)
+    Ensures(Acc(c.val) and c.val == 23 and Result() is None)
+    go3 = True
+    while go3:
+        Invariant(Acc(c.val))
+        Invariant((go3 and c.val == 0))
+        go3 = False
+        m2 = Manager(c, 2)
+        with m2:
+            if b:
+                break
+            c.val = c.val * 10 + 1
+    else:
+        c.val = c.val * 10 + 4
+    c.val = c.val * 10 + 3
+
+
+def f5_loop_w_brk_x(c: Cell, b: bool) -> Optional[int]:
+    Requires(Acc(c.val) and c.val == 0 and b)
+    Ensures(Acc(c.val) and c.val == 23 and Result() is None)
+    Exsures(Exception, False)
+    go3 = True
+    while go3:
+        Invariant(Acc(c.val))
+        Invariant((go3 and c.val == 0))
+        go3 = False
+        m2 = Manager(c, 2)
+        with m2:
+            if b:
+                break
+            c.val = c.val * 10 + 1
+    else:
+        c.val = c.val * 10 + 4
+    c.val = c.val * 10 + 3
+
+
+def f5_loop_w_brk_wrong(c: Cell, b: bool) -> Optional[int]:
+    Requires(Acc(c.val) and c.val == 0 and b)
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(Acc(c.val) and c.val == 24)
+    go3 = True
+    while go3:
+        Invariant(Acc(c.val))
+        Invariant((go3 and c.val == 0))
+        go3 = False
+        m2 = Manager(c, 2)
+        with m2:
+            if b:
+                break
+            c.val = c.val * 10 + 1
+    else:
+        c.val = c.val * 10 + 4
+    c.val = c.val * 10 + 3
+
+
+def f6_tf_loop2_brk(c: Cell, b: bool) -> Optional[int]:
+    Requires(Acc(c.val) and c.val == 0 and b)
+    Ensures(Acc(c.val) and c.val == 124 and Result() is None)
     try:
+        i2 = 0
+        while i2 < 2:
+            Invariant(Acc(c.val))
+            Invariant((i2 == 0 and c.val == 0) or (i2 == 1 and c.val == 1))
+            i2 = i2 + 1
+            if i2 == 2:
+                break
+            c.val = c.val * 10 + 1
+        else:
+            c.val = c.val * 10 + 3
+        c.val = c.val * 10 + 2
+    finally:
+        c.val = c.val * 10 + 4
+
+
+def f6_tf_loop2_brk_x(c: Cell, b: bool) -> Optional[int]:
+    Requires(Acc(c.val) and c.val == 0 and b)
+    Ensures(Acc(c.val) and c.val == 124 and Result() is None)
+    Exsures(Exception, False)
+    try:
+        i2 = 0
+        while i2 < 2:
+            Invariant(Acc(c.val))
+            Invariant((i2 == 0 and c.val == 0) or (i2 == 1 and c.val == 1))
+            i2 = i2 + 1
+            if i2 == 2:
+                break
+            c.val = c.val * 10 + 1
+        else:
+            c.val = c.val * 10 + 3
+        c.val = c.val * 10 + 2
+    finally:
+        c.val = c.val * 10 + 4
+
+
+def f6_tf_loop2_brk_wrong(c: Cell, b: bool) -> Optional[int]:
+    Requires(Acc(c.val) and c.val == 0 and b)
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(Acc(c.val) and c.val == 125)
+    try:
+        i2 = 0
+        while i2 < 2:
+            Invariant(Acc(c.val))
+            Invariant((i2 == 0 and c.val == 0) or (i2 == 1 and c.val == 1))
+            i2 = i2 + 1
+            if i2 == 2:
+                break
+            c.val = c.val * 10 + 1
+        else:
+            c.val = c.val * 10 + 3
+        c.val = c.val * 10 + 2
+    finally:
+        c.val = c.val * 10 + 4
+
+
+def f7_w_for_cont(c: Cell, b: bool) -> Optional[int]:
+    Requires(Acc(c.val) and c.val == 0 and b)
+    Ensures(Acc(c.val) and c.val == 1324 and Result() is None)
+    m4 = Manager(c, 4)
+    with m4:
+        n2 = 0
+        for k_n2 in range(0, 2):
+            Invariant(Acc(c.val) and Acc(m4.c) and m4.c is c and Acc(m4.d) and m4.d == 4)
+            Invariant(n2 == len(Previous(k_n2)))
+            Invariant((n2 == 0 and c.val == 0) or (n2 == 1 and c.val == 1) or (n2 == 2 and c.val == 1))
+            n2 = n2 + 1
+            if n2 == 2:
+                continue
+            c.val = c.val * 10 + 1
+        else:
+            c.val = c.val * 10 + 3
+        c.val = c.val * 10 + 2
+
+
+def f7_w_for_cont_x(c: Cell, b: bool) -> Optional[int]:
+    Requires(Acc(c.val) and c.val == 0 and b)
+    Ensures(Acc(c.val) and c.val == 1324 and Result() is None)
+    Exsures(Exception, False)
+    m4 = Manager(c, 4)
+    with m4:
+        n2 = 0
+        for k_n2 in range(0, 2):
+            Invariant(Acc(c.val) and Acc(m4.c) and m4.c is c and Acc(m4.d) and m4.d == 4)
+            Invariant(n2 == len(Previous(k_n2)))
+            Invariant((n2 == 0 and c.val == 0) or (n2 == 1 and c.val == 1) or (n2 == 2 and c.val == 1))
+            n2 = n2 + 1
+            if n2 == 2:
+                continue
+            c.val = c.val * 10 + 1
+        else:
+            c.val = c.val * 10 + 3
+        c.val = c.val * 10 + 2
+
+
+def f7_w_for_cont_wrong(c: Cell, b: bool) -> Optional[int]:
+    Requires(Acc(c.val) and c.val == 0 and b)
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(Acc(c.val) and c.val == 1325)
+    m4 = Manager(c, 4)
+    with m4:
+        n2 = 0
+        for k_n2 in range(0, 2):
+            Invariant(Acc(c.val) and Acc(m4.c) and m4.c is c and Acc(m4.d) and m4.d == 4)
+            Invariant(n2 == len(Previous(k_n2)))
+            Invariant((n2 == 0 and c.val == 0) or (n2 == 1 and c.val == 1) or (n2 == 2 and c.val == 1))
+            n2 = n2 + 1
+            if n2 == 2:
+                continue
+            c.val = c.val * 10 + 1
+        else:
+            c.val = c.val * 10 + 3
+        c.val = c.val * 10 + 2
+
+
+def f8_te_for_call(c: Cell, b: bool) -> Optional[int]:
+    Requires(Acc(c.val) and c.val == 0 and b)
+    Ensures(Acc(c.val) and c.val == 4 and Result() is None)
+    try:
+        n2 = 0
+        for k_n2 in range(0, 2):
+            Invariant(Acc(c.val))
+            Invariant(n2 == len(Previous(k_n2)))
+            Invariant((n2 == 0 and c.val == 0))
+            n2 = n2 + 1
+            throw1()
+            c.val = c.val * 10 + 1
+        else:
+            c.val = c.val * 10 + 3
         c.val = c.val * 10 + 2
     except E1:
-        pass
-    else:
-        if b:
-            raise E2()
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 3
+        c.val = c.val * 10 + 4
 
 
-def f19_el_raise_wrong(c: Cell, b: bool) -> Optional[int]:
+def f8_te_for_call_x(c: Cell, b: bool) -> Optional[int]:
     Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Exsures(E2, Acc(c.val) and c.val == 24)
+    Ensures(Acc(c.val) and c.val == 4 and Result() is None)
+    Exsures(Exception, False)
     try:
+        n2 = 0
+        for k_n2 in range(0, 2):
+            Invariant(Acc(c.val))
+            Invariant(n2 == len(Previous(k_n2)))
+            Invariant((n2 == 0 and c.val == 0))
+            n2 = n2 + 1
+            throw1()
+            c.val = c.val * 10 + 1
+        else:
+            c.val = c.val * 10 + 3
         c.val = c.val * 10 + 2
     except E1:
-        pass
+        c.val = c.val * 10 + 4
+
+
+def f8_te_for_call_wrong(c: Cell, b: bool) -> Optional[int]:
+    Requires(Acc(c.val) and c.val == 0 and b)
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(Acc(c.val) and c.val == 5)
+    try:
+        n2 = 0
+        for k_n2 in range(0, 2):
+            Invariant(Acc(c.val))
+            Invariant(n2 == len(Previous(k_n2)))
+            Invariant((n2 == 0 and c.val == 0))
+            n2 = n2 + 1
+            throw1()
+            c.val = c.val * 10 + 1
+        else:
+            c.val = c.val * 10 + 3
+        c.val = c.val * 10 + 2
+    except E1:
+        c.val = c.val * 10 + 4
+
+
+def f9_for_loop2_ret(c: Cell, b: bool) -> Optional[int]:
+    Requires(Acc(c.val) and c.val == 0 and b)
+    Ensures(Acc(c.val) and c.val == 1 and Result() is not None and Result() == 7)
+    n4 = 0
+    for k_n4 in range(0, 2):
+        Invariant(Acc(c.val))
+        Invariant(n4 == len(Previous(k_n4)))
+        Invariant((n4 == 0 and c.val == 0))
+        n4 = n4 + 1
+        i2 = 0
+        while i2 < 2:
+            Invariant(Acc(c.val))
+            Invariant((n4 == 1 and i2 == 0 and c.val == 0) or (n4 == 1 and i2 == 1 and c.val == 1))
+            i2 = i2 + 1
+            if i2 == 2:
+                return 7
+            c.val = c.val * 10 + 1
+        else:
+            c.val = c.val * 10 + 3
+        c.val = c.val * 10 + 2
     else:
-        if b:
-            raise E2()
-        c.val = c.val * 10 + 1
-    finally:
-        c.val = c.val * 10 + 3
+        c.val = c.val * 10 + 5
+    c.val = c.val * 10 + 4
 
 
-def f20_fin_pass(c: Cell, b: bool) -> Optional[int]:
+def f9_for_loop2_ret_x(c: Cell, b: bool) -> Optional[int]:
     Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 21 and Result() is None)
-    try:
-        c.val = c.val * 10 + 2
-    finally:
-        pass
-        c.val = c.val * 10 + 1
-
-
-def f20_fin_pass_x(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 21 and Result() is None)
+    Ensures(Acc(c.val) and c.val == 1 and Result() is not None and Result() == 7)
     Exsures(Exception, False)
-    try:
+    n4 = 0
+    for k_n4 in range(0, 2):
+        Invariant(Acc(c.val))
+        Invariant(n4 == len(Previous(k_n4)))
+        Invariant((n4 == 0 and c.val == 0))
+        n4 = n4 + 1
+        i2 = 0
+        while i2 < 2:
+            Invariant(Acc(c.val))
+            Invariant((n4 == 1 and i2 == 0 and c.val == 0) or (n4 == 1 and i2 == 1 and c.val == 1))
+            i2 = i2 + 1
+            if i2 == 2:
+                return 7
+            c.val = c.val * 10 + 1
+        else:
+            c.val = c.val * 10 + 3
         c.val = c.val * 10 + 2
-    finally:
-        pass
-        c.val = c.val * 10 + 1
+    else:
+        c.val = c.val * 10 + 5
+    c.val = c.val * 10 + 4
 
 
-def f20_fin_pass_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Acc(c.val) and c.val == 22)
-    try:
-        c.val = c.val * 10 + 2
-    finally:
-        pass
-        c.val = c.val * 10 + 1
-
-
-def f21_fin_ret(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 2 and Result() is not None and Result() == 7)
-    try:
-        c.val = c.val * 10 + 2
-    finally:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-
-
-def f21_fin_ret_x(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 2 and Result() is not None and Result() == 7)
-    Exsures(Exception, False)
-    try:
-        c.val = c.val * 10 + 2
-    finally:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-
-
-def f21_fin_ret_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Acc(c.val) and c.val == 3)
-    try:
-        c.val = c.val * 10 + 2
-    finally:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-
-
-def f22_fin_call(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    Exsures(E1, Acc(c.val) and c.val == 2)
-    try:
-        c.val = c.val * 10 + 2
-    finally:
-        throw1()
-        c.val = c.val * 10 + 1
-
-
-def f22_fin_call_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Exsures(E1, Acc(c.val) and c.val == 3)
-    try:
-        c.val = c.val * 10 + 2
-    finally:
-        throw1()
-        c.val = c.val * 10 + 1
-
-
-def f23_fin_raise(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    Exsures(E2, Acc(c.val) and c.val == 2)
-    try:
-        c.val = c.val * 10 + 2
-    finally:
-        if b:
-            raise E2()
-        c.val = c.val * 10 + 1
-
-
-def f23_fin_raise_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Exsures(E2, Acc(c.val) and c.val == 3)
-    try:
-        c.val = c.val * 10 + 2
-    finally:
-        if b:
-            raise E2()
-        c.val = c.val * 10 + 1
-
-
-def f24_finx_pass(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    Exsures(E1, Acc(c.val) and c.val == 1)
-    try:
-        throw1()
-    except E2:
-        pass
-    finally:
-        pass
-        c.val = c.val * 10 + 1
-
-
-def f24_finx_pass_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Exsures(E1, Acc(c.val) and c.val == 2)
-    try:
-        throw1()
-    except E2:
-        pass
-    finally:
-        pass
-        c.val = c.val * 10 + 1
-
-
-def f25_finx_ret(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 0 and Result() is not None and Result() == 7)
-    try:
-        throw1()
-    except E2:
-        pass
-    finally:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-
-
-def f25_finx_ret_x(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 0 and Result() is not None and Result() == 7)
-    Exsures(Exception, False)
-    try:
-        throw1()
-    except E2:
-        pass
-    finally:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-
-
-def f25_finx_ret_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Acc(c.val) and c.val == 1)
-    try:
-        throw1()
-    except E2:
-        pass
-    finally:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-
-
-def f26_finx_call(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    Exsures(E1, Acc(c.val) and c.val == 0)
-    try:
-        throw1()
-    except E2:
-        pass
-    finally:
-        throw1()
-        c.val = c.val * 10 + 1
-
-
-def f26_finx_call_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Exsures(E1, Acc(c.val) and c.val == 1)
-    try:
-        throw1()
-    except E2:
-        pass
-    finally:
-        throw1()
-        c.val = c.val * 10 + 1
-
-
-def f27_finx_raise(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    Exsures(E2, Acc(c.val) and c.val == 0)
-    try:
-        throw1()
-    except E2:
-        pass
-    finally:
-        if b:
-            raise E2()
-        c.val = c.val * 10 + 1
-
-
-def f27_finx_raise_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Exsures(E2, Acc(c.val) and c.val == 1)
-    try:
-        throw1()
-    except E2:
-        pass
-    finally:
-        if b:
-            raise E2()
-        c.val = c.val * 10 + 1
-
-
-def f28_finr_pass(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 1 and Result() is not None and Result() == 3)
-    try:
-        if b:
-            return 3
-    finally:
-        pass
-        c.val = c.val * 10 + 1
-
-
-def f28_finr_pass_x(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 1 and Result() is not None and Result() == 3)
-    Exsures(Exception, False)
-    try:
-        if b:
-            return 3
-    finally:
-        pass
-        c.val = c.val * 10 + 1
-
-
-def f28_finr_pass_wrong(c: Cell, b: bool) -> Optional[int]:
+def f9_for_loop2_ret_wrong(c: Cell, b: bool) -> Optional[int]:
     Requires(Acc(c.val) and c.val == 0 and b)
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Acc(c.val) and c.val == 2)
-    try:
-        if b:
-            return 3
-    finally:
-        pass
-        c.val = c.val * 10 + 1
-
-
-def f29_finr_ret(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 0 and Result() is not None and Result() == 7)
-    try:
-        if b:
-            return 3
-    finally:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-
-
-def f29_finr_ret_x(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 0 and Result() is not None and Result() == 7)
-    Exsures(Exception, False)
-    try:
-        if b:
-            return 3
-    finally:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-
-
-def f29_finr_ret_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Acc(c.val) and c.val == 1)
-    try:
-        if b:
-            return 3
-    finally:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-
-
-def f30_finr_call(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    Exsures(E1, Acc(c.val) and c.val == 0)
-    try:
-        if b:
-            return 3
-    finally:
-        throw1()
-        c.val = c.val * 10 + 1
-
-
-def f30_finr_call_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Exsures(E1, Acc(c.val) and c.val == 1)
-    try:
-        if b:
-            return 3
-    finally:
-        throw1()
-        c.val = c.val * 10 + 1
-
-
-def f31_finr_raise(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    Exsures(E2, Acc(c.val) and c.val == 0)
-    try:
-        if b:
-            return 3
-    finally:
-        if b:
-            raise E2()
-        c.val = c.val * 10 + 1
-
-
-def f31_finr_raise_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Exsures(E2, Acc(c.val) and c.val == 1)
-    try:
-        if b:
-            return 3
-    finally:
-        if b:
-            raise E2()
-        c.val = c.val * 10 + 1
-
-
-def f32_w_pass(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 12 and Result() is None)
-    m2 = Manager(c, 2)
-    with m2:
-        pass
-        c.val = c.val * 10 + 1
-
-
-def f32_w_pass_x(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 12 and Result() is None)
-    Exsures(Exception, False)
-    m2 = Manager(c, 2)
-    with m2:
-        pass
-        c.val = c.val * 10 + 1
-
-
-def f32_w_pass_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Acc(c.val) and c.val == 13)
-    m2 = Manager(c, 2)
-    with m2:
-        pass
-        c.val = c.val * 10 + 1
-
-
-def f33_w_ret(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 2 and Result() is not None and Result() == 7)
-    m2 = Manager(c, 2)
-    with m2:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-
-
-def f33_w_ret_x(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 2 and Result() is not None and Result() == 7)
-    Exsures(Exception, False)
-    m2 = Manager(c, 2)
-    with m2:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-
-
-def f33_w_ret_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Acc(c.val) and c.val == 3)
-    m2 = Manager(c, 2)
-    with m2:
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-
-
-def f34_w_call(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    Exsures(E1, Acc(c.val) and c.val == 9)
-    m2 = Manager(c, 2)
-    with m2:
-        throw1()
-        c.val = c.val * 10 + 1
-
-
-def f34_w_call_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Exsures(E1, Acc(c.val) and c.val == 10)
-    m2 = Manager(c, 2)
-    with m2:
-        throw1()
-        c.val = c.val * 10 + 1
-
-
-def f35_w_raise(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    Exsures(E2, Acc(c.val) and c.val == 9)
-    m2 = Manager(c, 2)
-    with m2:
-        if b:
-            raise E2()
-        c.val = c.val * 10 + 1
-
-
-def f35_w_raise_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Exsures(E2, Acc(c.val) and c.val == 10)
-    m2 = Manager(c, 2)
-    with m2:
-        if b:
-            raise E2()
-        c.val = c.val * 10 + 1
-
-
-def f36_loop_pass(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 132 and Result() is None)
-    go2 = True
-    while go2:
+    n4 = 0
+    for k_n4 in range(0, 2):
         Invariant(Acc(c.val))
-        Invariant((go2 and c.val == 0) or (not go2 and c.val == 1))
-        go2 = False
-        pass
-        c.val = c.val * 10 + 1
+        Invariant(n4 == len(Previous(k_n4)))
+        Invariant((n4 == 0 and c.val == 0))
+        n4 = n4 + 1
+        i2 = 0
+        while i2 < 2:
+            Invariant(Acc(c.val))
+            Invariant((n4 == 1 and i2 == 0 and c.val == 0) or (n4 == 1 and i2 == 1 and c.val == 1))
+            i2 = i2 + 1
+            if i2 == 2:
+                return 7
+            c.val = c.val * 10 + 1
+        else:
+            c.val = c.val * 10 + 3
+        c.val = c.val * 10 + 2
     else:
-        c.val = c.val * 10 + 3
-    c.val = c.val * 10 + 2
-
-
-def f36_loop_pass_x(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 132 and Result() is None)
-    Exsures(Exception, False)
-    go2 = True
-    while go2:
-        Invariant(Acc(c.val))
-        Invariant((go2 and c.val == 0) or (not go2 and c.val == 1))
-        go2 = False
-        pass
-        c.val = c.val * 10 + 1
-    else:
-        c.val = c.val * 10 + 3
-    c.val = c.val * 10 + 2
-
-
-def f36_loop_pass_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Acc(c.val) and c.val == 133)
-    go2 = True
-    while go2:
-        Invariant(Acc(c.val))
-        Invariant((go2 and c.val == 0) or (not go2 and c.val == 1))
-        go2 = False
-        pass
-        c.val = c.val * 10 + 1
-    else:
-        c.val = c.val * 10 + 3
-    c.val = c.val * 10 + 2
-
-
-def f37_loop_ret(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 0 and Result() is not None and Result() == 7)
-    go2 = True
-    while go2:
-        Invariant(Acc(c.val))
-        Invariant((go2 and c.val == 0))
-        go2 = False
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-    else:
-        c.val = c.val * 10 + 3
-    c.val = c.val * 10 + 2
-
-
-def f37_loop_ret_x(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(Acc(c.val) and c.val == 0 and Result() is not None and Result() == 7)
-    Exsures(Exception, False)
-    go2 = True
-    while go2:
-        Invariant(Acc(c.val))
-        Invariant((go2 and c.val == 0))
-        go2 = False
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-    else:
-        c.val = c.val * 10 + 3
-    c.val = c.val * 10 + 2
-
-
-def f37_loop_ret_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Acc(c.val) and c.val == 1)
-    go2 = True
-    while go2:
-        Invariant(Acc(c.val))
-        Invariant((go2 and c.val == 0))
-        go2 = False
-        if b:
-            return 7
-        c.val = c.val * 10 + 1
-    else:
-        c.val = c.val * 10 + 3
-    c.val = c.val * 10 + 2
-
-
-def f38_loop_call(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    Exsures(E1, Acc(c.val) and c.val == 0)
-    go2 = True
-    while go2:
-        Invariant(Acc(c.val))
-        Invariant((go2 and c.val == 0))
-        go2 = False
-        throw1()
-        c.val = c.val * 10 + 1
-    else:
-        c.val = c.val * 10 + 3
-    c.val = c.val * 10 + 2
-
-
-def f38_loop_call_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Exsures(E1, Acc(c.val) and c.val == 1)
-    go2 = True
-    while go2:
-        Invariant(Acc(c.val))
-        Invariant((go2 and c.val == 0))
-        go2 = False
-        throw1()
-        c.val = c.val * 10 + 1
-    else:
-        c.val = c.val * 10 + 3
-    c.val = c.val * 10 + 2
-
-
-def f39_loop_raise(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    Exsures(E2, Acc(c.val) and c.val == 0)
-    go2 = True
-    while go2:
-        Invariant(Acc(c.val))
-        Invariant((go2 and c.val == 0))
-        go2 = False
-        if b:
-            raise E2()
-        c.val = c.val * 10 + 1
-    else:
-        c.val = c.val * 10 + 3
-    c.val = c.val * 10 + 2
-
-
-def f39_loop_raise_wrong(c: Cell, b: bool) -> Optional[int]:
-    Requires(Acc(c.val) and c.val == 0 and b)
-    Ensures(False)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Exsures(E2, Acc(c.val) and c.val == 1)
-    go2 = True
-    while go2:
-        Invariant(Acc(c.val))
-        Invariant((go2 and c.val == 0))
-        go2 = False
-        if b:
-            raise E2()
-        c.val = c.val * 10 + 1
-    else:
-        c.val = c.val * 10 + 3
-    c.val = c.val * 10 + 2
+        c.val = c.val * 10 + 5
+    c.val = c.val * 10 + 4

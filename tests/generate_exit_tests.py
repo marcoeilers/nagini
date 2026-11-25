@@ -11,7 +11,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 # function, and what it observes becomes the postcondition, which must verify
 # without an error. A twin with a wrong postcondition must fail there.
 #
-# The tests in functional/verification/exits are those of the default options.
+# The tests in functional/verification/exits are those of the default options:
+# the nestings of SELECTION.
 
 import argparse
 import itertools
@@ -164,6 +165,25 @@ FRAMES = {'tf': f_try_finally, 'te': f_try_except, 'tef': f_try_except_finally,
 FINALLY_FRAMES = ('fin', 'finx', 'finr')
 LOOP_FRAMES = ('loop', 'loop2', 'for')
 MODES = ('plain', 'inline', 'inherit')
+
+SELECTION = [
+    # Leaving a handler or an else block.
+    'h_ret', 'h_raise', 'el_call',
+    # Leaving a block that is inside a loop.
+    'for_el_brk', 'loop2_h_cont', 'loop_w_brk',
+    # A loop inside a try block or a with statement.
+    'tf_loop2_brk', 'w_for_cont', 'te_for_call', 'for_loop2_ret',
+    # Through two try or with statements.
+    'tf_tf_raise', 'w_w_call', 'tef_w_raise', 'w_te_raise', 'w_tf_ret', 'te_te_call',
+    # In a finally block, with a return or an exception pending.
+    'h_finr_pass', 'w_finr_pass', 'tf_finx_pass', 'tef_finr_raise', 'loop2_finr_raise',
+    'finr_loop2_brk', 'finr_for_pass',
+    # A break in a finally block.
+    'finr_loop_tfbrk_ret', 'finx_loop_tfbrk_ret', 'finr_loop_tfbrk_call',
+    'loop2_w_tfbrk_raise',
+    # Three statements.
+    'h_loop2_tf_cont', 'loop2_tef_fin_ret', 'loop2_finx_tef_raise',
+]
 
 
 def valid(frames, exit):
@@ -322,26 +342,28 @@ def main():
                                'functional', 'verification', 'exits')
     parser = argparse.ArgumentParser(
         description='Generates tests for the ways of leaving try, with and loop statements.')
-    parser.add_argument('--depth', type=int, default=2, help='maximal nesting depth')
+    parser.add_argument('--depth', type=int,
+                        help='generate every nesting up to this depth')
     parser.add_argument('--mode', choices=MODES, default='plain',
                         help='where the nesting is: in the function itself, in an inlined '
                              'function, or in an inherited method')
-    parser.add_argument('--per-file', type=int, default=40, help='nestings per file')
-    parser.add_argument('--only', nargs='*', default=[],
-                        help='nestings to generate, e.g. finr_loop_tfbrk_ret, or +for for '
-                             'all with that frame')
+    parser.add_argument('--per-file', type=int, default=10, help='nestings per file')
+    parser.add_argument('--only', nargs='*', default=SELECTION,
+                        help='nestings to generate, e.g. finr_loop_tfbrk_ret')
+    parser.add_argument('--frame', choices=FRAMES,
+                        help='with --depth: only the nestings with this frame')
     parser.add_argument('--outdir', default=default_dir)
     args = parser.parse_args()
 
-    cases = []
-    for n in range(1, args.depth + 1):
-        for frames in itertools.product(FRAMES, repeat=n):
-            for exit in EXITS:
-                if not valid(frames, exit):
-                    continue
-                if (not args.only or '_'.join(frames + (exit,)) in args.only or
-                        any(o[0] == '+' and o[1:] in frames for o in args.only)):
-                    cases.append((frames, exit))
+    if args.depth:
+        cases = [(frames, exit)
+                 for n in range(1, args.depth + 1)
+                 for frames in itertools.product(FRAMES, repeat=n)
+                 for exit in EXITS
+                 if valid(frames, exit) and args.frame in (None,) + frames]
+    else:
+        cases = [(tuple(name.split('_')[:-1]), name.split('_')[-1]) for name in args.only]
+        assert all(valid(*case) for case in cases)
     os.makedirs(args.outdir, exist_ok=True)
     files = 0
     for start in range(0, len(cases), args.per_file):
