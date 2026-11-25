@@ -684,7 +684,8 @@ class MethodTranslator(CommonTranslator):
         Creates a code block representing the finally-block belonging to block,
         to be put at the end of a Viper method. It starts with one entry for
         each way of leaving block, which notes that way and what is pending,
-        and it ends by continuing on that way.
+        and it ends by continuing on that way, or after block if its __exit__
+        returns a true value for an exception.
         """
         pos = self.to_position(block.node, ctx)
         info = self.no_info(ctx)
@@ -720,6 +721,7 @@ class MethodTranslator(CommonTranslator):
                 finally_var, self.viper.IntLit(exit.value, pos, info),
                 position, info)
 
+        swallowed = None
         if block.finally_block:
             for stmt in block.finally_block:
                 body += self.translate_stmt(stmt, ctx)
@@ -762,6 +764,8 @@ class MethodTranslator(CommonTranslator):
                                              [exit_res.ref()],
                                              block.with_item.context_expr, ctx)
             body.extend(exit_call)
+            swallowed = self.to_bool(exit_res.ref(), ctx,
+                                     block.with_item.context_expr, exit_type)
 
         descriptions = {Exit.RETURN: 'returning',
                         Exit.RAISE: 'unhandled exception',
@@ -775,6 +779,12 @@ class MethodTranslator(CommonTranslator):
                 saved, var = pending[exit]
                 proceed.append(self.viper.LocalVarAssign(var, saved, pos, info))
             proceed += self.translate_exit(exit, block.node, ctx)
+            if exit is Exit.RAISE and swallowed is not None:
+                proceed = [self.viper.If(
+                    swallowed,
+                    self.translate_block([self.viper.Goto(post_label, pos, info)],
+                                         pos, info),
+                    self.translate_block(proceed, pos, info), pos, info)]
             exit_pos = self.to_position(
                 final_end_node, ctx,
                 error_string='({0}{1})'.format(descriptions[exit], loc))

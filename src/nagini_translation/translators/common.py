@@ -169,11 +169,13 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                                 position=e.pos())
         return result
 
-    def to_bool(self, e: Expr, ctx: Context, node: ast.AST = None) -> Expr:
+    def to_bool(self, e: Expr, ctx: Context, node: ast.AST = None,
+                node_type: PythonType = None) -> Expr:
         """
         Converts the given expression to an expression of the Silver type Bool
         if it isn't already, either by calling __bool__ on an object and
         possibly unboxing the result, or by undoing a previous boxing operation.
+        The type of e is node_type if given, else that of node.
         """
         # Avoid wrapping non-pure expressions (leads to errors within Silver's
         # Consistency object)
@@ -189,7 +191,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         result = e
         call_bool = True
         if node:
-            node_type = self.get_type(node, ctx)
+            if not node_type:
+                node_type = self.get_type(node, ctx)
             if node_type.name == 'bool':
                 call_bool = False
             if call_bool:

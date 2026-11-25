@@ -42,6 +42,15 @@ class Manager:
         return e is None
 
 
+class Swallow:
+    def __enter__(self) -> 'Swallow':
+        return self
+
+    def __exit__(self, t: object, e: object, tb: object) -> bool:
+        Ensures(Result())
+        return True
+
+
 def break_leaves_only_the_loop() -> int:
     Ensures(Result() == 5)
     r = 0
@@ -265,3 +274,21 @@ def break_and_continue_run_exit_wrong(c: Cell) -> None:
             if i == 1:
                 continue
             break
+
+
+def exit_swallows_exception() -> int:
+    Ensures(Result() == 1)
+    m = Swallow()
+    with m:
+        raise E1()
+    return 1
+
+
+def exit_swallows_exception_wrong() -> int:
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(False)
+    Exsures(E1, True)
+    m = Swallow()
+    with m:
+        raise E1()
+    return 1
