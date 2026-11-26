@@ -265,21 +265,30 @@ def contains_stmt(container: Any, contained: ast.AST) -> bool:
         return False
 
 
-def get_surrounding_try_blocks(try_blocks: List['PythonTryBlock'],
-                               stmt: ast.AST) -> List['PythonTryBlock']:
+def get_exit_frames(node: ast.AST) -> List[Tuple[ast.AST, str]]:
     """
-    Finds the try blocks in try_blocks that protect the statement stmt.
+    Returns the try, with and loop statements of the function that node is in,
+    innermost first, each with the name of its field that holds node. These
+    are the statements that control passes when it leaves node other than by
+    going on to the next statement.
     """
-    def rank(b: 'PythonTryBlock', blocks: List['PythonTryBlock']) -> int:
-        result = 0
-        for b2 in blocks:
-            if contains_stmt(b2.protected_region, b.node):
-                result += 1
-        return -result
-    tb = try_blocks
-    blocks = [b for b in tb if contains_stmt(b.protected_region, stmt)]
-    inner_to_outer = sorted(blocks,key=lambda b: rank(b, blocks))
-    return inner_to_outer
+    frames = []
+    child = node
+    parent = node._parent
+    while not isinstance(parent, (ast.FunctionDef, ast.Lambda, ast.ClassDef,
+                                  ast.Module)):
+        if isinstance(parent, (ast.Try, ast.With, ast.While, ast.For)):
+            if isinstance(parent, ast.Try):
+                fields = ['body', 'handlers', 'orelse', 'finalbody']
+            else:
+                # The else block of a loop is not part of the loop.
+                fields = ['body']
+            for field in fields:
+                if child in getattr(parent, field):
+                    frames.append((parent, field))
+        child = parent
+        parent = parent._parent
+    return frames
 
 
 def is_invariant(stmt: ast.AST) -> bool:

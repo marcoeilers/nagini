@@ -20,11 +20,13 @@ from nagini_translation.lib.constants import (
     TYPE_TYPE,
 )
 from nagini_translation.lib.program_nodes import (
+    Exit,
     GenericType,
     MethodType,
     PythonExceptionHandler,
     PythonMethod,
     PythonModule,
+    PythonNode,
     PythonTryBlock,
     PythonVar,
 )
@@ -38,8 +40,7 @@ from nagini_translation.lib.typedefs import (
 from nagini_translation.lib.util import (
     flatten,
     get_body_indices,
-    get_parent_of_type,
-    get_surrounding_try_blocks,
+    get_exit_frames,
     InvalidProgramException,
     isEllipsis,
     UnsupportedException
@@ -538,26 +539,27 @@ class MethodTranslator(CommonTranslator):
         ctx.allow_statements = False
         return body
 
-    def _translate_try_handlers(self, method: PythonMethod, ctx: Context) -> List[Stmt]:
+    def translate_try_handlers(self, container: PythonNode,
+                               ctx: Context) -> List[Stmt]:
         """
-        Translates the handlers of all try blocks, as well as finally blocks.
+        Translates the handlers of all try blocks of container, as well as
+        their else and finally blocks.
         """
         stmts = []
-        for block in method.try_blocks:
+        for block in container.try_blocks:
             for handler in block.handlers:
                 stmts += self.translate_handler(handler, ctx)
             if block.else_block:
                 stmts += self.translate_handler(block.else_block, ctx)
-            if block.finally_block or block.with_item:
+            if block.has_finally:
                 stmts += self.translate_finally(block, ctx)
         return stmts
 
     def _method_body_postamble(self, method: PythonMethod, ctx: Context) -> List[Stmt]:
-        postamble = []
-        end_label = ctx.get_label_name(END_LABEL)
-        postamble.append(self.viper.Goto(end_label, self.no_position(ctx), self.no_info(ctx)))
+        postamble = self.translate_function_exit(Exit.NORMAL,
+                                                 self.no_position(ctx), ctx)
         assert not ctx.var_aliases
-        postamble += self._translate_try_handlers(method, ctx)
+        postamble += self.translate_try_handlers(method, ctx)
         postamble += self.add_handlers_for_inlines(ctx)
         return postamble
 
@@ -634,19 +636,15 @@ class MethodTranslator(CommonTranslator):
         ctx.current_function = old_function
         return nodes
 
-    def _assign_exit_vars(self, block: PythonTryBlock, type_var: PythonVar,
+    def _assign_exit_vars(self, raising: Expr, error: Expr, type_var: PythonVar,
                           value_var: PythonVar, traceback_var: PythonVar,
                           pos: Position, ctx: Context) -> Stmt:
         """
-        Assigns the exception and its type to the given variables if there is
-        an uncaught exception, otherwise assigns None to everything.
+        Assigns the exception error and its type to the given variables if
+        the with block is left raising, otherwise assigns None to everything.
         """
         info = self.no_info(ctx)
         null = self.viper.NullLit(pos, info)
-        one = self.viper.IntLit(1, pos, info)
-        code_var = block.get_finally_var(self.translator)
-        # This condition would show up as a branch condition if it had a position; we hide it.
-        error_cond = self.viper.GtCmp(code_var.ref(), one, self.no_position(ctx), info)
         error_case = []
         no_error_case = []
         for var in [value_var, traceback_var]:
@@ -659,11 +657,10 @@ class MethodTranslator(CommonTranslator):
         no_error_case.append(self.viper.LocalVarAssign(type_var.ref(),
                                                        no_error_type, pos, info))
 
-        value_assign = self.viper.LocalVarAssign(value_var.ref(),
-                                                 block.error_var.ref(), pos,
+        value_assign = self.viper.LocalVarAssign(value_var.ref(), error, pos,
                                                  info)
         error_case.append(value_assign)
-        error_type = self.to_ref(self.type_factory.typeof(block.error_var.ref(), ctx), ctx)
+        error_type = self.to_ref(self.type_factory.typeof(error, ctx), ctx)
         type_assign = self.viper.LocalVarAssign(type_var.ref(), error_type,
                                                 pos, info)
         error_case.append(type_assign)
@@ -674,27 +671,75 @@ class MethodTranslator(CommonTranslator):
         error_case.append(inhale_types)
         then_block = self.translate_block(error_case, pos, info)
         else_block = self.translate_block(no_error_case, pos, info)
-        return self.viper.If(error_cond, then_block, else_block, pos, info)
+        return self.viper.If(raising, then_block, else_block, pos, info)
+
+    def _get_finally_exits(self, block: PythonTryBlock,
+                           ctx: Context) -> List[Exit]:
+        """
+        Returns the ways in which block can be left, which are the entries of
+        its finally block.
+        """
+        exits = [Exit.NORMAL]
+        if ctx.error_var is not None:
+            exits += [Exit.RETURN, Exit.RAISE]
+        if any(isinstance(stmt, (ast.While, ast.For))
+               for stmt, _ in get_exit_frames(block.node)):
+            exits += [Exit.BREAK, Exit.CONTINUE]
+        return exits
 
     def translate_finally(self, block: PythonTryBlock,
                           ctx: Context) -> List[Stmt]:
         """
         Creates a code block representing the finally-block belonging to block,
-        to be put at the end of a Viper method.
+        to be put at the end of a Viper method. It starts with one entry for
+        each way of leaving block, which notes that way and what is pending,
+        and it ends by continuing on that way, or after block if its __exit__
+        returns a true value for an exception.
         """
         pos = self.to_position(block.node, ctx)
         info = self.no_info(ctx)
-        label_name = ctx.get_label_name(block.finally_name)
-        label = self.viper.Label(label_name,
-                                 self.to_position(block.node, ctx),
-                                 self.no_info(ctx))
-        loop = get_parent_of_type(block.node, (ast.While, ast.For))
-        body = [label]
+        finally_var, error_var, result_var = (
+            var and ctx.var_aliases.get(var.sil_name, var).ref()
+            for var in (block.get_finally_var(self.translator),
+                        block.get_error_var(self.translator),
+                        block.get_result_var(self.translator)))
+        pending = {}
+        if ctx.error_var is not None:
+            pending[Exit.RAISE] = (error_var, ctx.error_var.ref())
+        if result_var:
+            pending[Exit.RETURN] = (result_var, ctx.result_var.ref())
+        exits = self._get_finally_exits(block, ctx)
+        finally_label = ctx.get_label_name(block.finally_name)
+        goto_finally = self.viper.Goto(finally_label, pos, info)
+
+        body = []
+        for exit in exits:
+            body.append(self.viper.Label(
+                ctx.get_label_name(block.entry_names[exit]), pos, info))
+            body.append(self.viper.LocalVarAssign(
+                finally_var, self.viper.IntLit(exit.value, pos, info), pos,
+                info))
+            if exit in pending:
+                saved, var = pending[exit]
+                body.append(self.viper.LocalVarAssign(saved, var, pos, info))
+            body.append(goto_finally)
+        body.append(self.viper.Label(finally_label, pos, info))
+
+        def is_exit(exit: Exit, position: Position) -> Expr:
+            return self.viper.EqCmp(
+                finally_var, self.viper.IntLit(exit.value, pos, info),
+                position, info)
+
+        swallowed = None
         if block.finally_block:
             for stmt in block.finally_block:
                 body += self.translate_stmt(stmt, ctx)
+            final_end_node = block.node.finalbody[-1]
+            loc = ' after finally'
         else:
             # With-block
+            final_end_node = block.node
+            loc = ' after with'
             ctx_type = self.get_type(block.with_item.context_expr, ctx)
             ctx_var = block.with_var
             exit_type = ctx_type.get_method('__exit__').type
@@ -710,16 +755,19 @@ class MethodTranslator(CommonTranslator):
             tb_class = ctx.module.global_module.classes['traceback']
             # The __exit__ method takes three arguments: type, value and
             # traceback.
-            type_var = ctx.actual_function.create_variable('t', type_class,
+            type_var = ctx.current_function.create_variable('t', type_class,
                                                            self.translator)
-            value_var = ctx.actual_function.create_variable('e',
+            value_var = ctx.current_function.create_variable('e',
                                                             exception_class,
                                                             self.translator)
-            traceback_var = ctx.actual_function.create_variable('tb',
+            traceback_var = ctx.current_function.create_variable('tb',
                                                                 tb_class,
                                                                 self.translator)
-            body.append(self._assign_exit_vars(block, type_var, value_var,
-                                               traceback_var, pos, ctx))
+            # This condition would show up as a branch condition if it had a position; we hide it.
+            raising = is_exit(Exit.RAISE, self.no_position(ctx))
+            body.append(self._assign_exit_vars(raising, error_var, type_var,
+                                               value_var, traceback_var, pos,
+                                               ctx))
             exit_call = self.get_method_call(ctx_type, '__exit__',
                                              [ctx_var.ref(), type_var.ref(),
                                               value_var.ref(),
@@ -728,135 +776,35 @@ class MethodTranslator(CommonTranslator):
                                              [exit_res.ref()],
                                              block.with_item.context_expr, ctx)
             body.extend(exit_call)
-        finally_var = block.get_finally_var(self.translator)
-        if finally_var.sil_name in ctx.var_aliases:
-            finally_var = ctx.var_aliases[finally_var.sil_name]
-        tries = get_surrounding_try_blocks(ctx.actual_function.try_blocks,
-                                           block.node)
-        tries_in_same_loop = []
-        if loop is not None:
-            tries_in_same_loop = [t for t in tries if get_parent_of_type(t.node, (ast.While, ast.For)) is loop]
+            swallowed = self.to_bool(exit_res.ref(), ctx,
+                                     block.with_item.context_expr, exit_type)
 
+        descriptions = {Exit.RETURN: 'returning',
+                        Exit.RAISE: 'unhandled exception',
+                        Exit.BREAK: 'breaking',
+                        Exit.CONTINUE: 'continuing'}
         post_label = ctx.get_label_name(block.post_name)
-        goto_post = self.viper.Goto(post_label, pos, info)
-        end_label = ctx.get_label_name(END_LABEL)
-        goto_end = self.viper.Goto(end_label, pos, info)
-        empty_stmt = self.translate_block([], pos, info)
-
-        except_block = []
-        return_block = []
-        for current in tries:
-            if not return_block and current.finally_block:
-                # Propagate finally var value
-                var_next = current.get_finally_var(self.translator)
-                if var_next.sil_name in ctx.var_aliases:
-                    var_next = ctx.var_aliases[var_next.sil_name]
-                next_assign = self.viper.LocalVarAssign(var_next.ref(),
-                                                        finally_var.ref(),
-                                                        pos, info)
-                # Goto finally block
-                next_label = ctx.get_label_name(current.finally_name)
-                goto_next = self.viper.Goto(next_label, pos, info)
-                return_block = [next_assign, goto_next]
-            for handler in current.handlers:
-                # If handler applies,
-                # goto handler
-                err_var = block.get_error_var(self.translator)
-                if err_var.sil_name in ctx.var_aliases:
-                    err_var = ctx.var_aliases[err_var.sil_name]
-                condition_pos = self.to_position(handler.node, ctx,
-                                                 error_string='(isinstance(RaisedException(), {0}))'.format(handler.exception.name))
-                condition = self.var_type_check(err_var.sil_name,
-                                                handler.exception,
-                                                condition_pos,
-                                                ctx, inhale_exhale=False)
-                label_name = ctx.get_label_name(handler.name)
-                goto = self.viper.Goto(label_name, pos, info)
-                if_handler = self.viper.If(condition, goto, empty_stmt, pos,
-                                           info)
-                except_block.append(if_handler)
-            if current.finally_block:
-                # Propagate finally var value
-                # Goto finally block
-                except_block += return_block
-                break
-        break_block = []
-        for current in tries_in_same_loop:
-            if not break_block and current.finally_block:
-                # Propagate finally var value
-                var_next = current.get_finally_var(self.translator)
-                if var_next.sil_name in ctx.var_aliases:
-                    var_next = ctx.var_aliases[var_next.sil_name]
-                next_assign = self.viper.LocalVarAssign(var_next.ref(),
-                                                        finally_var.ref(),
-                                                        pos, info)
-                # Goto finally block
-                next_label = ctx.get_label_name(current.finally_name)
-                goto_next = self.viper.Goto(next_label, pos, info)
-                break_block = [next_assign, goto_next]
-                continue_block = [next_assign, goto_next]
-        if not return_block:
-            return_block = [goto_end]
-        if loop and not break_block:
-            goto_break = self.viper.Goto(loop.post_label, pos, info)
-            goto_continue = self.viper.Goto(loop.end_label, pos, info)
-            break_block = [goto_break]
-            continue_block = [goto_continue]
-        if ctx.actual_function.declared_exceptions or ctx.actual_function.inline:
-            # Assign error to error output var
-            error_var = ctx.error_var.ref()
-            block_error_var = block.get_error_var(self.translator)
-            if block_error_var.sil_name in ctx.var_aliases:
-                block_error_var = ctx.var_aliases[block_error_var.sil_name]
-            assign = self.viper.LocalVarAssign(
-                error_var, block_error_var.ref(), pos, info)
-            except_block.append(assign)
-            except_block.append(goto_end)
-        else:
-            error_string = '"method raises no exceptions"'
-            error_pos = self.to_position(ctx.actual_function.node, ctx, error_string)
-            false = self.viper.FalseLit(error_pos, info)
-            assert_false = self.viper.Exhale(false, error_pos, info)
-            except_block.append(assert_false)
-            except_block.append(goto_end)
-        except_block = self.translate_block(except_block, pos, info)
-        return_block = self.translate_block(return_block, pos, info)
-        if loop:
-            break_block = self.translate_block(break_block, pos, info)
-            continue_block = self.translate_block(continue_block, pos, info)
-
-        number_one = self.viper.IntLit(1, pos, info)
-        number_two = self.viper.IntLit(2, pos, info)
-        number_three = self.viper.IntLit(3, pos, info)
-        number_four = self.viper.IntLit(4, pos, info)
-
-        if isinstance(block.node, ast.Try):
-            final_end_node = block.node.finalbody[-1]
-            loc = ' after finally'
-        else:
-            # ast.With
-            final_end_node = block.node
-            loc = ' after with'
-        is_one_pos = self.to_position(final_end_node, ctx, error_string='(returning{0})'.format(loc))
-        is_one = self.viper.EqCmp(finally_var.ref(), number_one, is_one_pos, info)
-        is_two_pos = self.to_position(final_end_node, ctx, error_string='(unhandled exception{0})'.format(loc))
-        is_two = self.viper.EqCmp(finally_var.ref(), number_two, is_two_pos, info)
-        is_three_pos = self.to_position(final_end_node, ctx, error_string='(breaking{0})'.format(loc))
-        is_three = self.viper.EqCmp(finally_var.ref(), number_three, is_three_pos, info)
-        is_four_pos = self.to_position(final_end_node, ctx, error_string='(continuing{0})'.format(loc))
-        is_four = self.viper.EqCmp(finally_var.ref(), number_four, is_four_pos, info)
-
-        if_return = self.viper.If(is_one, return_block, goto_post, pos,
-                                  info)
-        if_except = self.viper.If(is_two, except_block, if_return, pos,
-                                  info)
-        top_level_if = if_except
-        if loop is not None:
-            if_break = self.viper.If(is_three, break_block, if_except, pos, info)
-            if_continue = self.viper.If(is_four, continue_block, if_break, pos, info)
-            top_level_if = if_continue
-        body += [top_level_if]
-        return body
+        next = [self.viper.Goto(post_label, pos, info)]
+        for exit in exits[1:]:
+            proceed = []
+            if exit in pending:
+                saved, var = pending[exit]
+                proceed.append(self.viper.LocalVarAssign(var, saved, pos, info))
+            proceed += self.translate_exit(exit, block.node, ctx)
+            if exit is Exit.RAISE and swallowed is not None:
+                proceed = [self.viper.If(
+                    swallowed,
+                    self.translate_block([self.viper.Goto(post_label, pos, info)],
+                                         pos, info),
+                    self.translate_block(proceed, pos, info), pos, info)]
+            exit_pos = self.to_position(
+                final_end_node, ctx,
+                error_string='({0}{1})'.format(descriptions[exit], loc))
+            next = [self.viper.If(is_exit(exit, exit_pos),
+                                  self.translate_block(proceed, pos, info),
+                                  self.translate_block(next, pos, info), pos,
+                                  info)]
+        return body + next
 
     def translate_handler(self, handler: PythonExceptionHandler,
                           ctx: Context) -> List[Stmt]:
@@ -874,36 +822,32 @@ class MethodTranslator(CommonTranslator):
         no_info = self.no_info(ctx)
         body = []
         if handler.exception_name:
-            err_var = handler.try_block.get_error_var(self.translator)
-            if err_var.sil_name in ctx.var_aliases:
-                err_var = ctx.var_aliases[err_var.sil_name]
-            ctx.var_aliases[handler.exception_name] = err_var
-            err_var.type = handler.exception
+            # The handler keeps the exception in a variable of its own; the
+            # error variable changes when another one is raised.
+            caught = ctx.current_function.create_variable(
+                handler.exception_name, handler.exception, self.translator)
+            # At module level nothing can be raised, so no handler is entered.
+            if ctx.error_var is not None:
+                body.append(self.viper.LocalVarAssign(
+                    caught.ref(), self.get_error_var(handler.node, ctx),
+                    no_position, no_info))
+            ctx.var_aliases[handler.exception_name] = caught
 
-            body.append(self.set_var_defined(err_var, no_position, no_info))
+            body.append(self.set_var_defined(caught, no_position, no_info))
         for stmt in handler.body:
             body += self.translate_stmt(stmt, ctx)
         body_block = self.translate_block(body,
                                           self.to_position(handler.node, ctx),
                                           no_info)
         if handler.try_block.finally_block:
-            next = handler.try_block.finally_name
-            finally_var = handler.try_block.get_finally_var(self.translator)
-            if finally_var.sil_name in ctx.var_aliases:
-                finally_var = ctx.var_aliases[finally_var.sil_name]
-            lhs = finally_var.ref()
-            rhs = self.viper.IntLit(0, no_position, no_info)
-            var_set = self.viper.LocalVarAssign(lhs, rhs, no_position, no_info)
-            next_var_set = [var_set]
+            next = handler.try_block.entry_names[Exit.NORMAL]
         else:
-            next = 'post_' + handler.try_block.name
-            next_var_set = []
-        label_name = ctx.get_label_name(next)
-        goto_end = self.viper.Goto(label_name,
+            next = handler.try_block.post_name
+        goto_end = self.viper.Goto(ctx.get_label_name(next),
                                    self.to_position(handler.node, ctx),
                                    no_info)
         ctx.var_aliases = old_var_aliases
-        return [label, body_block] + next_var_set + [goto_end]
+        return [label, body_block, goto_end]
 
     def _initialize_module(self, module: PythonModule, ctx: Context) -> None:
         """
@@ -1045,8 +989,7 @@ class MethodTranslator(CommonTranslator):
         main_locals = [local.decl for local in main_method.get_locals()
                        if not local.name.startswith('lambda')]
         for tb in main_method.try_blocks:
-            main_locals.append(tb.error_var.decl)
-            main_locals.append(tb.finally_var.decl)
+            main_locals.extend(var.decl for var in tb.vars)
         body = stmts
         res = self.create_method_node(ctx, method_name, [], [], [], [],
                                       main_locals + locals, body, no_pos,
