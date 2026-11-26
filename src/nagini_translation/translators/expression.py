@@ -710,6 +710,8 @@ class ExpressionTranslator(CommonTranslator):
         return [], call
 
     def translate_Bytes(self, node: ast.Constant, ctx: Context) -> StmtsAndExpr:
+        # bytes___create__ takes only bytes: the parser gives none other
+        assert all(0 <= c < 256 for c in node.value)
         elems = []
         for c in node.value:
             lit = self.viper.IntLit(c, self.to_position(node, ctx),

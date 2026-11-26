@@ -688,6 +688,28 @@
     "ghost_alias": "GStr"
 },
 "bytes": {
+    "methods": {
+        "__initFromInt__": {
+            "args": ["int"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__initFromList__": {
+            "args": ["list"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__initFromBytearray__": {
+            "args": ["bytearray"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__iter__": {
+            "args": ["bytes"],
+            "type": "Iterator",
+            "MustTerminate": true
+        }
+    },
     "functions": {
         "__len__": {
             "args": ["bytes"],

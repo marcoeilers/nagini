@@ -16,6 +16,7 @@ method bytearray___init__() returns (res: Ref)
 
 method bytearray___initFromInt__(length: Ref) returns (res: Ref)
     requires issubtype(typeof(length), int())
+    requires int___unbox__(length) >= 0
     ensures typeof(res) == bytearray()
     ensures acc(res.bytearray_acc)
     ensures |res.bytearray_acc| == int___unbox__(length)

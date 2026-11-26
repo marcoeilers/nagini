@@ -44,6 +44,7 @@ from nagini_translation.lib.constants import (
     THREAD_START_PRED,
     TUPLE_TYPE,
     BYTEARRAY_TYPE,
+    BYTES_TYPE,
     TYPE_TYPE,
 )
 from nagini_translation.lib.errors import rules
@@ -666,6 +667,32 @@ class CallTranslator(CommonTranslator):
         raise UnsupportedException(node, 'Unsupported variant of bytearray().')
 
 
+    def _translate_bytes(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to bytes() of nothing, of bytes, or of an int, a list
+        or a bytearray, which make new bytes.
+        """
+        bytes_class = ctx.module.global_module.classes[BYTES_TYPE]
+        if node.keywords or len(node.args) > 1:
+            raise UnsupportedException(node, 'Unsupported variant of bytes().')
+        if not node.args:
+            empty = self.viper.EmptySeq(self.viper.Ref, self.to_position(node, ctx), self.no_info(ctx))
+            return [], self.get_function_call(bytes_class, '__create__', [empty, self.get_fresh_int_lit(ctx)],
+                                              [None, None], node, ctx)
+        arg_type = self.get_type(node.args[0], ctx)
+        if arg_type.name == BYTES_TYPE:
+            return self.translate_expr(node.args[0], ctx)
+        method_name = {INT_TYPE: '__initFromInt__', LIST_TYPE: '__initFromList__',
+                       BYTEARRAY_TYPE: '__initFromBytearray__'}.get(arg_type.name)
+        if method_name is None:
+            raise UnsupportedException(node, 'Unsupported variant of bytes().')
+        res_var = ctx.current_function.create_variable('bytes', bytes_class, self.translator)
+        target_method = bytes_class.get_method(method_name)
+        arg_stmts, arg_vals, arg_types = self.translate_args(
+            target_method, node.args, node.keywords, node, ctx, implicit_receiver=False)
+        call = self.get_method_call(bytes_class, method_name, arg_vals, arg_types, [res_var.ref()], node, ctx)
+        return arg_stmts + call, res_var.ref(node, ctx)
+
     def _translate_builtin_func(self, node: ast.Call,
                                 ctx: Context) -> StmtsAndExpr:
         """
@@ -707,6 +734,8 @@ class CallTranslator(CommonTranslator):
             return self._translate_cast_func(node, ctx)
         elif func_name == 'bytearray':
             return self._translate_bytearray(node, ctx)
+        elif func_name == 'bytes':
+            return self._translate_bytes(node, ctx)
         else:
             raise UnsupportedException(node, f'unsupported built-in function: {func_name}')
 

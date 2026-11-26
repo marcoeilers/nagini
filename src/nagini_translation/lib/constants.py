@@ -28,7 +28,8 @@ BUILTINS = ['cast',
             'type',
             'list',
             'enumerate',
-            'bytearray']
+            'bytearray',
+            'bytes']
 
 EXTENDABLE_BUILTINS = [
     'object',

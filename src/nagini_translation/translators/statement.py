@@ -611,7 +611,7 @@ class StatementTranslator(CommonTranslator):
                                                          frac_perm_120, pos,
                                                          info)
             invariant.append(field_pred)
-        elif iterable_type.name == RANGE_TYPE:
+        elif iterable_type.name in (RANGE_TYPE, BYTES_TYPE):
             pass
         else:
             raise UnsupportedException(node, 'for loop over unsupported iterable type')
