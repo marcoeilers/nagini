@@ -8,15 +8,18 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import logging
 import mypy.build
 import os
+import tokenize
 
 from mypy.build import BuildSource
+from mypy.plugin import Plugin
+from mypy.typevars import fill_typevars_with_any
 from nagini_translation.lib.constants import IGNORED_IMPORTS, LITERALS
 from nagini_translation.mypy_patches.visitor import TraverserVisitor
 
 from nagini_translation.lib.util import (
     construct_lambda_prefix,
 )
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 
 logger = logging.getLogger('nagini_translation.lib.typeinfo')
@@ -31,33 +34,57 @@ def col(node) -> Optional[int]:
     return None
 
 
+class ContractPlugin(Plugin):
+    """
+    Gives Result() the return type of the function whose contract it is in
+    and RaisedException() the exception type of the Exsures it is in.
+    """
+
+    CONTRACTS = 'nagini_contracts.contracts.'
+
+    def __init__(self, options) -> None:
+        super().__init__(options)
+        self.raised = None
+
+    def get_function_signature_hook(self, fullname: str):
+        # called before the arguments of the call are checked
+        if fullname == self.CONTRACTS + 'Exsures':
+            return self._enter_exsures
+        return None
+
+    def get_function_hook(self, fullname: str):
+        return {
+            self.CONTRACTS + 'Result': self._result_type,
+            self.CONTRACTS + 'RaisedException': self._raised_type,
+            self.CONTRACTS + 'Exsures': self._leave_exsures,
+        }.get(fullname)
+
+    def _result_type(self, ctx) -> mypy.types.Type:
+        function = next((scope for scope in reversed(ctx.api.scope.stack)
+                         if isinstance(scope, mypy.nodes.FuncDef)), None)
+        signature = function and mypy.types.get_proper_type(function.type)
+        if isinstance(signature, mypy.types.CallableType):
+            return signature.ret_type
+        return ctx.default_return_type
+
+    def _enter_exsures(self, ctx) -> mypy.types.CallableType:
+        exception = ctx.args[0][0] if ctx.args and ctx.args[0] else None
+        info = getattr(exception, 'node', None)
+        self.raised = (fill_typevars_with_any(info)
+                       if isinstance(info, mypy.nodes.TypeInfo) else None)
+        return ctx.default_signature
+
+    def _raised_type(self, ctx) -> mypy.types.Type:
+        return self.raised or ctx.default_return_type
+
+    def _leave_exsures(self, ctx) -> mypy.types.Type:
+        self.raised = None
+        return ctx.default_return_type
+
+
 class TypeException(Exception):
     def __init__(self, messages):
         self.messages = messages
-
-
-def absolute_import_id(importer: 'mypy.nodes.MypyFile', imp) -> str:
-    """
-    Returns the absolute module id an ImportFrom or ImportAll node refers to.
-
-    ``imp.id`` is the name as written, so for a relative import it is missing
-    the package part ('A' for ``from .A import A``, and '' for
-    ``from . import x``). Resolve it against the importing module the way
-    Python does: one leading dot means the package containing the importer,
-    which for a package's own __init__ is that package itself, and each further
-    dot strips one more level.
-    """
-    relative = getattr(imp, 'relative', 0)
-    if not relative:
-        return imp.id
-    parts = importer.fullname.split('.')
-    if not importer.is_package_init_file():
-        parts = parts[:-1]
-    if relative > 1:
-        parts = parts[:-(relative - 1)]
-    if imp.id:
-        parts = parts + imp.id.split('.')
-    return '.'.join(parts)
 
 
 class TypeVisitor(TraverserVisitor):
@@ -282,15 +309,6 @@ class TypeVisitor(TraverserVisitor):
             # narrowing by isinstance, whereas the recorded one is whatever the
             # name had at its first occurrence, so preferring it would stop alt
             # types from ever being collected.
-        elif isinstance(node, mypy.nodes.CallExpr):
-            if isinstance(node.callee, mypy.nodes.NameExpr) and node.callee.name == 'Result':
-                key = tuple(self.prefix)
-                for i in range(len(key)):
-                    if key[i].startswith('lambda'):
-                        key = key[:i]
-                        break
-                type = self.all_types[key]
-                return type
         if node in self.type_map:
             result = self.type_map[node]
             return result
@@ -331,6 +349,7 @@ class TypeInfo:
         self.type_vars = {}
         self.ghost_names = {}
         self.module_name = None
+        self.imports = None  # name -> path of the modules the checked file imports
 
     def _create_options(self, strict_optional: bool):
         """
@@ -351,10 +370,69 @@ class TypeInfo:
         result.export_types = True
         result.preserve_asts = True
         result.warn_no_return = False
+        # mypy's nodes are matched with those of Python's parser by position
+        result.native_parser = False
         # Since we run mypy twice with different options, we use different cache dirs for different configurations,
         # otherwise Mypy throws away the cache every time.
         result.cache_dir = '.mypy_cache_strict' if strict_optional else '.mypy_cache_nonstrict'
         return result
+
+    def _build(self, filename: str, module_name: str, base_dir: str, options):
+        """
+        Runs mypy on the given file. Nagini reads the typed ASTs of the file
+        and of everything it transitively imports, and mypy builds those in
+        full only for the sources of a build whose text it is given: a module
+        it loads from its cache has no AST, and one it finds among the
+        installed packages is checked only as far as its interface needs. So
+        the file is built alone to learn what it imports, and then together
+        with those modules, each where mypy found it.
+        """
+        if self.imports is None:
+            result = self._mypy(filename, module_name, base_dir, options, {})
+            self.imports = self._import_paths(result)
+            if not self.imports:
+                return result
+        result = self._mypy(filename, module_name, base_dir, options, self.imports)
+        if self._import_paths(result) != self.imports:
+            raise Exception('mypy builds of %s differ in what it imports.' % filename)
+        return result
+
+    def _import_paths(self, result) -> Dict[str, str]:
+        """Name -> path of the modules the main module of the given mypy build
+        imports, see _imported."""
+        paths = {name: result.graph[name].path
+                 for name in self._imported(result)[1:]}
+        return {name: path for name, path in paths.items()
+                if path and os.path.isfile(path)}
+
+    def _mypy(self, filename: str, module_name: str, base_dir: str, options,
+              imports: Dict[str, str]):
+        sources = [self._source(filename, module_name, base_dir)]
+        sources += [self._source(path, name, base_dir)
+                    for name, path in imports.items()]
+        return mypy.build.build(sources, options,
+                                extra_plugins=[ContractPlugin(options)])
+
+    def _source(self, path: str, module_name: str, base_dir: str) -> BuildSource:
+        with tokenize.open(path) as f:
+            return BuildSource(path, module_name, f.read(), base_dir=base_dir)
+
+    def _imported(self, result) -> List[str]:
+        """The main module of the given mypy build and every module it
+        transitively imports, except IGNORED_IMPORTS and what only those
+        import."""
+        names = [next(iter(result.graph))]
+        for name in names:
+            state = result.graph[name]
+            for dep_name in state.dep_line_map:
+                # a module loaded from the cache also lists the modules its
+                # types refer to
+                if (state.priorities.get(dep_name) != mypy.build.PRI_INDIRECT
+                        and dep_name in result.graph
+                        and dep_name not in IGNORED_IMPORTS
+                        and dep_name not in names):
+                    names.append(dep_name)
+        return names
 
     def check(self, filename: str, base_dir: str = None) -> bool:
         """
@@ -378,72 +456,20 @@ class TypeInfo:
                     relpath = relpath[:-4]
                 module_name = relpath
         self.module_name = module_name
-        old_find_cache_meta = mypy.build.find_cache_meta
         try:
             options_strict = self._create_options(True)
-
-            # Terrible dirty hack:
-            # We want mypy to use its cache as much as possible, however, all files that Nagini needs to analyze
-            # must be re-checked by mypy, otherwise there are no mypy ASTs for these files for us to use.
-            # So: We monkey-patch the function that tries to find cached type information for the given file s.t.
-            # it returns None (= no cached info to use) for all files transitively imported from __main__, ignoring
-            # modules in IGNORED_IMPORTS and everything imported solely by those.
-            directly_imported = set()
-            imports_not_handled = set()
-            def my_find_cache_meta(id, path, mgr):
-                fl = mgr.ast_cache
-                to_handle = set(imports_not_handled)
-                for i in to_handle:
-                    if i in fl:
-                        imports_not_handled.remove(i)
-                        importer = fl[i][0]
-                        for ii in importer.imports:
-                            ids = []
-                            if isinstance(ii, mypy.build.Import):
-                                ids.extend([imported_id for imported_id, _ in ii.ids])
-                            else:
-                                # ImportFrom and ImportAll may be relative, in
-                                # which case ii.id is not the name mypy asks
-                                # about later ('A' rather than 'pkg.A'), so the
-                                # module would keep its cached, stripped tree.
-                                ids.append(absolute_import_id(importer, ii))
-                            for imported_id in ids:
-                                if imported_id not in IGNORED_IMPORTS:
-                                    imports_not_handled.add(imported_id)
-                                    directly_imported.add(imported_id)
-                if id == '__main__' or id == module_name:
-                    imports_not_handled.add(id)
-                    directly_imported.add(id)
-
-                if id not in directly_imported:
-                    return old_find_cache_meta(id, path, mgr)
-                return None
-            mypy.build.find_cache_meta = my_find_cache_meta
-
-            sources = [BuildSource(filename, module_name, None, base_dir=base_dir)]
-
-            res_strict = mypy.build.build(sources, options_strict)
+            res_strict = self._build(filename, module_name, base_dir,
+                                     options_strict)
 
             if res_strict.errors:
                 # Run mypy a second time with strict optional checking disabled,
                 # s.t. we don't get overapproximated none-related errors.
                 options_non_strict = self._create_options(False)
-                res_non_strict = mypy.build.build(
-                    [BuildSource(filename, module_name, None, base_dir=base_dir)],
-                    options_non_strict
-                )
+                res_non_strict = self._build(filename, module_name, base_dir,
+                                             options_non_strict)
                 if res_non_strict.errors:
                     report_errors(res_non_strict.errors)
-            relevant_files = [next(iter(res_strict.graph))]
-            i = 0
-            while i < len(relevant_files):
-                name = relevant_files[i]
-                for dep_name in res_strict.graph[name].dep_line_map:
-                    if dep_name in IGNORED_IMPORTS:
-                        continue
-                    if dep_name not in relevant_files:
-                        relevant_files.append(dep_name)
-                i += 1
+            relevant_files = self._imported(res_strict)
             relevant_files = [(name, res_strict.graph[name]) for name in relevant_files]
 
             for name, file_graph in relevant_files:
@@ -465,11 +491,6 @@ class TypeInfo:
             return True
         except mypy.errors.CompileError as e:
             report_errors(e.messages)
-        finally:
-            # Undo the patch: otherwise every call would wrap the function
-            # installed by the previous one, and looking up a single cache entry
-            # would recurse through all of them.
-            mypy.build.find_cache_meta = old_find_cache_meta
 
     def get_type_prefix(self, name: str) -> str:
         name = os.path.abspath(name)
