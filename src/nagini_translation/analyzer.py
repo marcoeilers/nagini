@@ -6,6 +6,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import ast
+import builtins
 import logging
 import os
 import nagini_contracts.io_builtins
@@ -22,8 +23,8 @@ from nagini_contracts.io_contracts import (
 )
 from nagini_contracts.obligations import OBLIGATION_CONTRACT_FUNCS
 from nagini_translation.analyzer_io import IOOperationAnalyzer
-from nagini_translation.external.ast_util import mark_text_ranges
 from nagini_translation.lib.constants import (
+    BUILTIN_PREDICATES,
     CALLABLE_TYPE,
     EXTENDABLE_BUILTINS,
     IGNORED_IMPORTS,
@@ -34,9 +35,11 @@ from nagini_translation.lib.constants import (
     MYPY_SUPERCLASSES,
     OBJECT_TYPE,
     TUPLE_TYPE,
+    TYPE_ALIASES,
 )
 from nagini_translation.lib.program_nodes import (
     ContainerInterface,
+    Exit,
     GenericType,
     MethodType,
     OptionalType,
@@ -55,7 +58,10 @@ from nagini_translation.lib.program_nodes import (
     TypeVar,
     UnionType,
 )
-from nagini_translation.lib.resolver import get_target as do_get_target
+from nagini_translation.lib.resolver import (
+    _get_subscript_type,
+    get_target as do_get_target,
+)
 from nagini_translation.lib.typedefs import Expr
 from nagini_translation.lib.typeinfo import TypeInfo
 from nagini_translation.lib.util import (
@@ -65,8 +71,14 @@ from nagini_translation.lib.util import (
     get_parent_of_type,
     InvalidProgramException,
     is_io_existential,
+    is_type_checking,
+    is_type_checking_block,
     isStr,
+    TYPE_CHECKING_USE,
+    typed_statements,
+    unsupported_under_type_checking,
     UnsupportedException,
+    use_char_columns,
 )
 from nagini_translation.lib.views import PythonModuleView
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
@@ -100,6 +112,7 @@ class Analyzer(ast.NodeVisitor):
         self.modules = OrderedDict()
         self.modules[os.path.abspath(path)] = self.module
         self.asts = {}
+        self.sources = {}  # file -> its text as parsed
         # Are we defining an IOExists block?
         self._is_io_existential = False
         self._aliases = {}  # Dict[str, PythonBaseVar]
@@ -175,15 +188,12 @@ class Analyzer(ast.NodeVisitor):
             # An invalid type comment must not prevent us from analyzing the
             # program; mypy reports the problem anyway.
             parse_result = ast.parse(text)
-        try:
-            mark_text_ranges(parse_result, text)
-        except Exception:
-            # Ignore
-            pass
+        use_char_columns(parse_result, text)
         self.modules[abs_path].node = parse_result
         self.asts[abs_path] = parse_result
+        self.sources[abs_path] = text
         assert isinstance(parse_result, ast.Module)
-        for stmt in parse_result.body:
+        for stmt in typed_statements(parse_result):
             if isinstance(stmt, ast.Import):
                 for name in stmt.names:
                     module_name = name.name
@@ -214,8 +224,28 @@ class Analyzer(ast.NodeVisitor):
                 if len(stmt.names) == 1 and stmt.names[0].name == '*':
                     names = None
                 else:
-                    names = [(name.name, name.asname if name.asname else None)
-                             for name in stmt.names] # TODO rename?
+                    names = []
+                    for name in stmt.names:
+                        # A member that mypy knows as a module is a submodule
+                        # import (`from pkg import helpers`): bind it into the
+                        # importing module's namespaces — the same shape as
+                        # `import pkg.helpers as helpers` — instead of treating
+                        # it as a name defined inside the package.
+                        member_module = module_name + '.' + name.name
+                        if member_module in self.types.files:
+                            member_path = os.path.abspath(
+                                self.types.files[member_module])
+                            self.add_module(member_path, abs_path,
+                                            name.asname if name.asname
+                                            else name.name, parse_result)
+                        else:
+                            names.append((name.name,
+                                          name.asname if name.asname else None))
+                    if not names:
+                        # Every member was a submodule: keep the package itself
+                        # in from_imports (so its own statements still execute
+                        # at the import site) but let the view expose nothing.
+                        names = [('$nothing', None)]
                 self.add_module(path, abs_path, None, parse_result, names)
         self.module_index = self.module_paths.index(abs_path) + 1
 
@@ -427,6 +457,10 @@ class Analyzer(ast.NodeVisitor):
                         and len(ann.slice.elts) > 1:
                     sub_ann = ann.slice.elts[1]
                 return self.is_ghost_annotation(sub_ann)
+        elif isinstance(ann, ast.BinOp) and isinstance(ann.op, ast.BitOr):
+            # X | Y, read like Union[X, Y].
+            none_first = isinstance(ann.left, ast.Constant) and ann.left.value is None
+            return self.is_ghost_annotation(ann.right if none_first else ann.left)
         return False
 
     def is_ghost_type_name(self, name: str) -> bool:
@@ -473,13 +507,29 @@ class Analyzer(ast.NodeVisitor):
                         self.visit(item, node)
 
     def visit(self, child_node: ast.AST, parent: ast.AST) -> None:
-        child_node._parent = parent
+        self.attach(child_node, parent)
         method = 'visit_' + child_node.__class__.__name__
         visitor = getattr(self, method, self.visit_default)
         visitor(child_node)
 
-    def visit_but_ignore(self, node: ast.AST, parent: ast.AST) -> None:
+    def attach(self, node: ast.AST, parent: ast.AST) -> None:
+        """
+        Links the node to its parent and, for a collection literal or a
+        constructor call, records the type mypy inferred for it in the module's
+        literal_types; the resolver takes it from there.
+        """
         node._parent = parent
+        if (isinstance(node, (ast.List, ast.Set, ast.Dict, ast.Tuple, ast.Call))
+                and hasattr(node, 'lineno')):
+            # Nodes the analyzer synthesizes (dataclass methods) have no
+            # position, and mypy never saw them.
+            position = (node.lineno, node.col_offset)
+            mypy_type = self.types.get_expr_type(self.module.type_prefix, *position)
+            if mypy_type is not None:
+                self.module.literal_types[position] = self.convert_type(mypy_type, node)
+
+    def visit_but_ignore(self, node: ast.AST, parent: ast.AST) -> None:
+        self.attach(node, parent)
         for field in node._fields:
             fieldval = getattr(node, field)
             if isinstance(fieldval, ast.AST):
@@ -570,6 +620,22 @@ class Analyzer(ast.NodeVisitor):
         else:
             # Class doesn't exist yet, create it.
             superclass = self.global_module.classes[OBJECT_TYPE] if name != OBJECT_TYPE else None
+            builtin_val = getattr(builtins, name, None)
+            if (not nested_declaration and isinstance(builtin_val, type) and
+                    name != 'Exception' and
+                    issubclass(builtin_val, Exception) and
+                    'Exception' in self.global_module.classes):
+                # An unmodeled builtin exception class (e.g. ValueError): give it
+                # the modeled Exception as superclass so that it and its user
+                # subclasses sit inside the modeled exception hierarchy (and are
+                # caught by `except Exception`). BaseException-only descendants
+                # like KeyboardInterrupt deliberately stay below object.
+                # Register it in the global module: the name is process-global,
+                # so every referencing module must resolve to the same class —
+                # per-module copies are distinct nominal types, making a
+                # cross-module Exsures/except pair unprovable.
+                superclass = self.global_module.classes['Exception']
+                creation_scope = self.global_module
             cls = self.node_factory.create_python_class(name, creation_scope,
                                                         self.node_factory,
                                                         superclass=superclass)
@@ -676,6 +742,10 @@ class Analyzer(ast.NodeVisitor):
         container = self.module if self.current_class is None else self.current_class
         self.define_new(container, name, node)
         cls = self.find_or_create_class(name, defining=True)
+        if container.classes.get(name) is not cls:
+            raise UnsupportedException(
+                node, "class with the name of the built-in or imported class "
+                      "'{}'".format(name))
         cls.defined = True
         cls.node = node
         cls.is_ghost = self.defines_ghost(node)
@@ -844,6 +914,16 @@ class Analyzer(ast.NodeVisitor):
         self.module = old_module
         self.contract_only = old_contract_only
 
+    def visit_If(self, node: ast.If) -> None:
+        if not is_type_checking_block(node, self.module.node):
+            self.visit_default(node)
+            return
+        refused = unsupported_under_type_checking(node)
+        if refused is not None:
+            raise UnsupportedException(refused, TYPE_CHECKING_USE)
+        for stmt in node.body:
+            self.visit(stmt, node)
+
     def visit_Import(self, node: ast.Import):
         for name in node.names:
             self.analyze_import(name.name)
@@ -864,6 +944,15 @@ class Analyzer(ast.NodeVisitor):
                     self.module.ghost_names.add(new_ghost_name)
 
         self.analyze_import(module_name)
+        for name in node.names:
+            if name.name == '*':
+                continue
+            # Members that are submodules (`from pkg import helpers`) are
+            # bound as namespace imports during collect_imports; their
+            # contents must be analyzed like any imported module.
+            member_module = module_name + '.' + name.name
+            if member_module in self.types.files:
+                self.analyze_import(member_module)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         if self.current_function:
@@ -871,6 +960,13 @@ class Analyzer(ast.NodeVisitor):
         name = node.name
         if self._is_illegal_magic_method_name(name):
             raise InvalidProgramException(node, 'illegal.magic.method')
+        # Calls to these dispatch on the bare name, so a user definition would be
+        # silently shadowed by the built-in.
+        if name in BUILTIN_PREDICATES:
+            raise InvalidProgramException(
+                node, 'builtin.predicate.shadowed',
+                f'"{name}" is a built-in Nagini predicate name and cannot be '
+                'redefined; choose a different name.')
         assert isinstance(name, str)
         if self.is_io_operation(node):
             self.io_operation_analyzer.analyze_io_operation(node)
@@ -1145,6 +1241,8 @@ class Analyzer(ast.NodeVisitor):
             self.current_function.kw_arg = kw_arg
 
     def visit_ListComp(self, node: ast.Lambda) -> None:
+        if self.current_function is None:
+            raise UnsupportedException(node, 'comprehension at module level')
         name = construct_lambda_prefix(node.lineno, node.col_offset)
         target = node.generators[0].target
         local_name = name + '$' + target.id
@@ -1198,6 +1296,9 @@ class Analyzer(ast.NodeVisitor):
     def visit_arg(self, node: ast.arg) -> None:
         assert self.current_function is not None
         node_type = self.typeof(node)
+        if node_type is None:
+            # A parameter annotated None: its only value is None.
+            node_type = self.module.global_module.classes['NoneType']
         self.current_function.args[node.arg] = \
             self.node_factory.create_python_var(node.arg, node, node_type)
         # If we just introduced new type variables, create the expression that
@@ -1288,6 +1389,21 @@ class Analyzer(ast.NodeVisitor):
                     (node.args, self._aliases.copy()))
             elif node.func.id == 'Exsures':
                 exception = self.get_target(node.args[0], self.module)
+                if exception is None and isinstance(node.args[0], ast.Name):
+                    builtin_val = getattr(builtins, node.args[0].id, None)
+                    if (isinstance(builtin_val, type)
+                            and issubclass(builtin_val, Exception)):
+                        # Builtin exception: create it under the modeled
+                        # Exception, like except-handler analysis does.
+                        exception = self.find_or_create_class(node.args[0].id)
+                if exception is None:
+                    # Unresolvable (a BaseException-only builtin, or a typo).
+                    raise InvalidProgramException(
+                        node, 'invalid.program',
+                        message='Exsures names an exception type Nagini '
+                                'cannot resolve: {}. Use a module-defined '
+                                'Exception subclass.'.format(
+                                    ast.unparse(node.args[0])))
                 if exception not in self.current_function.declared_exceptions:
                     self.current_function.declared_exceptions[exception] = []
                 self.current_function.declared_exceptions[exception].append(
@@ -1536,8 +1652,10 @@ class Analyzer(ast.NodeVisitor):
                     return
                 
                 assign = node._parent
-                if (not isinstance(assign, ast.Assign)
-                        or len(assign.targets) != 1):
+                annotated = (isinstance(assign, ast.AnnAssign) and assign.simple == 1
+                             and assign.value is not None)
+                if not annotated and (not isinstance(assign, ast.Assign)
+                                      or len(assign.targets) != 1):
                     msg = ('only simple assignments and reads allowed for '
                             'static fields')
                     raise UnsupportedException(assign, msg)
@@ -1616,6 +1734,8 @@ class Analyzer(ast.NodeVisitor):
         """
         Tracks field accesses to find out which fields exist.
         """
+        if is_type_checking(node, self.module.node):
+            return
         self.visit_default(node)
         # If the LHS of this attribute is a module, or if this
         # is part of a complex expression and it's guaranteed that the field
@@ -1660,6 +1780,12 @@ class Analyzer(ast.NodeVisitor):
     def visit_Nonlocal(self, node: ast.Nonlocal) -> None:
         raise UnsupportedException(node, 'nonlocal statement')
 
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        raise UnsupportedException(node, 'async function')
+
+    def visit_GeneratorExp(self, node: ast.GeneratorExp) -> None:
+        raise UnsupportedException(node, 'generator expression; use a list comprehension')
+
     def convert_type(self, mypy_type, node, bound_type_vars: Dict[str, PythonType] = None) -> PythonType:
         """
         Converts an internal mypy type to a PythonType.
@@ -1672,7 +1798,8 @@ class Analyzer(ast.NodeVisitor):
         elif self.types.is_instance_type(mypy_type):
             result = self.convert_type(mypy_type.type, node)
             if mypy_type.args and not result.non_generic_builtin:
-                args = [self.convert_type(arg, node) for arg in mypy_type.args]
+                args = [self.convert_type(arg, node, bound_type_vars)
+                        for arg in mypy_type.args]
                 if mypy_type.type.name == 'enumerate':
                     # We cheat and represent type enumerate as a list of pairs.
                     assert len(args) == 1
@@ -1699,7 +1826,7 @@ class Analyzer(ast.NodeVisitor):
                     # without falling back (it is definitely not an ADT).
                     pass
             # Regular tuple handling without falling back
-            args = [self.convert_type(arg_type, node)
+            args = [self.convert_type(arg_type, node, bound_type_vars)
                     for arg_type in mypy_type.items]
             result = GenericType(self.module.global_module.classes[TUPLE_TYPE],
                                  args)
@@ -1726,6 +1853,9 @@ class Analyzer(ast.NodeVisitor):
             raise InvalidProgramException(node, 'partial.type', message=msg)
         elif self.types.is_literal_type(mypy_type):
             return self.convert_type(mypy_type.fallback, node, bound_type_vars)
+        elif self.types.is_uninhabited_type(mypy_type):
+            # Never: the element type of an empty literal in an untyped position.
+            result = self.module.global_module.classes[OBJECT_TYPE]
         else:
             name = ""
             if hasattr(node, 'id'):
@@ -1746,12 +1876,9 @@ class Analyzer(ast.NodeVisitor):
         return result
 
     def _convert_normal_type(self, mypy_type) -> PythonType:
-        prefix = mypy_type._fullname
-        name = mypy_type.name
-        if prefix == 'builtins.enumerate':
-            # We cheat and represent type enumerate as a list of pairs.
-            prefix = 'builtins.list'
-            name = 'list'
+        prefix = TYPE_ALIASES.get(mypy_type._fullname, mypy_type._fullname)
+        name = (mypy_type.name if prefix == mypy_type._fullname
+                else prefix.rsplit('.', 1)[-1])
         if prefix.endswith('.' + name):
             prefix = prefix[:-(len(name) + 1)]
         target_module = None
@@ -1820,7 +1947,10 @@ class Analyzer(ast.NodeVisitor):
         name = mypy_type.name
         if bound_type_vars and name in bound_type_vars:
             return bound_type_vars[name]
-        assert name in self.module.type_vars
+        if name not in self.module.type_vars:
+            raise UnsupportedException(
+                node, 'type variable {} that this module does not declare (typing.Self '
+                      'and unparameterized generic types are not supported)'.format(name))
         if (self.current_class and name in self.current_class.type_vars):
             return self.current_class.type_vars[name]
         if name in self.current_function.type_vars:
@@ -1966,6 +2096,9 @@ class Analyzer(ast.NodeVisitor):
             if isinstance(cls, PythonType):
                 return cls
             raise UnsupportedException(node)
+        elif isinstance(node, ast.Subscript):
+            return _get_subscript_type(self.typeof(node.value), self.module,
+                                       node)
         else:
             raise UnsupportedException(node)
 
@@ -1993,14 +2126,36 @@ class Analyzer(ast.NodeVisitor):
         post_name = self.stmt_container.get_fresh_name('post_with')
         try_block.post_name = post_name
         self.stmt_container.labels.append(post_name)
-        finally_name = self.stmt_container.get_fresh_name('with_finally')
         if len(node.items) != 1:
             msg = 'with block may only have one item'
             raise UnsupportedException(node, msg)
         try_block.with_item = node.items[0]
-        try_block.finally_name = finally_name
-        self.stmt_container.labels.append(finally_name)
+        self._add_finally_labels(try_block, 'with_finally')
         self.stmt_container.try_blocks.append(try_block)
+
+    def visit_Raise(self, node: ast.Raise) -> None:
+        # Raising a builtin exception must create its class in the modeled
+        # hierarchy, like except-handler analysis does.
+        target = node.exc.func if isinstance(node.exc, ast.Call) else node.exc
+        if isinstance(target, ast.Name):
+            builtin_val = getattr(builtins, target.id, None)
+            if (isinstance(builtin_val, type)
+                    and issubclass(builtin_val, Exception)):
+                self.find_or_create_class(target.id)
+        self.visit_default(node)
+
+    def _add_finally_labels(self, try_block: PythonTryBlock, name: str) -> None:
+        """
+        Creates the label of the finally block of try_block and those of its
+        entries, one for each way of leaving the block.
+        """
+        try_block.finally_name = self.stmt_container.get_fresh_name(name)
+        self.stmt_container.labels.append(try_block.finally_name)
+        for exit in Exit:
+            entry_name = self.stmt_container.get_fresh_name(
+                name + '_' + exit.name.lower())
+            try_block.entry_names[exit] = entry_name
+            self.stmt_container.labels.append(entry_name)
 
     def visit_Try(self, node: ast.Try) -> None:
         """
@@ -2035,10 +2190,8 @@ class Analyzer(ast.NodeVisitor):
                                                 handler_name, node.orelse, None)
             try_block.else_block = py_handler
         if node.finalbody:
-            finally_name = self.stmt_container.get_fresh_name('try_finally')
             try_block.finally_block = node.finalbody
-            try_block.finally_name = finally_name
-            self.stmt_container.labels.append(finally_name)
+            self._add_finally_labels(try_block, 'try_finally')
         self.visit_default(node)
 
     def _class_incompatible_decorators(self, decorators: set[str]) -> bool:

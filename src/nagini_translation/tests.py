@@ -48,17 +48,15 @@ from typing import Any, Dict, List, Optional, Set
 
 from nagini_translation.lib import config, jvmaccess
 from nagini_translation.lib.errors import error_manager
-from nagini_translation.lib.typeinfo import TypeException
+from nagini_translation.lib.typeinfo import LocatedTypeError, TypeException, type_error
 from nagini_translation.lib.util import InvalidProgramException, UnsupportedException
 from nagini_translation.ghost.extraction import ProgramExtractor
-from nagini_translation.main import translate, verify, TYPE_ERROR_PATTERN
+from nagini_translation.main import translate, verify
 from nagini_translation.verifier import VerificationResult, ViperVerifier
 
 
 _JVM = jvmaccess.JVM(config.classpath)
 
-
-_MYPY_ERROR_MATCHER = re.compile(TYPE_ERROR_PATTERN)
 
 _BACKEND_SILICON = 'silicon'
 _BACKEND_CARBON = 'carbon'
@@ -191,10 +189,8 @@ class UnsupportedError(Error):
 class TypeCheckError(Error):
     """Type error reported by Mypy."""
 
-    def __init__(self, msg: str) -> None:
-        self._msg = msg
-        match = _MYPY_ERROR_MATCHER.match(msg)
-        self._groups = match.groupdict()
+    def __init__(self, error: LocatedTypeError) -> None:
+        self._error = error
 
     def __repr__(self) -> str:
         return 'TypeCheckError({}, line={}, vias={})'.format(
@@ -202,11 +198,11 @@ class TypeCheckError(Error):
 
     @property
     def full_id(self) -> str:
-        return 'type.error:' + self._groups['msg']
+        return 'type.error:' + self._error.msg
 
     @property
     def line(self) -> int:
-        return int(self._groups['line'])
+        return self._error.line
 
     def get_vias(self) -> List[int]:
         return []
@@ -672,8 +668,8 @@ class TranslationTest(AnnotatedTest):
             actual_errors = [InvalidProgramError(exp1)]
         except TypeException as exp2:
             actual_errors = [
-                TypeCheckError(msg) for msg in exp2.messages
-                if _MYPY_ERROR_MATCHER.match(msg)]
+                TypeCheckError(error)
+                for error in map(type_error, exp2.messages) if error]
         except UnsupportedException as exp3:
             actual_errors = [UnsupportedError(exp3)]
         annotation_manager.check_errors(actual_errors)

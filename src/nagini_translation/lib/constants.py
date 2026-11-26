@@ -19,6 +19,7 @@ BUILTINS = ['cast',
             'float',
             'isinstance',
             'bool',
+            'id',
             'len',
             'str',
             'set',
@@ -27,7 +28,8 @@ BUILTINS = ['cast',
             'type',
             'list',
             'enumerate',
-            'bytearray']
+            'bytearray',
+            'bytes']
 
 EXTENDABLE_BUILTINS = [
     'object',
@@ -136,6 +138,9 @@ INTERNAL_NAMES = [
     SINGLE_NAME,
     '_is_single',
     '_is_combined',
+    '_ObjectId',
+    '_object_id',
+    '_object_id_inv',
     'm',     # the following are used in various
     'X',     # places in the resources/... files.
     'Y',
@@ -278,6 +283,7 @@ LEGAL_MAGIC_METHODS = {
 
     '__getitem__',
     '__setitem__',
+    '__contains__',
 
     '__iadd__',
     '__isub__',
@@ -381,7 +387,17 @@ MYPY_SUPERCLASSES = {
 
 EVAL_IO_SIGNATURE = ('eval_io', 'func', 'arg', 'result')
 
-IGNORED_IMPORTS = {'_importlib_modulespec',
+# Types of mypy that are represented by another class in Nagini.
+TYPE_ALIASES = {
+    # We cheat and represent type enumerate as a list of pairs.
+    'builtins.enumerate': 'builtins.list',
+    # Nothing but int is supported as an index.
+    'typing.SupportsIndex': 'builtins.int',
+    'typing_extensions.SupportsIndex': 'builtins.int',
+}
+
+IGNORED_IMPORTS = {'__future__',
+                   '_importlib_modulespec',
                    'abc',
                    'builtins',
                    'dataclasses',

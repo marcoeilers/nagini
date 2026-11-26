@@ -72,32 +72,33 @@ class PythonScope:
         self.sil_names = sil_names
         self.superscope = superscope
         self._module = None
+        # For a name already taken: the suffix to try next. Names are never
+        # released, so every smaller suffix is taken.
+        self._next_suffix = {}
+
+    def _naming_scope(self) -> 'PythonScope':
+        """The enclosing scope that holds the Silver names."""
+        scope = self
+        while scope.sil_names is None:
+            scope = scope.superscope
+        return scope
 
     def contains_name(self, name: str) -> bool:
-        if self.sil_names is not None:
-            result = name in self.sil_names
-        else:
-            result = self.superscope.contains_name(name)
-        return result
+        return name in self._naming_scope().sil_names
 
     def get_fresh_name(self, name: str) -> str:
-        if self.contains_name(name):
-            counter = 0
+        scope = self._naming_scope()
+        names = scope.sil_names
+        new_name = name
+        if name in names:
+            counter = scope._next_suffix.get(name, 0)
             new_name = name + '_' + str(counter)
-            while self.contains_name(new_name):
+            while new_name in names:
                 counter += 1
                 new_name = name + '_' + str(counter)
-            self._add_name(new_name)
-            return new_name
-        else:
-            self._add_name(name)
-            return name
-
-    def _add_name(self, new_name: str) -> None:
-        if self.sil_names is not None:
-            self.sil_names.add(new_name)
-        else:
-            self.superscope._add_name(new_name)
+            scope._next_suffix[name] = counter + 1
+        names.add(new_name)
+        return new_name
 
     @property
     def scope_prefix(self) -> List[str]:
@@ -168,6 +169,9 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
         self.defined_var = None
         self.names_var = None
         self.ghost_names = types.ghost_names[type_prefix] if type_prefix in types.ghost_names else set()
+        # (line, column) -> the type mypy inferred for the collection literal or
+        # constructor call there, recorded by the analyzer.
+        self.literal_types = {}
         if global_module and type_prefix != '__main__':
             self.add_builtin_vars()
 
@@ -576,7 +580,8 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         """
         if name in self.fields:
             field = self.fields[name]
-            if not isinstance(field.type, TypeVar):
+            if (isinstance(field, PythonField) and
+                    not isinstance(field.type, TypeVar)):
                 assert self.types_match(field.type.try_box(), type.try_box())
         elif name in self.static_fields:
             field = self.static_fields[name]
@@ -837,6 +842,11 @@ class GenericType(PythonType):
 
     def __init__(self, cls: PythonClass,
                  args: List[PythonType]) -> None:
+        if not isinstance(cls, PythonClass):
+            # Callers occasionally pass an already-instantiated GenericType
+            # (e.g. when re-instantiating with fresh args); every use of
+            # self.cls assumes the underlying class.
+            cls = cls.python_class
         self.name = cls.name
         self.module = cls.module
         self.cls = cls
@@ -1036,6 +1046,11 @@ class OptionalType(UnionType):
 
     def substitute(self, types: Dict['TypeVar', 'PythonType']):
         return OptionalType(self.optional_type.substitute(types))
+
+    def get_bound_type_vars(self) -> Dict['TypeVar', 'PythonType']:
+        # Optional[C[T]] behaves like C[T]; the inherited implementation
+        # would zip C's type variables against this union's [None, typ].
+        return self.optional_type.get_bound_type_vars()
 
     @property
     def cls(self):
@@ -1565,6 +1580,18 @@ class PythonExceptionHandler(PythonNode):
         self.exception_name = exception_name
 
 
+class Exit(Enum):
+    """
+    The ways in which control leaves a statement. The value is what the
+    variable of a finally block holds while control is on that way.
+    """
+    NORMAL = 0
+    RETURN = 1
+    RAISE = 2
+    BREAK = 3
+    CONTINUE = 4
+
+
 class PythonTryBlock(PythonNode):
     """
     Represents a try-block, which may include except-blocks, an else-block
@@ -1587,58 +1614,92 @@ class PythonTryBlock(PythonNode):
         self.protected_region = protected_region
         self.finally_var = None
         self.error_var = None
+        self.result_var = None
         self.method = method
         self.node_factory = node_factory
         self.finally_name = None
+        self.entry_names = {}
         self.post_name = None
         self.with_item = None
         self.with_var = None
         self.handler_aliases = {}
         method.labels.append(try_name)
 
-    def get_finally_var(self, translator: 'Translator') -> 'PythonVar':
+    @property
+    def has_finally(self) -> bool:
         """
-        Lazily creates and returns the variable in which we store the
-        information how control flow should proceed after the execution
-        of a finally block. We use a value of 0 to say normal flow, 1 to say
-        we returned normally, i.e. jump to the end of the function asap, 2
-        to say we returned exceptionally, i.e. jump to the end of the function
-        moving through exception handlers.
+        Whether code runs whenever the block is left: a finally block or the
+        exit method of a with block.
         """
-        if self.finally_var:
-            return self.finally_var
-        sil_name = self.method.get_fresh_name('try_finally')
-        global_module = self.method.module.global_module
-        int_type = global_module.classes[PRIMITIVE_INT_TYPE]
-        result = self.node_factory.create_python_var(sil_name, None,
-                                                     int_type)
-        result.process(sil_name, translator)
-        if isinstance(self.method, PythonMethod):
-            self.method.locals[sil_name] = result
-        self.finally_var = result
-        return result
+        return bool(self.finally_block or self.with_item)
 
-    def get_error_var(self, translator: 'Translator') -> 'PythonVar':
+    @property
+    def finally_returns(self) -> bool:
         """
-        Lazily creates and returns the variable in which any exceptions thrown
-        within the block will be stored.
+        Whether the finally block contains a return statement, which assigns
+        the result while that of an earlier return may be pending.
         """
-        if self.error_var:
-            return self.error_var
-        sil_name = self.method.get_fresh_name('error')
-        exc_type = self.method.module.global_module.classes['Exception']
-        result = self.node_factory.create_python_var(sil_name, None,
-                                                     exc_type)
+        return any(isinstance(node, ast.Return)
+                   for stmt in self.finally_block or []
+                   for node in ast.walk(stmt))
+
+    def _create_var(self, name: str, type: 'PythonType',
+                    translator: 'Translator') -> 'PythonVar':
+        sil_name = self.method.get_fresh_name(name)
+        result = self.node_factory.create_python_var(sil_name, None, type)
         result.process(sil_name, translator)
         result.show_in_ce = False
         if isinstance(self.method, PythonMethod):
             self.method.locals[sil_name] = result
-        self.error_var = result
         return result
+
+    def get_finally_var(self, translator: 'Translator') -> 'PythonVar':
+        """
+        Lazily creates and returns the variable that holds, while the finally
+        block runs, the value of the Exit by which the block is being left,
+        which is how control proceeds after the finally block.
+        """
+        if not self.finally_var:
+            global_module = self.method.module.global_module
+            self.finally_var = self._create_var(
+                'try_finally', global_module.classes[PRIMITIVE_INT_TYPE],
+                translator)
+        return self.finally_var
+
+    def get_error_var(self, translator: 'Translator') -> 'PythonVar':
+        """
+        Lazily creates and returns the variable that holds, while the finally
+        block runs, the exception that is raised again after it.
+        """
+        if not self.error_var:
+            global_module = self.method.module.global_module
+            self.error_var = self._create_var(
+                'error', global_module.classes['Exception'], translator)
+        return self.error_var
+
+    def get_result_var(self, translator: 'Translator') -> Optional['PythonVar']:
+        """
+        Lazily creates and returns the variable that holds, while the finally
+        block runs, the result that is returned after it. There is none if the
+        finally block cannot change the result.
+        """
+        type = getattr(self.method, 'type', None)
+        if not self.result_var and type and self.finally_returns:
+            self.result_var = self._create_var('result', type, translator)
+        return self.result_var
+
+    @property
+    def vars(self) -> List['PythonVar']:
+        """
+        The variables of the block that exist.
+        """
+        return [var for var in (self.finally_var, self.error_var,
+                                self.result_var) if var]
 
     def process(self, translator: 'Translator') -> None:
         self.get_error_var(translator)
         self.get_finally_var(translator)
+        self.get_result_var(translator)
 
 
 class PythonVarBase(PythonNode):
@@ -1993,9 +2054,13 @@ class ProgramNodeFactory:
 def toposort_classes(class_set: Set[PythonClass]) -> List[PythonClass]:
     """
     Topological sorting of classes in a set, ensuring that derived classes
-    precede their base classes in the returned list
+    precede their base classes in the returned list. Members are
+    canonicalized to their PythonClass: callers pass union members, which
+    include GenericType instances (e.g. from Optional[Klass[T]]), and the
+    subclass relation is class-level.
     """
     map = {}
+    class_set = {type.python_class for type in class_set}
 
     for type in class_set:
         map[type] = set(type.all_subclasses) & class_set

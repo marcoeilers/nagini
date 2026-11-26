@@ -7,6 +7,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import jpype
 import logging
+import os
+import shlex
 
 
 class JVMStartupError(Exception):
@@ -43,6 +45,7 @@ class JVM:
     """
 
     def __init__(self, classpath: str):
+        self._array_types = {}
         # Only one JVM can exist per process; reuse it if one is already running
         # (e.g. started by another component or the test harness).
         if not jpype.isJVMStarted():
@@ -56,8 +59,11 @@ class JVM:
                     'and/or point the JAVA_HOME environment variable to '
                     'it.'.format(e)) from e
             try:
+                # NAGINI_JVM_ARGS: extra JVM options, e.g. a heap cap (-Xmx6g)
+                # sized to the container the server runs in.
                 jpype.startJVM(jvm_path,
-                               '-Djava.class.path=' + classpath, '-Xss32m',
+                               '-Djava.class.path=' + classpath, '-Xss128m',
+                               *shlex.split(os.environ.get('NAGINI_JVM_ARGS', '')),
                                convertStrings=True)
             except OSError as e:
                 raise JVMStartupError(
@@ -87,7 +93,10 @@ class JVM:
         return jpype.JProxy(supertype, inst=instance)
 
     def get_array(self, t, n):
-        return jpype.JArray(t)(n)
+        array_type = self._array_types.get(t)
+        if array_type is None:
+            array_type = self._array_types[t] = jpype.JArray(t)
+        return array_type(n)
 
     def is_known_class(self, package_object, class_name) -> bool:
         return hasattr(package_object, class_name)

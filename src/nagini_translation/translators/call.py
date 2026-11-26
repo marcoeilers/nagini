@@ -6,6 +6,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import ast
+import builtins
 import copy
 from collections import OrderedDict
 from typing import Dict, List, Tuple, Union
@@ -43,11 +44,13 @@ from nagini_translation.lib.constants import (
     THREAD_START_PRED,
     TUPLE_TYPE,
     BYTEARRAY_TYPE,
+    BYTES_TYPE,
     TYPE_TYPE,
 )
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
     chain_cond_exp,
+    Exit,
     GenericType,
     MethodType,
     OptionalType,
@@ -83,12 +86,15 @@ from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
 
 
+# The builtins that are only modelled for one number of positional arguments.
+BUILTIN_ARITY = {'isinstance': 2, 'type': 1, 'len': 1, 'id': 1, 'str': 1,
+                 'int': 1, 'float': 1, 'bool': 1}
+
 class CallTranslator(CommonTranslator):
 
 
     def _translate_isinstance(self, node: ast.Call,
                               ctx: Context) -> StmtsAndExpr:
-        assert len(node.args) == 2
         target = self.get_target(node.args[1], ctx)
         type_arg_type = self.get_type(node.args[1], ctx)
         stmt, obj = self.translate_expr(node.args[0], ctx)
@@ -132,7 +138,6 @@ class CallTranslator(CommonTranslator):
 
     def _translate_type_func(self, node: ast.Call,
                              ctx: Context) -> StmtsAndExpr:
-        assert len(node.args) == 1
         stmt, obj = self.translate_expr(node.args[0], ctx)
         pos = self.to_position(node, ctx)
         result = self.type_factory.typeof(obj, ctx)
@@ -153,15 +158,20 @@ class CallTranslator(CommonTranslator):
         return stmt, result
 
     def _translate_len(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
         arg_type = self.get_type(node.args[0], ctx).try_box()
         len_stmt, len_val = self.get_func_or_method_call(arg_type, '__len__', [target],
                                                          [None], node, ctx)
         return stmt + len_stmt, len_val
 
+    def _translate_id(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        stmt, target = self.translate_expr(node.args[0], ctx)
+        object_class = ctx.module.global_module.classes['object']
+        id_val = self.get_function_call(object_class, '__id__', [target],
+                                        [None], node, ctx)
+        return stmt, id_val
+
     def _translate_str(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
         arg_type = self.get_type(node.args[0], ctx)
         str_stmt, str_val = self.get_func_or_method_call(arg_type, '__str__', [target],
@@ -170,7 +180,6 @@ class CallTranslator(CommonTranslator):
 
 
     def _translate_int(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
         arg_type = self.get_type(node.args[0], ctx)
         str_stmt, str_val = self.get_func_or_method_call(arg_type, '__int__', [target],
@@ -178,7 +187,6 @@ class CallTranslator(CommonTranslator):
         return stmt + str_stmt, str_val
 
     def _translate_float(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        assert len(node.args) == 1
         if isStr(node.args[0]):
             string_val = node.args[0].value
             try:
@@ -190,7 +198,6 @@ class CallTranslator(CommonTranslator):
         raise UnsupportedException(node, msg)
 
     def _translate_bool(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
         arg_type = self.get_type(node.args[0], ctx)
         bool_stmt, bool_val = self.get_func_or_method_call(arg_type, '__bool__', [target],
@@ -650,12 +657,42 @@ class CallTranslator(CommonTranslator):
             
         if method_name:
             target_method = bytearray_class.get_method(method_name)
-            arg_stmts, arg_vals, arg_types = self.translate_args(target_method, node.args, node.keywords, node, ctx)
+            # The __initFrom*__ factories take no receiver, although the call
+            # node syntactically is a constructor call.
+            arg_stmts, arg_vals, arg_types = self.translate_args(
+                target_method, node.args, node.keywords, node, ctx,
+                implicit_receiver=False)
             constr_call = self.get_method_call(bytearray_class, method_name, arg_vals, arg_types, targets, node, ctx)
             return arg_stmts + constr_call, res_var.ref(node, ctx)
 
         raise UnsupportedException(node, 'Unsupported variant of bytearray().')
 
+
+    def _translate_bytes(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to bytes() of nothing, of bytes, or of an int, a list
+        or a bytearray, which make new bytes.
+        """
+        bytes_class = ctx.module.global_module.classes[BYTES_TYPE]
+        if node.keywords or len(node.args) > 1:
+            raise UnsupportedException(node, 'Unsupported variant of bytes().')
+        if not node.args:
+            empty = self.viper.EmptySeq(self.viper.Ref, self.to_position(node, ctx), self.no_info(ctx))
+            return [], self.get_function_call(bytes_class, '__create__', [empty, self.get_fresh_int_lit(ctx)],
+                                              [None, None], node, ctx)
+        arg_type = self.get_type(node.args[0], ctx)
+        if arg_type.name == BYTES_TYPE:
+            return self.translate_expr(node.args[0], ctx)
+        method_name = {INT_TYPE: '__initFromInt__', LIST_TYPE: '__initFromList__',
+                       BYTEARRAY_TYPE: '__initFromBytearray__'}.get(arg_type.name)
+        if method_name is None:
+            raise UnsupportedException(node, 'Unsupported variant of bytes().')
+        res_var = ctx.current_function.create_variable('bytes', bytes_class, self.translator)
+        target_method = bytes_class.get_method(method_name)
+        arg_stmts, arg_vals, arg_types = self.translate_args(
+            target_method, node.args, node.keywords, node, ctx, implicit_receiver=False)
+        call = self.get_method_call(bytes_class, method_name, arg_vals, arg_types, [res_var.ref()], node, ctx)
+        return arg_stmts + call, res_var.ref(node, ctx)
 
     def _translate_builtin_func(self, node: ast.Call,
                                 ctx: Context) -> StmtsAndExpr:
@@ -663,10 +700,17 @@ class CallTranslator(CommonTranslator):
         Translates a call to a builtin function like len() or isinstance()
         """
         func_name = get_func_name(node)
+        arity = BUILTIN_ARITY.get(func_name)
+        if arity is not None and len(node.args) != arity:
+            raise UnsupportedException(
+                node, '{}() with {} argument(s); only the form with {} is '
+                      'supported'.format(func_name, len(node.args), arity))
         if func_name == 'isinstance':
             return self._translate_isinstance(node, ctx)
         elif func_name == 'super':
             return self._translate_super(node, ctx)
+        elif func_name == 'id':
+            return self._translate_id(node, ctx)
         elif func_name == 'len':
             return self._translate_len(node, ctx)
         elif func_name == 'str':
@@ -691,6 +735,8 @@ class CallTranslator(CommonTranslator):
             return self._translate_cast_func(node, ctx)
         elif func_name == 'bytearray':
             return self._translate_bytearray(node, ctx)
+        elif func_name == 'bytes':
+            return self._translate_bytes(node, ctx)
         else:
             raise UnsupportedException(node, f'unsupported built-in function: {func_name}')
 
@@ -747,9 +793,6 @@ class CallTranslator(CommonTranslator):
             result_var = ctx.current_function.create_variable(
                 target.name + '_res', target.type, self.translator)
             targets.append(result_var.ref())
-        if target.declared_exceptions:
-            error_var = self.get_error_var(node, ctx)
-            targets.append(error_var)
         defined_check = []
         if target.module is not target.module.global_module:
             # Mark the current function as depending on the called method. If we're in
@@ -759,12 +802,7 @@ class CallTranslator(CommonTranslator):
             if self.is_main_method(ctx) and not target.cls:
                 defined_check = self.assert_global_defined(target, ctx.module, node.func,
                                                            ctx)
-        call = self.create_method_call_node(
-            ctx, target.sil_name, args, targets, position, self.no_info(ctx),
-            target_method=target, target_node=node)
-        if target.declared_exceptions:
-            call = call + self.create_exception_catchers(error_var,
-                ctx.actual_function.try_blocks, node, ctx)
+        call = self.call_method(target, args, targets, position, node, ctx)
         return (defined_check + call,
                 result_var.ref(node, ctx) if result_var else None)
 
@@ -859,7 +897,10 @@ class CallTranslator(CommonTranslator):
         # If normal
         if not isinstance(called_func, PythonMethod):
             called_func = self.get_target(node.func, ctx)
-        assert isinstance(called_func, PythonMethod)
+        if not isinstance(called_func, PythonMethod):
+            raise UnsupportedException(
+                node, 'call of a value that is not a function, method or class, '
+                      'e.g. a parameter of type Callable')
         if (isinstance(node.func, ast.Attribute) and
                 get_func_name(node.func.value) == 'super'):
             return True
@@ -953,10 +994,16 @@ class CallTranslator(CommonTranslator):
             if keywords:
                 raise UnsupportedException(node, desc='Keyword arguments in call to '
                                                       'builtin function: ' + target.name)
-            diff = target.nargs - len(unpacked_args)
+            # The receiver of a method call is not among arg_nodes but fills the
+            # first declared parameter; count it, or extra arguments beyond the
+            # modeled arity are silently dropped downstream.
+            diff = target.nargs - len(unpacked_args) - (1 if implicit_receiver else 0)
             if diff < 0:
-                raise UnsupportedException(node, 'Unsupported version of builtin '
-                                                 'function: ' + target.name)
+                modeled = target.nargs - (1 if implicit_receiver else 0)
+                raise UnsupportedException(
+                    node, 'call to builtin function {} with {} argument(s); '
+                          'Nagini models only {}.'.format(
+                              target.name, len(unpacked_args), modeled))
             if diff > 0:
                 null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
                 unpacked_args += [null] * diff
@@ -1129,11 +1176,20 @@ class CallTranslator(CommonTranslator):
 
         for stmt in method.node.body[start:end]:
             stmts += self.translate_stmt(stmt, ctx)
+        stmts += self._translate_inline_end(ctx)
 
         ctx.inlined_calls.remove(method)
         ctx.var_aliases = old_var_aliases
         ctx.label_aliases = old_label_aliases
         return stmts, end_label
+
+    def _translate_inline_end(self, ctx: Context) -> List[Stmt]:
+        """
+        Returns the statements for control that reaches the end of the body of
+        the method being inlined.
+        """
+        return self.translate_function_exit(Exit.NORMAL, self.no_position(ctx),
+                                            ctx)
 
     def _inline_call(self, method: PythonMethod, node: ast.Call, is_super: bool,
                      inline_reason: str, ctx: Context) -> StmtsAndExpr:
@@ -1174,8 +1230,8 @@ class CallTranslator(CommonTranslator):
                                                            method.type,
                                                            self.translator)
         optional_error_var = None
-        error_var = self.get_error_var(node, ctx)
         if method.declared_exceptions or method.inline:
+            error_var = self.get_error_var(node, ctx)
             var = PythonVar(ERROR_NAME, None,
                             ctx.module.global_module.classes['Exception'])
             var._ref = error_var
@@ -1285,7 +1341,20 @@ class CallTranslator(CommonTranslator):
 
             # Must be a function that exists (otherwise mypy would complain)
             # we don't know, so probably some builtin we don't support yet.
-            msg = 'Unsupported builtin function'
+            func_name = get_func_name(node)
+            if isinstance(node.func, ast.Name):
+                builtin_target = getattr(builtins, node.func.id, None)
+                if (isinstance(builtin_target, type) and
+                        issubclass(builtin_target, BaseException)):
+                    raise UnsupportedException(
+                        node, 'builtin exceptions ({}) can only be '
+                              'constructed in a raise statement, Exsures, or '
+                              'except clause.'.format(node.func.id))
+            if func_name == 'pow' and len(node.args) == 3:
+                raise UnsupportedException(
+                    node, 'the 3-argument form of pow() is not modeled.')
+            msg = ("Unsupported builtin function '{}'".format(func_name)
+                   if func_name else 'Unsupported builtin function')
             if ctx.actual_function.method_type == MethodType.class_method:
                 msg += ' or indirect call of classmethod argument'
             raise UnsupportedException(node, msg + '.')
@@ -1388,7 +1457,7 @@ class CallTranslator(CommonTranslator):
                 target_name = family_root.get_predicate(name).sil_name
             perm = self.viper.FullPerm(position, self.no_info(ctx))
             if not impure:
-                raise InvalidProgramException(node, 'invalid.contract.position')
+                raise InvalidProgramException(node, 'permission.in.pure.context')
             return arg_stmts, self.create_predicate_access(target_name, args,
                                                            perm, node, ctx)
         elif target.pure:
@@ -1446,6 +1515,9 @@ class CallTranslator(CommonTranslator):
             elif func_name in OBLIGATION_CONTRACT_FUNCS:
                 return self.translate_obligation_contractfunc_call(node, ctx, impure)
             elif func_name in BUILTINS:
+                if func_name == 'id' and self.get_target(node.func, ctx) is not None:
+                    # A user-defined function named 'id' shadows the builtin.
+                    return self.translate_normal_call_node(node, ctx, impure)
                 return self._translate_builtin_func(node, ctx)
             elif func_name == "Thread":
                 return self._translate_thread_creation(node, ctx)

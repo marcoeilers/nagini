@@ -8,12 +8,17 @@
 function str___len__(self: Ref): Int
     decreases _
 	ensures result >= 0
+{
+    |str___val__(self)|
+}
 
+// The code points of the string.
 function str___val__(self: Ref): Seq[Int]
     decreases _
 
 function str___create__(len: Int, value: Seq[Int]) : Ref
     decreases _
+    requires len == |value|
 	ensures str___len__(result) == len
 	ensures str___val__(result) == value
 	ensures typeof(result) == str()
@@ -38,6 +43,226 @@ function str___add__(self: Ref, other: Ref): Ref
     ensures typeof(result) == str()
     ensures str___val__(result) == str___val__(self) ++ str___val__(other)
 
+function str___getitem__(self: Ref, index: Int): Ref
+    decreases _
+    requires issubtype(typeof(self), str())
+    requires @error("String index may be out of range.")(index >= 0 ==> index < str___len__(self))
+    requires @error("String index may be out of range.")(index < 0 ==> index >= -str___len__(self))
+    ensures typeof(result) == str()
+    ensures index >= 0 ==> str___val__(result) == Seq(str___val__(self)[index])
+    ensures index < 0 ==> str___val__(result) == Seq(str___val__(self)[str___len__(self) + index])
+
+// A bound outside the string is cut to fit, as Python does: taking and dropping are total on sequences.
+function str___getitem_slice__(self: Ref, index: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), str())
+    requires issubtype(typeof(index), slice())
+    ensures typeof(result) == str()
+    ensures str___val__(result) == str___val__(self)[slice___start__(index, str___len__(self))..slice___stop__(index, str___len__(self))]
+
+// item in self: item occurs in self as a substring.
+function str___contains__(self: Ref, item: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), str())
+    requires issubtype(typeof(item), str())
+{
+    str___occurs__(str___val__(item), str___val__(self))
+}
+
+// Whether sub occurs in s as a contiguous subsequence.
+function str___occurs__(sub: Seq[Int], s: Seq[Int]): Bool
+    decreases _
+    ensures result == (exists i: Int, j: Int :: { s[i..j] } 0 <= i && i <= j && j <= |s| && s[i..j] == sub)
+    ensures result ==> |sub| <= |s|
+    ensures |sub| == 0 ==> result
+    ensures |sub| == 1 ==> result == (sub[0] in s)
+    ensures sub == s ==> result
+
+function str_startswith(self: Ref, prefix: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), str())
+    requires issubtype(typeof(prefix), str())
+{
+    str___len__(prefix) <= str___len__(self) && str___val__(self)[..str___len__(prefix)] == str___val__(prefix)
+}
+
+function str_endswith(self: Ref, suffix: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), str())
+    requires issubtype(typeof(suffix), str())
+{
+    str___len__(suffix) <= str___len__(self) &&
+    str___val__(self)[str___len__(self) - str___len__(suffix)..] == str___val__(suffix)
+}
+
+function str___mul__(self: Ref, factor: Int): Ref
+    decreases _
+    requires issubtype(typeof(self), str())
+    ensures typeof(result) == str()
+    ensures str___val__(result) == str___mul__helper(str___val__(self), factor)
+
+// The sequence repeated factor times, empty for a factor below one.
+function str___mul__helper(seq: Seq[Int], factor: Int): Seq[Int]
+    decreases _
+    ensures |result| == (factor <= 0 ? 0 : factor * |seq|)
+{
+    (factor <= 0 ? Seq[Int]() : (factor == 1 ? seq : str___mul__helper(seq, factor - 1) ++ seq))
+}
+
+function str_lower(self: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), str())
+    ensures typeof(result) == str()
+    ensures str___val__(result) == str___lower__(str___val__(self))
+
+function str_upper(self: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), str())
+    ensures typeof(result) == str()
+    ensures str___val__(result) == str___upper__(str___val__(self))
+
+// The case mappings are Unicode's: they may change the length.
+function str___lower__(s: Seq[Int]): Seq[Int]
+    decreases _
+
+function str___upper__(s: Seq[Int]): Seq[Int]
+    decreases _
+
+function str_strip(self: Ref, chars: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), str())
+    requires chars == null || issubtype(typeof(chars), str())
+    ensures typeof(result) == str()
+    ensures chars == null ==> str___val__(result) == str___strip__(str___val__(self))
+    ensures chars != null ==> str___val__(result) == str___strip_chars__(str___val__(self), str___val__(chars))
+
+// Without the whitespace at both ends; below, without the code points of chars there.
+function str___strip__(s: Seq[Int]): Seq[Int]
+    decreases _
+    ensures |result| <= |s|
+
+function str___strip_chars__(s: Seq[Int], chars: Seq[Int]): Seq[Int]
+    decreases _
+    ensures |result| <= |s|
+
+function str_lstrip(self: Ref, chars: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), str())
+    requires chars == null || issubtype(typeof(chars), str())
+    ensures typeof(result) == str()
+    ensures chars == null ==> str___val__(result) == str___lstrip__(str___val__(self))
+    ensures chars != null ==> str___val__(result) == str___lstrip_chars__(str___val__(self), str___val__(chars))
+
+// Without the whitespace at the start; below, without the code points of chars there.
+function str___lstrip__(s: Seq[Int]): Seq[Int]
+    decreases _
+    ensures |result| <= |s|
+
+function str___lstrip_chars__(s: Seq[Int], chars: Seq[Int]): Seq[Int]
+    decreases _
+    ensures |result| <= |s|
+
+function str_rstrip(self: Ref, chars: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), str())
+    requires chars == null || issubtype(typeof(chars), str())
+    ensures typeof(result) == str()
+    ensures chars == null ==> str___val__(result) == str___rstrip__(str___val__(self))
+    ensures chars != null ==> str___val__(result) == str___rstrip_chars__(str___val__(self), str___val__(chars))
+
+// Without the whitespace at the end; below, without the code points of chars there.
+function str___rstrip__(s: Seq[Int]): Seq[Int]
+    decreases _
+    ensures |result| <= |s|
+
+function str___rstrip_chars__(s: Seq[Int], chars: Seq[Int]): Seq[Int]
+    decreases _
+    ensures |result| <= |s|
+
+function str_replace(self: Ref, target: Ref, replacement: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), str())
+    requires issubtype(typeof(target), str())
+    requires issubtype(typeof(replacement), str())
+    ensures typeof(result) == str()
+    ensures str___val__(result) == str___replace__(str___val__(self), str___val__(target), str___val__(replacement))
+
+function str___replace__(s: Seq[Int], target: Seq[Int], replacement: Seq[Int]): Seq[Int]
+    decreases _
+    ensures !str___occurs__(target, s) ==> result == s
+
+function str_isdigit(self: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), str())
+{
+    str___isdigit__(str___val__(self))
+}
+
+function str___isdigit__(s: Seq[Int]): Bool
+    decreases _
+    ensures |s| == 0 ==> !result
+
+function str_isalpha(self: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), str())
+{
+    str___isalpha__(str___val__(self))
+}
+
+function str___isalpha__(s: Seq[Int]): Bool
+    decreases _
+    ensures |s| == 0 ==> !result
+
+function str_isalnum(self: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), str())
+{
+    str___isalnum__(str___val__(self))
+}
+
+function str___isalnum__(s: Seq[Int]): Bool
+    decreases _
+    ensures |s| == 0 ==> !result
+
+function str_isupper(self: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), str())
+{
+    str___isupper__(str___val__(self))
+}
+
+function str___isupper__(s: Seq[Int]): Bool
+    decreases _
+    ensures |s| == 0 ==> !result
+
+function str_islower(self: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), str())
+{
+    str___islower__(str___val__(self))
+}
+
+function str___islower__(s: Seq[Int]): Bool
+    decreases _
+    ensures |s| == 0 ==> !result
+
+function str_isspace(self: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), str())
+{
+    str___isspace__(str___val__(self))
+}
+
+function str___isspace__(s: Seq[Int]): Bool
+    decreases _
+    ensures |s| == 0 ==> !result
+
+function ord(c: Ref): Int
+    decreases _
+    requires issubtype(typeof(c), str())
+    requires @error("ord() takes a string of length one.")(str___len__(c) == 1)
+    ensures result == str___val__(c)[0]
+
 function str_join(self: Ref, other: Ref): Ref
     decreases _
     requires issubtype(typeof(self), str())
@@ -57,8 +282,9 @@ method str___format__(self: Ref, other: Ref) returns (_res: Ref)
     requires issubtype(typeof(other), str())
     ensures issubtype(typeof(_res), str())
     
-method str_split(self: Ref) returns (res: Ref)
+method str_split(self: Ref, sep: Ref) returns (res: Ref)
     decreases _
     requires issubtype(typeof(self), str())
+    requires sep == null || (issubtype(typeof(sep), str()) && str___len__(sep) > 0)
     ensures issubtype(typeof(res), list(str()))
     ensures acc(res.list_acc)

@@ -15,12 +15,51 @@ function bytes___len__(self: Ref): Int
 
 function bytes___val__(self: Ref): Seq[Ref]
     decreases _
+    ensures forall i: Int :: { result[i] } 0 <= i < |result| ==> typeof(result[i]) == int() && int___byte_bounds__(int___unbox__(result[i]))
 
+// Called only by the translator, for a literal and bytes(), whose elements are in bounds as bytes___val__
+// has them: a precondition that says so is slow to check on a long literal.
 function bytes___create__(value: Seq[Ref], ctr: Int) : Ref
     decreases _
     ensures typeof(result) == bytes()
 	ensures bytes___len__(result) == |value|
 	ensures bytes___val__(result) == value
+
+method bytes___initFromInt__(length: Ref) returns (res: Ref)
+    requires issubtype(typeof(length), int())
+    requires int___unbox__(length) >= 0
+    ensures typeof(res) == bytes()
+    ensures bytes___len__(res) == int___unbox__(length)
+    ensures forall i: Int :: { bytes___val__(res)[i] } 0 <= i < int___unbox__(length) ==> bytes___val__(res)[i] == __prim__int___box__(0)
+    ensures Low(length) ==> Low(res)
+
+method bytes___initFromList__(values: Ref) returns (res: Ref)
+    requires issubtype(typeof(values), list(int()))
+    requires acc(values.list_acc, 1/1000)
+    requires forall i: Int :: {values.list_acc[i]} ((0 <= i < list___len__(values)) ==> int___byte_bounds__(int___unbox__(list___getitem__(values, __prim__int___box__(i)))))
+    ensures acc(values.list_acc, 1/1000)
+    ensures typeof(res) == bytes()
+    ensures bytes___len__(res) == list___len__(values)
+    ensures forall i: Int :: { bytes___val__(res)[i] } 0 <= i < list___len__(values) ==> bytes___val__(res)[i] == __prim__int___box__(int___unbox__(list___getitem__(values, __prim__int___box__(i))))
+    ensures Low(values) ==> Low(res)
+
+method bytes___initFromBytearray__(other: Ref) returns (res: Ref)
+    requires issubtype(typeof(other), bytearray())
+    requires acc(other.bytearray_acc, 1/1000)
+    ensures acc(other.bytearray_acc, 1/1000)
+    ensures typeof(res) == bytes()
+    ensures bytes___val__(res) == bytearray___sil_seq__(other)
+    ensures Low(other) ==> Low(res)
+
+method bytes___iter__(self: Ref) returns (_res: Ref)
+    requires issubtype(typeof(self), bytes())
+    ensures _res != self
+    ensures acc(_res.list_acc, 1 / 20)
+    ensures _res.list_acc == bytes___sil_seq__(self)
+    ensures acc(_res.__container, write) && (_res.__container == self)
+    ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
+    ensures acc(_res.__previous, write) && _res.__previous == Seq[Ref]()
+    ensures issubtype(typeof(_res), Iterator(int()))
 
 function bytes___bool__(self: Ref) : Bool
     decreases _

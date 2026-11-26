@@ -6,6 +6,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import ast
+import builtins
 
 from abc import ABCMeta
 from nagini_translation.lib.constants import (
@@ -13,6 +14,7 @@ from nagini_translation.lib.constants import (
     ASSERTING_FUNC,
     COMBINE_NAME_FUNC,
     DICT_TYPE,
+    END_LABEL,
     FLOAT_TYPE,
     INT_TYPE,
     IS_DEFINED_FUNC,
@@ -41,7 +43,6 @@ from nagini_translation.lib.program_nodes import (
     OptionalType,
     PythonClass,
     PythonField,
-    PythonIOOperation,
     PythonMethod,
     PythonModule,
     PythonNode,
@@ -49,8 +50,10 @@ from nagini_translation.lib.program_nodes import (
     PythonVar,
     toposort_classes,
     UnionType,
+    Exit,
+    PythonTryBlock,
 )
-from nagini_translation.lib.resolver import get_target as do_get_target
+from nagini_translation.lib.resolver import get_target as do_get_target, lookup_scopes
 from nagini_translation.lib.typedefs import (
     Expr,
     FuncApp,
@@ -60,7 +63,7 @@ from nagini_translation.lib.typedefs import (
     StmtsAndExpr,
 )
 from nagini_translation.lib.util import (
-    get_surrounding_try_blocks,
+    get_exit_frames,
     InvalidProgramException,
     isStr,
     string_to_int,
@@ -166,11 +169,13 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                                 position=e.pos())
         return result
 
-    def to_bool(self, e: Expr, ctx: Context, node: ast.AST = None) -> Expr:
+    def to_bool(self, e: Expr, ctx: Context, node: ast.AST = None,
+                node_type: PythonType = None) -> Expr:
         """
         Converts the given expression to an expression of the Silver type Bool
         if it isn't already, either by calling __bool__ on an object and
         possibly unboxing the result, or by undoing a previous boxing operation.
+        The type of e is node_type if given, else that of node.
         """
         # Avoid wrapping non-pure expressions (leads to errors within Silver's
         # Consistency object)
@@ -186,7 +191,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         result = e
         call_bool = True
         if node:
-            node_type = self.get_type(node, ctx)
+            if not node_type:
+                node_type = self.get_type(node, ctx)
             if node_type.name == 'bool':
                 call_bool = False
             if call_bool:
@@ -445,6 +451,20 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return [decl_id]
         return []
 
+    @staticmethod
+    def _is_runtime_defined(declaration: PythonNode) -> bool:
+        """
+        True for class declarations without a defining statement in any analyzed
+        module whose name the Python runtime supplies itself (e.g. unmodeled
+        builtin exception classes like ValueError). These names are defined
+        before any module-level code runs, so definedness checks for them must
+        trivially succeed; no module's names-set ever contains them, so an
+        emitted set-membership check would be unsatisfiable instead.
+        """
+        cls = getattr(declaration, 'python_class', None)
+        return (isinstance(cls, PythonClass) and cls.node is None and
+                hasattr(builtins, cls.name))
+
     def _get_global_definedness_conditions(self, declaration: PythonNode,
                                            module: PythonModule, ref_node: ast.AST,
                                            ctx: Context) -> Tuple[Expr, Expr]:
@@ -459,9 +479,11 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         module_set = module.names_var[1]
         decl_ids = self.extract_identifiers(ref_node, pos, info)
         contains = self.viper.TrueLit(pos, info)
-        for decl_id in decl_ids:
-            contains = self.viper.And(contains, self._is_defined(decl_id, module_set, pos,
-                                                                 info), pos, info)
+        if not self._is_runtime_defined(declaration):
+            for decl_id in decl_ids:
+                contains = self.viper.And(contains,
+                                          self._is_defined(decl_id, module_set, pos,
+                                                           info), pos, info)
         deps = set()
         if isinstance(declaration, (PythonMethod, PythonClass)):
             called = declaration
@@ -473,6 +495,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         pos = self.to_position(ref_node, ctx, error_string=msg)
         deps_defined = self.viper.TrueLit(pos, info)
         for ref, decl, mod, *conds in deps:
+            if self._is_runtime_defined(decl):
+                continue
             module_set = mod.names_var[1]
             decl_ids = self.extract_identifiers(ref, pos, info)
             for decl_id in decl_ids:
@@ -839,6 +863,9 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             func = ctx.module.methods[func_name]
         if not func:
             raise InvalidProgramException(node, 'unknown.method.called')
+        if func.interface and len(args) > len(func.get_args()):
+            raise UnsupportedException(
+                node, 'this call arity is not supported by the builtin model')
         actual_args = []
         for arg, param, _ in zip(args, func.get_args(), arg_types):
             if param.type.name == PRIMITIVE_BOOL_TYPE:
@@ -848,11 +875,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             else:
                 actual_arg = self.to_ref(arg, ctx)
             actual_args.append(actual_arg)
-        sil_name = func.sil_name
-        call = self.create_method_call_node(
-            ctx, sil_name, actual_args, targets, self.to_position(node, ctx),
-            self.no_info(ctx), target_method=func, target_node=node)
-        return call
+        return self.call_method(func, actual_args, targets,
+                                self.to_position(node, ctx), node, ctx)
 
     def get_method_call(self, receiver: PythonType,
                         func_name: str, args: List[Expr],
@@ -893,26 +917,121 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return self._get_method_call(receiver, func_name, args, arg_types,
                                          targets, node, ctx)
 
+    def call_method(self, target: PythonMethod, args: List[Expr],
+                    targets: List['silver.ast.LocalVarRef'],
+                    position: 'silver.ast.Position', node: ast.AST,
+                    ctx: Context) -> List[Stmt]:
+        """
+        Calls the impure method target, assigning its result to targets. An
+        exception it raises goes to the handlers protecting node or to the
+        caller.
+        """
+        if not target.declared_exceptions:
+            return self.create_method_call_node(
+                ctx, target.sil_name, args, targets, position, self.no_info(ctx),
+                target_method=target, target_node=node)
+        error_var = self.get_error_var(node, ctx)
+        call = self.create_method_call_node(
+            ctx, target.sil_name, args, targets + [error_var], position,
+            self.no_info(ctx), target_method=target, target_node=node)
+        return call + self.create_exception_catchers(
+            error_var, ctx.actual_function.try_blocks, node, ctx)
+
     def get_error_var(self, stmt: ast.AST,
                       ctx: Context) -> 'silver.ast.LocalVarRef':
         """
-        Returns the error variable of the try-block protecting stmt, otherwise
-        the error return variable of the surrounding function, otherwise
-        creates a new local variable of type Exception.
+        Returns the variable that holds the exception the current function is
+        raising at stmt, until a handler catches it or the function is left.
         """
-        tries = get_surrounding_try_blocks(ctx.actual_function.try_blocks,
-                                           stmt)
-        if tries:
-            err_var = tries[0].get_error_var(self.translator)
-            if err_var.sil_name in ctx.var_aliases:
-                err_var = ctx.var_aliases[err_var.sil_name]
-            return err_var.ref()
-        if ctx.actual_function.declared_exceptions or ctx.actual_function.inline:
-            return ctx.error_var.ref()
+        if ctx.error_var is None:
+            raise UnsupportedException(
+                stmt, 'exception that may be raised at module level')
+        return ctx.error_var.ref()
+
+    def _get_try_block(self, node: ast.AST, ctx: Context) -> PythonTryBlock:
+        for block in ctx.actual_function.try_blocks:
+            if block.node is node:
+                return block
+        return None
+
+    def translate_exit(self, exit: Exit, node: ast.AST,
+                       ctx: Context) -> List[Stmt]:
+        """
+        Returns the statements that take control from node, which is being
+        left by exit, to where it goes next: a handler, the entry of the
+        innermost finally block around node, the loop that is left or
+        continued, or the end of the function. When raising, the exception is
+        in the error variable.
+        """
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        handlers = []
+        target = None
+        for stmt, field in get_exit_frames(node):
+            if isinstance(stmt, (ast.While, ast.For)):
+                if exit is Exit.BREAK:
+                    target = stmt.post_label
+                elif exit is Exit.CONTINUE:
+                    target = stmt.end_label
+            elif field != 'finalbody':
+                block = self._get_try_block(stmt, ctx)
+                if exit is Exit.RAISE and field == 'body':
+                    handlers.extend(block.handlers)
+                if block.has_finally:
+                    target = ctx.get_label_name(block.entry_names[exit])
+            if target:
+                break
+        if target:
+            result = [self.viper.Goto(target, position, info)]
         else:
-            new_var = ctx.current_function.create_variable('error',
-                ctx.module.global_module.classes['Exception'], self.translator)
-            return new_var.ref()
+            result = self.translate_function_exit(exit, position, ctx)
+        for handler in reversed(handlers):
+            handler_pos = self.to_position(handler.node, ctx)
+            condition_pos = self.to_position(
+                handler.node, ctx,
+                error_string='isinstance(RaisedException(), {0})'.format(
+                    handler.exception.name))
+            condition = self.type_check(self.get_error_var(node, ctx),
+                                        handler.exception, condition_pos, ctx,
+                                        inhale_exhale=False)
+            goto = self.viper.Goto(ctx.get_label_name(handler.name),
+                                   handler_pos, info)
+            result = [self.viper.If(
+                condition, self.translate_block([goto], position, info),
+                self.translate_block(result, position, info), handler_pos,
+                info)]
+        return result
+
+    def translate_function_exit(self, exit: Exit,
+                                position: 'silver.ast.Position',
+                                ctx: Context) -> List[Stmt]:
+        """
+        Returns the statements that leave the current function by exit, where
+        NORMAL stands for control reaching the end of its body. The result
+        of a return is in the result variable already.
+        """
+        assert exit in (Exit.NORMAL, Exit.RETURN, Exit.RAISE)
+        info = self.no_info(ctx)
+        function = ctx.actual_function
+        result = []
+        if exit is Exit.RAISE:
+            if not (function.declared_exceptions or function.inline):
+                error_string = '"method raises no exceptions"'
+                error_pos = self.to_position(function.node, ctx, error_string)
+                result.append(self.viper.Exhale(
+                    self.viper.FalseLit(error_pos, info), error_pos, info))
+        else:
+            no_position = self.no_position(ctx)
+            null = self.viper.NullLit(no_position, info)
+            if exit is Exit.NORMAL and ctx.result_var:
+                result.append(self.viper.LocalVarAssign(
+                    ctx.result_var.ref(), null, no_position, info))
+            if ctx.error_var is not None:
+                result.append(self.viper.LocalVarAssign(
+                    ctx.error_var.ref(), null, no_position, info))
+        result.append(self.viper.Goto(ctx.get_label_name(END_LABEL), position,
+                                      info))
+        return result
 
     def var_type_check(self, name: str, type: PythonType,
                        position: 'silver.ast.Position',
@@ -955,13 +1074,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             ctx.var_aliases = var_aliases
             ctx.label_aliases = lbl_aliases
             ctx.inlined_calls.append(added_method)
-            for block in added_method.try_blocks:
-                for handler in block.handlers:
-                    stmts += self.translate_handler(handler, ctx)
-                if block.else_block:
-                    stmts += self.translate_handler(block.else_block, ctx)
-                if block.finally_block:
-                    stmts += self.translate_finally(block, ctx)
+            stmts += self.translate_try_handlers(added_method, ctx)
             ctx.inlined_calls.remove(added_method)
         ctx.added_handlers = []
         ctx.var_aliases = old_var_valiases
@@ -993,23 +1106,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return False
 
     def get_target(self, node: ast.AST, ctx: Context) -> PythonModule:
-        container = ctx.actual_function if ctx.actual_function else ctx.module
-        containers = [ctx]
-        current_class = ctx.current_class
-        class_scopes = []
-        while current_class:
-            class_scopes.append(current_class)
-            current_class = current_class.superscope if isinstance(current_class.superscope, PythonClass) else None
-        # Innermost first, so that a nested class shadows an enclosing one.
-        containers[1:1] = class_scopes
-        if isinstance(container, (PythonMethod, PythonIOOperation)):
-            containers.append(container)
-            containers.extend(container.module.get_included_modules())
-        else:
-            # Assume module
-            containers.extend(container.get_included_modules(()))
-        result = do_get_target(node, containers, container)
-        return result
+        containers, container = lookup_scopes(ctx)
+        return do_get_target(node, containers, container)
 
     def get_fresh_int_lit(self, ctx: Context) -> Expr:
         """

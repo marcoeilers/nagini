@@ -11,6 +11,7 @@ from typing import (
     Any,
     Callable,
     Dict,
+    Iterable,
     List,
     Optional,
     Tuple,
@@ -20,6 +21,79 @@ from typing import (
 
 T = TypeVar('T')
 V = TypeVar('V')
+
+
+TYPING_MODULES = ('typing', 'typing_extensions')
+
+# What an UnsupportedException says of any other use of TYPE_CHECKING.
+TYPE_CHECKING_USE = ('TYPE_CHECKING is only supported as the test of a '
+                     'module-level if without else that holds only imports')
+
+
+def is_type_checking(node: ast.expr, module: ast.Module) -> bool:
+    """
+    Whether the expression is typing.TYPE_CHECKING by the imports of the
+    module: a constant that is False when the program runs, and True for the
+    type checker.
+    """
+    def binds(stmt: ast.stmt, bound: str, name: str) -> bool:
+        return any(alias.name == name and (alias.asname or alias.name) == bound
+                   for alias in stmt.names)
+
+    if isinstance(node, ast.Name):
+        return any(isinstance(stmt, ast.ImportFrom) and
+                   stmt.module in TYPING_MODULES and
+                   binds(stmt, node.id, 'TYPE_CHECKING')
+                   for stmt in module.body)
+    if (isinstance(node, ast.Attribute) and node.attr == 'TYPE_CHECKING' and
+            isinstance(node.value, ast.Name)):
+        return any(isinstance(stmt, ast.Import) and
+                   any(binds(stmt, node.value.id, name) for name in TYPING_MODULES)
+                   for stmt in module.body)
+    return False
+
+
+def is_type_checking_block(stmt: ast.stmt, module: ast.Module) -> bool:
+    """
+    Whether the statement is an `if TYPE_CHECKING:` at module level, whose
+    body is never run and holds the imports only the annotations need.
+    """
+    return (isinstance(stmt, ast.If) and is_type_checking(stmt.test, module) and
+            any(stmt is other for other in module.body))
+
+
+def unsupported_under_type_checking(block: ast.If) -> Optional[ast.stmt]:
+    """
+    The first statement of an `if TYPE_CHECKING:` block that is not supported:
+    one of its body that is no import, or one of its else. Nothing that runs
+    may depend on the constant: the type checker takes the other value for it
+    and does not check what it skips.
+    """
+    refused = [stmt for stmt in block.body
+               if not isinstance(stmt, (ast.Import, ast.ImportFrom, ast.Pass))]
+    return next(iter(refused + block.orelse), None)
+
+
+def typed_statements(module: ast.Module) -> Iterable[ast.stmt]:
+    """
+    The statements at module level as a type checker reads them: with those
+    of each `if TYPE_CHECKING:` block.
+    """
+    for stmt in module.body:
+        yield stmt
+        if is_type_checking_block(stmt, module):
+            yield from stmt.body
+
+
+def defers_annotations(module: Optional[ast.Module]) -> bool:
+    """
+    Whether the module has `from __future__ import annotations`, with which
+    no annotation is evaluated.
+    """
+    return module is not None and any(
+        isinstance(stmt, ast.ImportFrom) and stmt.module == '__future__' and
+        any(alias.name == 'annotations' for alias in stmt.names)
+        for stmt in module.body)
 
 
 def flatten(lists: List[List[T]]) -> List[T]:
@@ -58,6 +132,10 @@ class UnsupportedException(Exception):
             desc = type(ast_element).__name__
         self.desc = desc
         super().__init__(desc)
+
+
+UNKNOWN_ELEMENT_TYPE = ('collection whose element type is not known, e.g. the '
+                        'result of dict.keys() or dict.values()')
 
 
 class InvalidProgramException(Exception):
@@ -135,6 +213,37 @@ def get_column(node: ast.AST) -> Optional[int]:
     return node.col_offset if hasattr(node, 'col_offset') else None
 
 
+def char_columns(source: str) -> Callable[[int, int], int]:
+    """
+    The function from a line of the given source and a column the parser
+    reports in it, a UTF-8 byte offset, to the character offset.
+    """
+    lines = {number: line.encode('utf-8')
+             for number, line in enumerate(source.split('\n'), 1)
+             if not line.isascii()}
+
+    def char_column(line: int, column: int) -> int:
+        if line not in lines:
+            return column
+        return len(lines[line][:column].decode('utf-8'))
+    return char_column
+
+
+def use_char_columns(tree: ast.AST, source: str) -> None:
+    """
+    Converts the column offsets of all nodes of the given AST of the given
+    source to character offsets.
+    """
+    char_column = char_columns(source)
+    for node in ast.walk(tree):
+        for line_attr, col_attr in (('lineno', 'col_offset'),
+                                    ('end_lineno', 'end_col_offset')):
+            line = getattr(node, line_attr, None)
+            col = getattr(node, col_attr, None)
+            if line is not None and col is not None:
+                setattr(node, col_attr, char_column(line, col))
+
+
 def contains_stmt(container: Any, contained: ast.AST) -> bool:
     """
     Checks if 'contained' is a part of the partial AST
@@ -156,21 +265,30 @@ def contains_stmt(container: Any, contained: ast.AST) -> bool:
         return False
 
 
-def get_surrounding_try_blocks(try_blocks: List['PythonTryBlock'],
-                               stmt: ast.AST) -> List['PythonTryBlock']:
+def get_exit_frames(node: ast.AST) -> List[Tuple[ast.AST, str]]:
     """
-    Finds the try blocks in try_blocks that protect the statement stmt.
+    Returns the try, with and loop statements of the function that node is in,
+    innermost first, each with the name of its field that holds node. These
+    are the statements that control passes when it leaves node other than by
+    going on to the next statement.
     """
-    def rank(b: 'PythonTryBlock', blocks: List['PythonTryBlock']) -> int:
-        result = 0
-        for b2 in blocks:
-            if contains_stmt(b2.protected_region, b.node):
-                result += 1
-        return -result
-    tb = try_blocks
-    blocks = [b for b in tb if contains_stmt(b.protected_region, stmt)]
-    inner_to_outer = sorted(blocks,key=lambda b: rank(b, blocks))
-    return inner_to_outer
+    frames = []
+    child = node
+    parent = node._parent
+    while not isinstance(parent, (ast.FunctionDef, ast.Lambda, ast.ClassDef,
+                                  ast.Module)):
+        if isinstance(parent, (ast.Try, ast.With, ast.While, ast.For)):
+            if isinstance(parent, ast.Try):
+                fields = ['body', 'handlers', 'orelse', 'finalbody']
+            else:
+                # The else block of a loop is not part of the loop.
+                fields = ['body']
+            for field in fields:
+                if child in getattr(parent, field):
+                    frames.append((parent, field))
+        child = parent
+        parent = parent._parent
+    return frames
 
 
 def is_invariant(stmt: ast.AST) -> bool:

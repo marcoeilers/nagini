@@ -7,12 +7,12 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import argparse
 import ast
+import hashlib
 import inspect
 import json
 import logging
 import os
 import sys
-import re
 import time
 import traceback
 
@@ -24,8 +24,10 @@ from nagini_translation.ghost.extraction import ProgramExtractor
 from nagini_translation.lib.context import Context
 from nagini_translation.sif_translator import SIFTranslator
 from nagini_translation.lib import config
+from nagini_translation.lib import phases
 from nagini_translation.lib.constants import DEFAULT_SERVER_SOCKET
 from nagini_translation.lib.errors import error_manager, format_translation_error
+from nagini_translation.lib.errors.messages import invalid_program_message
 from nagini_translation.lib.jvmaccess import (
     getclass,
     getobject,
@@ -33,7 +35,7 @@ from nagini_translation.lib.jvmaccess import (
     JVMStartupError
 )
 from nagini_translation.lib.typedefs import Program
-from nagini_translation.lib.typeinfo import TypeException, TypeInfo
+from nagini_translation.lib.typeinfo import TypeException, TypeInfo, type_error
 from nagini_translation.lib.util import (
     ConsistencyException,
     InvalidProgramException,
@@ -55,19 +57,7 @@ from nagini_translation.verifier import (
     ViperVerifier
 )
 from nagini_translation import verifier
-from typing import List, Set, Tuple, Union
-
-
-# Matches a mypy error line. The column and end-position fields are optional:
-# mypy only emits them when show_column_numbers/show_error_end are set, and some
-# type errors Nagini raises itself carry only a line. The file group is
-# non-greedy so a Windows drive letter (``C:\...``) or a ``: error:`` inside the
-# message does not get mistaken for the line/column separators.
-TYPE_ERROR_PATTERN = (
-    r"^(?P<file>.*?):(?P<line>\d+)"
-    r"(?::(?P<col>\d+)(?::(?P<end_line>\d+):(?P<end_col>\d+))?)?"
-    r": error: (?P<msg>.*)$")
-TYPE_ERROR_MATCHER = re.compile(TYPE_ERROR_PATTERN)
+from typing import Dict, List, Set, Tuple, Union
 
 
 def parse_sil_file(sil_path: str, bv_path: str, bv_size: int, jvm, float_option: str = None):
@@ -115,9 +105,12 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
               sif: bool = False, arp: bool = False, ignore_global: bool = False,
               reload_resources: bool = False, verbose: bool = False, skip_verification: bool = False,
               extraction: bool = False, check_consistency: bool = False, float_encoding: str = None,
-              counterexample: bool = False) -> Tuple[List['PythonModule'], Program]:
+              counterexample: bool = False,
+              erased: Dict[str, Dict[str, str]] = None) -> Tuple[List['PythonModule'], Program]:
     """
-    Translates the Python module at the given path to a Viper program
+    Translates the Python module at the given path to a Viper program. If given,
+    erased is filled with the ghost-erased text of every analyzed file, along
+    with the SHA-256 hash of the text it was extracted from.
     """
     path = os.path.abspath(path)
     error_manager.clear()
@@ -133,10 +126,17 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
     if sif and not viper_ast.is_extension_available():
         raise Exception('Viper AST SIF extension not found on classpath.')
     types = TypeInfo()
-    type_correct = types.check(path, base_dir)
+    with phases.phase('typecheck'):
+        try:
+            type_correct = types.check(path, base_dir)
+        except RecursionError:
+            raise UnsupportedException(
+                None, 'program nested too deeply for the type analysis, e.g. a '
+                      'chain of several hundred elif branches')
     if not type_correct:
         return None
 
+    translate_start, translate_cpu_start = time.time(), time.thread_time()
     analyzer = Analyzer(types, path, selected)
     main_module = analyzer.module
     with open(os.path.join(builtins_index_path, 'builtins.json'), 'r') as file:
@@ -168,6 +168,17 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
         global sil_programs
         sil_programs = load_sil_files(jvm, bv_size, sif, float_encoding)
 
+    if erased is not None:
+        with phases.phase('erase'):
+            program_extractor = ProgramExtractor(modules)
+            for file, text in analyzer.sources.items():
+                extr_module = program_extractor.process_module(analyzer.modules[file])
+                if extr_module is not None:
+                    erased[file] = {
+                        'sha256': hashlib.sha256(text.encode()).hexdigest(),
+                        'text': ast.unparse(extr_module),
+                    }
+
     if extraction:
         program_extractor = ProgramExtractor(modules)
         extr_prog = program_extractor.process()
@@ -176,6 +187,13 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
 
     prog = translator.translate_program(modules, sil_programs, selected,
                                         arp=arp, ignore_global=ignore_global, sif=sif, float_encoding=float_encoding)
+    # The erasure and the chopper inside translate_program time themselves;
+    # report the rest.
+    phases.record('translate',
+                  time.time() - translate_start
+                  - sum(phases.phases().get(p, 0.0) for p in ('erase', 'chop')),
+                  time.thread_time() - translate_cpu_start
+                  - sum(phases.cpu().get(p, 0.0) for p in ('erase', 'chop')))
     if skip_verification:
         return modules, None
     if sif:
@@ -543,6 +561,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
         start = time.time()
         if selected is None:
             selected = set(args.select.split(',')) if args.select else set()
+        phases.reset()
         modules, prog = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif, base_dir=base_dir,
                                   ignore_global=args.ignore_global, arp=arp, verbose=args.verbose, skip_verification=args.skip_verification,
                                   extraction=args.extraction, counterexample=args.counterexample, float_encoding=args.float_encoding)
@@ -579,10 +598,11 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                 submitter = jvm.viper.silver.utility.ManualProgramSubmitter(True, "", "Nagini", backend.name.capitalize(), viper_args)
                 submitter.setProgram(prog)
 
-            vresult = verify(modules, prog, python_file, jvm, viper_args,
-                             backend=backend, arp=arp, counterexample=args.counterexample,
-                             sif=args.sif, disable_branch_conditions=args.disable_branch_conditions)
-            
+            with phases.phase('verify'):
+                vresult = verify(modules, prog, python_file, jvm, viper_args,
+                                 backend=backend, arp=arp, counterexample=args.counterexample,
+                                 sif=args.sif, disable_branch_conditions=args.disable_branch_conditions)
+
             if submitter is not None:
                 submitter.setSuccess(vresult.__bool__())
                 submitter.submit()
@@ -590,17 +610,15 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
             print("Verification completed.")
         print(vresult.to_string(args.ide_mode, args.show_viper_errors))
         duration = '{:.2f}'.format(time.time() - start)
-        print('Verification took ' + duration + ' seconds.')
+        print('Verification took ' + duration + ' seconds ('
+              + phases.summary() + ').')
         return isinstance(vresult, verifier.Success)
     except (TypeException, InvalidProgramException, UnsupportedException) as e:
         print("Translation failed")
         if isinstance(e, (InvalidProgramException, UnsupportedException)):
             if isinstance(e, InvalidProgramException):
-                issue = 'Invalid program: '
-                if e.message:
-                    issue += e.message
-                else:
-                    issue += e.code
+                issue = ('Invalid program: ' +
+                         invalid_program_message(e.code, e.message))
             else:
                 issue = 'Not supported: '
                 if e.args[0]:
@@ -615,24 +633,11 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                 getattr(e.node, 'end_col_offset', None)))
         if isinstance(e, TypeException):
             for msg in e.messages:
-                parts = TYPE_ERROR_MATCHER.match(msg)
-                if parts:
-                    parts = parts.groupdict()
-                    file = parts['file']
-                    if file == '__main__':
-                        file = python_file
-                    msg = parts['msg']
-                    line = int(parts['line'])
-                    # mypy reports a 1-based start column and an (exclusive) end
-                    # position when available; convert to the 0-based-column
-                    # convention format_translation_error expects. Fall back to
-                    # column 0 for errors Nagini raises itself (line only).
-                    col = int(parts['col']) - 1 if parts['col'] else 0
-                    line_end = int(parts['end_line']) if parts['end_line'] else None
-                    col_end = int(parts['end_col']) if parts['end_col'] else None
+                error = type_error(msg, python_file)
+                if error:
                     print(format_translation_error(
-                        args.ide_mode, file, 'Type error: ' + msg, line, col,
-                        line_end, col_end))
+                        args.ide_mode, error.file, 'Type error: ' + error.msg,
+                        error.line, error.col, error.end_line, error.end_col))
                 else:
                     print(msg)
         return False

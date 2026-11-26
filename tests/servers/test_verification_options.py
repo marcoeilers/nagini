@@ -10,6 +10,13 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 --disable-branch-conditions, obligation auto-detection, per-request Viper
 backend arguments, and include_viper."""
 
+import threading
+import time
+
+import pytest
+
+from nagini_translation.service import Refused
+
 
 _TOPLEVEL_ASSERT_SRC = (
     "from nagini_contracts.contracts import *\n\n"
@@ -45,6 +52,21 @@ _MUST_TERMINATE_BAD_SRC = (
     "def rec(n: int) -> int:\n"
     "    Requires(MustTerminate(1))\n"
     "    return rec(n)\n"
+)
+
+
+_SLOW_THEN_FAILING_SRC = (
+    "from nagini_contracts.contracts import *\n\n"
+    "def slow(a: int, b: int, c: int, d: int) -> None:\n"
+    "    Requires(a > 1 and b > 1 and c > 1 and d > 1)\n"
+    + "".join("    Assert(a * b * c * d + {0} > a * b + {0})\n".format(i) for i in range(150))
+    + "    Assert(a > 1000)\n"
+)
+
+_QUICK_FAILING_SRC = (
+    "from nagini_contracts.contracts import *\n\n"
+    "def quick(x: int) -> None:\n"
+    "    Assert(x > 0)\n"
 )
 
 
@@ -137,6 +159,97 @@ def test_viper_args_invalid_option_fails_cleanly(service, tmp_path):
         _write(tmp_path, "va_bad.py", _NO_OBLIGATIONS_SRC),
         viper_args=["--no-such-silicon-option"])
     assert not result.success
+
+
+def test_prover_out_of_memory_is_a_crash(service, tmp_path):
+    path = _write(tmp_path, "oom.py", _NO_OBLIGATIONS_SRC)
+    capped = ["--proverConfigArgs=memory_max_size=1", "--disableCaching"]
+    result = service.verify(path, viper_args=capped)
+    assert result.crashed and not result.success
+    [diag] = result.diagnostics
+    assert diag.code == "verifier.crashed"
+    assert "memory limit of 1 MB" in diag.message
+    # Plain diagnostics keep the backend's crash.
+    service.plain_diagnostics = True
+    try:
+        plain = service.verify(path, viper_args=capped)
+    finally:
+        service.plain_diagnostics = False
+    assert plain.crashed
+    assert plain.diagnostics[0].code == "verifier.crashed"
+
+
+_UNFINISHED_SRC = (
+    "from nagini_contracts.contracts import *\n\n"
+    "def quick(x: int) -> int:\n"
+    "    Ensures(Result() == x + 1)\n"
+    "    return x + 1\n\n"
+    "def wrong(x: int) -> int:\n"
+    "    Ensures(Result() > x + 1)\n"
+    "    return x + 1\n\n"
+    "def slow(a: int, b: int, c: int, n: int) -> None:\n"
+    "    Requires(a > 0 and b > 0 and c > 0 and n > 2)\n"
+    "    Requires(n < 6)\n"
+    "    Assert(a * a * a * a * a + b * b * b * b * b != c * c * c * c * c"
+    " or a * b * c * n * n != a * a * b + 7 * c * c * n)\n"
+)
+
+
+def test_members_of_a_finished_run(service, tmp_path):
+    path = _write(tmp_path, "members_done.py", _UNFINISHED_SRC)
+    result = service.verify(path, selected=["quick", "wrong"])
+    assert result.members == {"quick": "passed", "wrong": "failed"}
+
+
+def test_timeout_says_how_far_each_member_got(service, tmp_path):
+    path = _write(tmp_path, "members_cut.py", _UNFINISHED_SRC)
+    cut = ["--timeout=15", "--disableCaching"]
+    result = service.verify(path, viper_args=cut)
+    assert result.members == {"quick": "passed", "wrong": "failed", "slow": "inFlight"}
+    # The error of the member that failed before the timeout is reported too.
+    assert sorted(d.code for d in result.diagnostics) == [
+        "TimeoutOccurred", "postcondition.violated:assertion.false"]
+    assert not any(d.recorded_only for d in result.diagnostics)
+    # With one verifier a second slow member is queued behind the first.
+    two = _write(tmp_path, "members_queued.py",
+                 _UNFINISHED_SRC + _UNFINISHED_SRC[_UNFINISHED_SRC.index("def slow("):]
+                 .replace("def slow(", "def slow2(").replace("+ 7 *", "+ 9 *"))
+    queued = service.verify(two, viper_args=cut + ["--numberOfParallelVerifiers=1"])
+    assert sorted(queued.members[m] for m in ("slow", "slow2")) == ["inFlight", "notStarted"]
+    # Plain diagnostics record that error for the archive only.
+    service.plain_diagnostics = True
+    try:
+        plain = service.verify(path, viper_args=cut)
+    finally:
+        service.plain_diagnostics = False
+    assert plain.members == result.members
+    assert [d.code for d in plain.diagnostics if not d.recorded_only] == ["TimeoutOccurred"]
+    assert [d.code for d in plain.diagnostics if d.recorded_only] == [
+        "postcondition.violated:assertion.false"]
+
+
+def test_a_request_with_other_backend_options_is_refused(service, tmp_path):
+    # Silicon's configuration is process-global: a job started next to one with
+    # other options would change that job's per-check budget mid-run.
+    slow = _write(tmp_path, "gate_slow.py", _SLOW_THEN_FAILING_SRC)
+    quick = _write(tmp_path, "gate_quick.py", _QUICK_FAILING_SRC)
+    results = {}
+
+    def run(path, budget):
+        results[path] = service.verify(path, viper_args=[
+            "--assertTimeout=%d" % budget, "--smtStateOnError", "--disableCaching"])
+
+    first = threading.Thread(target=run, args=(slow, 5000))
+    first.start()
+    time.sleep(3)  # the slow job is verifying when the quick one arrives
+    with pytest.raises(Refused):
+        run(quick, 500)
+    run(quick, 5000)  # the same options run beside it
+    first.join()
+    run(quick, 500)
+    budgets = lambda r: [d.debug["failingCheck"]["budgetMs"] for d in r.diagnostics]
+    assert budgets(results[slow]) == [5000]
+    assert budgets(results[quick]) == [500]
 
 
 # -- include_viper ------------------------------------------------------------

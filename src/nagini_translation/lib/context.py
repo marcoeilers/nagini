@@ -38,6 +38,7 @@ class Context:
         self.ignore_family_folds = False
         self.added_handlers = []
         self.loop_iterators = {}
+        self.tuple_constructors = {}  # name -> generated function for tuples beyond the fixed arities
         self.io_open_context = IOOpenContext()
         self.obligation_context = ObligationContext()
         self._alias_context_stack = []

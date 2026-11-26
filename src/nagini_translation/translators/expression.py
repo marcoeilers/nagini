@@ -14,7 +14,6 @@ from nagini_translation.lib.constants import (
     CHECK_DEFINED_FUNC,
     DICT_TYPE,
     ELLIPSIS_TYPE,
-    END_LABEL,
     FLOAT_TYPE,
     FUNCTION_DOMAIN_NAME,
     GET_METHOD_FUNC,
@@ -35,6 +34,7 @@ from nagini_translation.lib.constants import (
 )
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
+    Exit,
     GenericType,
     OptionalType,
     PythonClass,
@@ -60,8 +60,8 @@ from nagini_translation.lib.typedefs import (
 from nagini_translation.lib.util import (
     construct_lambda_prefix,
     get_func_name,
-    get_surrounding_try_blocks,
     InvalidProgramException,
+    is_type_checking,
     isBytes,
     isEllipsis,
     isNameConstant,
@@ -69,11 +69,12 @@ from nagini_translation.lib.util import (
     isStr,
     join_three_expressions,
     join_expressions,
+    TYPE_CHECKING_USE,
     UnsupportedException,
 )
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
-from typing import List, Optional, Tuple, Union
+from typing import List, Tuple, Union
 from math import isnan, isinf
 
 
@@ -158,6 +159,10 @@ class ExpressionTranslator(CommonTranslator):
             stmt, result = visitor(node, ctx, impure)
         else:
             stmt, result = visitor(node, ctx)
+        if result is None:
+            raise InvalidProgramException(
+                node, 'invalid.none.value',
+                'the result of a call that returns None is used as a value.')
         return stmt, result
 
     def translate_Return(self, node: ast.Return, ctx: Context,
@@ -192,6 +197,17 @@ class ExpressionTranslator(CommonTranslator):
                 result_var, list_type, element_var, body, filter_cond, node, ctx)
         return stmt, result_var.ref()
 
+    def _comp_iter_type(self, node: ast.AST, ctx: Context) -> GenericType:
+        """The comprehension's iterable type. Only generic collection instances
+        carry the element type the inhale needs."""
+        iter_type = self.get_type(node.generators[0].iter, ctx)
+        if isinstance(iter_type, GenericType):
+            return iter_type
+        hint = ('; iterate a list, or build the result with a while loop'
+                if iter_type.name == 'range' else '')
+        raise UnsupportedException(
+            node, 'comprehension over {}{}'.format(iter_type.name, hint))
+
     def _create_list_comp_inhale(self, result_var: PythonVar, list_type: PythonType,
                                  element_var: PythonVar, body: Expr, node: ast.ListComp,
                                  ctx: Context) -> List[Stmt]:
@@ -215,7 +231,7 @@ class ExpressionTranslator(CommonTranslator):
         result_len = self.get_function_call(list_class, '__len__', [result_var.ref()],
                                             [None], node, ctx)
         iter_stmt, iter = self.translate_expr(node.generators[0].iter, ctx)
-        iter_type = self.get_type(node.generators[0].iter, ctx)
+        iter_type = self._comp_iter_type(node, ctx)
         sil_seq, _ = self.get_sequence(iter_type.python_class, iter, None, node, ctx,
                                     position)
         seq_len = self.viper.SeqLength(sil_seq, position, info)
@@ -272,7 +288,7 @@ class ExpressionTranslator(CommonTranslator):
                                                    position, info)
         type_and_perm = self.viper.And(type_check, acc_pred, position, info)
         iter_stmt, iter = self.translate_expr(node.generators[0].iter, ctx)
-        iter_type = self.get_type(node.generators[0].iter, ctx)
+        iter_type = self._comp_iter_type(node, ctx)
         sil_seq, _ = self.get_sequence(iter_type.python_class, iter, None, node, ctx,
                                        position)
         seq_len = self.viper.SeqLength(sil_seq, position, info)
@@ -388,7 +404,7 @@ class ExpressionTranslator(CommonTranslator):
         type_check = self.type_check(result_var.ref(), result_type, position, ctx)
         # Iterate over the source.
         iter_stmt, iter = self.translate_expr(node.generators[0].iter, ctx)
-        iter_type = self.get_type(node.generators[0].iter, ctx)
+        iter_type = self._comp_iter_type(node, ctx)
         sil_seq, _ = self.get_sequence(iter_type.python_class, iter, None, node, ctx,
                                        position)
         seq_len = self.viper.SeqLength(sil_seq, position, info)
@@ -693,6 +709,8 @@ class ExpressionTranslator(CommonTranslator):
         return [], call
 
     def translate_Bytes(self, node: ast.Constant, ctx: Context) -> StmtsAndExpr:
+        # bytes___create__ takes only bytes: the parser gives none other
+        assert all(0 <= c < 256 for c in node.value)
         elems = []
         for c in node.value:
             lit = self.viper.IntLit(c, self.to_position(node, ctx),
@@ -732,11 +750,21 @@ class ExpressionTranslator(CommonTranslator):
         """
         tuple_class = ctx.module.global_module.classes[TUPLE_TYPE]
         tuple_len = len(vals)
-        if tuple_len > 9:
-            raise UnsupportedException(node, "Tuples longer than 9 elements are currently unsupported. Please file an issue to resolve this.")
-        func_name = '__create' + str(tuple_len) + '__'
         types = [self.get_tuple_type_arg(v, t, node, ctx)
                  for (t, v) in zip(val_types, vals)]
+        if tuple_len > 9:
+            if len({t.name for t in val_types}) != 1:
+                raise UnsupportedException(node, "Tuples longer than 9 elements are only supported with a single element type.")
+            refs = [self.to_ref(v, ctx) for v in vals]
+            position = self.to_position(node, ctx)
+            info = self.no_info(ctx)
+            if self._is_constant_literal(node):
+                return self.viper.FuncApp(self._constant_tuple(refs, types[0], ctx), [],
+                                          position, info, self.viper.Ref)
+            return self.viper.FuncApp(self._long_tuple_constructor(tuple_len, ctx),
+                                      refs + [types[0], self.get_fresh_int_lit(ctx)],
+                                      position, info, self.viper.Ref)
+        func_name = '__create' + str(tuple_len) + '__'
         args = vals + types
         # Also add a running integer s.t. other tuples with same contents are
         # not reference-identical (except for empty tuples).
@@ -746,6 +774,114 @@ class ExpressionTranslator(CommonTranslator):
         call = self.get_function_call(tuple_class, func_name, args, arg_types,
                                       node, ctx)
         return call
+
+    def _long_tuple_constructor(self, n: int, ctx: Context) -> str:
+        """
+        The name of the generated constructor for homogeneous tuples of arity
+        n (beyond the fixed-arity ones in tuple.sil), created on first use. It
+        states the variadic type, the length and one fact per element rather
+        than the value and type sequences, which Silicon encodes as chains of
+        the tuple's length.
+        """
+        name = 'tuple___create' + str(n) + '__'
+        if name in ctx.tuple_constructors:
+            return name
+        pos = self.no_position(ctx)
+        info = self.no_info(ctx)
+        tf = self.type_factory
+        ref = self.viper.Ref
+        args = [self.viper.LocalVarDecl('arg' + str(i), ref, pos, info) for i in range(n)]
+        elem_type = self.viper.LocalVarDecl('t', tf.type_type(), pos, info)
+        ctr = self.viper.LocalVarDecl('ctr', self.viper.Int, pos, info)
+        result = self.viper.Result(ref, pos, info)
+        length = self.viper.IntLit(n, pos, info)
+
+        def app(func, fargs, typ):
+            return self.viper.FuncApp(func, fargs, pos, info, typ)
+
+        pres = [self.viper.DomainFuncApp('issubtype', [tf.typeof(a.localVar(), ctx), elem_type.localVar()],
+                                         self.viper.Bool, pos, info, tf.type_domain)
+                for a in args]
+        posts = [self.viper.NeCmp(result, self.viper.NullLit(pos, info), pos, info),
+                 self.viper.EqCmp(tf.typeof(result, ctx),
+                                  self.viper.DomainFuncApp('tuple_var', [elem_type.localVar()],
+                                                           tf.type_type(), pos, info, tf.type_domain),
+                                  pos, info),
+                 self.viper.EqCmp(app('tuple___len__', [result], self.viper.Int), length, pos, info),
+                 self.viper.EqCmp(self.viper.SeqLength(app('tuple___val__', [result],
+                                                           self.viper.SeqType(ref)), pos, info),
+                                  length, pos, info)]
+        posts += [self.viper.EqCmp(app('tuple___getitem__', [result, self.viper.IntLit(i, pos, info)], ref),
+                                   a.localVar(), pos, info)
+                  for i, a in enumerate(args)]
+        posts.append(self.viper.DecreasesWildcard(None, pos, info))
+        ctx.tuple_constructors[name] = self.viper.Function(name, args + [elem_type, ctr], ref,
+                                                           pres, posts, None, pos, info)
+        return name
+
+    @staticmethod
+    def _is_constant_literal(node: ast.AST) -> bool:
+        """A tuple literal of constants, nested tuples of constants included."""
+        return isinstance(node, ast.Tuple) and all(
+            isinstance(e, ast.Constant) or ExpressionTranslator._is_constant_literal(e)
+            for e in node.elts)
+
+    def _constant_tuple(self, elems: List[Expr], elem_type: Expr, ctx: Context) -> str:
+        """
+        The name of a generated nullary function for a constant tuple literal
+        beyond the fixed arities (homogeneous, all elements constants). It
+        states the variadic type, the length, and the elements through an
+        element function whose body is the literal as a conditional chain, so
+        a lookup instantiates only the index it uses.
+        """
+        n = len(elems)
+        stem = 'tuple___lit' + str(ctx.get_fresh_int())
+        name, elem_name = stem + '__', stem + '_elem__'
+        pos = self.no_position(ctx)
+        info = self.no_info(ctx)
+        tf = self.type_factory
+        ref = self.viper.Ref
+
+        def lit(k):
+            return self.viper.IntLit(k, pos, info)
+
+        def app(func, fargs, typ):
+            return self.viper.FuncApp(func, fargs, pos, info, typ)
+
+        i = self.viper.LocalVarDecl('i', self.viper.Int, pos, info)
+        in_range = self.viper.And(self.viper.LeCmp(lit(0), i.localVar(), pos, info),
+                                  self.viper.LtCmp(i.localVar(), lit(n), pos, info), pos, info)
+        body = elems[-1]
+        for k in range(n - 2, -1, -1):
+            body = self.viper.CondExp(self.viper.EqCmp(i.localVar(), lit(k), pos, info),
+                                      elems[k], body, pos, info)
+        ctx.tuple_constructors[elem_name] = self.viper.Function(
+            elem_name, [i], ref, [in_range], [self.viper.DecreasesWildcard(None, pos, info)],
+            body, pos, info)
+        result = self.viper.Result(ref, pos, info)
+        getitem_i = app('tuple___getitem__', [result, i.localVar()], ref)
+        val_i = self.viper.SeqIndex(app('tuple___val__', [result], self.viper.SeqType(ref)),
+                                    i.localVar(), pos, info)
+        # Also triggered by the value sequence, which is what list(t), == and
+        # iteration read.
+        elements = self.viper.Forall(
+            [i], [self.viper.Trigger([getitem_i], pos, info), self.viper.Trigger([val_i], pos, info)],
+            self.viper.Implies(in_range, self.viper.EqCmp(getitem_i, app(elem_name, [i.localVar()], ref),
+                                                          pos, info), pos, info),
+            pos, info)
+        posts = [self.viper.NeCmp(result, self.viper.NullLit(pos, info), pos, info),
+                 self.viper.EqCmp(tf.typeof(result, ctx),
+                                  self.viper.DomainFuncApp('tuple_var', [elem_type], tf.type_type(),
+                                                           pos, info, tf.type_domain),
+                                  pos, info),
+                 self.viper.EqCmp(app('tuple___len__', [result], self.viper.Int), lit(n), pos, info),
+                 self.viper.EqCmp(self.viper.SeqLength(app('tuple___val__', [result],
+                                                           self.viper.SeqType(ref)), pos, info),
+                                  lit(n), pos, info),
+                 elements,
+                 self.viper.DecreasesWildcard(None, pos, info)]
+        ctx.tuple_constructors[name] = self.viper.Function(name, [], ref, [], posts, None, pos, info)
+        return name
 
     def translate_Subscript(self, node: ast.Subscript,
                             ctx: Context) -> StmtsAndExpr:
@@ -785,6 +921,11 @@ class ExpressionTranslator(CommonTranslator):
         args = [target, slice]
         stmt = target_stmt + start_stmt + stop_stmt
         getitem = target_type.get_func_or_method('__getitem_slice__')
+        if getitem is None:
+            # Only builtin sequence types model slicing.
+            raise UnsupportedException(
+                node, "slice expressions on type '{}'".format(
+                    getattr(target_type, 'name', target_type)))
         if not getitem.pure:
             result_var = ctx.current_function.create_variable(
                 'slice_res', target_type, self.translator)
@@ -808,104 +949,19 @@ class ExpressionTranslator(CommonTranslator):
         """
         if isinstance(var, PythonVar):
             var = var.ref()
-        cases = []
         position = self.to_position(call, ctx)
-        err_var = ctx.error_var.ref()
-        relevant_try_blocks = get_surrounding_try_blocks(try_blocks, call)
-        goto_finally = self._create_goto_finally(relevant_try_blocks, ctx)
-        if goto_finally:
-            uncaught_option = goto_finally
-        else:
-            end_label = ctx.get_label_name(END_LABEL)
-            goto_end = self.viper.Goto(end_label, position, self.no_info(ctx))
-            if ctx.actual_function.declared_exceptions or ctx.actual_function.inline:
-                assignerror = self.viper.LocalVarAssign(err_var, var, position,
-                                                        self.no_info(ctx))
-                uncaught_option = self.translate_block([assignerror, goto_end],
-                                                       position,
-                                                       self.no_info(ctx))
-            else:
-                error_string = '"method raises no exceptions"'
-                error_pos = self.to_position(ctx.actual_function.node, ctx, error_string)
-                exhale_false = self.viper.Exhale(
-                    self.viper.FalseLit(error_pos, self.no_info(ctx)),
-                    error_pos,
-                    self.no_info(ctx))
-                uncaught_option = self.translate_block([exhale_false, goto_end],
-                                                       position,
-                                                       self.no_info(ctx))
-
-        for block in relevant_try_blocks:
-            for handler in block.handlers:
-                condition_pos = self.to_position(handler.node, ctx,
-                                                 error_string='isinstance(RaisedException(), {0})'.format(handler.exception.name))
-                condition = self.type_check(var, handler.exception,
-                                            condition_pos,
-                                            ctx, inhale_exhale=False)
-                label_name = ctx.get_label_name(handler.name)
-                goto = self.viper.Goto(label_name,
-                                       self.to_position(handler.node, ctx),
-                                       self.no_info(ctx))
-                cases.insert(0, (condition, goto))
-            if block.finally_block:
-                break
-
-        result = None
-        for cond, goto in cases:
-            if result is None:
-                result = self.viper.If(cond, goto,
-                                       uncaught_option,
-                                       self.to_position(handler.node, ctx),
-                                       self.no_info(ctx))
-            else:
-                result = self.viper.If(cond, goto, result,
-                                       self.to_position(handler.node, ctx),
-                                       self.no_info(ctx))
-        if result is None:
-            error_case = uncaught_option
-        else:
-            error_case = result
+        info = self.no_info(ctx)
+        error_case = self.translate_block(
+            self.translate_exit(Exit.RAISE, call, ctx), position, info)
         some_error_pos = self.to_position(call, ctx, error_string='(exception has been raised)')
         errnotnull = self.viper.NeCmp(var,
                                       self.viper.NullLit(self.no_position(ctx),
-                                                         self.no_info(ctx)),
-                                      some_error_pos, self.no_info(ctx))
-        emptyblock = self.translate_block([], self.no_position(ctx),
-                                          self.no_info(ctx))
-        errcheck = self.viper.If(errnotnull, error_case, emptyblock,
-                                 position,
-                                 self.no_info(ctx))
+                                                         info),
+                                      some_error_pos, info)
+        emptyblock = self.translate_block([], self.no_position(ctx), info)
+        errcheck = self.viper.If(errnotnull, error_case, emptyblock, position,
+                                 info)
         return [errcheck]
-
-    def _create_goto_finally(self, tries: List[PythonTryBlock],
-                             ctx: Context) -> Optional[Stmt]:
-        """
-        If any of the blocks in tries has a finally-block, creates and
-        returns the statements to jump there.
-        """
-        for try_ in tries:
-            if try_.finally_block or try_.with_item:
-                # Propagate return value
-                var_next = try_.get_finally_var(self.translator)
-                if var_next.sil_name in ctx.var_aliases:
-                    var_next = ctx.var_aliases[var_next.sil_name]
-                number_two = self.viper.IntLit(2, self.no_position(ctx),
-                                               self.no_info(ctx))
-                next_assign = self.viper.LocalVarAssign(var_next.ref(),
-                                                        number_two,
-                                                        self.no_position(ctx),
-                                                        self.no_info(ctx))
-                # Goto finally block
-                label_name = ctx.get_label_name(try_.finally_name)
-                goto_next = self.viper.Goto(label_name,
-                                            self.no_position(ctx),
-                                            self.no_info(ctx))
-                return_block = [next_assign, goto_next]
-                result = self.translate_block(return_block,
-                                              self.no_position(ctx),
-                                              self.no_info(ctx))
-                return result
-        return None
 
     def translate_Expr(self, node: ast.Expr, ctx: Context) -> StmtsAndExpr:
         return self.translate_expr(node.value, ctx)
@@ -950,6 +1006,8 @@ class ExpressionTranslator(CommonTranslator):
         target = self.get_target(node, ctx)
         if node.id == 'Ellipsis':
             return self.translate_Ellipsis(node, ctx)
+        if target is None and is_type_checking(node, ctx.module.node):
+            raise UnsupportedException(node, TYPE_CHECKING_USE)
         if isinstance(target, PythonGlobalVar):
             return self.translate_global_var_reference(target, node, ctx)
         elif isinstance(target, PythonMethod):
@@ -971,6 +1029,8 @@ class ExpressionTranslator(CommonTranslator):
                 var = ctx.var_aliases[node.id]
             else:
                 var = ctx.actual_function.get_variable(node.id)
+            if var is None:
+                raise UnsupportedException(node, "name '{}'".format(node.id))
             if (isinstance(var, PythonIOExistentialVar) and
                     not var.is_defined()):
                 raise InvalidProgramException(
@@ -1119,6 +1179,8 @@ class ExpressionTranslator(CommonTranslator):
         position = self.to_position(node, ctx)
         target = self.get_target(node.value, ctx)
         func_name = get_func_name(node.value)
+        if target is None and is_type_checking(node, ctx.module.node):
+            raise UnsupportedException(node, TYPE_CHECKING_USE)
         if isinstance(target, PythonModule):
             target = self.get_target(node, ctx)
             if isinstance(target, PythonGlobalVar):
@@ -1312,9 +1374,9 @@ class ExpressionTranslator(CommonTranslator):
                 func_name = "__pow_unrolled__"
             call_stmt, call = self.get_func_or_method_call(left_type, func_name, [left, right], [left_type, right_type], node, ctx)
             if call is None:
-                raise UnsupportedException(node, "Unsupported binary operator")
+                raise UnsupportedException(node, self._binop_error(node, left_type, right_type))
             return stmt + call_stmt, call
-            
+
         else:
             right_func_name = RIGHT_OPERATOR_FUNCTIONS[type(node.op)]
             right_func = right_type.get_compatible_func_or_method(right_func_name, [right_type, left_type])
@@ -1333,6 +1395,21 @@ class ExpressionTranslator(CommonTranslator):
             if right_func:
                 call_stmt, call = self.get_func_or_method_call(right_type, right_func_name, [right, left], [right_type, left_type], node, ctx)
                 return stmt + call_stmt, call
+            # Neither operand models this operator (e.g. '%'-formatting on str).
+            raise UnsupportedException(node, self._binop_error(node, left_type, right_type))
+
+    @staticmethod
+    def _binop_error(node: ast.BinOp, left_type: PythonType,
+                     right_type: PythonType) -> str:
+        op_symbol = {
+            ast.Add: '+', ast.Sub: '-', ast.Mult: '*', ast.Div: '/',
+            ast.FloorDiv: '//', ast.Mod: '%', ast.Pow: '**',
+            ast.LShift: '<<', ast.RShift: '>>', ast.BitOr: '|',
+            ast.BitXor: '^', ast.BitAnd: '&', ast.MatMult: '@',
+        }.get(type(node.op), type(node.op).__name__)
+        return ("binary operator '{}' on operand types {} and {}".format(
+            op_symbol, getattr(left_type, 'name', left_type),
+            getattr(right_type, 'name', right_type)))
 
     def is_thread_method_definition(self, node: ast.Compare, ctx: Context) -> bool:
         """
@@ -1431,6 +1508,7 @@ class ExpressionTranslator(CommonTranslator):
         pair_node.col_offset = left_operand.col_offset
         pair_node.end_lineno = getattr(right_operand, 'end_lineno', None)
         pair_node.end_col_offset = getattr(right_operand, 'end_col_offset', None)
+        pair_node._parent = node
         return pair_node
 
     def _translate_comparison(self, op: ast.cmpop, left: Expr,
@@ -1445,6 +1523,12 @@ class ExpressionTranslator(CommonTranslator):
             return ([], self.viper.EqCmp(left, right, position, info))
         elif isinstance(op, ast.IsNot):
             return ([], self.viper.NeCmp(left, right, position, info))
+
+        # TODO is this really correct?
+        if isinstance(left_type, TypeVar):
+            left_type = left_type.bound
+        if isinstance(right_type, TypeVar):
+            right_type = right_type.bound
 
         # Unbox IntEnum to int
         if left_type.python_class.enum and left_type.python_class.enum_type == INT_TYPE:
@@ -1502,8 +1586,8 @@ class ExpressionTranslator(CommonTranslator):
         app_stmt, app = self.get_func_or_method_call(
             right_type, '__contains__', args, arg_types, node, ctx)
         if isinstance(node.ops[0], ast.NotIn):
-            app = self.viper.Not(
-                app, self.to_position(node, ctx), self.no_info(ctx))
+            app = self.viper.Not(self.to_bool(app, ctx, node),
+                                 self.to_position(node, ctx), self.no_info(ctx))
         return app_stmt, app
 
     def translate_Constant(self, node: 'ast.Constant', ctx: Context) -> StmtsAndExpr:

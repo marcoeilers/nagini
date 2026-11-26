@@ -8,30 +8,49 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import logging
 import mypy.build
 import os
+import re
 import tokenize
 
 from mypy.build import BuildSource
+from mypy.checkexpr import has_any_type
 from mypy.plugin import Plugin
+from mypy.type_visitor import TypeQuery
 from mypy.typevars import fill_typevars_with_any
+from nagini_translation.lib import phases
 from nagini_translation.lib.constants import IGNORED_IMPORTS, LITERALS
 from nagini_translation.mypy_patches.visitor import TraverserVisitor
 
 from nagini_translation.lib.util import (
+    char_columns,
     construct_lambda_prefix,
 )
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, NamedTuple, Optional
 
 
 logger = logging.getLogger('nagini_translation.lib.typeinfo')
 
 
-def col(node) -> Optional[int]:
-    """
-    Returns the column in a mypy mypy AST node, if any.
-    """
-    if hasattr(node, 'column'):
-        return node.column
-    return None
+class HasTypeObject(TypeQuery[bool]):
+    """Whether a type has a part that is a class seen as its constructor."""
+
+    def strategy(self, items: List[bool]) -> bool:
+        return any(items)
+
+    def visit_callable_type(self, t: mypy.types.CallableType) -> bool:
+        return t.is_type_obj() or super().visit_callable_type(t)
+
+    def visit_overloaded(self, t: mypy.types.Overloaded) -> bool:
+        return t.is_type_obj() or super().visit_overloaded(t)
+
+
+# A message of mypy or of the type collector; only mypy's has the column and
+# the end position. The file group is non-greedy so a Windows drive letter
+# (``C:\...``) or a ``: error:`` inside the message is not mistaken for the
+# separators.
+MESSAGE = re.compile(
+    r"^(?P<file>.*?):(?P<line>\d+)"
+    r"(?::(?P<col>\d+)(?::(?P<end_line>\d+):(?P<end_col>\d+))?)?"
+    r": (?P<severity>error|note): (?P<msg>.*)$")
 
 
 class ContractPlugin(Plugin):
@@ -87,18 +106,52 @@ class TypeException(Exception):
         self.messages = messages
 
 
+class LocatedTypeError(NamedTuple):
+    """An error of a TypeException: 0-based columns, and the end (exclusive)
+    if mypy gave one."""
+    file: str
+    line: int
+    col: int
+    end_line: Optional[int]
+    end_col: Optional[int]
+    msg: str
+
+
+def type_error(message: str, main_file: str = '__main__') -> Optional[LocatedTypeError]:
+    """The error that the given message of a TypeException reports, if it is
+    one, with main_file as the file of the checked module."""
+    match = MESSAGE.match(message)
+    if not match or match['severity'] != 'error':
+        return None
+    return LocatedTypeError(
+        main_file if match['file'] == '__main__' else match['file'],
+        int(match['line']),
+        int(match['col']) - 1 if match['col'] else 0,
+        int(match['end_line']) if match['end_line'] else None,
+        int(match['end_col']) if match['end_col'] else None,
+        match['msg'])
+
+
 class TypeVisitor(TraverserVisitor):
-    def __init__(self, type_map, path, ignored_lines, real_path):
+    def __init__(self, type_map, path, ignored_lines, real_path, source=''):
+        self.char_column = char_columns(source)
         self.prefix = []
         self.all_types = {}
         self.alt_types = {}
         self.ghost_names = {}
         self.type_map = type_map
+        self.expr_types = {}
         self.path = path
         self.ignored_lines = ignored_lines
         self.type_aliases = {}
         self.type_vars = {}
         self.real_path = real_path
+
+    def col(self, node) -> Optional[int]:
+        """The column of a mypy AST node, if any, as the analyzer has it."""
+        if hasattr(node, 'column'):
+            return self.char_column(node.line, node.column)
+        return None
 
     def _is_result_call(self, node: mypy.nodes.Node) -> bool:
         """Checks if call is either ``Result`` or ``RaisedException``."""
@@ -152,7 +205,7 @@ class TypeVisitor(TraverserVisitor):
                     continue
                 self.set_type(t.type.fullname.split('.') + [node.name],
                               self.type_of(node),
-                              node.line, col(node))
+                              node.line, self.col(node))
         super().visit_member_expr(node)
 
     def visit_del_stmt(self, node: mypy.nodes.DelStmt):
@@ -162,7 +215,7 @@ class TypeVisitor(TraverserVisitor):
         for var in node.vars:
             if var is not None:
                 self.set_type(self.prefix + [var.name], self.type_of(var),
-                              var.line, col(var))
+                              var.line, self.col(var))
         super().visit_try_stmt(node)
 
     def visit_assignment_stmt(self, node: mypy.nodes.AssignmentStmt):
@@ -194,7 +247,7 @@ class TypeVisitor(TraverserVisitor):
                                not name_type.is_type_obj())
             if not is_function_ref:
                 self.set_type(self.prefix + [node.name], name_type,
-                              node.line, col(node))
+                              node.line, self.col(node))
 
     def visit_star_expr(self, node: mypy.nodes.StarExpr):
         self.visit(node.expr)
@@ -203,20 +256,20 @@ class TypeVisitor(TraverserVisitor):
         oldprefix = self.prefix
         self.prefix = self.prefix + [node.name]
         functype = self.type_of(node)
-        self.set_type(self.prefix, functype, node.line, col(node), True)
+        self.set_type(self.prefix, functype, node.line, self.col(node), True)
         for arg in node.arguments:
             self.set_type(self.prefix + [arg.variable.name],
-                          arg.variable.type, arg.line, col(arg))
+                          arg.variable.type, arg.line, self.col(arg))
         super().visit_func_def(node)
         self.prefix = oldprefix
 
     def visit_lambda_expr(self, node: mypy.nodes.LambdaExpr):
         oldprefix = self.prefix
-        prefix_string = construct_lambda_prefix(node.line, col(node))
+        prefix_string = construct_lambda_prefix(node.line, self.col(node))
         self.prefix = self.prefix + [prefix_string]
         for arg in node.arguments:
             self.set_type(self.prefix + [arg.variable.name],
-                          arg.variable.type, arg.line, col(arg))
+                          arg.variable.type, arg.line, self.col(arg))
         self.visit(node.body)
         self.prefix = oldprefix
 
@@ -244,6 +297,11 @@ class TypeVisitor(TraverserVisitor):
                 raise TypeException([msg])
         key = tuple(fqn)
         if key in self.all_types:
+            if (str(type) != str(self.all_types[key]) and
+                    any(isinstance(t, mypy.types.Overloaded)
+                        for t in (type, self.all_types[key]))):
+                error = ' error: Overloaded function or method {} is used at different types.'.format(fqn[-1])
+                raise TypeException([':'.join([self.path, str(line), error])])
             if not self.type_equals(self.all_types[key], type):
                 # Type change after isinstance
                 if key not in self.alt_types:
@@ -288,9 +346,40 @@ class TypeVisitor(TraverserVisitor):
                 msg = self.path + ':' + str(node.line) + ': error: MarkGhost may only define ghost names once.'
                 raise TypeException([msg])
             curr_set.add(ghost_type.name)
+        if (isinstance(node.callee, mypy.nodes.RefExpr) and
+                isinstance(node.callee.node, mypy.nodes.TypeInfo)):
+            self.record_expr_type(node)
         for a in node.args:
             self.visit(a)
         self.visit(node.callee)
+
+    def visit_list_expr(self, node: mypy.nodes.ListExpr):
+        self.record_expr_type(node)
+        super().visit_list_expr(node)
+
+    def visit_set_expr(self, node: mypy.nodes.SetExpr):
+        self.record_expr_type(node)
+        super().visit_set_expr(node)
+
+    def visit_dict_expr(self, node: mypy.nodes.DictExpr):
+        self.record_expr_type(node)
+        super().visit_dict_expr(node)
+
+    def visit_tuple_expr(self, node: mypy.nodes.TupleExpr):
+        self.record_expr_type(node)
+        super().visit_tuple_expr(node)
+
+    def record_expr_type(self, node: mypy.nodes.Expression):
+        """
+        Records mypy's type for a collection literal or a constructor call,
+        whose type arguments mypy infers from the context (an annotation, the
+        callee's parameter, an enclosing literal) as well as the elements.
+        A type mypy made of classes seen as their constructors is not recorded.
+        """
+        expr_type = self.type_map.get(node)
+        if (expr_type is not None and not has_any_type(expr_type)
+                and not expr_type.accept(HasTypeObject())):
+            self.expr_types[(node.line, self.col(node))] = expr_type
 
     def type_of(self, node):
         if hasattr(node, 'node') and isinstance(node.node, mypy.nodes.MypyFile):
@@ -344,7 +433,9 @@ class TypeInfo:
     def __init__(self):
         self.all_types = {}
         self.alt_types = {}
+        self.expr_types = {}
         self.files = {}
+        self.sources = {}
         self.type_aliases = {}
         self.type_vars = {}
         self.ghost_names = {}
@@ -415,7 +506,25 @@ class TypeInfo:
 
     def _source(self, path: str, module_name: str, base_dir: str) -> BuildSource:
         with tokenize.open(path) as f:
-            return BuildSource(path, module_name, f.read(), base_dir=base_dir)
+            text = self.sources[os.path.abspath(path)] = f.read()
+        return BuildSource(path, module_name, text, base_dir=base_dir)
+
+    def _char_positions(self, message: str) -> str:
+        """The given message of mypy with the columns of its position, UTF-8
+        byte offsets, as character offsets."""
+        match = MESSAGE.match(message)
+        source = match and self.sources.get(os.path.abspath(match['file']))
+        if not source or not match['col']:
+            return message
+        char_column = char_columns(source)
+        position = '%s:%d' % (
+            match['line'], char_column(int(match['line']), int(match['col']) - 1) + 1)
+        if match['end_col']:
+            position += ':%s:%d' % (
+                match['end_line'],
+                char_column(int(match['end_line']), int(match['end_col'])))
+        return '%s:%s: %s: %s' % (match['file'], position, match['severity'],
+                                  match['msg'])
 
     def _imported(self, result) -> List[str]:
         """The main module of the given mypy build and every module it
@@ -434,16 +543,18 @@ class TypeInfo:
                     names.append(dep_name)
         return names
 
-    def check(self, filename: str, base_dir: str = None) -> bool:
+    def check(self, filename: str, base_dir: str = None,
+              confirm: bool = True) -> bool:
         """
         Typechecks the given file and collects all type information needed for
-        the translation to Viper
+        the translation to Viper. With ``confirm``, any errors of the first
+        strict build are confirmed by a second non-strict one.
         """
 
         def report_errors(errors: List[str]) -> None:
             for error in errors:
                 logger.info(error)
-            raise TypeException(errors)
+            raise TypeException([self._char_positions(e) for e in errors])
 
         module_name = None
         if base_dir is not None:
@@ -458,39 +569,59 @@ class TypeInfo:
         self.module_name = module_name
         try:
             options_strict = self._create_options(True)
-            res_strict = self._build(filename, module_name, base_dir,
-                                     options_strict)
 
-            if res_strict.errors:
+            with phases.phase('typecheck.strict'):
+                res_strict = self._build(filename, module_name, base_dir,
+                                         options_strict)
+
+            # An implicit-None return incompatibility exists only under
+            # strict-optional overapproximation: with strict_optional=False,
+            # None is compatible with every return type, so this error class
+            # ALWAYS vanishes in the confirmation build below. A batch
+            # consisting solely of such errors needs no confirmation build —
+            # this skips a full second mypy pass on the common
+            # agent-in-development file shape.
+            confirmable = [e for e in res_strict.errors
+                           if 'implicitly returns "None"' not in e]
+            if confirmable and confirm:
                 # Run mypy a second time with strict optional checking disabled,
                 # s.t. we don't get overapproximated none-related errors.
                 options_non_strict = self._create_options(False)
-                res_non_strict = self._build(filename, module_name, base_dir,
-                                             options_non_strict)
+                with phases.phase('typecheck.nonstrict'):
+                    res_non_strict = self._build(filename, module_name, base_dir,
+                                                 options_non_strict)
                 if res_non_strict.errors:
                     report_errors(res_non_strict.errors)
-            relevant_files = self._imported(res_strict)
-            relevant_files = [(name, res_strict.graph[name]) for name in relevant_files]
-
-            for name, file_graph in relevant_files:
-                file = file_graph.tree
-                real_name = None
-                if name == module_name:
-                    real_name = name.split('.')
-                    name = '__main__'
-                self.files[name] = file.path
-                visitor = TypeVisitor(res_strict.types, name,
-                                      file.ignored_lines, real_name)
-                visitor.prefix = name.split('.')
-                visitor.visit(file)
-                self.all_types.update(visitor.all_types)
-                self.alt_types.update(visitor.alt_types)
-                self.type_aliases.update(visitor.type_aliases)
-                self.type_vars.update(visitor.type_vars)
-                self.ghost_names.update(visitor.ghost_names)
+            with phases.phase('typecheck.visit'):
+                self._collect(res_strict, module_name)
             return True
         except mypy.errors.CompileError as e:
             report_errors(e.messages)
+
+    def _collect(self, result, module_name: str) -> None:
+        """Collects the type information of the main file of the given mypy
+        build and of everything it transitively imports."""
+        relevant_files = [(name, result.graph[name]) for name in self._imported(result)]
+
+        for name, file_graph in relevant_files:
+            file = file_graph.tree
+            real_name = None
+            if name == module_name:
+                real_name = name.split('.')
+                name = '__main__'
+            self.files[name] = file.path
+            visitor = TypeVisitor(result.types, name,
+                                  file.ignored_lines, real_name,
+                                  self.sources.get(os.path.abspath(file.path), ''))
+            visitor.prefix = name.split('.')
+            visitor.visit(file)
+            self.all_types.update(visitor.all_types)
+            self.alt_types.update(visitor.alt_types)
+            for (line, column), expr_type in visitor.expr_types.items():
+                self.expr_types[(name, line, column)] = expr_type
+            self.type_aliases.update(visitor.type_aliases)
+            self.type_vars.update(visitor.type_vars)
+            self.ghost_names.update(visitor.ghost_names)
 
     def get_type_prefix(self, name: str) -> str:
         name = os.path.abspath(name)
@@ -523,6 +654,13 @@ class TypeInfo:
                 return self.get_type(prefix[:len(prefix) - 1], name)
         else:
             return result, alts
+
+    def get_expr_type(self, module: str, line: int, column: int):
+        """
+        Looks up the recorded type of the collection literal or constructor
+        call at the given position of the given module, if any.
+        """
+        return self.expr_types.get((module, line, column))
 
     def get_func_type(self, prefix: List[str]):
         """

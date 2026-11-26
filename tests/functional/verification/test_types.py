@@ -23,7 +23,7 @@ def tester1(o: object) -> None:
         moc = cast(MyOtherClass, o)
     if isinstance(o, MyClass):
         mc = cast(MyClass, o)
-    ls = [int, MyClass]
+    ls = (int, MyClass)
     if type(o) in ls:
         if not isinstance(o, MyClass):
             a = cast(int, o)
@@ -45,7 +45,7 @@ def tester1f3(o: object) -> None:
         mc = cast(MyClass, o)
     elif type(o) in (MyClass, MyOtherClass):
         moc = cast(MyOtherClass, o)
-    ls = [int, MyClass]
+    ls = (int, MyClass)
     if type(o) in ls:
         #:: ExpectedOutput(application.precondition:assertion.false)
         a = cast(int, o)

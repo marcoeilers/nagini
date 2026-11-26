@@ -23,7 +23,7 @@ def m(l: List[A]) -> None:
         Invariant(i >= 0)
         Invariant(Acc(list_pred(l), 1/2))
         Invariant(Forall(l, lambda a: (Acc(a.a, 1/4), [])))
-        Invariant(myb in l)
+        Invariant(Exists(int, lambda j: 0 <= j and j < len(l) and l[j] is myb))
         assert isinstance(myb, A)
         assert isinstance(myb.a, int)
         myb = l[i]
@@ -40,7 +40,7 @@ def m2(l: List[A]) -> None:
         Invariant(i >= 0)
         Invariant(Acc(list_pred(l), 1/2))
         Invariant(Forall(l, lambda a: (Acc(a.a, 1/4), [])))
-        Invariant(myb in l)
+        Invariant(Exists(int, lambda j: 0 <= j and j < len(l) and l[j] is myb))
         #:: ExpectedOutput(assert.failed:assertion.false)
         assert isinstance(myb, B) or isinstance(myb.a, bool)
         myb = l[i]
@@ -54,15 +54,15 @@ def m3(l: List[A]) -> None:
     myb = l[0]
     i = 0
     for item in l:
-        Invariant(i >= 0)
+        Invariant(i == len(Previous(item)))
         Invariant(Acc(list_pred(l), 1/2))
         Invariant(Forall(l, lambda a: (Acc(a.a, 1/4), [])))
-        Invariant(myb in l)
+        Invariant(Exists(int, lambda j: 0 <= j and j < len(l) and l[j] is myb))
         assert isinstance(myb, A)
         assert isinstance(myb.a, int)
         assert isinstance(item, A)
         assert isinstance(item.a, int)
-        myb = item
+        myb = l[i]
         i += 1
 
 
@@ -73,11 +73,11 @@ def m4(l: List[A]) -> None:
     myb = l[0]
     i = 0
     for item in l:
-        Invariant(i >= 0)
+        Invariant(i == len(Previous(item)))
         Invariant(Acc(list_pred(l), 1/2))
         Invariant(Forall(l, lambda a: (Acc(a.a, 1/4), [])))
-        Invariant(myb in l)
+        Invariant(Exists(int, lambda j: 0 <= j and j < len(l) and l[j] is myb))
         #:: ExpectedOutput(assert.failed:assertion.false)
         assert isinstance(myb, B) or isinstance(myb.a, bool) or isinstance(item, B) or isinstance(item.a, bool)
-        myb = item
+        myb = l[i]
         i += 1

@@ -6,11 +6,14 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import ast
+import builtins
 from collections import OrderedDict
-from typing import List, Set, Tuple
+from typing import List, Optional, Set, Tuple
 
+from nagini_translation.lib import phases
 from nagini_translation.lib.constants import (
     ARBITRARY_BOOL_FUNC,
+    OBJECT_TYPE,
     ASSERTING_FUNC,
     ASSUMING_FUNC,
     CHECK_DEFINED_FUNC,
@@ -62,13 +65,34 @@ from nagini_translation.lib.typedefs import (
     VarDecl,
 )
 from nagini_translation.lib.util import (
+    defers_annotations,
     InvalidProgramException,
     isNameConstant,
+    UnsupportedException,
     isStr
 )
 from nagini_translation.sif.lib.viper_ast_extended import ViperASTExtended
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
+
+
+class DefinitionScope:
+    """
+    Stands in for the current function while a default argument or a class
+    attribute value is translated: it is evaluated outside any method and
+    has to be a pure expression, so it gets no temporaries.
+    """
+
+    def __init__(self, node: ast.expr) -> None:
+        self.node = node
+
+    def __bool__(self) -> bool:
+        return False
+
+    def create_variable(self, *args, **kwargs) -> None:
+        raise UnsupportedException(
+            self.node, 'default argument or class attribute value that is not '
+                       'a pure expression')
 
 
 class ProgramTranslator(CommonTranslator):
@@ -149,11 +173,13 @@ class ProgramTranslator(CommonTranslator):
             ctx.current_class = field.cls
             ctx.module = field.cls.module
             # Compute the field value
+            ctx.current_function = DefinitionScope(field.value)
             if cls.enum:
                 stmt, value = self.translate_expr(field.value, ctx, self.viper.Int)
                 value = self.viper.FuncApp(cls.name + '__box__', [value], position, info, self.viper.Ref)
             else:
                 stmt, value = self.translate_expr(field.value, ctx)
+            ctx.current_function = None
             if stmt:
                 raise InvalidProgramException('purity.violated', field.node)
             field_position = self.to_position(field.node, ctx)
@@ -167,6 +193,7 @@ class ProgramTranslator(CommonTranslator):
             posts.append(self.viper.Implies(exact_type, has_value,
                                             field_position, info))
         ctx.module = current_module
+        ctx.current_class = None
         # Create a single function that represents all
         return self.viper.Function(root.sil_name, [type_decl], type, [], posts,
                                    None, position, info)
@@ -243,8 +270,6 @@ class ProgramTranslator(CommonTranslator):
         error_var = PythonVar(ERROR_NAME, None,
                               ctx.module.global_module.classes['Exception'])
         error_var.process(ERROR_NAME, self.translator)
-        optional_error_var = error_var if method.declared_exceptions else None
-
         if method.declared_exceptions:
             results.append(error_var.decl)
 
@@ -263,13 +288,15 @@ class ProgramTranslator(CommonTranslator):
             pres = [not_null, new_type] + pres
 
         stmts, end_lbl = self.inline_method(method, args, method.result,
-                                            optional_error_var, ctx)
+                                            error_var, ctx)
 
         self._create_inherit_check_postamble(stmts, end_lbl, ctx)
 
         locals_after = set(method.locals.values())
         locals_diff = locals_after.symmetric_difference(locals_before)
         locals = [var.decl for var in locals_diff]
+        if not method.declared_exceptions:
+            locals.append(error_var.decl)
         result = self.create_method_node(
             ctx, mname, params, results, pres, posts, locals, stmts,
             self.no_position(ctx), self.no_info(ctx),
@@ -289,6 +316,14 @@ class ProgramTranslator(CommonTranslator):
         subtyping.
         """
         assert not method.pure
+        if (method.overrides.interface and method.overrides.type and
+                method.overrides.type.name not in PRIMITIVES):
+            # The contract of a built-in method is in the Viper library; the
+            # override cannot be checked against it.
+            raise InvalidProgramException(
+                method.node, 'invalid.override',
+                '{} overrides the built-in {}.{} and has to be @Pure.'.format(
+                    method.name, method.overrides.cls.name, method.name))
         old_function = ctx.current_function
         ctx.current_function = method.overrides
         pos = self.viper.to_position(method.node, ctx.position, py_node=method)
@@ -446,19 +481,26 @@ class ProgramTranslator(CommonTranslator):
         definition_deps = method.definition_deps
         if method.cls:
             definition_deps = method.cls.definition_deps
+        deferred = defers_annotations(method.module.node)
+
+        def evaluated(annotation: Optional[ast.expr]) -> bool:
+            # Whether the annotation is evaluated when the method is defined.
+            return bool(annotation) and not (
+                deferred or isStr(annotation) or isNameConstant(annotation))
+
         for arg in method.args.values():
-            if (arg.node and arg.node.annotation and
-                    not (isStr(arg.node.annotation) or isNameConstant(arg.node.annotation))):
+            if arg.node and evaluated(arg.node.annotation):
                 type = self.get_target(arg.node.annotation, ctx)
                 if type and not type.python_class.interface and not type.contains_type_var():
                     definition_deps.add((arg.node.annotation, type.python_class,
                                          method.module))
             if arg.default and not arg.default_factory:
+                ctx.current_function = DefinitionScope(arg.default)
                 stmt, expr = self.translate_expr(arg.default, ctx)
+                ctx.current_function = None
                 if not stmt and expr:
                     arg.default_expr = expr
-        if (method.node and method.node.returns and
-                not (isStr(method.node.returns) or isNameConstant(method.node.returns))):
+        if method.node and evaluated(method.node.returns):
             type = self.get_target(method.node.returns, ctx)
             if type and not type.python_class.interface and not type.contains_type_var():
                 definition_deps.add((method.node.returns, type.python_class,
@@ -1290,6 +1332,28 @@ class ProgramTranslator(CommonTranslator):
                                 None, pos, info)
 
 
+    @staticmethod
+    def _inherits_object_eq(cls: PythonClass, module: PythonModule) -> bool:
+        """
+        Whether instances whose dynamic type is exactly ``cls`` compare with
+        object's ``__eq__`` (identity): a user-defined, non-generic class that
+        does not override ``__eq__``. Built-ins compare by value and have
+        their own encodings, as do enums and ADTs; interfaces have no
+        instances of their own.
+        """
+        if module is module.global_module:
+            # Modeled builtins compare by value — except the runtime-defined
+            # builtin exception classes the analyzer registers globally, which
+            # keep object's identity __eq__.
+            builtin_val = getattr(builtins, cls.name, None)
+            if not (cls.node is None and isinstance(builtin_val, type) and
+                    cls.name != 'Exception' and issubclass(builtin_val, Exception)):
+                return False
+        if cls.interface or cls.enum or cls.is_adt or cls.type_vars:
+            return False
+        eq = cls.get_function('__eq__')
+        return eq is not None and eq.cls is not None and eq.cls.name == OBJECT_TYPE
+
     def translate_program(self, modules: List[PythonModule], sil_progs: Program,
                           ctx: Context, selected: Set[str] = None,
                           ignore_global: bool = False) -> Program:
@@ -1420,6 +1484,9 @@ class ProgramTranslator(CommonTranslator):
                 type_funcs.extend(funcs)
                 if axioms:
                     type_axioms.extend(axioms)
+                if self._inherits_object_eq(cls, module):
+                    type_axioms.append(
+                        self.type_factory.create_inherits_object_eq_fact(cls, ctx))
                 for func_name in cls.functions:
                     func = cls.functions[func_name]
                     if func.interface:
@@ -1504,6 +1571,7 @@ class ProgramTranslator(CommonTranslator):
                 # - if its precondition contains predicates or perms
                 functions.append(
                     self.create_global_var_function(var, ctx))
+        functions.extend(ctx.tuple_constructors.values())
 
         # IO operations are translated last because we need to know which functions are
         # used with Eval.
@@ -1574,7 +1642,8 @@ class ProgramTranslator(CommonTranslator):
                                   methods, self.no_position(ctx),
                                   self.no_info(ctx))
 
-        chopped_prog = self.viper.chopper.chop(prog, self.viper.to_set(all_used_names))
+        with phases.phase('chop'):
+            chopped_prog = self.viper.chopper.chop(prog, self.viper.to_set(all_used_names))
 
         if chopped_prog.isEmpty():
             print('Nothing was selected to be verified.')

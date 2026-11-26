@@ -12,6 +12,10 @@
         "__cast__": {
             "args": ["PyType", "object"],
             "type": "object"
+        },
+        "__id__": {
+            "args": ["object"],
+            "type": "__prim__int"
         }
     },
     "methods": {
@@ -58,7 +62,7 @@
         },
         "reverse": {
             "args": ["list"],
-            "type": "list",
+            "type": null,
             "MustTerminate": true
         },
         "copy": {
@@ -69,6 +73,23 @@
         "remove": {
             "args": ["list", "object"],
             "type": null,
+            "MustTerminate": true
+        },
+        "pop": {
+            "args": ["list"],
+            "type": "object",
+            "generic_type": 0,
+            "MustTerminate": true
+        },
+        "__delitem__": {
+            "args": ["list", "__prim__int"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__delitem_slice__": {
+            "args": ["list", "slice"],
+            "type": null,
+            "display_name": "__delitem__",
             "MustTerminate": true
         },
         "__setitem__": {
@@ -176,6 +197,10 @@
         "__sil_seq__": {
             "args": ["set"],
             "type": "__prim__Seq"
+        },
+        "__sil_set__": {
+            "args": ["set"],
+            "type": "__prim__Set"
         }
     },
     "type_vars": 1,
@@ -196,6 +221,17 @@
         "__setitem__": {
             "args": ["dict", "object", "object"],
             "type": null,
+            "MustTerminate": true
+        },
+        "__delitem__": {
+            "args": ["dict", "object"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "pop": {
+            "args": ["dict", "object"],
+            "type": "object",
+            "generic_type": 1,
             "MustTerminate": true
         },
         "__iter__": {
@@ -234,6 +270,10 @@
         "__sil_seq__": {
             "args": ["dict"],
             "type": "__prim__Seq"
+        },
+        "__sil_set__": {
+            "args": ["dict"],
+            "type": "__prim__Set"
         }
     },
     "type_vars": 2,
@@ -552,11 +592,84 @@
         "__mod__": {
             "args": ["str", "tuple"],
             "type": "str"
+        },
+        "__getitem__": {
+            "args": ["str", "__prim__int"],
+            "type": "str"
+        },
+        "__getitem_slice__": {
+            "args": ["str", "slice"],
+            "type": "str",
+            "display_name": "__getitem__"
+        },
+        "__contains__": {
+            "args": ["str", "str"],
+            "type": "__prim__bool"
+        },
+        "startswith": {
+            "args": ["str", "str"],
+            "type": "__prim__bool"
+        },
+        "endswith": {
+            "args": ["str", "str"],
+            "type": "__prim__bool"
+        },
+        "__mul__": {
+            "args": ["str", "__prim__int"],
+            "type": "str"
+        },
+        "lower": {
+            "args": ["str"],
+            "type": "str"
+        },
+        "upper": {
+            "args": ["str"],
+            "type": "str"
+        },
+        "strip": {
+            "args": ["str", "str"],
+            "type": "str"
+        },
+        "lstrip": {
+            "args": ["str", "str"],
+            "type": "str"
+        },
+        "rstrip": {
+            "args": ["str", "str"],
+            "type": "str"
+        },
+        "replace": {
+            "args": ["str", "str", "str"],
+            "type": "str"
+        },
+        "isdigit": {
+            "args": ["str"],
+            "type": "__prim__bool"
+        },
+        "isalpha": {
+            "args": ["str"],
+            "type": "__prim__bool"
+        },
+        "isalnum": {
+            "args": ["str"],
+            "type": "__prim__bool"
+        },
+        "isupper": {
+            "args": ["str"],
+            "type": "__prim__bool"
+        },
+        "islower": {
+            "args": ["str"],
+            "type": "__prim__bool"
+        },
+        "isspace": {
+            "args": ["str"],
+            "type": "__prim__bool"
         }
     },
     "methods": {
         "split": {
-            "args": ["str"],
+            "args": ["str", "str"],
             "type": "list",
             "MustTerminate": true
         },
@@ -575,6 +688,28 @@
     "ghost_alias": "GStr"
 },
 "bytes": {
+    "methods": {
+        "__initFromInt__": {
+            "args": ["int"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__initFromList__": {
+            "args": ["list"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__initFromBytearray__": {
+            "args": ["bytearray"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__iter__": {
+            "args": ["bytes"],
+            "type": "Iterator",
+            "MustTerminate": true
+        }
+    },
     "functions": {
         "__len__": {
             "args": ["bytes"],
@@ -895,11 +1030,13 @@
         },
         "update": {
             "args": ["PSeq", "__prim__int", "object"],
-            "type": "PSeq"
+            "type": "PSeq",
+            "generic_type": -2
         },
         "__add__": {
             "args": ["PSeq", "PSeq"],
-            "type": "PSeq"
+            "type": "PSeq",
+            "generic_type": -2
         },
         "__eq__": {
             "args": ["PSeq", "PSeq"],
@@ -994,11 +1131,13 @@
         },
         "__add__": {
             "args": ["PSet", "PSet"],
-            "type": "PSet"
+            "type": "PSet",
+            "generic_type": -2
         },
         "__sub__": {
             "args": ["PSet", "PSet"],
-            "type": "PSet"
+            "type": "PSet",
+            "generic_type": -2
         },
         "__eq__": {
             "args": ["PSet", "PSet"],
@@ -1032,11 +1171,13 @@
         },
         "__add__": {
             "args": ["PMultiset", "PMultiset"],
-            "type": "PMultiset"
+            "type": "PMultiset",
+            "generic_type": -2
         },
         "__sub__": {
             "args": ["PMultiset", "PMultiset"],
-            "type": "PMultiset"
+            "type": "PMultiset",
+            "generic_type": -2
         },
         "__eq__": {
             "args": ["PMultiset", "PMultiset"],
@@ -1185,6 +1326,10 @@
         },
         "sum": {
             "args": ["list"],
+            "type": "__prim__int"
+        },
+        "ord": {
+            "args": ["str"],
             "type": "__prim__int"
         }
     },
