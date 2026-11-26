@@ -12,11 +12,11 @@ from nagini_translation.lib import silver_nodes as sil
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.program_nodes import (
     PythonClass,
-    PythonExceptionHandler,
     PythonGlobalVar,
     PythonIOOperation,
     PythonMethod,
     PythonModule,
+    PythonNode,
     PythonTryBlock,
     PythonType,
     PythonVar,
@@ -338,13 +338,10 @@ class AbstractTranslator(metaclass=ABCMeta):
         return translator.create_while_node(
             ctx, cond, invariants, locals, body, node)
 
-    def translate_handler(self, handler: PythonExceptionHandler,
-                          ctx: Context) -> List[Stmt]:
-        return self.config.method_translator.translate_handler(handler, ctx)
-
-    def translate_finally(self, block: PythonTryBlock,
-                          ctx: Context) -> List[Stmt]:
-        return self.config.method_translator.translate_finally(block, ctx)
+    def translate_try_handlers(self, container: PythonNode,
+                               ctx: Context) -> List[Stmt]:
+        return self.config.method_translator.translate_try_handlers(container,
+                                                                    ctx)
 
     def translate_float_literal(self, lit: float, node: ast.AST, ctx: Context) -> Expr:
         return self.config.expr_translator.translate_float_literal(lit, node, ctx)

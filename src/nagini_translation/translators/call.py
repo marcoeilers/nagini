@@ -48,6 +48,7 @@ from nagini_translation.lib.constants import (
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
     chain_cond_exp,
+    Exit,
     GenericType,
     MethodType,
     OptionalType,
@@ -1129,11 +1130,20 @@ class CallTranslator(CommonTranslator):
 
         for stmt in method.node.body[start:end]:
             stmts += self.translate_stmt(stmt, ctx)
+        stmts += self._translate_inline_end(ctx)
 
         ctx.inlined_calls.remove(method)
         ctx.var_aliases = old_var_aliases
         ctx.label_aliases = old_label_aliases
         return stmts, end_label
+
+    def _translate_inline_end(self, ctx: Context) -> List[Stmt]:
+        """
+        Returns the statements for control that reaches the end of the body of
+        the method being inlined.
+        """
+        return self.translate_function_exit(Exit.NORMAL, self.no_position(ctx),
+                                            ctx)
 
     def _inline_call(self, method: PythonMethod, node: ast.Call, is_super: bool,
                      inline_reason: str, ctx: Context) -> StmtsAndExpr:
@@ -1174,8 +1184,8 @@ class CallTranslator(CommonTranslator):
                                                            method.type,
                                                            self.translator)
         optional_error_var = None
-        error_var = self.get_error_var(node, ctx)
         if method.declared_exceptions or method.inline:
+            error_var = self.get_error_var(node, ctx)
             var = PythonVar(ERROR_NAME, None,
                             ctx.module.global_module.classes['Exception'])
             var._ref = error_var

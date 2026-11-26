@@ -1561,6 +1561,18 @@ class PythonExceptionHandler(PythonNode):
         self.exception_name = exception_name
 
 
+class Exit(Enum):
+    """
+    The ways in which control leaves a statement. The value is what the
+    variable of a finally block holds while control is on that way.
+    """
+    NORMAL = 0
+    RETURN = 1
+    RAISE = 2
+    BREAK = 3
+    CONTINUE = 4
+
+
 class PythonTryBlock(PythonNode):
     """
     Represents a try-block, which may include except-blocks, an else-block
@@ -1583,58 +1595,92 @@ class PythonTryBlock(PythonNode):
         self.protected_region = protected_region
         self.finally_var = None
         self.error_var = None
+        self.result_var = None
         self.method = method
         self.node_factory = node_factory
         self.finally_name = None
+        self.entry_names = {}
         self.post_name = None
         self.with_item = None
         self.with_var = None
         self.handler_aliases = {}
         method.labels.append(try_name)
 
-    def get_finally_var(self, translator: 'Translator') -> 'PythonVar':
+    @property
+    def has_finally(self) -> bool:
         """
-        Lazily creates and returns the variable in which we store the
-        information how control flow should proceed after the execution
-        of a finally block. We use a value of 0 to say normal flow, 1 to say
-        we returned normally, i.e. jump to the end of the function asap, 2
-        to say we returned exceptionally, i.e. jump to the end of the function
-        moving through exception handlers.
+        Whether code runs whenever the block is left: a finally block or the
+        exit method of a with block.
         """
-        if self.finally_var:
-            return self.finally_var
-        sil_name = self.method.get_fresh_name('try_finally')
-        global_module = self.method.module.global_module
-        int_type = global_module.classes[PRIMITIVE_INT_TYPE]
-        result = self.node_factory.create_python_var(sil_name, None,
-                                                     int_type)
-        result.process(sil_name, translator)
-        if isinstance(self.method, PythonMethod):
-            self.method.locals[sil_name] = result
-        self.finally_var = result
-        return result
+        return bool(self.finally_block or self.with_item)
 
-    def get_error_var(self, translator: 'Translator') -> 'PythonVar':
+    @property
+    def finally_returns(self) -> bool:
         """
-        Lazily creates and returns the variable in which any exceptions thrown
-        within the block will be stored.
+        Whether the finally block contains a return statement, which assigns
+        the result while that of an earlier return may be pending.
         """
-        if self.error_var:
-            return self.error_var
-        sil_name = self.method.get_fresh_name('error')
-        exc_type = self.method.module.global_module.classes['Exception']
-        result = self.node_factory.create_python_var(sil_name, None,
-                                                     exc_type)
+        return any(isinstance(node, ast.Return)
+                   for stmt in self.finally_block or []
+                   for node in ast.walk(stmt))
+
+    def _create_var(self, name: str, type: 'PythonType',
+                    translator: 'Translator') -> 'PythonVar':
+        sil_name = self.method.get_fresh_name(name)
+        result = self.node_factory.create_python_var(sil_name, None, type)
         result.process(sil_name, translator)
         result.show_in_ce = False
         if isinstance(self.method, PythonMethod):
             self.method.locals[sil_name] = result
-        self.error_var = result
         return result
+
+    def get_finally_var(self, translator: 'Translator') -> 'PythonVar':
+        """
+        Lazily creates and returns the variable that holds, while the finally
+        block runs, the value of the Exit by which the block is being left,
+        which is how control proceeds after the finally block.
+        """
+        if not self.finally_var:
+            global_module = self.method.module.global_module
+            self.finally_var = self._create_var(
+                'try_finally', global_module.classes[PRIMITIVE_INT_TYPE],
+                translator)
+        return self.finally_var
+
+    def get_error_var(self, translator: 'Translator') -> 'PythonVar':
+        """
+        Lazily creates and returns the variable that holds, while the finally
+        block runs, the exception that is raised again after it.
+        """
+        if not self.error_var:
+            global_module = self.method.module.global_module
+            self.error_var = self._create_var(
+                'error', global_module.classes['Exception'], translator)
+        return self.error_var
+
+    def get_result_var(self, translator: 'Translator') -> Optional['PythonVar']:
+        """
+        Lazily creates and returns the variable that holds, while the finally
+        block runs, the result that is returned after it. There is none if the
+        finally block cannot change the result.
+        """
+        type = getattr(self.method, 'type', None)
+        if not self.result_var and type and self.finally_returns:
+            self.result_var = self._create_var('result', type, translator)
+        return self.result_var
+
+    @property
+    def vars(self) -> List['PythonVar']:
+        """
+        The variables of the block that exist.
+        """
+        return [var for var in (self.finally_var, self.error_var,
+                                self.result_var) if var]
 
     def process(self, translator: 'Translator') -> None:
         self.get_error_var(translator)
         self.get_finally_var(translator)
+        self.get_result_var(translator)
 
 
 class PythonVarBase(PythonNode):

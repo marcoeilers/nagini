@@ -6,13 +6,13 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import ast
-from typing import List
+from typing import List, Tuple, Union
 
 from nagini_translation.lib.constants import ARBITRARY_BOOL_FUNC
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import PythonClass, PythonTryBlock, PythonVar
 from nagini_translation.lib.typedefs import Expr, Position, Seqn, Stmt, Var, VarDecl
-from nagini_translation.lib.util import flatten, get_body_indices, get_surrounding_try_blocks
+from nagini_translation.lib.util import flatten, get_body_indices
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.statement import StatementTranslator
 
@@ -49,9 +49,42 @@ class SIFStatementTranslator(StatementTranslator):
     def translate_stmt_Continue(self, node: ast.Continue, ctx: Context) -> List[Stmt]:
         return [self.viper.Continue(self.to_position(node, ctx), self.no_info(ctx))]
 
+    def _keep_exit_vars(self, node: Union[ast.While, ast.For], ctx: Context
+                        ) -> Tuple[List[Stmt], List[Stmt], List[Stmt]]:
+        """
+        A return in a loop body does not leave the loop here, so the loop makes
+        the result and the error of the function unknown. They are saved
+        before the loop and restored after it, which only happens for an
+        execution that has not returned. The loop body and the else block read
+        only the error, so only the error is restored there.
+        """
+        function = ctx.actual_function
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+
+        def keep(var: PythonVar) -> Tuple[Stmt, Stmt]:
+            copy = ctx.current_function.create_variable('saved', var.type,
+                                                        self.translator)
+            return (self.viper.LocalVarAssign(copy.ref(), var.ref(), position, info),
+                    self.viper.LocalVarAssign(var.ref(), copy.ref(), position, info))
+
+        save = []
+        in_loop = []
+        after_loop = []
+        if function.type:
+            saved, restored = keep(ctx.result_var)
+            save.append(saved)
+            after_loop.append(restored)
+        if function.declared_exceptions or function.inline:
+            saved, restored = keep(ctx.error_var)
+            save.append(saved)
+            in_loop.append(restored)
+            after_loop.append(restored)
+        return save, in_loop, after_loop
+
     def _while_postamble(self, node: ast.While, post_label: str,
                          ctx: Context) -> List[Stmt]:
-        return self._set_result_none(ctx)
+        return []
 
     def _translate_while_body(self, node: ast.While, ctx: Context,
                               end_label: str) -> List[Stmt]:

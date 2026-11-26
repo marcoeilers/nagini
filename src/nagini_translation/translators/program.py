@@ -243,8 +243,6 @@ class ProgramTranslator(CommonTranslator):
         error_var = PythonVar(ERROR_NAME, None,
                               ctx.module.global_module.classes['Exception'])
         error_var.process(ERROR_NAME, self.translator)
-        optional_error_var = error_var if method.declared_exceptions else None
-
         if method.declared_exceptions:
             results.append(error_var.decl)
 
@@ -263,13 +261,15 @@ class ProgramTranslator(CommonTranslator):
             pres = [not_null, new_type] + pres
 
         stmts, end_lbl = self.inline_method(method, args, method.result,
-                                            optional_error_var, ctx)
+                                            error_var, ctx)
 
         self._create_inherit_check_postamble(stmts, end_lbl, ctx)
 
         locals_after = set(method.locals.values())
         locals_diff = locals_after.symmetric_difference(locals_before)
         locals = [var.decl for var in locals_diff]
+        if not method.declared_exceptions:
+            locals.append(error_var.decl)
         result = self.create_method_node(
             ctx, mname, params, results, pres, posts, locals, stmts,
             self.no_position(ctx), self.no_info(ctx),

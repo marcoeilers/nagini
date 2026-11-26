@@ -22,6 +22,10 @@ class SIFCallTranslator(CallTranslator):
     def get_error_var(self, stmt: ast.AST, ctx: Context) -> 'silver.ast.LocalVarRef':
         return ctx.current_function.error_var.ref()
 
+    def _translate_inline_end(self, ctx: Context) -> List[Stmt]:
+        # With the extended AST the end of the body needs no statements.
+        return []
+
     def inline_method(self, method: PythonMethod, args: List[PythonVar],
                       result_var: PythonVar, error_var: PythonVar,
                       ctx: Context) -> Tuple[List[Stmt], 'silver.ast.Label']:
