@@ -24,7 +24,7 @@ from nagini_translation.lib.util import (
     char_columns,
     construct_lambda_prefix,
 )
-from typing import List, NamedTuple, Optional
+from typing import Dict, List, NamedTuple, Optional
 
 
 logger = logging.getLogger('nagini_translation.lib.typeinfo')
@@ -41,11 +41,6 @@ class HasTypeObject(TypeQuery[bool]):
 
     def visit_overloaded(self, t: mypy.types.Overloaded) -> bool:
         return t.is_type_obj() or super().visit_overloaded(t)
-
-
-# (path, module name) of a checked file -> name -> path of the modules its last
-# build imported
-_IMPORTED = {}
 
 
 # A message of mypy or of the type collector; only mypy's has the column and
@@ -445,6 +440,7 @@ class TypeInfo:
         self.type_vars = {}
         self.ghost_names = {}
         self.module_name = None
+        self.imports = None  # name -> path of the modules the checked file imports
 
     def _create_options(self, strict_optional: bool):
         """
@@ -479,28 +475,34 @@ class TypeInfo:
         full only for the sources of a build whose text it is given: a module
         it loads from its cache has no AST, and one it finds among the
         installed packages is checked only as far as its interface needs. So
-        the build's sources are the file and the modules its last build
-        imported, each where mypy finds it, and it is repeated until those are
-        the modules it imports.
+        the file is built alone to learn what it imports, and then together
+        with those modules, each where mypy found it.
         """
-        key = (filename, module_name)
-        imported = _IMPORTED.pop(key, {})
-        while True:
-            sources = [self._source(filename, module_name, base_dir)]
-            sources += [self._source(path, name, base_dir)
-                        for name, path in imported.items() if os.path.isfile(path)]
-            result = mypy.build.build(sources, options,
-                                      extra_plugins=[ContractPlugin(options)])
-            find = result.manager.find_module_cache.find_module
-            read = {name: find(name) for name in self._imported(result)[1:]}
-            read = {name: path for name, path in read.items()
-                    if isinstance(path, str) and os.path.isfile(path)}
-            given = read.items() <= imported.items()
-            imported = read
-            if given:
-                if imported:
-                    _IMPORTED[key] = imported
+        if self.imports is None:
+            result = self._mypy(filename, module_name, base_dir, options, {})
+            self.imports = self._import_paths(result)
+            if not self.imports:
                 return result
+        result = self._mypy(filename, module_name, base_dir, options, self.imports)
+        if self._import_paths(result) != self.imports:
+            raise Exception('mypy builds of %s differ in what it imports.' % filename)
+        return result
+
+    def _import_paths(self, result) -> Dict[str, str]:
+        """Name -> path of the modules the main module of the given mypy build
+        imports, see _imported."""
+        paths = {name: result.graph[name].path
+                 for name in self._imported(result)[1:]}
+        return {name: path for name, path in paths.items()
+                if path and os.path.isfile(path)}
+
+    def _mypy(self, filename: str, module_name: str, base_dir: str, options,
+              imports: Dict[str, str]):
+        sources = [self._source(filename, module_name, base_dir)]
+        sources += [self._source(path, name, base_dir)
+                    for name, path in imports.items()]
+        return mypy.build.build(sources, options,
+                                extra_plugins=[ContractPlugin(options)])
 
     def _source(self, path: str, module_name: str, base_dir: str) -> BuildSource:
         with tokenize.open(path) as f:
@@ -530,8 +532,13 @@ class TypeInfo:
         import."""
         names = [next(iter(result.graph))]
         for name in names:
-            for dep_name in result.graph[name].dep_line_map:
-                if (dep_name in result.graph and dep_name not in IGNORED_IMPORTS
+            state = result.graph[name]
+            for dep_name in state.dep_line_map:
+                # a module loaded from the cache also lists the modules its
+                # types refer to
+                if (state.priorities.get(dep_name) != mypy.build.PRI_INDIRECT
+                        and dep_name in result.graph
+                        and dep_name not in IGNORED_IMPORTS
                         and dep_name not in names):
                     names.append(dep_name)
         return names
@@ -547,11 +554,7 @@ class TypeInfo:
         def report_errors(errors: List[str]) -> None:
             for error in errors:
                 logger.info(error)
-            # mypy 1.8 appends "(it only ever returns None)" to
-            # func-returns-value messages; strip it for stable error texts.
-            raise TypeException([
-                self._char_positions(e).replace(' (it only ever returns None)', '')
-                for e in errors])
+            raise TypeException([self._char_positions(e) for e in errors])
 
         module_name = None
         if base_dir is not None:
