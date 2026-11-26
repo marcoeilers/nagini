@@ -320,7 +320,7 @@ class Analyzer(ast.NodeVisitor):
                         name, object_class, self.module.global_module,
                         target_type=cls, index=i)
             else:
-                cls.ignore_type_args = True
+                cls.non_generic_builtin = True
             if 'extends' in if_cls:
                 superclass = self.find_or_create_class(
                     if_cls['extends'], module=self.module.global_module)
@@ -1671,7 +1671,7 @@ class Analyzer(ast.NodeVisitor):
             result = None
         elif self.types.is_instance_type(mypy_type):
             result = self.convert_type(mypy_type.type, node)
-            if mypy_type.args and not result.ignore_type_args:
+            if mypy_type.args and not result.non_generic_builtin:
                 args = [self.convert_type(arg, node) for arg in mypy_type.args]
                 if mypy_type.type.name == 'enumerate':
                     # We cheat and represent type enumerate as a list of pairs.

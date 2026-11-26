@@ -19,7 +19,7 @@ from nagini_translation.mypy_patches.visitor import TraverserVisitor
 from nagini_translation.lib.util import (
     construct_lambda_prefix,
 )
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 
 logger = logging.getLogger('nagini_translation.lib.typeinfo')
@@ -349,7 +349,7 @@ class TypeInfo:
         self.type_vars = {}
         self.ghost_names = {}
         self.module_name = None
-        self.imports = {}  # name -> path of the modules the checked file imports
+        self.imports = None  # name -> path of the modules the checked file imports
 
     def _create_options(self, strict_optional: bool):
         """
@@ -384,23 +384,34 @@ class TypeInfo:
         full only for the sources of a build whose text it is given: a module
         it loads from its cache has no AST, and one it finds among the
         installed packages is checked only as far as its interface needs. So
-        the build's sources are the file and the modules it imports, each
-        where mypy finds it, and it is repeated until those are the modules it
-        imports.
+        the file is built alone to learn what it imports, and then together
+        with those modules, each where mypy found it.
         """
-        while True:
-            sources = [self._source(filename, module_name, base_dir)]
-            sources += [self._source(path, name, base_dir)
-                        for name, path in self.imports.items()]
-            result = mypy.build.build(sources, options,
-                                      extra_plugins=[ContractPlugin(options)])
-            imports = {name: result.graph[name].path
-                       for name in self._imported(result)[1:]}
-            imports = {name: path for name, path in imports.items()
-                       if path and os.path.isfile(path)}
-            if imports == self.imports:
+        if self.imports is None:
+            result = self._mypy(filename, module_name, base_dir, options, {})
+            self.imports = self._import_paths(result)
+            if not self.imports:
                 return result
-            self.imports = imports
+        result = self._mypy(filename, module_name, base_dir, options, self.imports)
+        if self._import_paths(result) != self.imports:
+            raise Exception('mypy builds of %s differ in what it imports.' % filename)
+        return result
+
+    def _import_paths(self, result) -> Dict[str, str]:
+        """Name -> path of the modules the main module of the given mypy build
+        imports, see _imported."""
+        paths = {name: result.graph[name].path
+                 for name in self._imported(result)[1:]}
+        return {name: path for name, path in paths.items()
+                if path and os.path.isfile(path)}
+
+    def _mypy(self, filename: str, module_name: str, base_dir: str, options,
+              imports: Dict[str, str]):
+        sources = [self._source(filename, module_name, base_dir)]
+        sources += [self._source(path, name, base_dir)
+                    for name, path in imports.items()]
+        return mypy.build.build(sources, options,
+                                extra_plugins=[ContractPlugin(options)])
 
     def _source(self, path: str, module_name: str, base_dir: str) -> BuildSource:
         with tokenize.open(path) as f:

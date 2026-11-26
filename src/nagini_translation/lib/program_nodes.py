@@ -446,7 +446,10 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self.defined = False
         self._has_classmethod = False
         self.type_vars = OrderedDict()
-        self.ignore_type_args = False  # builtin modelled without type parameters
+        # True for built-ins which Nagini treats as non-generic (so type_vars
+        # is empty). In particular, if mypy treats them as generic (such as
+        # slice) the type arguments are ignored.
+        self.non_generic_builtin = False
         self.definition_deps = set()
         self.is_adt = name == 'ADT' # This flag is set when the class is
         # defining an algebraic data type or one of its constructors.
